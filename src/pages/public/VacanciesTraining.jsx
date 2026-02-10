@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Container,
   Typography,
@@ -10,15 +9,15 @@ import {
   Chip,
   Box,
   Divider,
-  Paper
-} from '@mui/material';
+  Paper,
+} from "@mui/material";
 import {
   BusinessCenter as BusinessCenterIcon,
   LocationOn as LocationIcon,
   Schedule as ScheduleIcon,
   School as EducationIcon,
-  MonetizationOn as SalaryIcon
-} from '@mui/icons-material';
+  MonetizationOn as SalaryIcon,
+} from "@mui/icons-material";
 
 const vacancies = [
   {
@@ -29,9 +28,10 @@ const vacancies = [
     type: "Full-time",
     experience: "2+ years",
     salary: "$80,000 - $100,000",
-    description: "We're looking for an experienced React developer to join our team and help build innovative web applications.",
+    description:
+      "We're looking for an experienced React developer to join our team and help build innovative web applications.",
     skills: ["React", "TypeScript", "Material-UI", "Redux"],
-    posted: "2 days ago"
+    posted: "2 days ago",
   },
   {
     id: 2,
@@ -41,9 +41,10 @@ const vacancies = [
     type: "Contract",
     experience: "3+ years",
     salary: "$70,000 - $90,000",
-    description: "Join our design team to create beautiful and intuitive user experiences for our products.",
+    description:
+      "Join our design team to create beautiful and intuitive user experiences for our products.",
     skills: ["Figma", "Adobe XD", "User Research", "Prototyping"],
-    posted: "1 week ago"
+    posted: "1 week ago",
   },
   {
     id: 3,
@@ -53,10 +54,24 @@ const vacancies = [
     type: "Full-time",
     experience: "5+ years",
     salary: "$110,000 - $140,000",
-    description: "Help us build and maintain our cloud infrastructure and CI/CD pipelines.",
+    description:
+      "Help us build and maintain our cloud infrastructure and CI/CD pipelines.",
     skills: ["AWS", "Docker", "Kubernetes", "Terraform"],
-    posted: "3 days ago"
-  }
+    posted: "3 days ago",
+  },
+  {
+    id: 4,
+    title: "Data Scientist",
+    department: "Analytics",
+    location: "London, UK",
+    type: "Full-time",
+    experience: "5+ years",
+    salary: "$110,000 - $140,000",
+    description:
+      "Analyze complex datasets and build predictive models to drive business decisions.",
+    skills: ["Python", "Machine Learning", "SQL", "TensorFlow"],
+    posted: "3 days ago",
+  },
 ];
 
 const trainingPrograms = [
@@ -66,8 +81,9 @@ const trainingPrograms = [
     duration: "4 weeks",
     schedule: "Mon & Wed, 6-9 PM",
     instructor: "John Smith",
-    description: "Master advanced React patterns, state management, and performance optimization.",
-    skills: ["Hooks", "Context API", "Performance", "Testing"]
+    description:
+      "Master advanced React patterns, state management, and performance optimization.",
+    skills: ["Hooks", "Context API", "Performance", "Testing"],
   },
   {
     id: 2,
@@ -75,89 +91,133 @@ const trainingPrograms = [
     duration: "6 weeks",
     schedule: "Tue & Thu, 7-9 PM",
     instructor: "Sarah Johnson",
-    description: "Learn to design and implement scalable cloud solutions on AWS.",
-    skills: ["AWS", "Microservices", "Serverless", "Security"]
-  }
+    description:
+      "Learn to design and implement scalable cloud solutions on AWS.",
+    skills: ["AWS", "Microservices", "Serverless", "Security"],
+  },
 ];
 
 const VacanciesTraining = () => {
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
+    <Container maxWidth="lg" sx={{ py: 6 }}>
+      {/* Page Header */}
+      <Typography
+        variant="h4"
+        component="h1"
+        gutterBottom
+        sx={{ fontWeight: 700 }}
+      >
         Career Opportunities
       </Typography>
       <Typography variant="subtitle1" color="text.secondary" gutterBottom>
         Explore our current job openings and professional development programs
       </Typography>
-      
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h5" component="h2" gutterBottom sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          fontWeight: 600
-        }}>
-          <BusinessCenterIcon sx={{ mr: 1 }} />
+
+      {/* Vacancies Section */}
+      <Box sx={{ my: 6 }}>
+        <Typography
+          variant="h5"
+          component="h2"
+          gutterBottom
+          sx={{ display: "flex", alignItems: "center", fontWeight: 600 }}
+        >
+          <BusinessCenterIcon sx={{ mr: 1, color: "primary.main" }} />
           Current Vacancies
         </Typography>
-        <Divider sx={{ mb: 3 }} />
-        
+        <Divider sx={{ mb: 4 }} />
+
         <Grid container spacing={3}>
           {vacancies.map((vacancy) => (
-            <Grid item xs={12} md={6} lg={4} key={vacancy.id}>
-              <Card elevation={3} sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column',
-                minHeight: '500px' // Set minimum height for all cards
-              }}>
+            <Grid item size={{ xs: 12, md: 6 }} key={vacancy.id}>
+              <Card
+                elevation={4}
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                  "&:hover": {
+                    transform: "translateY(-5px)",
+                    boxShadow: 6,
+                  },
+                }}
+              >
                 <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography variant="h6" component="h3" gutterBottom>
+                  <Typography
+                    variant="h6"
+                    component="h3"
+                    gutterBottom
+                    sx={{ fontWeight: 600 }}
+                  >
                     {vacancy.title}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    gutterBottom
+                  >
                     {vacancy.department}
                   </Typography>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
-                    <LocationIcon fontSize="small" color="action" sx={{ mr: 1 }} />
-                    <Typography variant="body2">{vacancy.location}</Typography>
+
+                  <Box
+                    sx={{ display: "flex", flexWrap: "wrap", mt: 1, gap: 1 }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <LocationIcon
+                        fontSize="small"
+                        sx={{ mr: 0.5, color: "action.active" }}
+                      />
+                      <Typography variant="body2">
+                        {vacancy.location}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <ScheduleIcon
+                        fontSize="small"
+                        sx={{ mr: 0.5, color: "action.active" }}
+                      />
+                      <Typography variant="body2">{vacancy.type}</Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <EducationIcon
+                        fontSize="small"
+                        sx={{ mr: 0.5, color: "action.active" }}
+                      />
+                      <Typography variant="body2">
+                        {vacancy.experience} experience
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <SalaryIcon
+                        fontSize="small"
+                        sx={{ mr: 0.5, color: "action.active" }}
+                      />
+                      <Typography variant="body2">{vacancy.salary}</Typography>
+                    </Box>
                   </Box>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
-                    <ScheduleIcon fontSize="small" color="action" sx={{ mr: 1 }} />
-                    <Typography variant="body2">{vacancy.type}</Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
-                    <EducationIcon fontSize="small" color="action" sx={{ mr: 1 }} />
-                    <Typography variant="body2">{vacancy.experience} experience</Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
-                    <SalaryIcon fontSize="small" color="action" sx={{ mr: 1 }} />
-                    <Typography variant="body2">{vacancy.salary}</Typography>
-                  </Box>
-                  
+
                   <Typography variant="body1" paragraph sx={{ mt: 2 }}>
                     {vacancy.description}
                   </Typography>
-                  
+
                   <Box sx={{ mt: 2 }}>
                     {vacancy.skills.map((skill) => (
-                      <Chip 
-                        key={skill} 
-                        label={skill} 
-                        size="small" 
-                        sx={{ mr: 1, mb: 1 }} 
+                      <Chip
+                        key={skill}
+                        label={skill}
+                        size="small"
+                        sx={{ mr: 1, mb: 1 }}
+                        color="primary"
                       />
                     ))}
                   </Box>
                 </CardContent>
-                <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
+
+                <CardActions sx={{ justifyContent: "space-between", p: 2 }}>
                   <Typography variant="caption" color="text.secondary">
                     Posted {vacancy.posted}
                   </Typography>
-                  <Button size="small" variant="contained">
+                  <Button size="small" variant="contained" color="primary">
                     Apply Now
                   </Button>
                 </CardActions>
@@ -166,61 +226,89 @@ const VacanciesTraining = () => {
           ))}
         </Grid>
       </Box>
-      
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h5" component="h2" gutterBottom sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          fontWeight: 600
-        }}>
-          <EducationIcon sx={{ mr: 1 }} />
+
+      {/* Training Programs Section */}
+      <Box sx={{ my: 6 }}>
+        <Typography
+          variant="h5"
+          component="h2"
+          gutterBottom
+          sx={{ display: "flex", alignItems: "center", fontWeight: 600 }}
+        >
+          <EducationIcon sx={{ mr: 1, color: "primary.main" }} />
           Training Programs
         </Typography>
-        <Divider sx={{ mb: 3 }} />
-        
+        <Divider sx={{ mb: 4 }} />
+
         <Grid container spacing={3}>
           {trainingPrograms.map((program) => (
-            <Grid item xs={12} md={6} key={program.id}>
-              <Paper elevation={2} sx={{ 
-                p: 3, 
-                height: '100%',
-                minHeight: '500px', // Match the same height as vacancy cards
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
+            <Grid item size={{ xs: 12, md: 6 }} key={program.id}>
+              <Paper
+                elevation={3}
+                sx={{
+                  p: 3,
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                  "&:hover": {
+                    transform: "translateY(-5px)",
+                    boxShadow: 6,
+                  },
+                }}
+              >
                 <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="h6" component="h3" gutterBottom>
+                  <Typography
+                    variant="h6"
+                    gutterBottom
+                    sx={{ fontWeight: 600 }}
+                  >
                     {program.title}
                   </Typography>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
-                    <ScheduleIcon fontSize="small" color="action" sx={{ mr: 1 }} />
-                    <Typography variant="body2">{program.duration} • {program.schedule}</Typography>
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      mb: 2,
+                      gap: 1,
+                    }}
+                  >
+                    <ScheduleIcon
+                      fontSize="small"
+                      sx={{ color: "action.active" }}
+                    />
+                    <Typography variant="body2">
+                      {program.duration} • {program.schedule}
+                    </Typography>
                   </Box>
-                  
-                  <Typography variant="body1" paragraph sx={{ mt: 2 }}>
+
+                  <Typography variant="body1" paragraph>
                     {program.description}
                   </Typography>
-                  
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+
+                  <Typography variant="subtitle2" gutterBottom>
                     Instructor: {program.instructor}
                   </Typography>
-                  
-                  <Box sx={{ mt: 2 }}>
+
+                  <Box
+                    sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 1 }}
+                  >
                     {program.skills.map((skill) => (
-                      <Chip 
-                        key={skill} 
-                        label={skill} 
-                        size="small" 
+                      <Chip
+                        key={skill}
+                        label={skill}
+                        size="small"
                         color="primary"
                         variant="outlined"
-                        sx={{ mr: 1, mb: 1 }} 
                       />
                     ))}
                   </Box>
                 </Box>
-                
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+
+                <Box
+                  sx={{ mt: 3, display: "flex", justifyContent: "flex-end" }}
+                >
                   <Button variant="contained" color="primary">
                     Register Now
                   </Button>
