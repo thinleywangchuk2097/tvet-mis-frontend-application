@@ -72,6 +72,32 @@ const vacancies = [
     skills: ["Python", "Machine Learning", "SQL", "TensorFlow"],
     posted: "3 days ago",
   },
+  {
+    id: 5,
+    title: "Data Analyst",
+    department: "Analytics",
+    location: "London, UK",
+    type: "Full-time",
+    experience: "5+ years",
+    salary: "$110,000 - $140,000",
+    description:
+      "Analyze complex datasets and build predictive models to drive business decisions.",
+    skills: ["Python", "Machine Learning", "SQL", "TensorFlow"],
+    posted: "3 days ago",
+  },
+   {
+    id: 6,
+    title: "Data Engineer",
+    department: "Analytics",
+    location: "London, UK",
+    type: "Full-time",
+    experience: "5+ years",
+    salary: "$110,000 - $140,000",
+    description:
+      "Design and build scalable data pipelines and infrastructure for data analysis.",
+    skills: ["Python", "Spark", "SQL", "Airflow"],
+    posted: "3 days ago",
+  },
 ];
 
 const trainingPrograms = [
@@ -99,7 +125,7 @@ const trainingPrograms = [
 
 const VacanciesTraining = () => {
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    <Container maxWidth="xl" sx={{ py: 6 }}>
       {/* Page Header */}
       <Typography
         variant="h4"
@@ -114,7 +140,7 @@ const VacanciesTraining = () => {
       </Typography>
 
       {/* Vacancies Section */}
-      <Box sx={{ my: 6 }}>
+      <Box sx={{ my: 3 }}>
         <Typography
           variant="h5"
           component="h2"
@@ -128,7 +154,7 @@ const VacanciesTraining = () => {
 
         <Grid container spacing={3}>
           {vacancies.map((vacancy) => (
-            <Grid item size={{ xs: 12, md: 6 }} key={vacancy.id}>
+            <Grid item size={{ xs: 12, md: 4 }} key={vacancy.id}>
               <Card
                 elevation={4}
                 sx={{
