@@ -264,7 +264,6 @@ const PublicIndex = () => {
           </Button>
         </Box>
       </Box>
-
       <Container maxWidth="xl" sx={{ pt: 6, pb: 10 }}>
         {/* Title */}
         <Box sx={{ textAlign: "center", mb: 4 }}>
@@ -282,7 +281,6 @@ const PublicIndex = () => {
             Recent Applications
           </Typography>
         </Box>
-
         {/* Tables */}
         <Box
           sx={{
@@ -367,7 +365,6 @@ const PublicIndex = () => {
             </TableContainer>
           ))}
         </Box>
-
         {/* Charts */}
         <Box
           sx={{
@@ -403,7 +400,6 @@ const PublicIndex = () => {
               </PieChart>
             </ResponsiveContainer>
           </Paper>
-
           {/* Line Chart */}
           <Paper
             sx={{ flex: 1, p: { xs: 3, md: 6 }, borderRadius: 2, boxShadow: 2 }}
@@ -439,118 +435,113 @@ const PublicIndex = () => {
           </Paper>
         </Box>
       </Container>
+      {/* Modal */}
+      <Dialog
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Application Details</DialogTitle>
+        <DialogContent dividers>
+          <TableContainer
+            component={Paper}
+            sx={{
+              borderRadius: 2,
+              boxShadow: 2,
+              border: "1px solid #e0e0e0",
+            }}
+          >
+            <Table sx={{ borderCollapse: "collapse" }}>
+              <TableHead>
+                <TableRow>
+                  {[
+                    "Application No",
+                    "Name",
+                    "Location",
+                    "Service",
+                    "Status",
+                  ].map((header) => (
+                    <TableCell
+                      key={header}
+                      sx={{
+                        fontWeight: 700,
+                        textAlign: "center",
+                        border: "1px solid #e0e0e0",
+                        backgroundColor: "#f5f7fa",
+                      }}
+                    >
+                      {header}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {selectedApplication ? (
+                  <TableRow>
+                    {[
+                      "application_no",
+                      "name",
+                      "location",
+                      "service",
+                      "status",
+                    ].map((key) => (
+                      <TableCell
+                        key={key}
+                        sx={{
+                          textAlign: "center",
+                          py: 1.5,
+                          border: "1px solid #e0e0e0",
+                          fontWeight: key === "status" ? 600 : 400,
+                          color:
+                            key === "status"
+                              ? getStatusColor(selectedApplication[key])
+                              : "inherit",
+                        }}
+                      >
+                        {selectedApplication[key]}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      sx={{
+                        textAlign: "center",
+                        py: 2,
+                        color: "error.main",
+                        border: "1px solid #e0e0e0",
+                        fontWeight: 500,
+                      }}
+                    >
+                      No data found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
 
-     {/* Modal */}
-<Dialog
-  open={openModal}
-  onClose={() => setOpenModal(false)}
-  maxWidth="md"
-  fullWidth
->
-  <DialogTitle sx={{ fontWeight: 600 }}>
-    Application Details
-  </DialogTitle>
-
-  <DialogContent dividers>
-    <TableContainer
-      component={Paper}
-      sx={{
-        borderRadius: 2,
-        boxShadow: 2,
-        border: "1px solid #e0e0e0",
-      }}
-    >
-      <Table sx={{ borderCollapse: "collapse" }}>
-        <TableHead>
-          <TableRow>
-            {[
-              "Application No",
-              "Name",
-              "Location",
-              "Service",
-              "Status",
-            ].map((header) => (
-              <TableCell
-                key={header}
-                sx={{
-                  fontWeight: 700,
-                  textAlign: "center",
-                  border: "1px solid #e0e0e0",
-                  backgroundColor: "#f5f7fa",
-                }}
-              >
-                {header}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-
-        <TableBody>
-          {selectedApplication ? (
-            <TableRow>
-              {[
-                "application_no",
-                "name",
-                "location",
-                "service",
-                "status",
-              ].map((key) => (
-                <TableCell
-                  key={key}
-                  sx={{
-                    textAlign: "center",
-                    py: 1.5,
-                    border: "1px solid #e0e0e0",
-                    fontWeight: key === "status" ? 600 : 400,
-                    color:
-                      key === "status"
-                        ? getStatusColor(selectedApplication[key])
-                        : "inherit",
-                  }}
-                >
-                  {selectedApplication[key]}
-                </TableCell>
-              ))}
-            </TableRow>
-          ) : (
-            <TableRow>
-              <TableCell
-                colSpan={5}
-                sx={{
-                  textAlign: "center",
-                  py: 2,
-                  color: "error.main",
-                  border: "1px solid #e0e0e0",
-                  fontWeight: 500,
-                }}
-              >
-                No data found
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  </DialogContent>
-
-  <DialogActions>
-    <Button
-      onClick={() => setOpenModal(false)}
-      variant="outlined"
-      color="error"
-      sx={{
-        borderWidth: 2,
-        px: 3,
-        "&:hover": {
-          backgroundColor: "error.main",
-          color: "#fff",
-        },
-      }}
-    >
-      Close
-    </Button>
-  </DialogActions>
-</Dialog>
+        <DialogActions>
+          <Button
+            onClick={() => setOpenModal(false)}
+            variant="outlined"
+            color="error"
+            sx={{
+              borderWidth: 2,
+              px: 3,
+              "&:hover": {
+                backgroundColor: "error.main",
+                color: "#fff",
+              },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

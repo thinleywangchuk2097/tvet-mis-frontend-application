@@ -172,7 +172,7 @@ const Login = () => {
       />
 
       <Container maxWidth="xs" sx={{ position: "relative", zIndex: 2 }}>
-        <Paper elevation={3} sx={{ p: 3, mt: 6 }}>
+        <Paper elevation={3} sx={{ p: 3, mt: 2 }}>
           <Box display="flex" flexDirection="column" alignItems="center">
             {/* SIGN IN */}
             <Typography
