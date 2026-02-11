@@ -55,7 +55,8 @@ const Header = () => {
     setMobileReportsOpen(false);
   };
 
-  const handleRegisterOpen = (event) => setRegisterAnchorEl(event.currentTarget);
+  const handleRegisterOpen = (event) =>
+    setRegisterAnchorEl(event.currentTarget);
   const handleRegisterClose = () => setRegisterAnchorEl(null);
   const handleCoursesOpen = (event) => setCoursesAnchorEl(event.currentTarget);
   const handleCoursesClose = () => setCoursesAnchorEl(null);
@@ -69,7 +70,7 @@ const Header = () => {
 
   const navItems = [
     { label: "Vacancies & Trainings", path: "/vancies-training" },
-    { label: "Career Information", path: "/career-info" },
+    { label: "Assessment", path: "/assessment-info" },
     { label: "Feedback/Complaint", path: "/feedback" },
   ];
 
@@ -99,6 +100,28 @@ const Header = () => {
     { label: "Courses Accredited", path: "/reports/courses-accredited" },
   ];
 
+  const renderMenuItems = (items, closeFn) =>
+    items.flatMap((item, index) => [
+      <MenuItem
+        key={item.path}
+        onClick={() => {
+          navigate(item.path);
+          closeFn();
+        }}
+        sx={{
+          py: 0.4,
+          px: 1.75,
+          minHeight: "auto",
+          fontSize: "0.88rem",
+        }}
+      >
+        {item.label}
+      </MenuItem>,
+      index < items.length - 1 && (
+        <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
+      ),
+    ]);
+
   return (
     <AppBar
       position="static"
@@ -127,6 +150,7 @@ const Header = () => {
             TVET Management Information System(TVET-MIS)
           </Typography>
         </Box>
+
         {/* Desktop Nav */}
         {!isMobile && (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -138,23 +162,22 @@ const Header = () => {
                   color: "#fff",
                   textTransform: "none",
                   position: "relative",
-                  "&:hover": {
-                    "&::after": {
-                      content: '""',
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "2px",
-                      bgcolor: "#fff",
-                    },
+                  "&:hover::after": {
+                    content: '""',
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "2px",
+                    bgcolor: "#fff",
                   },
                 }}
               >
                 {item.label}
               </Button>
             ))}
-            {/* Desktop Register Menu */}
+
+            {/* Registration */}
             <Box>
               <Button
                 onClick={handleRegisterOpen}
@@ -163,16 +186,14 @@ const Header = () => {
                   color: "#fff",
                   textTransform: "none",
                   position: "relative",
-                  "&:hover": {
-                    "&::after": {
-                      content: '""',
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "2px",
-                      bgcolor: "#fff",
-                    },
+                  "&:hover::after": {
+                    content: '""',
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "2px",
+                    bgcolor: "#fff",
                   },
                 }}
               >
@@ -182,51 +203,34 @@ const Header = () => {
                 anchorEl={registerAnchorEl}
                 open={registerOpen}
                 onClose={handleRegisterClose}
-                TransitionComponent={Fade}
-                PaperProps={{
-                  sx: {
-                    mt: 1,
-                    minWidth: 220,
-                    p: 0,
-                    borderRadius: 1.5,
-                    overflow: "visible",
-                    "&::before": {
-                      content: '""',
-                      position: "absolute",
-                      top: 0,
-                      left: 24,
-                      width: 10,
-                      height: 10,
-                      bgcolor: "#fff",
-                      transform: "translateY(-50%) rotate(45deg)",
+                slots={{ transition: Fade }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      mt: 1,
+                      minWidth: 220,
+                      p: 0,
+                      borderRadius: 1.5,
+                      overflow: "visible",
+                      "&::before": {
+                        content: '""',
+                        position: "absolute",
+                        top: 0,
+                        left: 24,
+                        width: 10,
+                        height: 10,
+                        bgcolor: "#fff",
+                        transform: "translateY(-50%) rotate(45deg)",
+                      },
                     },
                   },
                 }}
               >
-                {registerItems.map((item, index) => (
-                  <React.Fragment key={item.path}>
-                    <MenuItem
-                      onClick={() => {
-                        navigate(item.path);
-                        handleRegisterClose();
-                      }}
-                      sx={{
-                        py: 0.4,
-                        px: 1.75,
-                        minHeight: "auto",
-                        fontSize: "0.88rem",
-                      }}
-                    >
-                      {item.label}
-                    </MenuItem>
-                    {index < registerItems.length - 1 && (
-                      <Divider sx={{ my: 0.25 }} />
-                    )}
-                  </React.Fragment>
-                ))}
+                {renderMenuItems(registerItems, handleRegisterClose)}
               </Menu>
             </Box>
-            {/* Desktop Courses Menu */}
+
+            {/* Courses */}
             <Box>
               <Button
                 onClick={handleCoursesOpen}
@@ -235,16 +239,14 @@ const Header = () => {
                   color: "#fff",
                   textTransform: "none",
                   position: "relative",
-                  "&:hover": {
-                    "&::after": {
-                      content: '""',
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "2px",
-                      bgcolor: "#fff",
-                    },
+                  "&:hover::after": {
+                    content: '""',
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "2px",
+                    bgcolor: "#fff",
                   },
                 }}
               >
@@ -254,51 +256,34 @@ const Header = () => {
                 anchorEl={coursesAnchorEl}
                 open={coursesOpen}
                 onClose={handleCoursesClose}
-                TransitionComponent={Fade}
-                PaperProps={{
-                  sx: {
-                    mt: 1,
-                    minWidth: 220,
-                    p: 0,
-                    borderRadius: 1.5,
-                    overflow: "visible",
-                    "&::before": {
-                      content: '""',
-                      position: "absolute",
-                      top: 0,
-                      left: 24,
-                      width: 10,
-                      height: 10,
-                      bgcolor: "#fff",
-                      transform: "translateY(-50%) rotate(45deg)",
+                slots={{ transition: Fade }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      mt: 1,
+                      minWidth: 220,
+                      p: 0,
+                      borderRadius: 1.5,
+                      overflow: "visible",
+                      "&::before": {
+                        content: '""',
+                        position: "absolute",
+                        top: 0,
+                        left: 24,
+                        width: 10,
+                        height: 10,
+                        bgcolor: "#fff",
+                        transform: "translateY(-50%) rotate(45deg)",
+                      },
                     },
                   },
                 }}
               >
-                {courses.map((item, index) => (
-                  <React.Fragment key={item.path}>
-                    <MenuItem
-                      onClick={() => {
-                        navigate(item.path);
-                        handleCoursesClose();
-                      }}
-                      sx={{
-                        py: 0.4,
-                        px: 1.75,
-                        minHeight: "auto",
-                        fontSize: "0.88rem",
-                      }}
-                    >
-                      {item.label}
-                    </MenuItem>
-                    {index < courses.length - 1 && (
-                      <Divider sx={{ my: 0.25 }} />
-                    )}
-                  </React.Fragment>
-                ))}
+                {renderMenuItems(courses, handleCoursesClose)}
               </Menu>
             </Box>
-            {/* Desktop Reports Menu */}
+
+            {/* Reports */}
             <Box>
               <Button
                 onClick={handleReportsOpen}
@@ -307,16 +292,14 @@ const Header = () => {
                   color: "#fff",
                   textTransform: "none",
                   position: "relative",
-                  "&:hover": {
-                    "&::after": {
-                      content: '""',
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "2px",
-                      bgcolor: "#fff",
-                    },
+                  "&:hover::after": {
+                    content: '""',
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "2px",
+                    bgcolor: "#fff",
                   },
                 }}
               >
@@ -326,58 +309,41 @@ const Header = () => {
                 anchorEl={reportsAnchorEl}
                 open={reportsOpen}
                 onClose={handleReportsClose}
-                TransitionComponent={Fade}
-                PaperProps={{
-                  sx: {
-                    mt: 1,
-                    minWidth: 220,
-                    p: 0,
-                    borderRadius: 1.5,
-                    overflow: "visible",
-                    "&::before": {
-                      content: '""',
-                      position: "absolute",
-                      top: 0,
-                      left: 24,
-                      width: 10,
-                      height: 10,
-                      bgcolor: "#fff",
-                      transform: "translateY(-50%) rotate(45deg)",
+                slots={{ transition: Fade }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      mt: 1,
+                      minWidth: 220,
+                      p: 0,
+                      borderRadius: 1.5,
+                      overflow: "visible",
+                      "&::before": {
+                        content: '""',
+                        position: "absolute",
+                        top: 0,
+                        left: 24,
+                        width: 10,
+                        height: 10,
+                        bgcolor: "#fff",
+                        transform: "translateY(-50%) rotate(45deg)",
+                      },
                     },
                   },
                 }}
               >
-                {reports.map((item, index) => (
-                  <React.Fragment key={item.path}>
-                    <MenuItem
-                      onClick={() => {
-                        navigate(item.path);
-                        handleReportsClose();
-                      }}
-                      sx={{
-                        py: 0.4,
-                        px: 1.75,
-                        minHeight: "auto",
-                        fontSize: "0.88rem",
-                      }}
-                    >
-                      {item.label}
-                    </MenuItem>
-                    {index < reports.length - 1 && (
-                      <Divider sx={{ my: 0.25 }} />
-                    )}
-                  </React.Fragment>
-                ))}
+                {renderMenuItems(reports, handleReportsClose)}
               </Menu>
             </Box>
           </Box>
         )}
+
         {/* Login */}
         <form onSubmit={formik.handleSubmit} style={{ margin: 0 }}>
           <Button
             type="submit"
             variant="contained"
-            color="primary"
+            startIcon={<LoginIcon />}
             sx={{
               padding: { xs: "2px 8px", sm: "2px 12px" },
               fontWeight: "bold",
@@ -388,137 +354,134 @@ const Header = () => {
                 boxShadow: "0 6px 12px rgba(0,0,0,0.2)",
               },
             }}
-            startIcon={<LoginIcon />}
           >
             {isMobile ? "" : "Login"}
           </Button>
         </form>
+
         {/* Mobile Menu */}
         {isMobile && (
           <Menu
             anchorEl={anchorEl}
             open={open}
             onClose={handleMenuClose}
-            PaperProps={{ sx: { minWidth: 240, p: 0, borderRadius: 1.5 } }}
+            slotProps={{
+              paper: {
+                sx: {
+                  minWidth: 240,
+                  p: 0,
+                  borderRadius: 1.5,
+                },
+              },
+            }}
           >
-            {navItems.map((item, index) => (
-              <React.Fragment key={item.path}>
-                <MenuItem
-                  onClick={() => {
-                    navigate(item.path);
-                    handleMenuClose();
-                  }}
-                  sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
-                >
-                  {item.label}
-                </MenuItem>
-                {index < navItems.length - 1 && <Divider sx={{ my: 0.25 }} />}
-              </React.Fragment>
-            ))}
-            <Divider sx={{ my: 0.5 }} />
-            {/* Mobile Register */}
+            {navItems.flatMap((item, index) => [
+              <MenuItem
+                key={item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  handleMenuClose();
+                }}
+                sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
+              >
+                {item.label}
+              </MenuItem>,
+              index < navItems.length - 1 && (
+                <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
+              ),
+            ])}
+
+            <Divider sx={{ my: 0.25 }} />
+
+            {/* Registration */}
             <MenuItem
               onClick={() => setMobileRegisterOpen((prev) => !prev)}
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                py: 0.5,
-                px: 1.75,
-              }}
+              sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
             >
               Registration{" "}
               {mobileRegisterOpen ? <ExpandLess /> : <ExpandMore />}
             </MenuItem>
             <Collapse in={mobileRegisterOpen} timeout="auto" unmountOnExit>
-              {registerItems.map((item, index) => (
-                <React.Fragment key={item.path}>
-                  <MenuItem
-                    onClick={() => {
-                      navigate(item.path);
-                      handleMenuClose();
-                    }}
-                    sx={{
-                      py: 0.35,
-                      px: 3,
-                      minHeight: "auto",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    {item.label}
-                  </MenuItem>
-                  {index < registerItems.length - 1 && (
-                    <Divider sx={{ my: 0.2 }} />
-                  )}
-                </React.Fragment>
-              ))}
+              {registerItems.flatMap((item, index) => [
+                <MenuItem
+                  key={item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    handleMenuClose();
+                  }}
+                  sx={{
+                    py: 0.35,
+                    px: 3,
+                    minHeight: "auto",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {item.label}
+                </MenuItem>,
+                index < registerItems.length - 1 && (
+                  <Divider key={`${item.path}-divider`} sx={{ my: 0.2 }} />
+                ),
+              ])}
             </Collapse>
-
-            {/* Mobile Courses */}
+            <Divider sx={{ my: 0.25 }} />
+            {/* Courses */}
             <MenuItem
               onClick={() => setMobileCoursesOpen((prev) => !prev)}
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                py: 0.5,
-                px: 1.75,
-              }}
+              sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
             >
               Courses {mobileCoursesOpen ? <ExpandLess /> : <ExpandMore />}
             </MenuItem>
             <Collapse in={mobileCoursesOpen} timeout="auto" unmountOnExit>
-              {courses.map((item, index) => (
-                <React.Fragment key={item.path}>
-                  <MenuItem
-                    onClick={() => {
-                      navigate(item.path);
-                      handleMenuClose();
-                    }}
-                    sx={{
-                      py: 0.35,
-                      px: 3,
-                      minHeight: "auto",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    {item.label}
-                  </MenuItem>
-                  {index < courses.length - 1 && <Divider sx={{ my: 0.2 }} />}
-                </React.Fragment>
-              ))}
+              {courses.flatMap((item, index) => [
+                <MenuItem
+                  key={item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    handleMenuClose();
+                  }}
+                  sx={{
+                    py: 0.35,
+                    px: 3,
+                    minHeight: "auto",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {item.label}
+                </MenuItem>,
+                index < courses.length - 1 && (
+                  <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
+                ),
+              ])}
             </Collapse>
-
-            {/* Mobile Reports */}
+            <Divider sx={{ my: 0.25 }} />
+            {/* Reports */}
             <MenuItem
               onClick={() => setMobileReportsOpen((prev) => !prev)}
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                py: 0.5,
-                px: 1.75,
-              }}
+              sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
             >
               Reports {mobileReportsOpen ? <ExpandLess /> : <ExpandMore />}
             </MenuItem>
             <Collapse in={mobileReportsOpen} timeout="auto" unmountOnExit>
-              {reports.map((item, index) => (
-                <React.Fragment key={item.path}>
-                  <MenuItem
-                    onClick={() => {
-                      navigate(item.path);
-                      handleMenuClose();
-                    }}
-                    sx={{
-                      py: 0.35,
-                      px: 3,
-                      minHeight: "auto",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    {item.label}
-                  </MenuItem>
-                  {index < reports.length - 1 && <Divider sx={{ my: 0.2 }} />}
-                </React.Fragment>
-              ))}
+              {reports.flatMap((item, index) => [
+                <MenuItem
+                  key={item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    handleMenuClose();
+                  }}
+                  sx={{
+                    py: 0.35,
+                    px: 3,
+                    minHeight: "auto",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {item.label}
+                </MenuItem>,
+                index < reports.length - 1 && (
+                  <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
+                ),
+              ])}
             </Collapse>
           </Menu>
         )}

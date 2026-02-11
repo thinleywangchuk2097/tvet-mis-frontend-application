@@ -17,14 +17,12 @@ import FileUplaod from "../../components/File/FileUplaod";
 import ComplaintService from "../../api/services/ComplaintService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { useTheme } from "@mui/material/styles"; // <-- added
 
 /* ---------------- Validation ---------------- */
 const validationSchema = Yup.object({
   name: Yup.string().required("Name is required"),
   citizenshipNo: Yup.string()
     .matches(/^\d{11}$/, "Citizenship No must be exactly 11 digits")
-    .required("Citizenship No is required")
     .required("Citizenship No is required"),
   gewog: Yup.string().required("Gewog is required"),
   dzongkhag: Yup.string().required("Dzongkhag is required"),
@@ -48,8 +46,6 @@ const validationSchema = Yup.object({
 });
 
 const ComplaintIssue = () => {
-  const theme = useTheme(); // <-- using theme
-
   const access_token = useSelector((state) => state.auth.accessToken);
   const current_roleId = useSelector((state) => state.auth.current_roleId);
   const locationId = useSelector((state) => state.auth.locationId);
@@ -137,27 +133,45 @@ const ComplaintIssue = () => {
       sx={{
         p: 4,
         borderRadius: 3,
-        backgroundColor: theme.palette.background.default, // theme aware
         width: "100%",
       }}
     >
       {/* Page Title */}
-      <Typography
-        variant="h5"
-        fontWeight={700}
-        align="center"
-        sx={{ mb: 4, letterSpacing: 0.3 }}
-      >
-        Complaint Submission
-      </Typography>
-
+      <Box textAlign="center">
+        <Typography
+          variant="h5"
+          fontWeight={700}
+          sx={{
+            mb: 4,
+            letterSpacing: 0.3,
+            position: "relative",
+            display: "inline-block",
+            cursor: "pointer",
+            "&::after": {
+              content: '""',
+              position: "absolute",
+              left: "50%",
+              bottom: -4,
+              width: "0%",
+              height: "2px",
+              backgroundColor: "#1e88e6",
+              transform: "translateX(-50%)",
+              transition: "width 0.3s ease-in-out",
+            },
+            "&:hover::after": {
+              width: "100%",
+            },
+          }}
+        >
+          Complaint Issue Form
+        </Typography>
+      </Box>
       <form onSubmit={formik.handleSubmit}>
         {/* Applicant Information */}
         <Box
           sx={{
             p: 3,
             mb: 4,
-            backgroundColor: theme.palette.background.paper, // theme aware
             borderRadius: 2,
             boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
           }}
@@ -268,7 +282,6 @@ const ComplaintIssue = () => {
           sx={{
             p: 3,
             mb: 4,
-            backgroundColor: theme.palette.background.paper, // theme aware
             borderRadius: 2,
             boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
           }}
@@ -358,7 +371,6 @@ const ComplaintIssue = () => {
           sx={{
             p: 3,
             mb: 4,
-            backgroundColor: theme.palette.background.paper, // theme aware
             borderRadius: 2,
             boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
           }}
@@ -374,7 +386,6 @@ const ComplaintIssue = () => {
               border: "1px dashed",
               borderColor: "divider",
               borderRadius: 2,
-              backgroundColor: theme.palette.action.hover, // theme aware
             }}
           >
             <FileUplaod
@@ -399,7 +410,6 @@ const ComplaintIssue = () => {
         <Box
           sx={{
             p: 3,
-            backgroundColor: theme.palette.background.paper, // theme aware
             borderRadius: 2,
             boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
           }}

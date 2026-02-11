@@ -16,11 +16,8 @@ import { useSelector } from "react-redux";
 import { useParams } from "react-router-dom";
 import ComplaintService from "../../api/services/ComplaintService";
 import FileDownload from "../../components/File/FileDownload";
-import { useTheme } from "@mui/material/styles"; // <-- added
 
 const ComplaintView = () => {
-  const theme = useTheme(); // <-- theme hook
-
   const { application_no } = useParams();
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,11 +78,9 @@ const ComplaintView = () => {
       sx={{
         p: 4,
         borderRadius: 3,
-        backgroundColor: theme.palette.background.default, // theme aware
         width: "100%",
       }}
     >
-      {/* Title */}
       <Typography
         variant="h5"
         fontWeight={700}
@@ -100,7 +95,6 @@ const ComplaintView = () => {
         sx={{
           p: 3,
           mb: 4,
-          backgroundColor: theme.palette.background.paper, // theme aware
           borderRadius: 2,
           boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
         }}
@@ -116,11 +110,7 @@ const ComplaintView = () => {
               fullWidth
               label="Full Name"
               value={complaint.applicant_name || "N/A"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
@@ -130,11 +120,7 @@ const ComplaintView = () => {
               fullWidth
               label="Email Address"
               value={complaint.emaild_id || "N/A"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
@@ -144,11 +130,7 @@ const ComplaintView = () => {
               fullWidth
               label="Primary Phone"
               value={complaint.mobile_no || "N/A"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
@@ -158,11 +140,7 @@ const ComplaintView = () => {
               fullWidth
               label="Alternate Phone"
               value={complaint.alternate_phone || "Not provided"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
@@ -172,11 +150,7 @@ const ComplaintView = () => {
               fullWidth
               label="Address"
               value={complaint.address || "Address not provided"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               multiline
               rows={2}
               size="small"
@@ -190,7 +164,6 @@ const ComplaintView = () => {
         sx={{
           p: 3,
           mb: 4,
-          backgroundColor: theme.palette.background.paper, // theme aware
           borderRadius: 2,
           boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
         }}
@@ -206,11 +179,7 @@ const ComplaintView = () => {
               fullWidth
               label="Complaint Type"
               value={complaint.complaint_type || "N/A"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
@@ -220,11 +189,7 @@ const ComplaintView = () => {
               fullWidth
               label="Category"
               value={complaint.category || "General"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
@@ -234,11 +199,7 @@ const ComplaintView = () => {
               fullWidth
               label="Priority"
               value={complaint.priority_level || "Medium"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
@@ -248,11 +209,7 @@ const ComplaintView = () => {
               fullWidth
               label="Description"
               value={complaint.description || "No description provided"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               multiline
               rows={3}
               size="small"
@@ -266,7 +223,6 @@ const ComplaintView = () => {
         sx={{
           p: 3,
           mb: 4,
-          backgroundColor: theme.palette.background.paper, // theme aware
           borderRadius: 2,
           boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
         }}
@@ -275,56 +231,44 @@ const ComplaintView = () => {
           System Information
         </Typography>
         <Divider sx={{ my: 2 }} />
+
         <Grid container spacing={2}>
           <Grid item size={{ xs: 12, md: 4 }}>
             <TextField
               fullWidth
               label="Created Date"
               value={complaint.created_date || "N/A"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
+
           <Grid item size={{ xs: 12, md: 4 }}>
             <TextField
               fullWidth
               label="Last Updated"
               value={complaint.updated_date || "N/A"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
+
           <Grid item size={{ xs: 12, md: 4 }}>
             <TextField
               fullWidth
               label="Assigned To"
               value={complaint.assigned_to || "Not assigned"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               size="small"
             />
           </Grid>
+
           <Grid item size={{ xs: 12 }}>
             <TextField
               fullWidth
               label="Admin Remarks"
               value={complaint.admin_remarks || "No remarks added"}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
-              }}
+              slotProps={{ input: { readOnly: true } }}
               multiline
               rows={2}
               size="small"
@@ -338,7 +282,6 @@ const ComplaintView = () => {
         sx={{
           p: 3,
           mb: 4,
-          backgroundColor: theme.palette.background.paper, // theme aware
           borderRadius: 2,
           boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
         }}
@@ -355,7 +298,6 @@ const ComplaintView = () => {
       <Box
         sx={{
           p: 3,
-          backgroundColor: theme.palette.background.paper, // theme aware
           borderRadius: 2,
           boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
         }}

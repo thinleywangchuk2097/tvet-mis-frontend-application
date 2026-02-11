@@ -637,8 +637,7 @@ const DropdownIndex = () => {
                   p: 2,
                   maxHeight: 200,
                   overflowY: "auto",
-                  minHeight: 100,
-                  backgroundColor: formik.values.dropdownChild.length === 0 ? "#f9f9f9" : "transparent",
+                  minHeight: 100
                 }}
               >
                 {formik.values.dropdownChild.length === 0 ? (

@@ -13,7 +13,6 @@ import { useSelector } from "react-redux";
 import { publicRoutes, privateRoutes } from "./routes/appRoutes";
 import { jwtDecode } from "jwt-decode";
 import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 
 const useAuth = () => {
   const token = useSelector((state) => state.auth.accessToken);
@@ -54,14 +53,18 @@ const App = () => {
       <ToastContainer
         position="top-right"
         autoClose={3000}
-        hideProgressBar={false}// Show progress bar (more polished)
+        hideProgressBar={false} // Show progress bar
         newestOnTop={false}
         closeOnClick
         rtl={false}
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        style={{ marginTop: "50px" }} // Add top margin here
+        style={{ marginTop: "50px" }} //top margin
+        toastStyle={{
+          minHeight: "37px", // reduce height
+          fontSize: "0.85rem", //smaller text
+        }}
       />
       <Routes>
         <Route>
