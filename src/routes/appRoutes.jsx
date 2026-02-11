@@ -18,6 +18,16 @@ import DashboardIndex from '../pages/dashboard/DashboardIndex';
 import ComplaintView from '../pages/complaint/ComplaintView';
 import GenerateQRCode from '../pages/auth/bhutanndi/GenerateQRCode';
 
+//public registration routes paths
+import Assessor from '../pages/public/registration/Assessor';
+import AssessmentCentre from '../pages/public/registration/AssessmentCentre';
+import Accreditor from '../pages/public/registration/Accreditor';
+import InstituteProposal from '../pages/public/registration/InstituteProposal'; 
+import InstituteRegistration from '../pages/public/registration/InstituteRegistration';
+import QMSAuditor from '../pages/public/registration/QMSAuditor';
+import Trainer from '../pages/public/registration/Trainer';
+
+
 //public routes ..
 export const publicRoutes = [
   { path: '/', element: <PublicIndex /> },
@@ -25,7 +35,14 @@ export const publicRoutes = [
   { path: '/vancies-training', element: <VacanciesTraining /> },
   { path: '/forgot-password', element: <ForgotPassword /> },
   { path: '/reset-password', element: <ResetPassword /> },
-  { path: '/login-ndi-qrcode', element: <GenerateQRCode /> }
+  { path: '/login-ndi-qrcode', element: <GenerateQRCode /> },
+  { path: '/register/assessor', element: <Assessor /> },
+  { path: '/register/assessment-centre', element: <AssessmentCentre /> },
+  { path: '/register/accreditor', element: <Accreditor /> },
+  { path: '/register/institute-proposal', element: <InstituteProposal /> },
+  { path: '/register/institute', element: <InstituteRegistration /> },
+  { path: '/register/qms-auditor', element: <QMSAuditor /> },
+  { path: '/register/trainer', element: <Trainer /> }
 ];
 
 //private routes ..

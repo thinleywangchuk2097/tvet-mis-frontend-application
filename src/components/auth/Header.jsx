@@ -36,7 +36,7 @@ const Header = ({ onToggleSidebar }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const username = useSelector((state) => state.userProfile.userName);
   const current_role = useSelector(
-    (state) => state.userProfile.current_role_name
+    (state) => state.userProfile.current_role_name,
   );
   const userId = useSelector((state) => state.auth.userId);
   const access_token = useSelector((state) => state.auth.accessToken);
@@ -57,7 +57,7 @@ const Header = ({ onToggleSidebar }) => {
 
         const response = await UserProfileService.getUserProfileImage(
           userId,
-          access_token
+          access_token,
         );
 
         if (response.status === 200) {
@@ -129,7 +129,9 @@ const Header = ({ onToggleSidebar }) => {
           )}
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
+          <Tooltip
+            title={`Switch to ${mode === "light" ? "dark" : "light"} mode`}
+          >
             <IconButton
               color="inherit"
               onClick={() => dispatch(toggleTheme())}
@@ -166,7 +168,6 @@ const Header = ({ onToggleSidebar }) => {
               </IconButton>
             </Tooltip>
           </Box>
-
           <Menu
             anchorEl={anchorEl}
             id="account-menu"
