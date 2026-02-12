@@ -1,4 +1,4 @@
-import UserDashboard from "./UserDashboard";
+import TraineeDashboard from "./TraineeDashboard";
 import AdminDashboard from "./AdminDashboard";
 import Dashboard from "./Dashboard";
 import { useSelector } from "react-redux";
@@ -9,7 +9,7 @@ const DashboardIndex = () => {
     case "Admin":
       return <AdminDashboard />;
     case "Trainee":
-      return <UserDashboard />;
+      return <TraineeDashboard />;
     case "Executives":
       return <AdminDashboard />; 
     default:

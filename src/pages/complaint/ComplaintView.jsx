@@ -9,13 +9,13 @@ import {
   TextField,
   Divider,
 } from "@mui/material";
-import { Download, AttachFile, Cancel } from "@mui/icons-material";
+import { Cancel } from "@mui/icons-material";
 import FastForwardIcon from "@mui/icons-material/FastForward";
 import TaskIcon from "@mui/icons-material/Task";
 import { useSelector } from "react-redux";
 import { useParams } from "react-router-dom";
 import ComplaintService from "../../api/services/ComplaintService";
-import FileDownload from "../../components/File/FileDownload";
+import FileDownload from "../../components/file/FileDownload";
 
 const ComplaintView = () => {
   const { application_no } = useParams();

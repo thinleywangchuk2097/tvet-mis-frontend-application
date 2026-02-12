@@ -9,10 +9,10 @@ import DropdownIndex from '../pages/common/DropdownIndex';
 import ReportIndex from '../pages/report/ReportIndex';
 import SwitchRole from '../pages/auth/SwitchRole';
 import VacanciesTraining from '../pages/public/VacanciesTraining';
-import MyTask from '../pages/TaskList/MyTaskList';
-import GroupTaskList from '../pages/TaskList/GroupTaskList';
+import MyTask from '../pages/tasklist/MyTaskList';
+import GroupTaskList from '../pages/tasklist/GroupTaskList';
 import ResetPassword from '../pages/auth/ResetPassword';
-import UserDashboard from '../pages/dashboard/UserDashboard';
+import TraineeDashboard from '../pages/dashboard/TraineeDashboard';
 import  ComplaintIssue  from '../pages/complaint/ComplaintIssue';
 import DashboardIndex from '../pages/dashboard/DashboardIndex';
 import ComplaintView from '../pages/complaint/ComplaintView';
@@ -57,7 +57,7 @@ export const privateRoutes = [
   { path: '/report-index', element: <ReportIndex /> },
   { path: '/my-task-index', element: <MyTask /> },
   { path: '/group-task-index', element: <GroupTaskList /> },
-  { path: '/user-dashboard', element: <UserDashboard /> },
+  { path: '/trainee-dashboard', element: <TraineeDashboard /> },
   { path: '/complaint-service', element: <ComplaintIssue /> },
   { path: '/view-complaint-details/:application_no', element: <ComplaintView /> },
 

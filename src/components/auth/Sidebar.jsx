@@ -8,16 +8,16 @@ import {
   Collapse,
   ListItemIcon,
   Typography,
-  useTheme,
   Avatar,
   ListItemButton,
+  useTheme,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
-import MiscellaneousServicesIcon from '@mui/icons-material/MiscellaneousServices';
+import MiscellaneousServicesIcon from "@mui/icons-material/MiscellaneousServices";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import BuildIcon from "@mui/icons-material/Build";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
@@ -28,9 +28,7 @@ const Sidebar = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-
   const privileges = useSelector((state) => state.privileges?.privileges || []);
-
   const [expandedMenus, setExpandedMenus] = useState({});
 
   const toggleMenu = (menuId) => {
@@ -43,7 +41,7 @@ const Sidebar = () => {
   const getMenuIcon = (name) => {
     const icons = {
       Dashboard: <DashboardIcon fontSize="small" />,
-      "User Dashboard": <DashboardIcon fontSize="small" />,
+      "Trainee Dashboard": <DashboardIcon fontSize="small" />,
       Administration: <PeopleIcon fontSize="small" />,
       "Dropdown Management": <DownloadForOfflineIcon fontSize="small" />,
       TaskList: <FormatListNumberedIcon fontSize="small" />,
@@ -61,15 +59,27 @@ const Sidebar = () => {
     borderRadius: 1,
     px: 1.5,
     py: 0.75,
-    fontWeight: 500,
+    fontWeight: active ? 600 : 500,
     color: active ? theme.palette.primary.main : theme.palette.text.primary,
-    backgroundColor: active ? theme.palette.action.selected : "transparent",
+    borderLeft: active
+      ? `3px solid ${theme.palette.primary.main}`
+      : "3px solid transparent",
+    transition: "all 0.2s ease",
+
     "&:hover": {
-      backgroundColor: theme.palette.action.hover,
+      color: theme.palette.primary.main,
+      transform: "translateX(4px)",
+      borderLeft: `3px solid ${theme.palette.primary.main}`,
     },
+
     "& .MuiListItemIcon-root": {
       minWidth: 34,
       color: active ? theme.palette.primary.main : theme.palette.text.secondary,
+      transition: "color 0.2s ease",
+    },
+
+    "&:hover .MuiListItemIcon-root": {
+      color: theme.palette.primary.main,
     },
   });
 
@@ -77,26 +87,31 @@ const Sidebar = () => {
     ml: 3,
     mr: 0.5,
     mb: 0.25,
-    borderRadius: 1,
     py: 0.5,
     fontSize: "0.8rem",
+    fontWeight: active ? 600 : 400,
     color: active ? theme.palette.primary.main : theme.palette.text.primary,
-    backgroundColor: active ? theme.palette.action.selected : "transparent",
+    borderLeft: active
+      ? `2px solid ${theme.palette.primary.main}`
+      : "2px solid transparent",
+    transition: "all 0.2s ease",
+
     "&:hover": {
-      backgroundColor: theme.palette.action.hover,
+      color: theme.palette.primary.main,
+      transform: "translateX(4px)",
+      borderLeft: `2px solid ${theme.palette.primary.main}`,
     },
   });
 
   const mainMenus = privileges.filter((priv) => priv.parent_id === null);
-
-  const getSubmenus = (parentId) => privileges.filter((priv) => priv.parent_id === parentId);
+  const getSubmenus = (parentId) =>
+    privileges.filter((priv) => priv.parent_id === parentId);
 
   return (
     <Box
       sx={{
         width: 240,
         height: "100vh",
-        bgcolor: theme.palette.background.paper,
         borderRight: `1px solid ${theme.palette.divider}`,
         display: "flex",
         flexDirection: "column",
@@ -110,7 +125,6 @@ const Sidebar = () => {
           display: "flex",
           alignItems: "center",
           gap: 1.5,
-          // borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
         <Avatar src={logo} sx={{ width: 44, height: 44 }} />
@@ -145,9 +159,7 @@ const Sidebar = () => {
                     <ListItemText
                       primary={menu.privilege_name}
                       slotProps={{
-                        primary: {
-                          sx: { fontSize: "0.85rem" },
-                        },
+                        primary: { sx: { fontSize: "0.85rem" } },
                       }}
                     />
 
@@ -172,11 +184,7 @@ const Sidebar = () => {
                             <ListItemText
                               primary={submenu.privilege_name}
                               slotProps={{
-                                primary: {
-                                  sx: {
-                                    fontSize: "0.8rem",
-                                  },
-                                },
+                                primary: { sx: { fontSize: "0.8rem" } },
                               }}
                             />
                           </ListItemButton>
