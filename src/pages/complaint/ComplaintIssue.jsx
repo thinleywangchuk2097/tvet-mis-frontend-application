@@ -13,7 +13,7 @@ import {
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { Send, Clear } from "@mui/icons-material";
-import FileUplaod from "../../components/File/FileUplaod";
+import FileUplaod from "../../components/file/FileUplaod";
 import ComplaintService from "../../api/services/ComplaintService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";

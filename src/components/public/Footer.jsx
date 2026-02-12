@@ -1,11 +1,11 @@
-import React from "react";
+import { Typography } from "@mui/material";
 
 const Footer = () => {
   return (
-    <>
-      ©2026 TVET-Mis Ministry of Education and Skills Development. All rights
+    <Typography variant="caption" color="text.secondary">
+      ©2026 TVET-MIS Ministry of Education and Skills Development. All rights
       reserved.
-    </>
+    </Typography>
   );
 };
 

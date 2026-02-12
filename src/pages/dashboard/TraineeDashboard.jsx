@@ -289,7 +289,7 @@ const QuickActions = () => (
   </Card>
 );
 
-const UserDashboard = () => {
+const TraineeDashboard = () => {
   const theme = useTheme();
 
   return (
@@ -304,7 +304,7 @@ const UserDashboard = () => {
       <Box sx={{ maxWidth: 1600, mx: "auto", px: 3, py: 4 }}>
         <Box sx={{ mb: 2 }}>
           <Typography variant="h6" fontWeight={800} gutterBottom>
-            User Dashboard
+            Trainee Dashboard
           </Typography>
           <Divider
             sx={{
@@ -485,4 +485,4 @@ const UserDashboard = () => {
   );
 };
 
-export default UserDashboard;
+export default TraineeDashboard;
