@@ -55,7 +55,8 @@ const Header = () => {
     setMobileReportsOpen(false);
   };
 
-  const handleRegisterOpen = (event) => setRegisterAnchorEl(event.currentTarget);
+  const handleRegisterOpen = (event) =>
+    setRegisterAnchorEl(event.currentTarget);
   const handleRegisterClose = () => setRegisterAnchorEl(null);
   const handleCoursesOpen = (event) => setCoursesAnchorEl(event.currentTarget);
   const handleCoursesClose = () => setCoursesAnchorEl(null);
@@ -108,7 +109,7 @@ const Header = () => {
           closeFn();
         }}
         sx={{
-          py: 0.5,
+          py: 0.4,
           px: 1.75,
           minHeight: "auto",
           fontSize: "0.88rem",
@@ -124,7 +125,7 @@ const Header = () => {
   return (
     <AppBar
       position="static"
-      sx={{ backgroundColor: "#283593", height: { xs: 70, sm: 65 } }}
+      sx={{ backgroundColor: "#283593", height: { xs: 60, sm: 70 } }}
     >
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
         {/* Left side */}
@@ -142,7 +143,7 @@ const Header = () => {
           <Typography
             sx={{
               fontWeight: "bold",
-              fontSize: { xs: "0.80rem", sm: "1rem" },
+              fontSize: { xs: "0.85rem", sm: "1rem" },
             }}
           >
             TVET Management Information System (TVET-MIS)
