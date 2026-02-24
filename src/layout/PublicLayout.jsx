@@ -16,7 +16,8 @@ const PublicLayout = () => {
       <Box sx={{ flexShrink: 0 }}>
         <AnimatedHeader />
       </Box>
-      {/* Scrollable main content */}
+
+      {/* Scrollable main content + footer */}
       <Box
         sx={{
           flex: 1,
@@ -25,20 +26,19 @@ const PublicLayout = () => {
         }}
       >
         <Outlet />
-      </Box>
 
-      {/* Footer */}
-      <Box
-        component="footer"
-        sx={{
-          flexShrink: 0,
-          py: 1, // small vertical padding
-          textAlign: "center",
-          bgcolor: "background.paper",
-          borderTop: "1px solid #ddd",
-        }}
-      >
-        <Footer />
+        {/* Footer included inside scrollable area */}
+        <Box
+          component="footer"
+          sx={{
+            py: 1,
+            textAlign: "center",
+            bgcolor: "background.paper",
+            borderTop: "1px solid #ddd",
+          }}
+        >
+          <Footer />
+        </Box>
       </Box>
     </Box>
   );
