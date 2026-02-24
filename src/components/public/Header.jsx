@@ -108,7 +108,7 @@ const Header = () => {
           closeFn();
         }}
         sx={{
-          py: 0.4,
+          py: 0.5,
           px: 1.75,
           minHeight: "auto",
           fontSize: "0.88rem",
@@ -142,7 +142,7 @@ const Header = () => {
           <Typography
             sx={{
               fontWeight: "bold",
-              fontSize: { xs: "0.85rem", sm: "1rem" },
+              fontSize: { xs: "0.80rem", sm: "1rem" },
             }}
           >
             TVET Management Information System (TVET-MIS)
