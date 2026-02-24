@@ -26,7 +26,7 @@ import InstituteProposal from '../pages/public/registration/InstituteProposal';
 import InstituteRegistration from '../pages/public/registration/InstituteRegistration';
 import QMSAuditor from '../pages/public/registration/QMSAuditor';
 import Trainer from '../pages/public/registration/Trainer';
-
+import RPLAssessment from '../pages/public/courses/RPLAssessment';
 
 //public routes ..
 export const publicRoutes = [
@@ -42,7 +42,8 @@ export const publicRoutes = [
   { path: '/register/institute-proposal', element: <InstituteProposal /> },
   { path: '/register/institute', element: <InstituteRegistration /> },
   { path: '/register/qms-auditor', element: <QMSAuditor /> },
-  { path: '/register/trainer', element: <Trainer /> }
+  { path: '/register/trainer', element: <Trainer /> },
+  { path: '/apply/rpl-assessment', element: <RPLAssessment /> }
 ];
 
 //private routes ..

@@ -55,8 +55,7 @@ const Header = () => {
     setMobileReportsOpen(false);
   };
 
-  const handleRegisterOpen = (event) =>
-    setRegisterAnchorEl(event.currentTarget);
+  const handleRegisterOpen = (event) => setRegisterAnchorEl(event.currentTarget);
   const handleRegisterClose = () => setRegisterAnchorEl(null);
   const handleCoursesOpen = (event) => setCoursesAnchorEl(event.currentTarget);
   const handleCoursesClose = () => setCoursesAnchorEl(null);
@@ -125,7 +124,7 @@ const Header = () => {
   return (
     <AppBar
       position="static"
-      sx={{ backgroundColor: "#283593", height: { xs: 70, sm: 80 } }}
+      sx={{ backgroundColor: "#283593", height: { xs: 70, sm: 65 } }}
     >
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
         {/* Left side */}
@@ -142,12 +141,11 @@ const Header = () => {
 
           <Typography
             sx={{
-              ml: 1,
               fontWeight: "bold",
               fontSize: { xs: "0.85rem", sm: "1rem" },
             }}
           >
-            TVET Management Information System(TVET-MIS)
+            TVET Management Information System (TVET-MIS)
           </Typography>
         </Box>
 
@@ -168,7 +166,7 @@ const Header = () => {
                     bottom: 0,
                     left: 0,
                     width: "100%",
-                    height: "2px",
+                    height: "1px",
                     bgcolor: "#fff",
                   },
                 }}
@@ -192,7 +190,7 @@ const Header = () => {
                     bottom: 0,
                     left: 0,
                     width: "100%",
-                    height: "2px",
+                    height: "1px",
                     bgcolor: "#fff",
                   },
                 }}
@@ -229,7 +227,6 @@ const Header = () => {
                 {renderMenuItems(registerItems, handleRegisterClose)}
               </Menu>
             </Box>
-
             {/* Courses */}
             <Box>
               <Button
@@ -245,7 +242,7 @@ const Header = () => {
                     bottom: 0,
                     left: 0,
                     width: "100%",
-                    height: "2px",
+                    height: "1px",
                     bgcolor: "#fff",
                   },
                 }}
@@ -282,7 +279,6 @@ const Header = () => {
                 {renderMenuItems(courses, handleCoursesClose)}
               </Menu>
             </Box>
-
             {/* Reports */}
             <Box>
               <Button
@@ -298,7 +294,7 @@ const Header = () => {
                     bottom: 0,
                     left: 0,
                     width: "100%",
-                    height: "2px",
+                    height: "1px",
                     bgcolor: "#fff",
                   },
                 }}
@@ -337,7 +333,6 @@ const Header = () => {
             </Box>
           </Box>
         )}
-
         {/* Login */}
         <form onSubmit={formik.handleSubmit} style={{ margin: 0 }}>
           <Button
@@ -358,7 +353,6 @@ const Header = () => {
             {isMobile ? "" : "Login"}
           </Button>
         </form>
-
         {/* Mobile Menu */}
         {isMobile && (
           <Menu

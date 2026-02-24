@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
 import { Outlet } from "react-router-dom";
-import Header from "../components/public/Header";
 import Footer from "../components/public/Footer";
+import AnimatedHeader from "../components/public/AnimatedHeader";
 
 const PublicLayout = () => {
   return (
@@ -14,7 +14,7 @@ const PublicLayout = () => {
     >
       {/* Static Header */}
       <Box sx={{ flexShrink: 0 }}>
-        <Header />
+        <AnimatedHeader />
       </Box>
       {/* Scrollable main content */}
       <Box

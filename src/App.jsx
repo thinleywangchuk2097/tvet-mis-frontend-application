@@ -60,7 +60,7 @@ const App = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        style={{ marginTop: "50px" }} //top margin
+        style={{ marginTop: "57px" }} //top margin
         toastStyle={{
           minHeight: "37px", // reduce height
           fontSize: "0.85rem", //smaller text
