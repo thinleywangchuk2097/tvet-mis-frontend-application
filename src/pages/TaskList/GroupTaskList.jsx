@@ -220,7 +220,7 @@ const GroupTaskList = () => {
           mb: 3,
         }}
       >
-        <Typography variant="h4">Group Task</Typography>
+        <Typography variant="h5">Group Task</Typography>
 
         {/* Search Field */}
         <TextField
@@ -273,7 +273,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "8%",
                     }}
                   >
                     Serial No
@@ -282,7 +281,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "18%",
                     }}
                   >
                     Application No
@@ -291,7 +289,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "22%",
                     }}
                   >
                     Service Name
@@ -300,7 +297,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "22%",
                     }}
                   >
                     Applicant Name
@@ -309,7 +305,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "15%",
                     }}
                   >
                     Submitted Date
@@ -318,7 +313,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "15%",
                     }}
                   >
                     Current Status

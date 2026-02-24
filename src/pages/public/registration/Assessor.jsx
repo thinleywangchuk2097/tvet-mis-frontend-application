@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -18,10 +18,10 @@ import {
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { Send, Clear } from "@mui/icons-material";
 import FileUplaod from "../../../components/file/FileUplaod";
 import { toast } from "react-toastify";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import LockResetIcon from "@mui/icons-material/LockReset";
 
 const sectors = ["Education", "Health", "Engineering"];
 const occupations = ["Teacher", "Engineer", "Doctor"];
@@ -50,7 +50,7 @@ const Assessor = () => {
 
   useEffect(() => {
     if (hasCitizenId === "yes") {
-      navigate("/login");
+      navigate("/login-ndi-qrcode");
     }
   }, [hasCitizenId, navigate]);
 
@@ -83,37 +83,50 @@ const Assessor = () => {
   });
 
   return (
-    <Box sx={{ m: 4 }}>
+    <Box sx={{ m: { xs: 2, md: 6 } }}>
       <Paper
-        elevation={1}
+        elevation={3}
         sx={{
-          p: 3,
+          p: { xs: 2, md: 4 },
           width: "100%",
+          borderRadius: 3,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
         }}
       >
-        <Box textAlign="center" sx={{ mb: 4 }}>
+        {/* Header */}
+        <Box textAlign="center" sx={{ mb: 6 }}>
           <Typography
             variant="h5"
-            fontWeight={700}
+            fontWeight={600}
             sx={{
-              letterSpacing: 0.3,
+              letterSpacing: 0.7,
+              borderBottom: "3px solid #555",
+              color: "#1a1a1a",
               display: "inline-block",
-              borderBottom: "3px solid #1e88e6", // static underline
-              pb: 0.2, //space between text and underline
+              fontFamily: "'Roboto', 'Arial', sans-serif",
+              textTransform: "capitalize",
+              transition: "color 0.3s ease, border-color 0.3s ease", // animate both
+              "&:hover": {
+                color: "#0d47a1",
+                borderColor: "#0d47a1", // underline matches text on hover
+              },
             }}
           >
             Assessor Registration Form
           </Typography>
         </Box>
 
-        {/* Has Citizen ID as Radio Buttons */}
-        <Box sx={{ mb: 3 }}>
+        {/* Citizen ID Radio */}
+        <Box sx={{ mb: 4 }}>
           <FormControl component="fieldset">
-            <FormLabel component="legend">Has Citizen ID Number?</FormLabel>
+            <FormLabel component="legend" sx={{ fontWeight: 500 }}>
+              Do you have a Citizen ID Number?
+            </FormLabel>
             <RadioGroup
               row
               value={hasCitizenId}
               onChange={(e) => setHasCitizenId(e.target.value)}
+              sx={{ mt: 1 }}
             >
               <FormControlLabel value="yes" control={<Radio />} label="Yes" />
               <FormControlLabel value="no" control={<Radio />} label="No" />
@@ -121,23 +134,24 @@ const Assessor = () => {
           </FormControl>
         </Box>
 
+        {/* Registration Form */}
         {hasCitizenId === "no" && (
           <form onSubmit={formik.handleSubmit}>
-            {/* Basic Information */}
-            <Box
+            {/* Section: Basic Info */}
+            <Paper
               sx={{
-                p: 3,
+                p: { xs: 2, md: 3 },
                 mb: 4,
                 borderRadius: 2,
-                boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
+                border: "1px solid #e0e0e0",
               }}
             >
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
                 Basic Information
               </Typography>
               <Divider sx={{ mb: 3 }} />
 
-              <Grid container spacing={2}>
+              <Grid container spacing={3}>
                 <Grid item size={{ xs: 12, md: 4 }}>
                   <TextField
                     fullWidth
@@ -149,6 +163,7 @@ const Assessor = () => {
                     disabled={loading}
                   />
                 </Grid>
+
                 <Grid item size={{ xs: 12, md: 4 }}>
                   <TextField
                     fullWidth
@@ -166,6 +181,7 @@ const Assessor = () => {
                     disabled={loading}
                   />
                 </Grid>
+
                 <Grid item size={{ xs: 12, md: 4 }}>
                   <TextField
                     select
@@ -252,7 +268,7 @@ const Assessor = () => {
                 <Grid item size={{ xs: 12, md: 4 }}>
                   <TextField
                     fullWidth
-                    label="Name of Working Organization"
+                    label="Organization Name"
                     name="organizationName"
                     size="small"
                     value={formik.values.organizationName}
@@ -269,22 +285,23 @@ const Assessor = () => {
                   />
                 </Grid>
               </Grid>
-            </Box>
+            </Paper>
 
-            {/* Assessor Criteria */}
-            <Box
+            {/* Section: Assessor Criteria */}
+            <Paper
               sx={{
-                p: 3,
+                p: { xs: 2, md: 3 },
                 mb: 4,
                 borderRadius: 2,
-                boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
+
+                border: "1px solid #e0e0e0",
               }}
             >
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
                 Assessor Registration Criteria
               </Typography>
               <Divider sx={{ mb: 3 }} />
-              <Grid container spacing={2}>
+              <Grid container spacing={3}>
                 <Grid item size={{ xs: 12, md: 4 }}>
                   <TextField
                     select
@@ -330,8 +347,8 @@ const Assessor = () => {
                     select
                     fullWidth
                     label="Certification Level"
-                    size="small"
                     name="certificationLevel"
+                    size="small"
                     value={formik.values.certificationLevel}
                     onChange={formik.handleChange}
                     disabled={loading}
@@ -345,27 +362,28 @@ const Assessor = () => {
                   </TextField>
                 </Grid>
               </Grid>
-            </Box>
+            </Paper>
 
-            {/* Supporting Documents */}
-            <Box
+            {/* Section: Supporting Documents */}
+            <Paper
               sx={{
-                p: 3,
+                p: { xs: 2, md: 3 },
                 mb: 4,
                 borderRadius: 2,
-                boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
+
+                border: "1px solid #e0e0e0",
               }}
             >
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
                 Supporting Documents
               </Typography>
               <Divider sx={{ mb: 3 }} />
               <Box
                 sx={{
                   p: 2,
-                  border: "1px dashed",
-                  borderColor: "divider",
+                  border: "1px dashed #bdbdbd",
                   borderRadius: 2,
+                  minHeight: 100,
                 }}
               >
                 <FileUplaod
@@ -376,9 +394,9 @@ const Assessor = () => {
                   disabled={loading}
                 />
               </Box>
-            </Box>
+            </Paper>
 
-            {/* Actions */}
+            {/* Form Actions */}
             <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
               <Button
                 type="submit"
@@ -390,18 +408,30 @@ const Assessor = () => {
                     <ArrowUpwardIcon />
                   )
                 }
+                sx={{
+                  px: 3,
+                  py: 0.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                }}
                 disabled={loading}
               >
                 Submit
               </Button>
               <Button
                 type="button"
-                variant="contained" // makes the background filled
-                color="error" // red background
-                startIcon={<Clear />}
+                variant="contained"
+                color="error"
+                startIcon={<LockResetIcon />}
+                sx={{
+                  px: 3,
+                  py: 0.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                }}
                 onClick={() => formik.resetForm()}
               >
-                Clear
+                Reset
               </Button>
             </Box>
           </form>

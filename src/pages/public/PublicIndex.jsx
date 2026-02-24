@@ -35,6 +35,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
+import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 
 // Slider images
 import slide1 from "../../assets/slider/slide1.jpg";
@@ -439,99 +440,114 @@ const PublicIndex = () => {
       <Dialog
         open={openModal}
         onClose={() => setOpenModal(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: 600 }}>Application Details</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 500 }}>Application Details</DialogTitle>
         <DialogContent dividers>
-          <TableContainer
-            component={Paper}
-            sx={{
-              borderRadius: 2,
-              boxShadow: 2,
-              border: "1px solid #e0e0e0",
-            }}
-          >
-            <Table sx={{ borderCollapse: "collapse" }}>
-              <TableHead>
-                <TableRow>
-                  {[
-                    "Application No",
-                    "Name",
-                    "Location",
-                    "Service",
-                    "Status",
-                  ].map((header) => (
-                    <TableCell
-                      key={header}
-                      sx={{
-                        fontWeight: 700,
-                        textAlign: "center",
-                        border: "1px solid #e0e0e0",
-                        backgroundColor: "#f5f7fa",
-                      }}
-                    >
-                      {header}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {selectedApplication ? (
+          <Box>
+            <TableContainer component={Paper}>
+              <Table sx={{ borderCollapse: "collapse", width: "100%" }}>
+                <TableHead>
                   <TableRow>
                     {[
-                      "application_no",
-                      "name",
-                      "location",
-                      "service",
-                      "status",
-                    ].map((key) => (
+                      "Application No",
+                      "Name",
+                      "Location",
+                      "Service",
+                      "Status",
+                    ].map((header) => (
                       <TableCell
-                        key={key}
+                        key={header}
                         sx={{
+                          fontWeight: 550,
                           textAlign: "center",
-                          py: 1.5,
-                          border: "1px solid #e0e0e0",
-                          fontWeight: key === "status" ? 600 : 400,
-                          color:
-                            key === "status"
-                              ? getStatusColor(selectedApplication[key])
-                              : "inherit",
+                          border: "1px solid #000",
+                          py: 1,
+                          fontSize: "0.875rem",
                         }}
                       >
-                        {selectedApplication[key]}
+                        {header}
                       </TableCell>
                     ))}
                   </TableRow>
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      sx={{
-                        textAlign: "center",
-                        py: 2,
-                        color: "error.main",
-                        border: "1px solid #e0e0e0",
-                        fontWeight: 500,
-                      }}
-                    >
-                      No data found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {selectedApplication ? (
+                    <TableRow hover>
+                      {[
+                        "application_no",
+                        "name",
+                        "location",
+                        "service",
+                        "status",
+                      ].map((key) => (
+                        <TableCell
+                          key={key}
+                          sx={{
+                            textAlign: "center",
+                            py: 1.25,
+                            fontSize: "0.85rem",
+                            border: "1px solid #000",
+                          }}
+                        >
+                          {key === "status" ? (
+                            <Box
+                              component="span"
+                              sx={{
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: 1,
+                                fontWeight: 600,
+                                fontSize: "0.75rem",
+                                color: "#fff",
+                                backgroundColor: getStatusColor(
+                                  selectedApplication[key],
+                                ),
+                                textTransform: "capitalize",
+                              }}
+                            >
+                              {selectedApplication[key]}
+                            </Box>
+                          ) : (
+                            selectedApplication[key]
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        sx={{
+                          textAlign: "center",
+                          py: 3,
+                          color: "error.main",
+                          fontWeight: 500,
+                          border: "1px solid #000",
+                        }}
+                      >
+                        No data found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
         </DialogContent>
-
-        <DialogActions>
+        <DialogActions sx={{ px: 3 }}>
           <Button
             onClick={() => setOpenModal(false)}
-            variant="outlined"
+            variant="contained"
             color="error"
+            startIcon={<CloseFullscreenIcon />}
+            size="small"
             sx={{
-              borderWidth: 2,
-              px: 3,
+              borderWidth: 1,
+              px: 2,
+              py: 0.5,
+              fontSize: "0.75rem",
               "&:hover": {
                 backgroundColor: "error.main",
                 color: "#fff",
