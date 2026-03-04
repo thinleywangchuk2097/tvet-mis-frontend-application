@@ -228,7 +228,7 @@ const ACSLevel1Dashboard = () => {
       <Grid container spacing={3} mb={3}>
         {/* Line Chart */}
         <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-          <Card>
+          <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
                 Monthly Case Trend
@@ -250,12 +250,12 @@ const ACSLevel1Dashboard = () => {
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
-          </Card>
+          </Paper>
         </Grid>
 
         {/* Pie Chart */}
         <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-          <Card>
+          <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
                 Case Status Distribution
@@ -282,12 +282,12 @@ const ACSLevel1Dashboard = () => {
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
-          </Card>
+          </Paper>
         </Grid>
 
         {/* Bar Chart */}
         <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-          <Card>
+          <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
                 Monthly Case Comparison
@@ -308,12 +308,12 @@ const ACSLevel1Dashboard = () => {
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
-          </Card>
+          </Paper>
         </Grid>
       </Grid>
 
       {/* Table Section */}
-      <Card>
+      <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
         <CardContent>
           <Typography fontWeight={600} sx={{ mb: 2 }}>
             Recent Case Records
@@ -345,7 +345,7 @@ const ACSLevel1Dashboard = () => {
             </Table>
           </TableContainer>
         </CardContent>
-      </Card>
+      </Paper>
     </Paper>
   );
 };

@@ -235,7 +235,7 @@ const ApproverBQPCADashboard = () => {
       <Grid container spacing={3} mb={3}>
         {/* Line Chart */}
         <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-          <Card>
+         <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
                 Monthly Approvals
@@ -257,12 +257,12 @@ const ApproverBQPCADashboard = () => {
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
-          </Card>
+          </Paper>
         </Grid>
 
         {/* Pie Chart */}
         <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-          <Card>
+          <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
                 Approval Status Distribution
@@ -289,12 +289,12 @@ const ApproverBQPCADashboard = () => {
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
-          </Card>
+          </Paper>
         </Grid>
 
         {/* Bar Chart */}
         <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-          <Card>
+          <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
                 Pending vs Completed
@@ -315,14 +315,14 @@ const ApproverBQPCADashboard = () => {
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
-          </Card>
+          </Paper>
         </Grid>
       </Grid>
 
       {/* Table Section */}
-      <Card>
+      <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
         <CardContent>
-          <Typography variant="h6" mb={2}>
+          <Typography fontWeight={600} mb={2}>
             Recent Approval Requests
           </Typography>
           <TableContainer component={Paper}>
@@ -352,7 +352,7 @@ const ApproverBQPCADashboard = () => {
             </Table>
           </TableContainer>
         </CardContent>
-      </Card>
+      </Paper>
     </Paper>
   );
 };
