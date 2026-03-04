@@ -234,7 +234,7 @@ const ApproverBQPCADashboard = () => {
       {/* Charts Section */}
       <Grid container spacing={3} mb={3}>
         {/* Line Chart */}
-        <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+        <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
          <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
@@ -261,7 +261,7 @@ const ApproverBQPCADashboard = () => {
         </Grid>
 
         {/* Pie Chart */}
-        <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+        <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
@@ -293,7 +293,7 @@ const ApproverBQPCADashboard = () => {
         </Grid>
 
         {/* Bar Chart */}
-        <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+        <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
