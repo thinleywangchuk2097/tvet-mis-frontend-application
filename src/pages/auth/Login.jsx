@@ -98,6 +98,7 @@ const Login = () => {
             current_role,
             access_token,
           );
+console.log("Fetched privileges from API:", privilegesData.data);
 
           const privileges =
             privilegesData.data?.map((item) => ({
@@ -107,9 +108,8 @@ const Login = () => {
               parent_id: item.parentId,
               privilege_name: item.privilegeName,
               route_name: item.routeName,
-              icon: item.icon,
+              menuIcon: item.menuIcon,
             })) || [];
-
           dispatch(setPrivileges(privileges));
         } catch (err) {
           console.error("Privilege fetch error", err);

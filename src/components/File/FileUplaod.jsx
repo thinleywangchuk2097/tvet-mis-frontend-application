@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -22,30 +22,31 @@ const FileUpload = ({ files = [], onFilesChange, disabled = false }) => {
   const theme = useTheme();
   const fileInputRef = useRef(null);
 
-  const [items, setItems] = useState([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [currentPreview, setCurrentPreview] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    if (!files || files.length === 0) {
-      setItems([]);
-      setPreviewOpen(false);
-      setCurrentPreview(null);
-    }
+  /**
+   * Derive items safely using useMemo
+   * Prevents unnecessary recalculations
+   */
+  const items = useMemo(() => {
+    return files.map((file) => ({
+      file,
+      name: file.name,
+      type: file.type,
+      url: URL.createObjectURL(file),
+    }));
   }, [files]);
 
+  /**
+   * Cleanup object URLs to prevent memory leaks
+   */
   useEffect(() => {
-    if (files?.length) {
-      const mapped = files.map((file) => ({
-        file,
-        name: file.name,
-        type: file.type,
-        url: URL.createObjectURL(file),
-      }));
-      setItems(mapped);
-    }
-  }, [files]);
+    return () => {
+      items.forEach((item) => URL.revokeObjectURL(item.url));
+    };
+  }, [items]);
 
   const handleFileSelect = (e) => {
     const selected = Array.from(e.target.files);
@@ -62,7 +63,6 @@ const FileUpload = ({ files = [], onFilesChange, disabled = false }) => {
       }
     });
 
-    // Show error message under the upload box
     if (invalidFiles.length) {
       setErrorMessage(
         `The following files exceed ${MAX_FILE_SIZE_MB}MB and were not added: ${invalidFiles.join(
@@ -70,7 +70,7 @@ const FileUpload = ({ files = [], onFilesChange, disabled = false }) => {
         )}`
       );
     } else {
-      setErrorMessage(""); // clear error if all files valid
+      setErrorMessage("");
     }
 
     if (validFiles.length) {
@@ -83,7 +83,7 @@ const FileUpload = ({ files = [], onFilesChange, disabled = false }) => {
   const handleRemove = (index) => {
     const updated = files.filter((_, i) => i !== index);
     onFilesChange(updated);
-    setErrorMessage(""); // clear error on remove
+    setErrorMessage("");
   };
 
   const handlePreview = (item) => {
@@ -146,7 +146,7 @@ const FileUpload = ({ files = [], onFilesChange, disabled = false }) => {
         </Typography>
       </Box>
 
-      {/* Error message under upload box */}
+      {/* Error message */}
       {errorMessage && (
         <Typography
           variant="body2"
@@ -215,7 +215,11 @@ const FileUpload = ({ files = [], onFilesChange, disabled = false }) => {
                 component="img"
                 src={currentPreview.url}
                 alt="preview"
-                sx={{ width: "100%", maxHeight: "70vh", objectFit: "contain" }}
+                sx={{
+                  width: "100%",
+                  maxHeight: "70vh",
+                  objectFit: "contain",
+                }}
               />
             )}
 

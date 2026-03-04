@@ -18,6 +18,8 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import InstituteProposalService from "../../../api/services/InstituteProposalService";
+
 // ===== Static Data =====
 const ownershipTypes = [
   { id: 1, name: "Company" },
@@ -174,6 +176,19 @@ const validationSchema = Yup.object({
 const InstituteProposal = () => {
   const [loading, setLoading] = useState(false);
 
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () =>
+        resolve({
+          name: file.name,
+          content: reader.result.split(",")[1],
+          contentType: file.type || "application/octet-stream",
+        });
+      reader.onerror = reject;
+    });
+
   const formik = useFormik({
     initialValues: {
       // Ownership Information
@@ -184,7 +199,6 @@ const InstituteProposal = () => {
       otherName: "",
       otherAddress: "",
       partners: [], // Added for Partnership owners
-
       // Training Provider Profile
       proposedInstituteName: "",
       dzongkhag: "",
@@ -196,7 +210,6 @@ const InstituteProposal = () => {
       promoterName: "",
       fieldOfTraining: "",
       activityLevel: "",
-
       // Supporting Documents
       files: [],
     },
@@ -205,8 +218,46 @@ const InstituteProposal = () => {
     onSubmit: async (values, { resetForm }) => {
       setLoading(true);
       try {
-        toast.success("Institute Proposal submitted successfully!");
-        resetForm();
+        const documents = await Promise.all(
+          values.files.map((file) => fileToBase64(file)),
+        );
+        const payload = {
+          ownershipType: values.ownershipType || null,
+          otherOwnershipType: values.otherOwnershipType || null,
+          registrationNo: values.registrationNo || null,
+          companyName: values.companyName || null,
+          otherName: values.otherName || null,
+          otherAddress: values.otherAddress || null,
+          proposedInstituteName: values.proposedInstituteName || null,
+          dzongkhagId: 14,
+          exactLocation: values.exactLocation,
+          telephoneNo: values.telephoneNo || null,
+          mobileNo: values.mobileNo || null,
+          email: values.email || null,
+          promoterCitizenId: values.promoterCitizenId || null,
+          promoterName: values.promoterName || null,
+          fieldOfTraining: values.fieldOfTraining || null,
+          activityLevel: values.activityLevel || null,
+          serviceId: 6,
+          currentRoleId: 1,
+          statusId: 101,
+          userId: "11606000208",
+          documents,
+          partners: values.partners || [], // Include partners in the payload
+        };
+
+        console.log("Payload to submit:", payload); // Debug log to check payload structure
+        const response =
+          await InstituteProposalService.submitInstituteProposal(payload);
+        console.log("API Response:", response); // Debug log to check API response
+        if (response.status == 201) {
+          toast.success(
+            `Institute Proposal submitted successfully! Application No: ${response.data.applicationNo}`,
+          );
+          resetForm();
+        } else {
+          toast.error("Submission failed. Please try again.");
+        }
       } catch (error) {
         toast.error(error.message || "Submission failed");
       } finally {
@@ -230,8 +281,8 @@ const InstituteProposal = () => {
             fontWeight={600}
             sx={{
               letterSpacing: 0.7,
-              borderBottom: "3px solid #555",
-              color: "#1a1a1a",
+              borderBottom: "3px solid #0d47a1",
+              color: "#0d47a1",
               display: "inline-block",
               fontFamily: "'Roboto', 'Arial', sans-serif",
               textTransform: "capitalize",

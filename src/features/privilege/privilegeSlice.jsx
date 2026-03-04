@@ -1,39 +1,42 @@
-import { createSlice } from '@reduxjs/toolkit';
-import Cookies from 'js-cookie';
+import { createSlice } from "@reduxjs/toolkit";
 
-// Helper function to load from cookies
-const loadPrivilegesFromCookies = () => {
+// Helper functions to load/save privileges from localStorage
+const loadPrivilegesFromStorage = () => {
   try {
-    const savedPrivileges = Cookies.get('privileges');
+    const savedPrivileges = localStorage.getItem("privileges");
     return savedPrivileges ? JSON.parse(savedPrivileges) : [];
   } catch (error) {
-    console.error("Failed to parse privileges from cookies:", error);
+    console.error("Failed to parse privileges from localStorage:", error);
     return [];
   }
 };
 
-// Initialize state from cookies
+const savePrivilegesToStorage = (privileges) => {
+  try {
+    localStorage.setItem("privileges", JSON.stringify(privileges));
+  } catch (error) {
+    console.error("Failed to save privileges to localStorage:", error);
+  }
+};
+
+// Initialize state from localStorage
 const initialState = {
-  privileges: loadPrivilegesFromCookies(),
+  privileges: loadPrivilegesFromStorage(),
 };
 
 const privilegeSlice = createSlice({
-  name: 'privileges',
+  name: "privileges",
   initialState,
   reducers: {
     setPrivileges: (state, action) => {
       const privileges = Array.isArray(action.payload) ? action.payload : [];
+      console.log("Setting privileges in Redux state:", privileges);
       state.privileges = privileges;
-      // Store in cookies with 1 day expiration
-      Cookies.set('privileges', JSON.stringify(privileges), { 
-        expires: 1,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
-      });
+      savePrivilegesToStorage(privileges); // Persist in localStorage
     },
     reSetPrivileges: (state) => {
       state.privileges = [];
-      Cookies.remove('privileges');
+      localStorage.removeItem("privileges"); // Clear localStorage on logout
     },
   },
 });

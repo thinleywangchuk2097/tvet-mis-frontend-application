@@ -4,7 +4,7 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from "react-toastify";
 import {
-  Card,
+  Paper,
   Typography,
   Box,
   Divider,
@@ -13,7 +13,7 @@ import {
   Container,
   TextField,
   Button,
-  Stack,
+  Grid,
   IconButton,
   LinearProgress,
   Link,
@@ -45,10 +45,10 @@ const profileSchema = Yup.object().shape({
 });
 
 const UserProfile = () => {
-  const access_token = useSelector((state) => state.auth.accessToken);
   const theme = useTheme();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const access_token = useSelector((state) => state.auth.accessToken);
   const userId = useSelector((state) => state.auth.userId);
   const roleIds = useSelector((state) => state.auth.roles);
   const currentProfilePic =
@@ -60,7 +60,6 @@ const UserProfile = () => {
   const [profilePicFile, setProfilePicFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch user profile & profile image
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -69,7 +68,6 @@ const UserProfile = () => {
           UserProfileService.getUserProfileImage(userId, access_token),
         ]);
         setUserProfileLists(profileResponse.data);
-
         if (imageResponse.status === 200) {
           const base64Image = btoa(
             new Uint8Array(imageResponse.data).reduce(
@@ -77,18 +75,18 @@ const UserProfile = () => {
               "",
             ),
           );
-          const imageUrl = `data:${imageResponse.headers["content-type"]};base64,${base64Image}`;
-          setProfilePic(imageUrl);
+          setProfilePic(
+            `data:${imageResponse.headers["content-type"]};base64,${base64Image}`,
+          );
         }
       } catch (error) {
-        console.error("Error loading data:", error);
+        console.error(error);
         setProfilePic(null);
       }
     };
     fetchData();
   }, [userId, access_token]);
 
-  // Convert image file to Base64
   const convertImageToBase64 = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -97,12 +95,10 @@ const UserProfile = () => {
       reader.onerror = (error) => reject(error);
     });
 
-  // Formik setup
   const formik = useFormik({
     initialValues: {
-      username: `${userProfileLists.firstName || ""} ${
-        userProfileLists.middleName || ""
-      } ${userProfileLists.lastName || ""}`.trim(),
+      username:
+        `${userProfileLists.firstName || ""} ${userProfileLists.middleName || ""} ${userProfileLists.lastName || ""}`.trim(),
       email: userProfileLists.emailId || "",
       mobile_no: userProfileLists.mobileNo || "",
       profilePic: userProfileLists.profileImageUrl || "",
@@ -113,11 +109,8 @@ const UserProfile = () => {
       setIsSubmitting(true);
       try {
         let profileImageBase64 = null;
-
-        if (profilePicFile) {
+        if (profilePicFile)
           profileImageBase64 = await convertImageToBase64(profilePicFile);
-        }
-
         const userData = {
           userId,
           userName: values.username,
@@ -126,7 +119,6 @@ const UserProfile = () => {
           profileImageBase64,
           currentProfilePic,
         };
-
         const response = await UserProfileService.updateUserProfile(
           userData,
           access_token,
@@ -151,40 +143,36 @@ const UserProfile = () => {
     setIsEditing(!isEditing);
     if (!isEditing) formik.resetForm();
   };
-
   const handleCancelEdit = () => {
     setIsEditing(false);
     formik.resetForm();
-    setProfilePicFile(null); // reset uploaded image
+    setProfilePicFile(null);
   };
-
   const handleClose = () => navigate(-1);
-
   const handleFileChange = (event) => {
     const file = event.target.files[0];
-    if (file) {
-      if (!file.type.match("image.*")) return;
-      if (file.size > 2 * 1024 * 1024) return;
-      setProfilePic(URL.createObjectURL(file));
-      setProfilePicFile(file);
-    }
+    if (!file || !file.type.match("image.*") || file.size > 2 * 1024 * 1024)
+      return;
+    setProfilePic(URL.createObjectURL(file));
+    setProfilePicFile(file);
   };
-
   const triggerFileInput = () => fileInputRef.current.click();
 
   return (
     <Container
       maxWidth={false}
-      sx={{ maxWidth: 600, mt: { xs: 2, md: 4 }, mb: 4 }}
+      sx={{
+        maxWidth: 700,
+        mt: { xs: 2, md: 4 },
+        mb: 4,
+      }}
     >
-      <Card
+      <Paper
+        elevation={6}
         sx={{
           borderRadius: 3,
-          boxShadow: theme.shadows[4],
-          border: `1px solid ${theme.palette.divider}`,
-          backgroundColor: theme.palette.background.paper,
-          px: { xs: 2, sm: 4 },
-          py: 3,
+          px: { xs: 3, sm: 3 },
+          py: { xs: 3, sm: 3 },
           position: "relative",
           overflow: "visible",
         }}
@@ -195,7 +183,7 @@ const UserProfile = () => {
           sx={{
             position: "absolute",
             right: 16,
-            top: 16,
+            top: 10,
             color: theme.palette.text.secondary,
             "&:hover": {
               color: theme.palette.text.primary,
@@ -206,52 +194,28 @@ const UserProfile = () => {
           <Close />
         </IconButton>
 
-        <Box sx={{ textAlign: "center", mb: 2 }}>
-          <Typography
-            variant="h6"
-            fontWeight={700}
-            color="text.primary"
-            sx={{
-              display: "inline-block",
-              position: "relative",
-              cursor: "pointer",
-              "&::after": {
-                content: '""',
-                position: "absolute",
-                left: 0,
-                bottom: -2,
-                width: "100%",
-                height: "2px",
-                backgroundColor: "#1e88e6",
-                borderRadius: "2px",
-                transform: "scaleX(0)",
-                transformOrigin: "center",
-                transition: "transform 0.3s ease",
-              },
-              "&:hover::after": {
-                transform: "scaleX(1)",
-              },
-            }}
-          >
+        {/* Header */}
+        <Box textAlign="center" mb={2}>
+          <Typography variant="h5" fontWeight={700} color="text.primary">
             User Profile
           </Typography>
         </Box>
 
-        <Box display="flex" flexDirection="column" alignItems="center" mb={1}>
+        {/* Avatar & Roles */}
+        <Box display="flex" flexDirection="column" alignItems="center" mb={4}>
           <Box sx={{ position: "relative" }}>
             <Avatar
               src={profilePic}
               sx={{
-                bgcolor: "primary.main",
-                width: 100,
-                height: 100,
+                width: 110,
+                height: 110,
                 mb: 1,
                 border: `4px solid ${theme.palette.primary.light}`,
-                boxShadow: theme.shadows[2],
+                boxShadow: theme.shadows[3],
               }}
               onError={() => setProfilePic(null)}
             >
-              {!profilePic && <AccountCircle sx={{ fontSize: 60 }} />}
+              {!profilePic && <AccountCircle sx={{ fontSize: 64 }} />}
             </Avatar>
 
             {isEditing && (
@@ -260,7 +224,7 @@ const UserProfile = () => {
                   onClick={triggerFileInput}
                   sx={{
                     position: "absolute",
-                    bottom: 10,
+                    bottom: 7,
                     right: 0,
                     backgroundColor: theme.palette.background.paper,
                     "&:hover": { backgroundColor: theme.palette.action.hover },
@@ -278,14 +242,12 @@ const UserProfile = () => {
               </>
             )}
           </Box>
+
           <Box
-            sx={{
-              mt: 1,
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              color: "text.secondary",
-            }}
+            display="flex"
+            alignItems="center"
+            gap={1}
+            color="text.secondary"
           >
             <AdminPanelSettings fontSize="small" />
             <Typography variant="body2" fontWeight={500}>
@@ -296,176 +258,135 @@ const UserProfile = () => {
 
         <Divider sx={{ mb: 3 }} />
         {isSubmitting && <LinearProgress />}
+
+        {/* Form */}
         <form onSubmit={formik.handleSubmit}>
-          <Stack spacing={3}>
-            <TextField
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              name="userId"
-              label="User ID"
-              size="small"
-              value={userId || "Not available"}
-              disabled
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
-                  "&.Mui-disabled": {
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: theme.palette.divider,
-                    },
-                  },
-                },
-              }}
-            />
-
-            <TextField
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              name="username"
-              label="Username"
-              size="small"
-              value={formik.values.username}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.username && Boolean(formik.errors.username)}
-              helperText={formik.touched.username && formik.errors.username}
-              disabled={!isEditing}
-              placeholder="Enter username"
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-
-            <TextField
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              name="email"
-              label="Email"
-              size="small"
-              value={formik.values.email}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.email && Boolean(formik.errors.email)}
-              helperText={formik.touched.email && formik.errors.email}
-              disabled={!isEditing}
-              placeholder="Enter email address"
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-
-            <TextField
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              name="mobile_no"
-              label="Mobile Number"
-              size="small"
-              value={formik.values.mobile_no}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={
-                formik.touched.mobile_no && Boolean(formik.errors.mobile_no)
-              }
-              helperText={formik.touched.mobile_no && formik.errors.mobile_no}
-              disabled={!isEditing}
-              placeholder="Enter 8-digit mobile number"
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-          </Stack>
-
-          <Box sx={{ mt: 3, mb: 2 }}>
-            <Link
-              component={RouterLink}
-              to="/change-password"
-              underline="hover"
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                color: "primary.main",
-                "&:hover": { color: "secondary.main" },
-              }}
-            >
-              <Lock fontSize="small" />
-              <Typography variant="body2">Change Password</Typography>
-            </Link>
-          </Box>
-
-          <Divider sx={{ my: 3 }} />
-
-          <Stack
-            direction="row"
-            spacing={2}
-            justifyContent={isEditing ? "space-between" : "flex-end"}
-          >
-            {isEditing ? (
-              <>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  startIcon={<Cancel />}
-                  onClick={handleCancelEdit}
-                  disabled={isSubmitting}
-                  size="small"
-                  sx={{
-                    borderRadius: 2,
-                    py: 0.5,
-                    px: 3,
-                    fontWeight: 600,
-                    letterSpacing: 0.5,
-                    minWidth: 140,
-                    textTransform: "none",
-                  }}
-                >
-                  Cancel
-                </Button>
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  startIcon={
-                    isSubmitting ? <CircularProgress size={16} /> : <Save />
-                  }
-                  disabled={isSubmitting || (!formik.dirty && !profilePicFile)}
-                  size="small"
-                  sx={{
-                    borderRadius: 2,
-                    py: 0.5,
-                    px: 3,
-                    fontWeight: 600,
-                    letterSpacing: 0.5,
-                    minWidth: 140,
-                    textTransform: "none",
-                  }}
-                >
-                  {isSubmitting ? "Saving..." : "Save"}
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="outlined"
-                color="primary"
-                startIcon={<Edit />}
-                onClick={handleEditToggle}
+          <Grid container spacing={2}>
+            <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+              <TextField
+                fullWidth
+                label="User ID"
                 size="small"
+                value={userId || "Not available"}
+                disabled
+                sx={{ borderRadius: 2 }}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Username"
+                size="small"
+                name="username"
+                value={formik.values.username}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.username && Boolean(formik.errors.username)
+                }
+                helperText={formik.touched.username && formik.errors.username}
+                disabled={!isEditing}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Email"
+                size="small"
+                name="email"
+                value={formik.values.email}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.email && Boolean(formik.errors.email)}
+                helperText={formik.touched.email && formik.errors.email}
+                disabled={!isEditing}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Mobile Number"
+                size="small"
+                name="mobile_no"
+                value={formik.values.mobile_no}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.mobile_no && Boolean(formik.errors.mobile_no)
+                }
+                helperText={formik.touched.mobile_no && formik.errors.mobile_no}
+                disabled={!isEditing}
+              />
+            </Grid>
+
+            {/* Change Password */}
+            <Grid item size={{ xs: 12 }}>
+              <Link
+                component={RouterLink}
+                to="/change-password"
+                underline="hover"
                 sx={{
-                  ml: "auto",
-                  borderRadius: 2,
-                  py: 0.5,
-                  px: 3,
-                  fontWeight: 600,
-                  letterSpacing: 0.5,
-                  minWidth: 140,
-                  textTransform: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  color: "primary.main",
                 }}
               >
-                Edit Profile
-              </Button>
-            )}
-          </Stack>
+                <Lock fontSize="small" />
+                <Typography variant="body2">Change Password</Typography>
+              </Link>
+            </Grid>
+
+            {/* Buttons */}
+            <Grid
+              item
+              size={{ xs: 12 }}
+              display="flex"
+              justifyContent={isEditing ? "space-between" : "flex-end"}
+              mt={2}
+            >
+              {isEditing ? (
+                <>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    startIcon={<Cancel />}
+                    onClick={handleCancelEdit}
+                    disabled={isSubmitting}
+                    sx={{ borderRadius: 2, textTransform: "none" }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    startIcon={
+                      isSubmitting ? <CircularProgress size={16} /> : <Save />
+                    }
+                    disabled={
+                      isSubmitting || (!formik.dirty && !profilePicFile)
+                    }
+                    sx={{ borderRadius: 2, textTransform: "none" }}
+                  >
+                    {isSubmitting ? "Saving..." : "Save"}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<Edit />}
+                  onClick={handleEditToggle}
+                  sx={{ borderRadius: 2, textTransform: "none" }}
+                >
+                  Edit Profile
+                </Button>
+              )}
+            </Grid>
+          </Grid>
         </form>
-      </Card>
+      </Paper>
     </Container>
   );
 };

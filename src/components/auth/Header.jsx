@@ -46,7 +46,6 @@ const Header = ({ onToggleSidebar }) => {
     name: username,
     role: current_role,
   };
-
   useEffect(() => {
     let objectUrl;
     const fetchProfileImage = async () => {
