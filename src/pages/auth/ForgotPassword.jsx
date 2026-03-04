@@ -18,7 +18,6 @@ import {
   ArrowBack as ArrowBackIcon,
 } from "@mui/icons-material";
 import UserProfileService from "../../api/services/UserProfileService";
-import { useTheme } from "@mui/material/styles";
 import { Link as RouterLink } from "react-router-dom";
 import slide7 from "../../assets/slider/slide7.png"; // background image
 
@@ -27,7 +26,6 @@ const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const theme = useTheme();
 
   const formik = useFormik({
     initialValues: {
@@ -86,7 +84,6 @@ const ForgotPasswordPage = () => {
           zIndex: 1,
         }}
       />
-
       <Container
         component="main"
         maxWidth="xs"
@@ -110,7 +107,6 @@ const ForgotPasswordPage = () => {
             alignItems: "center",
             borderRadius: 2,
             boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
-            backgroundColor: "#fff",
           }}
         >
           <LockIcon sx={{ fontSize: 40, mb: 2 }} />

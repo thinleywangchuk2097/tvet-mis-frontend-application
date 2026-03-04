@@ -29,7 +29,8 @@ import {
 import UserProfileService from "../../api/services/UserProfileService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import BorderColorIcon from '@mui/icons-material/BorderColor';
+import BorderColorIcon from "@mui/icons-material/BorderColor";
+
 const PasswordChange = ({ redirectOnSuccess = "/" }) => {
   const token = useSelector((state) => state.auth.accessToken);
   const navigate = useNavigate();
@@ -64,7 +65,7 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
       .min(8, "Password must be at least 8 characters")
       .matches(
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-        "Must contain uppercase, lowercase, number and special character"
+        "Must contain uppercase, lowercase, number and special character",
       )
       .required("New password is required")
       .notOneOf([Yup.ref("currentPassword")], "New password must be different"),
@@ -84,7 +85,7 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
       try {
         const response = await UserProfileService.changeUserPassword(
           values,
-          token
+          token,
         );
         if (response.status === 200) {
           showMessage("Password changed successfully!", "success");
@@ -94,14 +95,14 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
         } else {
           showMessage(
             response.data.message || "Password change failed",
-            "error"
+            "error",
           );
         }
       } catch (error) {
         showMessage(
           error.response?.data?.message ||
             "Failed to change password. Please try again.",
-          "error"
+          "error",
         );
       } finally {
         setSubmitting(false);
@@ -138,13 +139,43 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
               color="primary"
               sx={{
                 fontSize: 40,
-                mb: 1,
               }}
             />
-            <Typography variant="h5" fontWeight={600} gutterBottom>
-              Change Your Password
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Box sx={{ textAlign: "center", mb: 1 }}>
+              <Typography
+                variant="h6"
+                fontWeight={700}
+                color="text.primary"
+                sx={{
+                  display: "inline-block",
+                  position: "relative",
+                  cursor: "pointer",
+                  "&::after": {
+                    content: '""',
+                    position: "absolute",
+                    left: 0,
+                    bottom: -2,
+                    width: "100%",
+                    height: "2px",
+                    backgroundColor: "#1e88e6",
+                    borderRadius: "2px",
+                    transform: "scaleX(0)",
+                    transformOrigin: "center",
+                    transition: "transform 0.3s ease",
+                  },
+                  "&:hover::after": {
+                    transform: "scaleX(1)",
+                  },
+                }}
+              >
+                Change Your Password
+              </Typography>
+            </Box>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontStyle: "italic" }}
+            >
               Secure your account with a new password
             </Typography>
           </Box>
@@ -179,8 +210,8 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
                 const key = field.includes("confirm")
                   ? "confirm"
                   : field.includes("new")
-                  ? "new"
-                  : "old";
+                    ? "new"
+                    : "old";
 
                 return (
                   <TextField
@@ -239,11 +270,11 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
                   mt: 3,
                   "& .MuiButton-root": {
                     borderRadius: 2,
-                    py: 0.9,
-                    px: 2,
+                    py: 0.6,
+                    px: 0.2,
                     fontWeight: 600,
                     textTransform: "none",
-                    minHeight: 36,
+                    minHeight: 30,
                   },
                 }}
               >

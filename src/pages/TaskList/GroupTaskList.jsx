@@ -77,12 +77,12 @@ const GroupTaskList = () => {
           taskStatusId,
           currentRoleId,
           locationId,
-          access_token
+          access_token,
         );
 
         if (response.data && Array.isArray(response.data)) {
           const mappedTasks = response.data.map((task, index) =>
-            mapApiDataToTask(task, index)
+            mapApiDataToTask(task, index),
           );
           setTasks(mappedTasks);
           setTotalTasks(mappedTasks.length);
@@ -123,7 +123,7 @@ const GroupTaskList = () => {
   const handleClaimTask = async () => {
     if (!selectedTask) return;
 
-    try {      
+    try {
       // Prepare the payload according to API requirements
       const claimPayload = {
         applicationNo: selectedTask.applicationNo,
@@ -132,40 +132,51 @@ const GroupTaskList = () => {
         assignedRoleId: currentRoleId,
         locationId: locationId,
         serviceId: selectedTask.serviceId || 1, // Use serviceId from task data
-        actorId: assignedUserId
+        actorId: assignedUserId,
       };
 
       // Call the API
-      const response = await TaskListService.claimTask(claimPayload, access_token);
-      
+      const response = await TaskListService.claimTask(
+        claimPayload,
+        access_token,
+      );
+
       // Handle response based on your API structure
       if (response && response.status === 200) {
         // Remove claimed task from list
         setTasks(tasks.filter((task) => task.id !== selectedTask.id));
         setTotalTasks((prev) => prev - 1);
-        
+
         // Show success toast
-        toast.success(response.message || `Task ${selectedTask.applicationNo} claimed successfully!`);
+        toast.success(
+          response.message ||
+            `Task ${selectedTask.applicationNo} claimed successfully!`,
+        );
       } else if (response && response.data && response.data.status === 200) {
         // Alternative response structure
         setTasks(tasks.filter((task) => task.id !== selectedTask.id));
         setTotalTasks((prev) => prev - 1);
-        
-        toast.success(response.data.message || `Task ${selectedTask.applicationNo} claimed successfully!`);
+
+        toast.success(
+          response.data.message ||
+            `Task ${selectedTask.applicationNo} claimed successfully!`,
+        );
       } else {
         // Handle API errors
-        const errorMessage = response?.data?.message || 
-                            response?.message || 
-                            "Failed to claim task. Please try again.";
+        const errorMessage =
+          response?.data?.message ||
+          response?.message ||
+          "Failed to claim task. Please try again.";
         toast.error(errorMessage);
       }
     } catch (err) {
       console.error("Error claiming task:", err);
-      
+
       // Show error toast
-      const errorMessage = err.response?.data?.message || 
-                          err.message || 
-                          "Failed to claim task. Please try again.";
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to claim task. Please try again.";
       toast.error(errorMessage);
     } finally {
       handleMenuClose();
@@ -201,13 +212,13 @@ const GroupTaskList = () => {
       task.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.submittedDate.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.currentStatus.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.applicantName.toLowerCase().includes(searchTerm.toLowerCase())
+      task.applicantName.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // Calculate paginated tasks
   const paginatedTasks = filteredTasks.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   return (
@@ -217,10 +228,10 @@ const GroupTaskList = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          mb: 3,
+          mb: 2,
         }}
       >
-        <Typography variant="h4">Group Task</Typography>
+        <Typography variant="h5">Group Task</Typography>
 
         {/* Search Field */}
         <TextField
@@ -268,12 +279,17 @@ const GroupTaskList = () => {
               sx={{ borderCollapse: "collapse" }}
             >
               <TableHead>
-                <TableRow>
+                <TableRow
+                  sx={{
+                    "& .MuiTableCell-root": {
+                      textAlign: "center",
+                    },
+                  }}
+                >
                   <TableCell
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "8%",
                     }}
                   >
                     Serial No
@@ -282,7 +298,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "18%",
                     }}
                   >
                     Application No
@@ -291,7 +306,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "22%",
                     }}
                   >
                     Service Name
@@ -300,7 +314,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "22%",
                     }}
                   >
                     Applicant Name
@@ -309,7 +322,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "15%",
                     }}
                   >
                     Submitted Date
@@ -318,7 +330,6 @@ const GroupTaskList = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
-                      width: "15%",
                     }}
                   >
                     Current Status

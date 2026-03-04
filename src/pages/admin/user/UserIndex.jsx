@@ -68,7 +68,7 @@ const createUserSchema = Yup.object().shape({
     .min(8, "Password must be at least 8 characters")
     .matches(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])/,
-      "Password must contain at least one uppercase, one lowercase, one number and one special character"
+      "Password must contain at least one uppercase, one lowercase, one number and one special character",
     )
     .required("Password is required"),
   confirmPassword: Yup.string()
@@ -117,9 +117,8 @@ const UserIndex = () => {
       try {
         setLoading(true);
         // Fetch users
-        const usersResponse = await UserRoleManagementService.getAllUsers(
-          access_token
-        );
+        const usersResponse =
+          await UserRoleManagementService.getAllUsers(access_token);
         if (usersResponse.status === 200) {
           const formattedUsers = usersResponse.data.map((user) => ({
             user_id: user.user_id || "",
@@ -131,8 +130,8 @@ const UserIndex = () => {
               typeof user.roles === "string"
                 ? JSON.parse(user.roles.replace(/'/g, '"')).map(String)
                 : Array.isArray(user.roles)
-                ? user.roles.map(String)
-                : [],
+                  ? user.roles.map(String)
+                  : [],
             location_id: parseInt(user.location_id) || 0,
             mobile_no: user.mobile_no || "",
             email_id: user.email_id || "",
@@ -148,20 +147,19 @@ const UserIndex = () => {
             locationsResponse.data.map((item) => ({
               id: item.id,
               name: item.dzonkhagName,
-            }))
+            })),
           );
         }
 
         // Fetch roles
-        const rolesResponse = await UserRoleManagementService.getRoles(
-          access_token
-        );
+        const rolesResponse =
+          await UserRoleManagementService.getRoles(access_token);
         if (rolesResponse.status === 200) {
           setCurrentRoles(
             rolesResponse.data.map((item) => ({
               id: item.id.toString(),
               name: item.role_name,
-            }))
+            })),
           );
         }
       } catch (error) {
@@ -196,7 +194,7 @@ const UserIndex = () => {
             .includes(searchTerm.toLowerCase()) ||
           getLocationNameById(user.location_id)
             .toLowerCase()
-            .includes(searchTerm.toLowerCase())
+            .includes(searchTerm.toLowerCase()),
       );
       setFilteredUsers(filtered);
     }
@@ -242,7 +240,7 @@ const UserIndex = () => {
   const handleCurrentRoleChange = (event) => {
     const selectedRoleId = event.target.value;
     const rolesWithoutCurrent = formik.values.roles.filter(
-      (role) => role !== formik.values.current_role
+      (role) => role !== formik.values.current_role,
     );
     const updatedRoles = rolesWithoutCurrent.includes(selectedRoleId)
       ? rolesWithoutCurrent
@@ -295,12 +293,12 @@ const UserIndex = () => {
       if (editMode && currentUser) {
         response = await UserRoleManagementService.updateUser(
           payload,
-          access_token
+          access_token,
         );
       } else {
         response = await UserRoleManagementService.createUser(
           payload,
-          access_token
+          access_token,
         );
       }
 
@@ -314,9 +312,8 @@ const UserIndex = () => {
         setRolesOpen(false); // Close roles dropdown
 
         // Refresh the user list
-        const usersResponse = await UserRoleManagementService.getAllUsers(
-          access_token
-        );
+        const usersResponse =
+          await UserRoleManagementService.getAllUsers(access_token);
         if (usersResponse.status === 200) {
           const formattedUsers = usersResponse.data.map((user) => ({
             user_id: user.user_id || "",
@@ -328,8 +325,8 @@ const UserIndex = () => {
               typeof user.roles === "string"
                 ? JSON.parse(user.roles.replace(/'/g, '"')).map(String)
                 : Array.isArray(user.roles)
-                ? user.roles.map(String)
-                : [],
+                  ? user.roles.map(String)
+                  : [],
             location_id: parseInt(user.location_id) || 0,
             mobile_no: user.mobile_no || "",
             email_id: user.email_id || "",
@@ -434,12 +431,12 @@ const UserIndex = () => {
       setLoading(true);
       const response = await UserRoleManagementService.deleteUser(
         payload,
-        access_token
+        access_token,
       );
 
       if (response.status === 200) {
         const updatedUsers = users.filter(
-          (user) => user.user_id !== userToDelete
+          (user) => user.user_id !== userToDelete,
         );
         setUsers(updatedUsers);
         setFilteredUsers(updatedUsers);
@@ -462,7 +459,7 @@ const UserIndex = () => {
 
   const getLocationNameById = (locationId) => {
     const location = locations.find(
-      (loc) => String(loc.id) === String(locationId)
+      (loc) => String(loc.id) === String(locationId),
     );
     return location ? location.name : "Unknown";
   };
@@ -492,7 +489,7 @@ const UserIndex = () => {
           alignItems="center"
           mb={3}
         >
-          <Typography variant="h4" component="h1">
+          <Typography variant="h5" component="h1">
             User Management
           </Typography>
           <Stack direction="row" spacing={2} alignItems="center">
@@ -555,7 +552,13 @@ const UserIndex = () => {
                 }}
               >
                 <TableHead>
-                  <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+                  <TableRow
+                    sx={{
+                      "& .MuiTableCell-root": {
+                        textAlign: "center",
+                      },
+                    }}
+                  >
                     <TableCell
                       sx={{ borderRight: "1px solid rgba(224, 224, 224, 1)" }}
                     >
@@ -599,7 +602,7 @@ const UserIndex = () => {
                     filteredUsers
                       .slice(
                         page * rowsPerPage,
-                        page * rowsPerPage + rowsPerPage
+                        page * rowsPerPage + rowsPerPage,
                       )
                       .map((user, index) => (
                         <TableRow key={user.user_id} hover>
@@ -1013,12 +1016,19 @@ const UserIndex = () => {
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleDialogClose} disabled={loading}>
+              <Button
+                color="error"
+                variant="contained"
+                size="small"
+                onClick={handleDialogClose}
+                disabled={loading}
+              >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="contained"
+                size="small"
                 disabled={isUpdateDisabled()}
                 startIcon={loading ? <CircularProgress size={20} /> : null}
               >
@@ -1054,6 +1064,7 @@ const UserIndex = () => {
             <Button
               onClick={() => setDeleteDialogOpen(false)}
               color="primary"
+              variant="contained"
               disabled={loading}
             >
               Cancel

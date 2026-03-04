@@ -58,7 +58,7 @@ const authSlice = createSlice({
 
       Cookies.remove('access_token');
       Cookies.remove('refresh_token');
-      Cookies.remove('privileges');
+      localStorage.removeItem("privileges"); 
       Cookies.remove('username');
       Cookies.remove('current_roleId');
       Cookies.remove('current_role_name');

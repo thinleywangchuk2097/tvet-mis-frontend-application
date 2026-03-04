@@ -1,36 +1,44 @@
-import { Box, AppBar, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { Outlet } from "react-router-dom";
-import Header from "../components/public/Header";
 import Footer from "../components/public/Footer";
+import AnimatedHeader from "../components/public/AnimatedHeader";
+
 const PublicLayout = () => {
   return (
-    <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <AppBar position="static" sx={{ bgcolor: "primary.main", boxShadow: 2 }}>
-        <Header />
-      </AppBar>
-
-      {/* Main Content */}
-      <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {/* Outlet renders page content like PublicIndex */}
-        <Outlet />
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+      }}
+    >
+      {/* Static Header */}
+      <Box sx={{ flexShrink: 0 }}>
+        <AnimatedHeader />
       </Box>
 
-      {/* Footer */}
+      {/* Scrollable main content + footer */}
       <Box
-        component="footer"
         sx={{
-          height: 60,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          borderTop: "1px solid #ddd",
-          bgcolor: "background.paper",
+          flex: 1,
+          overflowY: "auto", // vertical scroll
+          overflowX: "hidden", // hide horizontal scroll
         }}
       >
-        <Typography variant="body2" color="text.secondary">
+        <Outlet />
+
+        {/* Footer included inside scrollable area */}
+        <Box
+          component="footer"
+          sx={{
+            py: 1,
+            textAlign: "center",
+            bgcolor: "background.paper",
+            borderTop: "1px solid #ddd",
+          }}
+        >
           <Footer />
-        </Typography>
+        </Box>
       </Box>
     </Box>
   );

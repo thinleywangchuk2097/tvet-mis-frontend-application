@@ -4,23 +4,20 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from "react-toastify";
 import {
-  Card,
+  Paper,
   Typography,
   Box,
   Divider,
   Avatar,
   useTheme,
   Container,
-  Chip,
   TextField,
   Button,
-  Stack,
+  Grid,
   IconButton,
-  Link,
-  Snackbar,
-  Alert,
-  CircularProgress,
   LinearProgress,
+  Link,
+  CircularProgress,
 } from "@mui/material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import {
@@ -37,7 +34,7 @@ import UserProfileService from "../../api/services/UserProfileService";
 const profileSchema = Yup.object().shape({
   username: Yup.string()
     .min(3, "Username must be at least 3 characters")
-    .max(50, "Username must not exceed 20 characters")
+    .max(50, "Username must not exceed 50 characters")
     .required("Username is required"),
   email: Yup.string()
     .email("Invalid email address")
@@ -48,28 +45,20 @@ const profileSchema = Yup.object().shape({
 });
 
 const UserProfile = () => {
-  const access_token = useSelector((state) => state.auth.accessToken);
   const theme = useTheme();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const access_token = useSelector((state) => state.auth.accessToken);
   const userId = useSelector((state) => state.auth.userId);
   const roleIds = useSelector((state) => state.auth.roles);
-
   const currentProfilePic =
     useSelector((state) => state.auth.profilePic) || null;
+
   const [userProfileLists, setUserProfileLists] = useState({});
   const [isEditing, setIsEditing] = useState(false);
-  const [profilePic, setProfilePic] = useState(
-    currentProfilePic ? currentProfilePic : null,
-  );
-
+  const [profilePic, setProfilePic] = useState(currentProfilePic);
   const [profilePicFile, setProfilePicFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -79,154 +68,95 @@ const UserProfile = () => {
           UserProfileService.getUserProfileImage(userId, access_token),
         ]);
         setUserProfileLists(profileResponse.data);
-        // Handle image response
         if (imageResponse.status === 200) {
-          // Convert binary image data to base64
           const base64Image = btoa(
             new Uint8Array(imageResponse.data).reduce(
               (data, byte) => data + String.fromCharCode(byte),
               "",
             ),
           );
-          const imageUrl = `data:${imageResponse.headers["content-type"]};base64,${base64Image}`;
-          setProfilePic(imageUrl);
+          setProfilePic(
+            `data:${imageResponse.headers["content-type"]};base64,${base64Image}`,
+          );
         }
       } catch (error) {
-        console.error("Error loading data:", error);
-        setProfilePic(null); // Fallback to default avatar
+        console.error(error);
+        setProfilePic(null);
       }
     };
-
     fetchData();
   }, [userId, access_token]);
 
-  const convertImageToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
+  const convertImageToBase64 = (file) =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result);
       reader.onerror = (error) => reject(error);
     });
-  };
 
   const formik = useFormik({
     initialValues: {
-      username: `${userProfileLists.firstName || ""} ${
-        userProfileLists.middleName || ""
-      } ${userProfileLists.lastName || ""}`.trim(),
+      username:
+        `${userProfileLists.firstName || ""} ${userProfileLists.middleName || ""} ${userProfileLists.lastName || ""}`.trim(),
       email: userProfileLists.emailId || "",
       mobile_no: userProfileLists.mobileNo || "",
       profilePic: userProfileLists.profileImageUrl || "",
     },
     validationSchema: profileSchema,
+    enableReinitialize: true,
     onSubmit: async (values) => {
       setIsSubmitting(true);
       try {
         let profileImageBase64 = null;
-        // Convert image to base64 if a new one was selected
-        if (profilePicFile) {
-          try {
-            profileImageBase64 = await convertImageToBase64(profilePicFile);
-          } catch (error) {
-            setSnackbar({
-              open: true,
-              message: "Failed to process image",
-              severity: "error",
-            });
-            setIsSubmitting(false);
-            return;
-          }
-        }
-
-        // Prepare the data to submit
+        if (profilePicFile)
+          profileImageBase64 = await convertImageToBase64(profilePicFile);
         const userData = {
           userId,
           userName: values.username,
           mobileNo: values.mobile_no,
           emailId: values.email,
           profileImageBase64,
-          currentProfilePic: currentProfilePic,
+          currentProfilePic,
         };
-
-        // Make API call
         const response = await UserProfileService.updateUserProfile(
           userData,
           access_token,
         );
         if (response.status === 200) {
           setIsEditing(false);
+          setProfilePicFile(null);
           toast.success(
             response.data.message || "Profile updated successfully!",
           );
           navigate(-1);
         }
       } catch (error) {
-        setSnackbar({
-          open: true,
-          message: error.response?.data?.message || "Failed to update profile",
-          severity: "error",
-        });
+        console.error(error);
       } finally {
         setIsSubmitting(false);
       }
     },
-    enableReinitialize: true,
   });
 
   const handleEditToggle = () => {
     setIsEditing(!isEditing);
-    if (!isEditing) {
-      formik.resetForm();
-    }
+    if (!isEditing) formik.resetForm();
   };
-
   const handleCancelEdit = () => {
     setIsEditing(false);
     formik.resetForm();
-    setProfilePic(currentProfilePic ? currentProfilePic : null);
     setProfilePicFile(null);
   };
-
-  const handleClose = () => {
-    navigate(-1);
-  };
-
+  const handleClose = () => navigate(-1);
   const handleFileChange = (event) => {
     const file = event.target.files[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.match("image.*")) {
-        setSnackbar({
-          open: true,
-          message: "Please select an image file",
-          severity: "error",
-        });
-        return;
-      }
-      // Validate file size (e.g., 2MB max)
-      if (file.size > 2 * 1024 * 1024) {
-        setSnackbar({
-          open: true,
-          message: "Image size must be less than 2MB",
-          severity: "error",
-        });
-        return;
-      }
-
-      // Create a preview URL for the image
-      const previewUrl = URL.createObjectURL(file);
-      setProfilePic(previewUrl);
-      setProfilePicFile(file);
-    }
+    if (!file || !file.type.match("image.*") || file.size > 2 * 1024 * 1024)
+      return;
+    setProfilePic(URL.createObjectURL(file));
+    setProfilePicFile(file);
   };
-
-  const triggerFileInput = () => {
-    fileInputRef.current.click();
-  };
-
-  const handleSnackbarClose = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
+  const triggerFileInput = () => fileInputRef.current.click();
 
   return (
     <Container
@@ -237,14 +167,12 @@ const UserProfile = () => {
         mb: 4,
       }}
     >
-      <Card
+      <Paper
+        elevation={6}
         sx={{
           borderRadius: 3,
-          boxShadow: theme.shadows[4],
-          border: `1px solid ${theme.palette.divider}`,
-          backgroundColor: theme.palette.background.paper,
-          px: { xs: 2, sm: 4 },
-          py: 3,
+          px: { xs: 3, sm: 3 },
+          py: { xs: 3, sm: 3 },
           position: "relative",
           overflow: "visible",
         }}
@@ -255,7 +183,7 @@ const UserProfile = () => {
           sx={{
             position: "absolute",
             right: 16,
-            top: 16,
+            top: 10,
             color: theme.palette.text.secondary,
             "&:hover": {
               color: theme.palette.text.primary,
@@ -265,36 +193,41 @@ const UserProfile = () => {
         >
           <Close />
         </IconButton>
-        <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
+
+        {/* Header */}
+        <Box textAlign="center" mb={2}>
+          <Typography variant="h5" fontWeight={700} color="text.primary">
+            User Profile
+          </Typography>
+        </Box>
+
+        {/* Avatar & Roles */}
+        <Box display="flex" flexDirection="column" alignItems="center" mb={4}>
           <Box sx={{ position: "relative" }}>
             <Avatar
               src={profilePic}
               sx={{
-                bgcolor: "primary.main",
-                width: 100,
-                height: 100,
-                mb: 2,
+                width: 110,
+                height: 110,
+                mb: 1,
                 border: `4px solid ${theme.palette.primary.light}`,
-                boxShadow: theme.shadows[2],
+                boxShadow: theme.shadows[3],
               }}
-              onError={() => {
-                setProfilePic(null);
-              }}
+              onError={() => setProfilePic(null)}
             >
-              {!profilePic && <AccountCircle sx={{ fontSize: 60 }} />}
+              {!profilePic && <AccountCircle sx={{ fontSize: 64 }} />}
             </Avatar>
+
             {isEditing && (
               <>
                 <IconButton
                   onClick={triggerFileInput}
                   sx={{
                     position: "absolute",
-                    bottom: 10,
+                    bottom: 7,
                     right: 0,
                     backgroundColor: theme.palette.background.paper,
-                    "&:hover": {
-                      backgroundColor: theme.palette.action.hover,
-                    },
+                    "&:hover": { backgroundColor: theme.palette.action.hover },
                   }}
                 >
                   <Edit fontSize="small" />
@@ -309,17 +242,12 @@ const UserProfile = () => {
               </>
             )}
           </Box>
-          <Typography variant="h5" fontWeight={600} color="text.primary">
-            User Profile
-          </Typography>
+
           <Box
-            sx={{
-              mt: 1,
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              color: "text.secondary",
-            }}
+            display="flex"
+            alignItems="center"
+            gap={1}
+            color="text.secondary"
           >
             <AdminPanelSettings fontSize="small" />
             <Typography variant="body2" fontWeight={500}>
@@ -329,217 +257,136 @@ const UserProfile = () => {
         </Box>
 
         <Divider sx={{ mb: 3 }} />
-
         {isSubmitting && <LinearProgress />}
 
+        {/* Form */}
         <form onSubmit={formik.handleSubmit}>
-          <Stack spacing={3}>
-            {/* User ID - Not editable */}
-            <TextField
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              name="userId"
-              label="User ID"
-              size="small"
-              value={userId || "Not available"}
-              disabled
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
-                  "&.Mui-disabled": {
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: theme.palette.divider,
-                    },
-                  },
-                },
-              }}
-            />
-            {/* Username */}
-            <TextField
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              name="username"
-              label="Username"
-              size="small"
-              value={formik.values.username}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.username && Boolean(formik.errors.username)}
-              helperText={formik.touched.username && formik.errors.username}
-              disabled={!isEditing}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
-                  "&.Mui-disabled": {
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: theme.palette.divider,
-                    },
-                  },
-                },
-              }}
-              placeholder="Enter username"
-            />
-            {/* Email */}
-            <TextField
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              name="email"
-              label="Email"
-              size="small"
-              value={formik.values.email}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.email && Boolean(formik.errors.email)}
-              helperText={formik.touched.email && formik.errors.email}
-              disabled={!isEditing}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
-                  "&.Mui-disabled": {
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: theme.palette.divider,
-                    },
-                  },
-                },
-              }}
-              placeholder="Enter email address"
-            />
-            {/* Mobile Number */}
-            <TextField
-              fullWidth
-              margin="normal"
-              variant="outlined"
-              name="mobile_no"
-              label="Mobile Number"
-              size="small"
-              value={formik.values.mobile_no}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={
-                formik.touched.mobile_no && Boolean(formik.errors.mobile_no)
-              }
-              helperText={formik.touched.mobile_no && formik.errors.mobile_no}
-              disabled={!isEditing}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
-                  "&.Mui-disabled": {
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: theme.palette.divider,
-                    },
-                  },
-                },
-              }}
-              placeholder="Enter 8-digit mobile number"
-            />
-          </Stack>
-          {/* Change Password Link */}
-          <Box sx={{ mt: 3, mb: 2 }}>
-            <Link
-              component={RouterLink}
-              to="/change-password"
-              underline="hover"
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                color: "primary.main",
-                "&:hover": {
-                  color: "secondary.main",
-                },
-              }}
-            >
-              <Lock fontSize="small" />
-              <Typography variant="body2">Change Password</Typography>
-            </Link>
-          </Box>
-          <Divider sx={{ my: 3 }} />
-          <Stack
-            direction="row"
-            spacing={2}
-            justifyContent={isEditing ? "space-between" : "flex-end"}
-          >
-            {isEditing ? (
-              <>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  startIcon={<Cancel />}
-                  onClick={handleCancelEdit}
-                  disabled={isSubmitting}
-                  size="small"
-                  sx={{
-                    borderRadius: 2,
-                    py: 0.8, // smaller height
-                    px: 3, // increased width padding
-                    fontWeight: 600,
-                    letterSpacing: 0.5,
-                    minWidth: 160, // longer button
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  startIcon={
-                    isSubmitting ? <CircularProgress size={16} /> : <Save />
-                  }
-                  disabled={isSubmitting}
-                  size="small"
-                  sx={{
-                    borderRadius: 2,
-                    py: 0.8, // smaller height
-                    px: 3, // increased width padding
-                    fontWeight: 600,
-                    letterSpacing: 0.5,
-                    minWidth: 160, // longer button
-                  }}
-                >
-                  {isSubmitting ? "Saving..." : "Save"}
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="outlined"
-                color="primary"
-                startIcon={<Edit />}
-                onClick={handleEditToggle}
+          <Grid container spacing={2}>
+            <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+              <TextField
+                fullWidth
+                label="User ID"
                 size="small"
+                value={userId || "Not available"}
+                disabled
+                sx={{ borderRadius: 2 }}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Username"
+                size="small"
+                name="username"
+                value={formik.values.username}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.username && Boolean(formik.errors.username)
+                }
+                helperText={formik.touched.username && formik.errors.username}
+                disabled={!isEditing}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Email"
+                size="small"
+                name="email"
+                value={formik.values.email}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.email && Boolean(formik.errors.email)}
+                helperText={formik.touched.email && formik.errors.email}
+                disabled={!isEditing}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Mobile Number"
+                size="small"
+                name="mobile_no"
+                value={formik.values.mobile_no}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.mobile_no && Boolean(formik.errors.mobile_no)
+                }
+                helperText={formik.touched.mobile_no && formik.errors.mobile_no}
+                disabled={!isEditing}
+              />
+            </Grid>
+
+            {/* Change Password */}
+            <Grid item size={{ xs: 12 }}>
+              <Link
+                component={RouterLink}
+                to="/change-password"
+                underline="hover"
                 sx={{
-                  ml: "auto",
-                  borderRadius: 2,
-                  py: 0.8, // smaller height
-                  px: 3, // increased width padding
-                  fontWeight: 600,
-                  letterSpacing: 0.5,
-                  minWidth: 160, // longer button
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  color: "primary.main",
                 }}
               >
-                Edit Profile
-              </Button>
-            )}
-          </Stack>
+                <Lock fontSize="small" />
+                <Typography variant="body2">Change Password</Typography>
+              </Link>
+            </Grid>
+
+            {/* Buttons */}
+            <Grid
+              item
+              size={{ xs: 12 }}
+              display="flex"
+              justifyContent={isEditing ? "space-between" : "flex-end"}
+              mt={2}
+            >
+              {isEditing ? (
+                <>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    startIcon={<Cancel />}
+                    onClick={handleCancelEdit}
+                    disabled={isSubmitting}
+                    sx={{ borderRadius: 2, textTransform: "none" }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    startIcon={
+                      isSubmitting ? <CircularProgress size={16} /> : <Save />
+                    }
+                    disabled={
+                      isSubmitting || (!formik.dirty && !profilePicFile)
+                    }
+                    sx={{ borderRadius: 2, textTransform: "none" }}
+                  >
+                    {isSubmitting ? "Saving..." : "Save"}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<Edit />}
+                  onClick={handleEditToggle}
+                  sx={{ borderRadius: 2, textTransform: "none" }}
+                >
+                  Edit Profile
+                </Button>
+              )}
+            </Grid>
+          </Grid>
         </form>
-      </Card>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      </Paper>
     </Container>
   );
 };

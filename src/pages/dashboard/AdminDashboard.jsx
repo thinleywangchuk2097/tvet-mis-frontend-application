@@ -67,7 +67,7 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
         transition: "all 0.3s ease",
         background: `linear-gradient(135deg, ${alpha(
           theme.palette[color].main,
-          0.05
+          0.05,
         )} 0%, ${theme.palette.background.paper} 100%)`,
         position: "relative",
         overflow: "hidden",
@@ -358,20 +358,34 @@ const AdminDashboard = () => {
       }}
     >
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight={800} gutterBottom>
-          Admin Dashboard 
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h6" fontWeight={800} gutterBottom>
+          Admin Dashboard
         </Typography>
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          sx={{ maxWidth: 600 }}
-        >
-          Welcome back, Administrator. 
-        </Typography>
-        <Divider sx={{ mt: 2 }} />
+        <Divider
+          sx={{
+            position: "relative",
+            height: 2,
+            backgroundColor: "grey.400",
+            overflow: "hidden",
+            "&::after": {
+              content: '""',
+              position: "absolute",
+              left: "50%",
+              top: 0,
+              width: 0,
+              height: "100%",
+              bgcolor: "primary.main",
+              transition: "width 0.4s ease, left 0.4s ease",
+              transform: "translateX(-50%)",
+            },
+            "&:hover::after": {
+              width: "100%",
+              left: "50%",
+            },
+          }}
+        />
       </Box>
-
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item size={{ xs: 12, sm: 6, md: 3 }}>

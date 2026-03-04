@@ -289,7 +289,7 @@ const QuickActions = () => (
   </Card>
 );
 
-const UserDashboard = () => {
+const TraineeDashboard = () => {
   const theme = useTheme();
 
   return (
@@ -302,9 +302,34 @@ const UserDashboard = () => {
       }}
     >
       <Box sx={{ maxWidth: 1600, mx: "auto", px: 3, py: 4 }}>
-        <Typography variant="h4" fontWeight={700} sx={{ mb: 4 }}>
-          User Dashboard
-        </Typography>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6" fontWeight={800} gutterBottom>
+            Trainee Dashboard
+          </Typography>
+          <Divider
+            sx={{
+              position: "relative",
+              height: 2,
+              backgroundColor: "grey.400",
+              overflow: "hidden",
+              "&::after": {
+                content: '""',
+                position: "absolute",
+                left: "50%",
+                top: 0,
+                width: 0,
+                height: "100%",
+                bgcolor: "primary.main",
+                transition: "width 0.4s ease, left 0.4s ease",
+                transform: "translateX(-50%)",
+              },
+              "&:hover::after": {
+                width: "100%",
+                left: "50%",
+              },
+            }}
+          />
+        </Box>
 
         {/* Top Progress Cards */}
         <Box
@@ -460,4 +485,4 @@ const UserDashboard = () => {
   );
 };
 
-export default UserDashboard;
+export default TraineeDashboard;

@@ -98,6 +98,7 @@ const Login = () => {
             current_role,
             access_token,
           );
+console.log("Fetched privileges from API:", privilegesData.data);
 
           const privileges =
             privilegesData.data?.map((item) => ({
@@ -107,9 +108,8 @@ const Login = () => {
               parent_id: item.parentId,
               privilege_name: item.privilegeName,
               route_name: item.routeName,
-              icon: item.icon,
+              menuIcon: item.menuIcon,
             })) || [];
-
           dispatch(setPrivileges(privileges));
         } catch (err) {
           console.error("Privilege fetch error", err);
@@ -172,7 +172,7 @@ const Login = () => {
       />
 
       <Container maxWidth="xs" sx={{ position: "relative", zIndex: 2 }}>
-        <Paper elevation={3} sx={{ p: 3, mt: 6 }}>
+        <Paper elevation={3} sx={{ p: 3, mt: 1 }}>
           <Box display="flex" flexDirection="column" alignItems="center">
             {/* SIGN IN */}
             <Typography

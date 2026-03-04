@@ -8,27 +8,20 @@ import {
   Collapse,
   ListItemIcon,
   Typography,
-  useTheme,
   Avatar,
   ListItemButton,
+  useTheme,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
+import * as MuiIcons from "@mui/icons-material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import PeopleIcon from "@mui/icons-material/People";
-import MiscellaneousServicesIcon from '@mui/icons-material/MiscellaneousServices';
-import AssessmentIcon from "@mui/icons-material/Assessment";
-import BuildIcon from "@mui/icons-material/Build";
-import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
-import DownloadForOfflineIcon from "@mui/icons-material/DownloadForOffline";
 import logo from "../../assets/bhutan-emblem.jpeg";
 
 const Sidebar = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-
   const privileges = useSelector((state) => state.privileges?.privileges || []);
 
   const [expandedMenus, setExpandedMenus] = useState({});
@@ -40,20 +33,30 @@ const Sidebar = () => {
     }));
   };
 
-  const getMenuIcon = (name) => {
-    const icons = {
-      Dashboard: <DashboardIcon fontSize="small" />,
-      "User Dashboard": <DashboardIcon fontSize="small" />,
-      Administration: <PeopleIcon fontSize="small" />,
-      "Dropdown Management": <DownloadForOfflineIcon fontSize="small" />,
-      TaskList: <FormatListNumberedIcon fontSize="small" />,
-      "Report Management": <AssessmentIcon fontSize="small" />,
-      Service: <BuildIcon fontSize="small" />,
-    };
-    return icons[name] || <MiscellaneousServicesIcon fontSize="small" />;
+  const isActive = (path) => location.pathname === path;
+
+  // Dynamic icon rendering
+  const renderIcon = (iconName) => {
+    if (!iconName) return null;
+    const formattedName = iconName.replace(/Icon$/, "");
+    const IconComponent = MuiIcons[formattedName];
+    if (!IconComponent) return null;
+    return <IconComponent fontSize="small" />;
   };
 
-  const isActive = (path) => location.pathname === path;
+  const mainMenus = privileges
+    .filter((priv) => priv.parent_id === null)
+    .sort(
+      (a, b) => (Number(a.display_order) || 0) - (Number(b.display_order) || 0),
+    );
+
+  const getSubmenus = (parentId) =>
+    privileges
+      .filter((priv) => priv.parent_id === parentId)
+      .sort(
+        (a, b) =>
+          (Number(a.display_order) || 0) - (Number(b.display_order) || 0),
+      );
 
   const menuItemSx = (active) => ({
     mx: 0.5,
@@ -61,15 +64,24 @@ const Sidebar = () => {
     borderRadius: 1,
     px: 1.5,
     py: 0.75,
-    fontWeight: 500,
+    fontWeight: active ? 600 : 500,
     color: active ? theme.palette.primary.main : theme.palette.text.primary,
-    backgroundColor: active ? theme.palette.action.selected : "transparent",
+    borderLeft: active
+      ? `3px solid ${theme.palette.primary.main}`
+      : "3px solid transparent",
+    transition: "all 0.2s ease",
     "&:hover": {
-      backgroundColor: theme.palette.action.hover,
+      color: theme.palette.primary.main,
+      transform: "translateX(4px)",
+      borderLeft: `3px solid ${theme.palette.primary.main}`,
     },
     "& .MuiListItemIcon-root": {
       minWidth: 34,
       color: active ? theme.palette.primary.main : theme.palette.text.secondary,
+      transition: "color 0.2s ease",
+    },
+    "&:hover .MuiListItemIcon-root": {
+      color: theme.palette.primary.main,
     },
   });
 
@@ -77,26 +89,26 @@ const Sidebar = () => {
     ml: 3,
     mr: 0.5,
     mb: 0.25,
-    borderRadius: 1,
     py: 0.5,
     fontSize: "0.8rem",
+    fontWeight: active ? 600 : 400,
     color: active ? theme.palette.primary.main : theme.palette.text.primary,
-    backgroundColor: active ? theme.palette.action.selected : "transparent",
+    borderLeft: active
+      ? `2px solid ${theme.palette.primary.main}`
+      : "2px solid transparent",
+    transition: "all 0.2s ease",
     "&:hover": {
-      backgroundColor: theme.palette.action.hover,
+      color: theme.palette.primary.main,
+      transform: "translateX(4px)",
+      borderLeft: `2px solid ${theme.palette.primary.main}`,
     },
   });
-
-  const mainMenus = privileges.filter((priv) => priv.parent_id === null);
-
-  const getSubmenus = (parentId) => privileges.filter((priv) => priv.parent_id === parentId);
 
   return (
     <Box
       sx={{
         width: 240,
         height: "100vh",
-        bgcolor: theme.palette.background.paper,
         borderRight: `1px solid ${theme.palette.divider}`,
         display: "flex",
         flexDirection: "column",
@@ -104,14 +116,7 @@ const Sidebar = () => {
     >
       {/* Logo Header */}
       <Box
-        sx={{
-          px: 2,
-          py: 1.35,
-          display: "flex",
-          alignItems: "center",
-          gap: 1.5,
-          // borderBottom: `1px solid ${theme.palette.divider}`,
-        }}
+        sx={{ px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1.5 }}
       >
         <Avatar src={logo} sx={{ width: 44, height: 44 }} />
         <Typography fontWeight={600} fontSize="0.95rem">
@@ -129,6 +134,7 @@ const Sidebar = () => {
 
             return (
               <React.Fragment key={menu.id}>
+                {/* Parent Menu */}
                 <ListItem disablePadding>
                   <ListItemButton
                     sx={menuItemSx(activeMain)}
@@ -138,19 +144,14 @@ const Sidebar = () => {
                         : navigate(menu.route_name)
                     }
                   >
-                    <ListItemIcon>
-                      {getMenuIcon(menu.privilege_name)}
-                    </ListItemIcon>
-
+                    <ListItemIcon>{renderIcon(menu.menuIcon)}</ListItemIcon>
                     <ListItemText
-                      primary={menu.privilege_name}
-                      slotProps={{
-                        primary: {
-                          sx: { fontSize: "0.85rem" },
-                        },
-                      }}
+                      primary={
+                        <Typography sx={{ fontSize: "0.85rem" }}>
+                          {menu.privilege_name}
+                        </Typography>
+                      }
                     />
-
                     {hasSubmenus &&
                       (expandedMenus[menu.id] ? (
                         <ExpandLessIcon fontSize="small" />
@@ -160,6 +161,7 @@ const Sidebar = () => {
                   </ListItemButton>
                 </ListItem>
 
+                {/* Submenus */}
                 {hasSubmenus && (
                   <Collapse in={expandedMenus[menu.id]} timeout={200}>
                     <List disablePadding>
@@ -170,14 +172,11 @@ const Sidebar = () => {
                             onClick={() => navigate(submenu.route_name)}
                           >
                             <ListItemText
-                              primary={submenu.privilege_name}
-                              slotProps={{
-                                primary: {
-                                  sx: {
-                                    fontSize: "0.8rem",
-                                  },
-                                },
-                              }}
+                              primary={
+                                <Typography sx={{ fontSize: "0.8rem" }}>
+                                  {submenu.privilege_name}
+                                </Typography>
+                              }
                             />
                           </ListItemButton>
                         </ListItem>

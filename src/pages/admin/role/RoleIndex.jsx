@@ -72,9 +72,8 @@ const RoleIndex = () => {
     const fetchData = async () => {
       const fetchPrivileges = async () => {
         try {
-          const response = await PrivilegeService.getParentPrivileges(
-            access_token
-          );
+          const response =
+            await PrivilegeService.getParentPrivileges(access_token);
           const parentPrivileges = response.data;
 
           const hierarchyPromises = parentPrivileges.map(async (parent) => {
@@ -82,7 +81,7 @@ const RoleIndex = () => {
               if (parent.id) {
                 const childResponse = await PrivilegeService.getChildPrivileges(
                   parent.id,
-                  access_token
+                  access_token,
                 );
                 return {
                   ...parent,
@@ -93,7 +92,7 @@ const RoleIndex = () => {
             } catch (childError) {
               console.error(
                 `Error fetching children for parent ${parent.id}:`,
-                childError
+                childError,
               );
               return {
                 ...parent,
@@ -118,9 +117,8 @@ const RoleIndex = () => {
 
       const fetchRolePrivilegesIndex = async () => {
         try {
-          const response = await UserRoleManagementService.getAllPrivilegeRole(
-            access_token
-          );
+          const response =
+            await UserRoleManagementService.getAllPrivilegeRole(access_token);
           if (response.status === 200) {
             const data = response.data.map((item) => {
               let privileges = [];
@@ -160,7 +158,6 @@ const RoleIndex = () => {
     fetchData();
   }, [access_token]);
 
-  // Filter roles based on search term
   useEffect(() => {
     if (searchTerm.trim() === "") {
       setFilteredRoles(roles);
@@ -168,7 +165,7 @@ const RoleIndex = () => {
       const filtered = roles.filter(
         (role) =>
           role.roleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          role.description.toLowerCase().includes(searchTerm.toLowerCase())
+          role.description.toLowerCase().includes(searchTerm.toLowerCase()),
       );
       setFilteredRoles(filtered);
     }
@@ -194,18 +191,6 @@ const RoleIndex = () => {
     });
   };
 
-  const handlePrivilegeChange = (privilegeId) => {
-    const currentPrivileges = formData.assignedPrivilegeId;
-    const newPrivileges = currentPrivileges.includes(privilegeId)
-      ? currentPrivileges.filter((id) => id !== privilegeId)
-      : [...currentPrivileges, privilegeId];
-
-    setFormData({
-      ...formData,
-      assignedPrivilegeId: newPrivileges,
-    });
-  };
-
   const toggleCategoryPrivileges = (parentId, children, checked) => {
     const privilegeIds = [parentId, ...children.map((child) => child.id)];
     const newPrivileges = checked
@@ -221,16 +206,48 @@ const RoleIndex = () => {
   const isCategoryChecked = (parentId, children) => {
     const privilegeIds = [parentId, ...children.map((child) => child.id)];
     return privilegeIds.every((id) =>
-      formData.assignedPrivilegeId.includes(id)
+      formData.assignedPrivilegeId.includes(id),
     );
   };
 
   const isCategoryIndeterminate = (parentId, children) => {
     const privilegeIds = [parentId, ...children.map((child) => child.id)];
     const selectedCount = privilegeIds.filter((id) =>
-      formData.assignedPrivilegeId.includes(id)
+      formData.assignedPrivilegeId.includes(id),
     ).length;
     return selectedCount > 0 && selectedCount < privilegeIds.length;
+  };
+
+  // ✅ UPDATED: Child checkbox always adds parent
+  const handlePrivilegeChange = (childId, parentId) => {
+    const currentPrivileges = formData.assignedPrivilegeId;
+    const isSelected = currentPrivileges.includes(childId);
+
+    let updatedPrivileges;
+
+    if (isSelected) {
+      updatedPrivileges = currentPrivileges.filter((id) => id !== childId);
+
+      const parent = assignedPrivilegeId.find((p) => p.id === parentId);
+      const siblings = parent?.children?.map((c) => c.id) || [];
+
+      const hasOtherChildrenSelected = siblings.some((id) =>
+        updatedPrivileges.includes(id),
+      );
+
+      if (!hasOtherChildrenSelected) {
+        updatedPrivileges = updatedPrivileges.filter((id) => id !== parentId);
+      }
+    } else {
+      updatedPrivileges = [
+        ...new Set([...currentPrivileges, childId, parentId]),
+      ];
+    }
+
+    setFormData({
+      ...formData,
+      assignedPrivilegeId: updatedPrivileges,
+    });
   };
 
   const handleAddRole = () => {
@@ -263,14 +280,14 @@ const RoleIndex = () => {
     try {
       if (editMode && currentRole) {
         const updatedRoles = roles.map((role) =>
-          role.id === currentRole.id ? { ...role, ...formData } : role
+          role.id === currentRole.id ? { ...role, ...formData } : role,
         );
         setRoles(updatedRoles);
         setFilteredRoles(updatedRoles);
 
         const response = await UserRoleManagementService.editRole(
           formData,
-          access_token
+          access_token,
         );
         toast.success(response.data.message || "Data Edit successfully");
       } else {
@@ -283,7 +300,7 @@ const RoleIndex = () => {
         setFilteredRoles(updatedRoles);
         const response = await UserRoleManagementService.createRole(
           formData,
-          access_token
+          access_token,
         );
         toast.success(response.data.message || "Data save successfully");
       }
@@ -291,7 +308,7 @@ const RoleIndex = () => {
     } catch (error) {
       console.error("Error saving role:", error);
       toast.error(
-        error.response?.data?.message || error.message || "Failed to save role"
+        error.response?.data?.message || error.message || "Failed to save role",
       );
     }
   };
@@ -310,9 +327,8 @@ const RoleIndex = () => {
       const payload = { id: roleToDelete.id };
       const response = await UserRoleManagementService.deleteRole(
         payload,
-        access_token
+        access_token,
       );
-      console.log("response deleted role", response);
 
       setDeleteConfirmOpen(false);
       toast.success(response.data.message || "Role deleted successfully");
@@ -323,7 +339,7 @@ const RoleIndex = () => {
       toast.error(
         error.response?.data?.message ||
           error.message ||
-          "Failed to delete role"
+          "Failed to delete role",
       );
     }
   };
@@ -353,7 +369,6 @@ const RoleIndex = () => {
     return `Privilege ${id}`;
   };
 
-  // NEW: Check if form data has changes
   const hasChanges = () => {
     if (!editMode) {
       return (
@@ -375,13 +390,14 @@ const RoleIndex = () => {
   return (
     <Container maxWidth="lg">
       <Box sx={{ my: 4 }}>
+        {/* TOPBAR */}
         <Stack
           direction="row"
           justifyContent="space-between"
           alignItems="center"
           mb={3}
         >
-          <Typography variant="h4" component="h1">
+          <Typography variant="h5" component="h1">
             Role Management
           </Typography>
           <Stack direction="row" spacing={2} alignItems="center">
@@ -411,6 +427,8 @@ const RoleIndex = () => {
             </Button>
           </Stack>
         </Stack>
+
+        {/* TABLE */}
         <TableContainer component={Paper} sx={{ border: "1px solid #e0e0e0" }}>
           <Table
             sx={{
@@ -432,14 +450,14 @@ const RoleIndex = () => {
             }}
           >
             <TableHead>
-              <TableRow>
+              <TableRow
+                sx={{ "& .MuiTableCell-root": { textAlign: "center" } }}
+              >
                 <TableCell sx={{ width: "5%" }}>ID</TableCell>
                 <TableCell sx={{ width: "15%" }}>Role Name</TableCell>
                 <TableCell sx={{ width: "25%" }}>Description</TableCell>
                 <TableCell sx={{ width: "45%" }}>Privileges</TableCell>
-                <TableCell sx={{ width: "10%" }} align="center">
-                  Actions
-                </TableCell>
+                <TableCell sx={{ width: "10%" }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -519,7 +537,7 @@ const RoleIndex = () => {
           />
         </TableContainer>
 
-        {/* Add/Edit Role Dialog */}
+        {/* ADD/EDIT DIALOG */}
         <Dialog
           open={open}
           onClose={() => setOpen(false)}
@@ -578,17 +596,17 @@ const RoleIndex = () => {
                           <Checkbox
                             checked={isCategoryChecked(
                               parent.id,
-                              parent.children || []
+                              parent.children || [],
                             )}
                             indeterminate={isCategoryIndeterminate(
                               parent.id,
-                              parent.children || []
+                              parent.children || [],
                             )}
                             onChange={(e) =>
                               toggleCategoryPrivileges(
                                 parent.id,
                                 parent.children || [],
-                                e.target.checked
+                                e.target.checked,
                               )
                             }
                             onClick={(e) => e.stopPropagation()}
@@ -613,24 +631,22 @@ const RoleIndex = () => {
                       timeout="auto"
                       unmountOnExit
                     >
-                      <List component="div" disablePadding sx={{ pl: 4 }}>
+                      <List component="div" disablePadding sx={{ pl: 6 }}>
                         {parent.children.map((child) => (
-                          <ListItem key={child.id} sx={{ pl: 4 }}>
-                            <FormControlLabel
-                              control={
+                          <ListItem key={child.id} disablePadding>
+                            <ListItemButton sx={{ pl: 2 }}>
+                              <ListItemIcon sx={{ minWidth: 36 }}>
                                 <Checkbox
                                   checked={formData.assignedPrivilegeId.includes(
-                                    child.id
+                                    child.id,
                                   )}
                                   onChange={() =>
-                                    handlePrivilegeChange(child.id)
+                                    handlePrivilegeChange(child.id, parent.id)
                                   }
-                                  name={child.id.toString()}
-                                  size="small"
                                 />
-                              }
-                              label={child.privilegeName}
-                            />
+                              </ListItemIcon>
+                              <ListItemText primary={child.privilegeName} />
+                            </ListItemButton>
                           </ListItem>
                         ))}
                       </List>
@@ -641,9 +657,17 @@ const RoleIndex = () => {
             </List>
           </DialogContent>
           <DialogActions sx={{ borderTop: "1px solid #e0e0e0" }}>
-            <Button onClick={() => setOpen(false)}>Cancel</Button>
+            <Button
+              color="error"
+              variant="contained"
+              size="small"
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
             <Button
               variant="contained"
+              size="small"
               onClick={handleSaveRole}
               disabled={!hasChanges()}
             >
@@ -652,25 +676,19 @@ const RoleIndex = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog
-          open={deleteConfirmOpen}
-          onClose={handleDeleteCanceled}
-          maxWidth="xs"
-          fullWidth
-        >
+        {/* DELETE CONFIRM DIALOG */}
+        <Dialog open={deleteConfirmOpen} onClose={handleDeleteCanceled}>
           <DialogTitle>Confirm Delete</DialogTitle>
           <DialogContent>
             <Typography>
-              Are you sure you want to delete the role "{roleToDelete?.roleName}
-              "?
+              Are you sure you want to delete role "{roleToDelete?.roleName}"?
             </Typography>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleDeleteCanceled}>Cancel</Button>
             <Button
-              variant="contained"
               color="error"
+              variant="contained"
               onClick={handleDeleteConfirmed}
             >
               Delete

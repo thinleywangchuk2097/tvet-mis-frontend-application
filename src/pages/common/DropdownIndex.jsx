@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useTheme } from "@mui/material/styles";
 import {
   Box,
   Typography,
@@ -47,7 +46,7 @@ const dropdownSchema = Yup.object().shape({
       Yup.object().shape({
         id: Yup.number().required(),
         designation: Yup.string().required("Option cannot be empty"),
-      })
+      }),
     )
     .min(1, "At least one option is required"),
   newOption: Yup.string(),
@@ -63,27 +62,23 @@ const DropdownIndex = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [dropdownToDelete, setDropdownToDelete] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const theme = useTheme();
-  // Pagination state
+
+  // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
-  // Track original values for comparison
+  // Original values & change tracking
   const [originalValues, setOriginalValues] = useState({
     dropdownName: "",
     description: "",
     dropdownChild: [],
   });
-
-  // Track if form has changes
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await DropdownManagementService.getAllDropdownLists(
-        access_token
-      );
-      // Transform the API data to match your desired format
+      const response =
+        await DropdownManagementService.getAllDropdownLists(access_token);
       const transformedData = response.data.body.map((dropdown) => ({
         id: dropdown.id,
         dropdownName: dropdown.dropdownName,
@@ -96,11 +91,10 @@ const DropdownIndex = () => {
       setDropdowns(transformedData);
       setFilteredDropdowns(transformedData);
     };
-
     fetchData();
-  }, []);
+  }, [access_token]);
 
-  // Handle search
+  // Search filtering
   useEffect(() => {
     if (searchTerm.trim() === "") {
       setFilteredDropdowns(dropdowns);
@@ -113,11 +107,11 @@ const DropdownIndex = () => {
           dropdown.description
             .toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          dropdown.id.toString().includes(searchTerm)
+          dropdown.id.toString().includes(searchTerm),
       );
       setFilteredDropdowns(filtered);
     }
-    setPage(0); // Reset to first page when searching
+    setPage(0);
   }, [searchTerm, dropdowns]);
 
   // Formik form
@@ -129,62 +123,44 @@ const DropdownIndex = () => {
       newOption: "",
     },
     validationSchema: dropdownSchema,
-    onSubmit: (values) => {
-      handleSaveDropdown(values);
-    },
+    onSubmit: (values) => handleSaveDropdown(values),
     validateOnChange: true,
     validateOnBlur: true,
     enableReinitialize: true,
   });
 
-  // Check for changes when form values change
+  // Track changes in edit mode
   useEffect(() => {
     if (editMode && currentDropdown) {
-      const checkForChanges = () => {
-        // Check if dropdownName changed
-        const nameChanged =
-          formik.values.dropdownName !== originalValues.dropdownName;
-
-        // Check if description changed
-        const descriptionChanged =
-          formik.values.description !== originalValues.description;
-
-        // Check if dropdownChild changed (compare arrays)
-        const childChanged =
-          formik.values.dropdownChild.length !==
-            originalValues.dropdownChild.length ||
-          !formik.values.dropdownChild.every(
-            (child, index) =>
-              originalValues.dropdownChild[index] &&
-              child.id === originalValues.dropdownChild[index].id &&
-              child.designation ===
-                originalValues.dropdownChild[index].designation
-          );
-
-        setHasChanges(nameChanged || descriptionChanged || childChanged);
-      };
-
-      checkForChanges();
+      const nameChanged =
+        formik.values.dropdownName !== originalValues.dropdownName;
+      const descriptionChanged =
+        formik.values.description !== originalValues.description;
+      const childChanged =
+        formik.values.dropdownChild.length !==
+          originalValues.dropdownChild.length ||
+        !formik.values.dropdownChild.every(
+          (child, index) =>
+            originalValues.dropdownChild[index] &&
+            child.id === originalValues.dropdownChild[index].id &&
+            child.designation ===
+              originalValues.dropdownChild[index].designation,
+        );
+      setHasChanges(nameChanged || descriptionChanged || childChanged);
     }
   }, [formik.values, originalValues, editMode, currentDropdown]);
 
-  // Handle page change
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  // Handle rows per page change
+  // Pagination handlers
+  const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  // Handle search change
-  const handleSearchChange = (event) => {
-    setSearchTerm(event.target.value);
-  };
+  // Search input
+  const handleSearchChange = (event) => setSearchTerm(event.target.value);
 
-  // Add new option to the list
+  // Add child option
   const handleAddOption = () => {
     if (formik.values.newOption.trim() !== "") {
       const newOption = {
@@ -194,33 +170,25 @@ const DropdownIndex = () => {
             : 1,
         designation: formik.values.newOption.trim(),
       };
-
       const updatedChildOptions = [...formik.values.dropdownChild, newOption];
-
-      // Set the field value and mark it as touched
       formik.setFieldValue("dropdownChild", updatedChildOptions, true);
       formik.setFieldTouched("dropdownChild", true, false);
       formik.setFieldValue("newOption", "", false);
-      
-      // Trigger validation
       formik.validateForm();
     }
   };
 
-  // Remove option from the list
+  // Remove child option
   const handleRemoveOption = (optionId) => {
     const newOptions = formik.values.dropdownChild.filter(
-      (option) => option.id !== optionId
+      (option) => option.id !== optionId,
     );
-
     formik.setFieldValue("dropdownChild", newOptions, true);
     formik.setFieldTouched("dropdownChild", true, false);
-    
-    // Trigger validation
     formik.validateForm();
   };
 
-  // Open dialog for adding new dropdown
+  // Add/Edit dropdown dialogs
   const handleAddDropdown = () => {
     setEditMode(false);
     setCurrentDropdown(null);
@@ -229,81 +197,52 @@ const DropdownIndex = () => {
     setOpen(true);
   };
 
-  // Open dialog for editing dropdown
   const handleEditDropdown = (dropdown) => {
     setEditMode(true);
     setCurrentDropdown(dropdown);
-
-    // Store original values for comparison
-    const originalChild = dropdown.dropdownChild.map(child => ({
-      ...child
-    }));
-    
+    const originalChild = dropdown.dropdownChild.map((child) => ({ ...child }));
     setOriginalValues({
       dropdownName: dropdown.dropdownName,
       description: dropdown.description,
       dropdownChild: originalChild,
     });
-
-    // Set form values
-    const formChild = dropdown.dropdownChild.map(child => ({
-      ...child
-    }));
-    
     formik.setValues({
       dropdownName: dropdown.dropdownName,
       description: dropdown.description,
-      dropdownChild: formChild,
+      dropdownChild: originalChild,
       newOption: "",
     });
-
-    setHasChanges(false); // Start with no changes
+    setHasChanges(false);
     setOpen(true);
   };
 
-  // Save dropdown (both add and edit)
+  // Save dropdown
   const handleSaveDropdown = async (values) => {
     try {
       if (editMode && currentDropdown) {
-        // Update existing dropdown
         const updatedDropdowns = dropdowns.map((dropdown) =>
           dropdown.id === currentDropdown.id
-            ? {
-                ...dropdown,
-                dropdownName: values.dropdownName,
-                description: values.description,
-                dropdownChild: values.dropdownChild,
-              }
-            : dropdown
+            ? { ...dropdown, ...values }
+            : dropdown,
         );
         setDropdowns(updatedDropdowns);
         setFilteredDropdowns(updatedDropdowns);
-
         const data = await DropdownManagementService.updateDropdown(
-          {
-            id: currentDropdown.id,
-            dropdownName: values.dropdownName,
-            description: values.description,
-            dropdownChild: values.dropdownChild,
-          },
-          access_token
+          { id: currentDropdown.id, ...values },
+          access_token,
         );
         toast.success(data.message || "Data edited successfully");
       } else {
-        // Add new dropdown
         const newDropdown = {
           id: Math.max(...dropdowns.map((d) => d.id), 0) + 1,
-          dropdownName: values.dropdownName,
-          description: values.description,
-          dropdownChild: values.dropdownChild,
+          ...values,
         };
         const updatedDropdowns = [...dropdowns, newDropdown];
         setDropdowns(updatedDropdowns);
         setFilteredDropdowns(updatedDropdowns);
-
         const data = await DropdownManagementService.createDropdown(
           newDropdown,
-          access_token
+          access_token,
         );
         toast.success(data.message || "Data saved successfully");
       }
@@ -313,65 +252,48 @@ const DropdownIndex = () => {
     }
   };
 
-  // Open delete confirmation dialog
+  // Delete handlers
   const handleDeleteClick = (id) => {
     setDropdownToDelete(id);
     setDeleteConfirmOpen(true);
   };
-
-  // Confirm delete
   const handleConfirmDelete = async () => {
     try {
       const updatedDropdowns = dropdowns.filter(
-        (dropdown) => dropdown.id !== dropdownToDelete
+        (dropdown) => dropdown.id !== dropdownToDelete,
       );
       setDropdowns(updatedDropdowns);
       setFilteredDropdowns(updatedDropdowns);
-
-      const data = await DropdownManagementService.deleteDropdown(
+      await DropdownManagementService.deleteDropdown(
         { parentId: dropdownToDelete },
-        access_token
+        access_token,
       );
       setDeleteConfirmOpen(false);
       setDropdownToDelete(null);
-      toast.success(data.message || "Data deleted successfully");
+      toast.success("Data deleted successfully");
     } catch (error) {
       toast.error("Failed to delete dropdown");
     }
   };
-
-  // Cancel delete
   const handleCancelDelete = () => {
     setDeleteConfirmOpen(false);
     setDropdownToDelete(null);
   };
 
-  // Simplified: Check if form is valid
+  // Form validity check
   const isFormValid = () => {
-    // Check if form has no errors
     const hasErrors = Object.keys(formik.errors).length > 0;
-    
-    // Check if all required fields have values
-    const hasRequiredValues = 
+    const hasRequiredValues =
       formik.values.dropdownName.trim() !== "" &&
       formik.values.description.trim() !== "" &&
       formik.values.dropdownChild.length > 0;
-    
-    // For edit mode, also check if there are changes
-    if (editMode) {
-      return !hasErrors && hasRequiredValues && hasChanges;
-    }
-    
-    // For add mode, just check if form is valid
-    return !hasErrors && hasRequiredValues;
+    return editMode
+      ? !hasErrors && hasRequiredValues && hasChanges
+      : !hasErrors && hasRequiredValues;
   };
 
-  // Check form validity on mount and when values change
   useEffect(() => {
-    // Trigger validation when form opens
-    if (open) {
-      formik.validateForm();
-    }
+    if (open) formik.validateForm();
   }, [open, formik.values]);
 
   return (
@@ -383,7 +305,7 @@ const DropdownIndex = () => {
           alignItems="center"
           mb={3}
         >
-          <Typography variant="h4" component="h1">
+          <Typography variant="h5" component="h1">
             Dropdown Management
           </Typography>
           <Stack direction="row" spacing={2} alignItems="center">
@@ -411,43 +333,38 @@ const DropdownIndex = () => {
             </Button>
           </Stack>
         </Stack>
+
         <TableContainer component={Paper}>
-          <Table
-            sx={{
-              borderCollapse: "separate",
-              borderSpacing: 0,
-              "& th, & td": {
-                borderRight: `1px solid ${theme.palette.divider}`,
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                "&:last-child": { borderRight: "none" },
-              },
-              "& th": {
-                backgroundColor:
-                  theme.palette.mode === "dark" ? "#333" : "#f5f5f5",
-                color: theme.palette.mode === "dark" ? "#fff" : "#000",
-                fontWeight: "bold",
-                borderTop: `1px solid ${theme.palette.divider}`,
-              },
-              "& tr:last-child td": { borderBottom: "none" },
-            }}
-          >
+          <Table sx={{ borderCollapse: "collapse" }}>
             <TableHead>
               <TableRow
                 sx={{
-                  backgroundColor: "#f5f5f5",
                   "& .MuiTableCell-root": {
-                    fontWeight: "bold",
-                    borderRight: "1px solid rgba(224, 224, 224, 1)",
-                    "&:last-child": {
-                      borderRight: "none",
-                    },
+                    textAlign: "center",
                   },
                 }}
               >
-                <TableCell>ID</TableCell>
-                <TableCell>Dropdown Name</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell align="center">Actions</TableCell>
+                <TableCell
+                  sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
+                >
+                  ID
+                </TableCell>
+                <TableCell
+                  sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
+                >
+                  Dropdown Name
+                </TableCell>
+                <TableCell
+                  sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
+                >
+                  Description
+                </TableCell>
+                <TableCell
+                  sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
+                  align="center"
+                >
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -456,10 +373,19 @@ const DropdownIndex = () => {
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((dropdown) => (
                     <TableRow key={dropdown.id} hover>
-                      <TableCell>{dropdown.id}</TableCell>
-                      <TableCell>{dropdown.dropdownName}</TableCell>
-                      <TableCell>{dropdown.description}</TableCell>
-                      <TableCell align="center">
+                      <TableCell sx={{ border: "1px solid #ccc" }}>
+                        {dropdown.id}
+                      </TableCell>
+                      <TableCell sx={{ border: "1px solid #ccc" }}>
+                        {dropdown.dropdownName}
+                      </TableCell>
+                      <TableCell sx={{ border: "1px solid #ccc" }}>
+                        {dropdown.description}
+                      </TableCell>
+                      <TableCell
+                        sx={{ border: "1px solid #ccc" }}
+                        align="center"
+                      >
                         <Box
                           sx={{
                             display: "flex",
@@ -501,7 +427,6 @@ const DropdownIndex = () => {
             </TableBody>
           </Table>
 
-          {/* Pagination */}
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
@@ -510,19 +435,15 @@ const DropdownIndex = () => {
             page={page}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
-            sx={{
-              borderTop: "1px solid rgba(224, 224, 224, 1)",
-            }}
           />
         </TableContainer>
 
-        {/* Add/Edit Dropdown Dialog */}
+        {/* Add/Edit Dialog */}
         <Dialog
           open={open}
           onClose={() => setOpen(false)}
           fullWidth
           maxWidth="sm"
-          onEnter={() => formik.validateForm()}
         >
           <form onSubmit={formik.handleSubmit}>
             <DialogTitle>
@@ -542,10 +463,7 @@ const DropdownIndex = () => {
                 name="dropdownName"
                 size="small"
                 value={formik.values.dropdownName}
-                onChange={(e) => {
-                  formik.handleChange(e);
-                  formik.setFieldTouched("dropdownName", true, false);
-                }}
+                onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 error={
                   formik.touched.dropdownName &&
@@ -554,10 +472,7 @@ const DropdownIndex = () => {
                 helperText={
                   formik.touched.dropdownName && formik.errors.dropdownName
                 }
-                required
-                sx={{ mb: 2 }}
               />
-
               <TextField
                 fullWidth
                 margin="normal"
@@ -565,10 +480,7 @@ const DropdownIndex = () => {
                 name="description"
                 size="small"
                 value={formik.values.description}
-                onChange={(e) => {
-                  formik.handleChange(e);
-                  formik.setFieldTouched("description", true, false);
-                }}
+                onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 error={
                   formik.touched.description &&
@@ -577,21 +489,17 @@ const DropdownIndex = () => {
                 helperText={
                   formik.touched.description && formik.errors.description
                 }
-                required
                 multiline
                 rows={3}
-                sx={{ mb: 2 }}
               />
 
               <Typography variant="subtitle1" gutterBottom>
                 Child Dropdown
               </Typography>
-
-              {/* Show error only when there are no child options */}
               {formik.touched.dropdownChild &&
                 formik.errors.dropdownChild &&
                 formik.values.dropdownChild.length === 0 && (
-                  <FormHelperText error sx={{ mb: 1 }}>
+                  <FormHelperText error>
                     {formik.errors.dropdownChild}
                   </FormHelperText>
                 )}
@@ -632,13 +540,12 @@ const DropdownIndex = () => {
 
               <Box
                 sx={{
-                  border: "1px solid #e0e0e0",
-                  borderRadius: 1,
                   p: 2,
                   maxHeight: 200,
                   overflowY: "auto",
                   minHeight: 100,
-                  backgroundColor: formik.values.dropdownChild.length === 0 ? "#f9f9f9" : "transparent",
+                  border: "1px solid #ccc",
+                  borderRadius: 1,
                 }}
               >
                 {formik.values.dropdownChild.length === 0 ? (
@@ -660,7 +567,13 @@ const DropdownIndex = () => {
               </Box>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setOpen(false)}>Cancel</Button>
+              <Button
+                color="error"
+                variant="contained"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
                 variant="contained"
@@ -689,7 +602,9 @@ const DropdownIndex = () => {
             </Typography>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCancelDelete}>Cancel</Button>
+            <Button variant="contained" onClick={handleCancelDelete}>
+              Cancel
+            </Button>
             <Button
               onClick={handleConfirmDelete}
               color="error"
