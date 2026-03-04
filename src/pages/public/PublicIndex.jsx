@@ -777,7 +777,7 @@ const PublicIndex = () => {
             </Paper>
           </Grid>
           {/* TVET Indicators */}
-          <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+          <Grid item size={{ xs: 12, sm: 12, md: 6 }}>
             <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
               <Typography fontWeight={600} sx={{ mb: 2 }}>
                 TVET Indicators
@@ -829,7 +829,7 @@ const PublicIndex = () => {
             </Paper>
           </Grid>
           {/* Courses */}
-          <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+          <Grid item size={{ xs: 12, sm: 12, md: 6 }}>
             <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
               <Typography fontWeight={600} sx={{ mb: 2 }}>
                 Recent Ongoing Course Details
