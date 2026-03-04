@@ -130,16 +130,25 @@ const Header = () => {
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
         {/* Left side */}
         <Box sx={{ display: "flex", alignItems: "center" }}>
+          {/* Icon: Menu for mobile, Home for desktop */}
           {isMobile ? (
-            <IconButton color="inherit" onClick={handleMenuOpen}>
+            <IconButton color="inherit" onClick={handleMenuOpen} sx={{ mr: 1 }}>
               <MenuIcon fontSize="small" />
             </IconButton>
           ) : (
-            <IconButton onClick={() => navigate("/")} sx={{ color: "#fff" }}>
-              <HomeIcon />
+            <IconButton
+              onClick={() => navigate("/")}
+              sx={{ color: "#fff", mr: 2 }}
+            >
+              <HomeIcon
+                sx={{
+                  fontSize: { xs: 24, sm: 30 }, // larger on bigger screens
+                }}
+              />
             </IconButton>
           )}
 
+          {/* Title: always shown */}
           <Typography
             sx={{
               fontWeight: "bold",

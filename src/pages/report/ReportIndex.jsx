@@ -32,7 +32,7 @@ const ReportIndex = () => {
   const theme = useTheme();
   // Report types
   const reportTypes = [
-    { id: 1, name: "Sales Report" },
+    { id: 1, name: "Tvet Report" },
     { id: 2, name: "Inventory Report" },
     { id: 3, name: "Customer Report" },
     { id: 4, name: "Financial Report" },
@@ -44,14 +44,14 @@ const ReportIndex = () => {
 
   // Locations
   const locations = [
-    { id: 1, name: "New York" },
-    { id: 2, name: "Los Angeles" },
-    { id: 3, name: "Chicago" },
-    { id: 4, name: "Houston" },
-    { id: 5, name: "Miami" },
-    { id: 6, name: "Seattle" },
-    { id: 7, name: "Boston" },
-    { id: 8, name: "San Francisco" },
+    { id: 1, name: "Thimphu" },
+    { id: 2, name: "Paro" },
+    { id: 3, name: "Wangdue" },
+    { id: 4, name: "Trongsa" },
+    { id: 5, name: "Bumthang" },
+    { id: 6, name: "chukha" },
+    { id: 7, name: "samtse" },
+    { id: 8, name: "Trashigang" },
   ];
 
   // Statuses
@@ -233,7 +233,7 @@ const ReportIndex = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ my: 4 }}>
+    <Container maxWidth="lg" sx={{ my: 2 }}>
       <Typography variant="h4" component="h1" gutterBottom>
         Reports
       </Typography>
@@ -245,14 +245,15 @@ const ReportIndex = () => {
         </Typography>
         <Grid container spacing={3}>
           {/* Report Type Dropdown */}
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth size="small">
               <InputLabel>Report Type</InputLabel>
               <Select
                 name="reportType"
-                value={filters.reportType}
+                value={filters.reportType} 
                 onChange={handleFilterChange}
                 label="Report Type"
+                size="small"
                 MenuProps={{
                   PaperProps: {
                     style: {
@@ -274,14 +275,15 @@ const ReportIndex = () => {
           </Grid>
 
           {/* Location Dropdown */}
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth size="small">
               <InputLabel>Location</InputLabel>
               <Select
                 name="location"
                 value={filters.location}
                 onChange={handleFilterChange}
                 label="Location"
+                size="small"
                 MenuProps={{
                   PaperProps: {
                     style: {
@@ -303,14 +305,15 @@ const ReportIndex = () => {
           </Grid>
 
           {/* Status Dropdown */}
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth size="small">
               <InputLabel>Status</InputLabel>
               <Select
                 name="status"
                 value={filters.status}
                 onChange={handleFilterChange}
                 label="Status"
+                size="small"
                 MenuProps={{
                   PaperProps: {
                     style: {
@@ -332,12 +335,13 @@ const ReportIndex = () => {
           </Grid>
 
           {/* Search Field */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               variant="outlined"
               placeholder="Search reports..."
               name="search"
+              size="small"
               value={filters.search}
               onChange={handleFilterChange}
               InputProps={{
@@ -362,21 +366,22 @@ const ReportIndex = () => {
           </Grid>
 
           {/* Action Buttons */}
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12, md: 4 }}>
             <Box sx={{ display: "flex", gap: 2 }}>
               <Button
                 variant="contained"
+                color="error"
                 onClick={handleClearFilters}
                 startIcon={<ClearIcon />}
               >
                 Clear Filters
               </Button>
               <Button
-                variant="outlined"
+                variant="contained"
                 startIcon={<DownloadIcon />}
                 disabled={filteredReports.length === 0}
               >
-                Export All
+                Export 
               </Button>
             </Box>
           </Grid>

@@ -12,7 +12,6 @@ import VacanciesTraining from '../pages/public/VacanciesTraining';
 import MyTask from '../pages/tasklist/MyTaskList';
 import GroupTaskList from '../pages/tasklist/GroupTaskList';
 import ResetPassword from '../pages/auth/ResetPassword';
-import TraineeDashboard from '../pages/dashboard/TraineeDashboard';
 import  ComplaintIssue  from '../pages/complaint/ComplaintIssue';
 import DashboardIndex from '../pages/dashboard/DashboardIndex';
 import ComplaintView from '../pages/complaint/ComplaintView';
@@ -27,6 +26,13 @@ import InstituteRegistration from '../pages/public/registration/InstituteRegistr
 import QMSAuditor from '../pages/public/registration/QMSAuditor';
 import Trainer from '../pages/public/registration/Trainer';
 import RPLAssessment from '../pages/public/courses/RPLAssessment';
+//course announcement paths
+import AccreditatedCourse from '../pages/institute/courseannouncement/AccreditatedCourse';
+import NonAccreditedCourse from '../pages/institute/courseannouncement/NonAccreditedCourse';
+import RPLAssessment1 from '../pages/institute/courseannouncement/RPLAssessment';
+
+//trainee course application
+import ApplyCourse from '../pages/trainee/ApplyCourse';
 
 //public routes ..
 export const publicRoutes = [
@@ -43,7 +49,9 @@ export const publicRoutes = [
   { path: '/register/institute', element: <InstituteRegistration /> },
   { path: '/register/qms-auditor', element: <QMSAuditor /> },
   { path: '/register/trainer', element: <Trainer /> },
-  { path: '/apply/rpl-assessment', element: <RPLAssessment /> }
+  { path: '/apply/rpl-assessment', element: <RPLAssessment /> },
+  { path: '/apply-course/:application_no', element: <ApplyCourse /> },
+
 ];
 
 //private routes ..
@@ -58,9 +66,12 @@ export const privateRoutes = [
   { path: '/report-index', element: <ReportIndex /> },
   { path: '/my-task-index', element: <MyTask /> },
   { path: '/group-task-index', element: <GroupTaskList /> },
-  { path: '/trainee-dashboard', element: <TraineeDashboard /> },
+  { path: '/accredited-course', element: <AccreditatedCourse /> },
+  { path: '/non-accredited-course', element: <NonAccreditedCourse /> },
+  { path: '/rpl-assessment', element: <RPLAssessment1 /> },
   { path: '/complaint-service', element: <ComplaintIssue /> },
   { path: '/view-complaint-details/:application_no', element: <ComplaintView /> },
+
 
 
 ];

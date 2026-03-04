@@ -58,7 +58,7 @@ const MyTaskList = () => {
         const response = await TaskListService.getMyTaskListDetails(
           userId,
           currentRoleId,
-          token
+          token,
         );
 
         if (response.data && Array.isArray(response.data)) {
@@ -128,7 +128,7 @@ const MyTaskList = () => {
         assignedUserId: null,
         taskStatusId: 98, // From your payload example
         assignedRoleId: 1,
-        serviceId: selectedTask.service_id || 1 // Use task's service_id if available, otherwise default to 1
+        serviceId: selectedTask.service_id || 1, // Use task's service_id if available, otherwise default to 1
       };
 
       // Call the API to unclaim the task
@@ -142,8 +142,8 @@ const MyTaskList = () => {
           // Remove the task from local state
           setTasks((prevTasks) =>
             prevTasks.filter(
-              (task) => task.application_no !== selectedTask.application_no
-            )
+              (task) => task.application_no !== selectedTask.application_no,
+            ),
           );
 
           // Show success message
@@ -161,13 +161,14 @@ const MyTaskList = () => {
       }
     } catch (err) {
       console.error("Error releasing task:", err);
-      
+
       // Handle different error types
       if (err.response) {
         // Server responded with error status
-        const errorMessage = err.response.data?.message || 
-                            err.response.statusText || 
-                            "Server error occurred";
+        const errorMessage =
+          err.response.data?.message ||
+          err.response.statusText ||
+          "Server error occurred";
         toast.error(errorMessage);
       } else if (err.request) {
         // Request made but no response
@@ -194,7 +195,7 @@ const MyTaskList = () => {
       task.application_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.service_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.current_status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.action_date?.toLowerCase().includes(searchTerm.toLowerCase())
+      task.action_date?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // Add serial numbers to the filtered data
@@ -245,7 +246,7 @@ const MyTaskList = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          mb: 3,
+          mb: 2,
         }}
       >
         <Typography variant="h5">My Task</Typography>
@@ -278,7 +279,13 @@ const MyTaskList = () => {
             sx={{ borderCollapse: "collapse" }}
           >
             <TableHead>
-              <TableRow>
+              <TableRow
+                sx={{
+                  "& .MuiTableCell-root": {
+                    textAlign: "center",
+                  },
+                }}
+              >
                 <TableCell
                   sx={{ border: "1px solid #e0e0e0", fontWeight: "bold" }}
                 >
@@ -417,12 +424,11 @@ const MyTaskList = () => {
         <MenuItem onClick={handleViewDetails}>
           <ListItemText>View</ListItemText>
         </MenuItem>
-        <MenuItem 
-          onClick={handleReleaseTask}
-          disabled={unclaimLoading}
-        >
+        <MenuItem onClick={handleReleaseTask} disabled={unclaimLoading}>
           {unclaimLoading ? (
-            <Box sx={{ display: "flex", alignItems: "center", minWidth: "80px" }}>
+            <Box
+              sx={{ display: "flex", alignItems: "center", minWidth: "80px" }}
+            >
               <CircularProgress size={16} sx={{ mr: 1.5 }} />
               <ListItemText>Processing...</ListItemText>
             </Box>
