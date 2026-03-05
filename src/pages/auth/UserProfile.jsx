@@ -195,7 +195,7 @@ const UserProfile = () => {
         </IconButton>
 
         {/* Header */}
-        <Box textAlign="center" mb={2}>
+        <Box textAlign="center" mb={1}>
           <Typography variant="h5" fontWeight={700} color="text.primary">
             User Profile
           </Typography>
@@ -256,7 +256,7 @@ const UserProfile = () => {
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 3 }} />
+        <Divider sx={{ mb: 4 }} />
         {isSubmitting && <LinearProgress />}
 
         {/* Form */}

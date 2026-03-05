@@ -27,7 +27,9 @@ import { useNavigate } from "react-router-dom";
 const Header = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // --- FIXED: Use md breakpoint for responsiveness ---
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"), { noSsr: true });
 
   // Mobile menu
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -125,12 +127,11 @@ const Header = () => {
   return (
     <AppBar
       position="static"
-      sx={{ backgroundColor: "#283593", height: { xs: 60, sm: 70 } }}
+      sx={{ backgroundColor: "#283593", height: { xs: 60, sm: 70, md: 70 } }} // minor height fix
     >
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
         {/* Left side */}
         <Box sx={{ display: "flex", alignItems: "center" }}>
-          {/* Icon: Menu for mobile, Home for desktop */}
           {isMobile ? (
             <IconButton color="inherit" onClick={handleMenuOpen} sx={{ mr: 1 }}>
               <MenuIcon fontSize="small" />
@@ -142,13 +143,12 @@ const Header = () => {
             >
               <HomeIcon
                 sx={{
-                  fontSize: { xs: 24, sm: 30 }, // larger on bigger screens
+                  fontSize: { xs: 24, sm: 30 },
                 }}
               />
             </IconButton>
           )}
 
-          {/* Title: always shown */}
           <Typography
             sx={{
               fontWeight: "bold",
@@ -185,7 +185,7 @@ const Header = () => {
               </Button>
             ))}
 
-            {/* Registration */}
+            {/* Dropdowns */}
             <Box>
               <Button
                 onClick={handleRegisterOpen}
@@ -237,7 +237,7 @@ const Header = () => {
                 {renderMenuItems(registerItems, handleRegisterClose)}
               </Menu>
             </Box>
-            {/* Courses */}
+
             <Box>
               <Button
                 onClick={handleCoursesOpen}
@@ -289,7 +289,7 @@ const Header = () => {
                 {renderMenuItems(courses, handleCoursesClose)}
               </Menu>
             </Box>
-            {/* Reports */}
+
             <Box>
               <Button
                 onClick={handleReportsOpen}
@@ -343,6 +343,7 @@ const Header = () => {
             </Box>
           </Box>
         )}
+
         {/* Login */}
         <form onSubmit={formik.handleSubmit} style={{ margin: 0 }}>
           <Button
@@ -363,6 +364,7 @@ const Header = () => {
             {isMobile ? "" : "Login"}
           </Button>
         </form>
+
         {/* Mobile Menu */}
         {isMobile && (
           <Menu
@@ -371,14 +373,11 @@ const Header = () => {
             onClose={handleMenuClose}
             slotProps={{
               paper: {
-                sx: {
-                  minWidth: 240,
-                  p: 0,
-                  borderRadius: 1.5,
-                },
+                sx: { minWidth: 240, p: 0, borderRadius: 1.5 },
               },
             }}
           >
+            {/* Navigation */}
             {navItems.flatMap((item, index) => [
               <MenuItem
                 key={item.path}
@@ -397,96 +396,39 @@ const Header = () => {
 
             <Divider sx={{ my: 0.25 }} />
 
-            {/* Registration */}
-            <MenuItem
-              onClick={() => setMobileRegisterOpen((prev) => !prev)}
-              sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
-            >
-              Registration{" "}
-              {mobileRegisterOpen ? <ExpandLess /> : <ExpandMore />}
-            </MenuItem>
-            <Collapse in={mobileRegisterOpen} timeout="auto" unmountOnExit>
-              {registerItems.flatMap((item, index) => [
+            {/* Collapsible sections */}
+            {[
+              { label: "Registration", open: mobileRegisterOpen, setOpen: setMobileRegisterOpen, items: registerItems },
+              { label: "Courses", open: mobileCoursesOpen, setOpen: setMobileCoursesOpen, items: courses },
+              { label: "Reports", open: mobileReportsOpen, setOpen: setMobileReportsOpen, items: reports },
+            ].map(({ label, open, setOpen, items }) => (
+              <Box key={label}>
                 <MenuItem
-                  key={item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    handleMenuClose();
-                  }}
-                  sx={{
-                    py: 0.35,
-                    px: 3,
-                    minHeight: "auto",
-                    fontSize: "0.85rem",
-                  }}
+                  onClick={() => setOpen(!open)}
+                  sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
                 >
-                  {item.label}
-                </MenuItem>,
-                index < registerItems.length - 1 && (
-                  <Divider key={`${item.path}-divider`} sx={{ my: 0.2 }} />
-                ),
-              ])}
-            </Collapse>
-            <Divider sx={{ my: 0.25 }} />
-            {/* Courses */}
-            <MenuItem
-              onClick={() => setMobileCoursesOpen((prev) => !prev)}
-              sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
-            >
-              Courses {mobileCoursesOpen ? <ExpandLess /> : <ExpandMore />}
-            </MenuItem>
-            <Collapse in={mobileCoursesOpen} timeout="auto" unmountOnExit>
-              {courses.flatMap((item, index) => [
-                <MenuItem
-                  key={item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    handleMenuClose();
-                  }}
-                  sx={{
-                    py: 0.35,
-                    px: 3,
-                    minHeight: "auto",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  {item.label}
-                </MenuItem>,
-                index < courses.length - 1 && (
-                  <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
-                ),
-              ])}
-            </Collapse>
-            <Divider sx={{ my: 0.25 }} />
-            {/* Reports */}
-            <MenuItem
-              onClick={() => setMobileReportsOpen((prev) => !prev)}
-              sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
-            >
-              Reports {mobileReportsOpen ? <ExpandLess /> : <ExpandMore />}
-            </MenuItem>
-            <Collapse in={mobileReportsOpen} timeout="auto" unmountOnExit>
-              {reports.flatMap((item, index) => [
-                <MenuItem
-                  key={item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    handleMenuClose();
-                  }}
-                  sx={{
-                    py: 0.35,
-                    px: 3,
-                    minHeight: "auto",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  {item.label}
-                </MenuItem>,
-                index < reports.length - 1 && (
-                  <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
-                ),
-              ])}
-            </Collapse>
+                  {label} {open ? <ExpandLess /> : <ExpandMore />}
+                </MenuItem>
+                <Collapse in={open} timeout="auto" unmountOnExit>
+                  {items.flatMap((item, index) => [
+                    <MenuItem
+                      key={item.path}
+                      onClick={() => {
+                        navigate(item.path);
+                        handleMenuClose();
+                      }}
+                      sx={{ py: 0.35, px: 3, minHeight: "auto", fontSize: "0.85rem" }}
+                    >
+                      {item.label}
+                    </MenuItem>,
+                    index < items.length - 1 && (
+                      <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
+                    ),
+                  ])}
+                </Collapse>
+                <Divider sx={{ my: 0.25 }} />
+              </Box>
+            ))}
           </Menu>
         )}
       </Toolbar>

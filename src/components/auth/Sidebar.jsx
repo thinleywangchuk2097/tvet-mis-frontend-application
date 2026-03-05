@@ -8,7 +8,6 @@ import {
   Collapse,
   ListItemIcon,
   Typography,
-  Avatar,
   ListItemButton,
   useTheme,
 } from "@mui/material";
@@ -16,7 +15,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import * as MuiIcons from "@mui/icons-material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import logo from "../../assets/bhutan-emblem.jpeg";
 
 const Sidebar = () => {
   const theme = useTheme();
@@ -114,18 +112,8 @@ const Sidebar = () => {
         flexDirection: "column",
       }}
     >
-      {/* Logo Header */}
-      <Box
-        sx={{ px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1.5 }}
-      >
-        <Avatar src={logo} sx={{ width: 44, height: 44 }} />
-        <Typography fontWeight={600} fontSize="0.95rem">
-          TVET-MIS
-        </Typography>
-      </Box>
-
       {/* Menu */}
-      <Box sx={{ flex: 1, overflowY: "auto", py: 1 }}>
+      <Box sx={{ flex: 1, overflowY: "auto", py: 3 }}>
         <List disablePadding>
           {mainMenus.map((menu) => {
             const submenus = getSubmenus(menu.id);

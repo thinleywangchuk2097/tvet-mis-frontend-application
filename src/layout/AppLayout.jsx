@@ -1,17 +1,17 @@
 // src/layout/AppLayout.jsx
-import { Box, Drawer, useMediaQuery } from '@mui/material';
-import { useState } from 'react';
-import { useTheme } from '@mui/material/styles';
-import Sidebar from '../components/auth/Sidebar';
-import Header from '../components/auth/Header';
-import Footer from '../components/auth/Footer';
+import { Box, Drawer, useMediaQuery } from "@mui/material";
+import { useState } from "react";
+import { useTheme } from "@mui/material/styles";
+import Sidebar from "../components/auth/Sidebar";
+import Header from "../components/auth/Header";
+import Footer from "../components/auth/Footer";
 import { Outlet } from "react-router-dom";
 
 const drawerWidth = 240;
 
 const AppLayout = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleDrawerToggle = () => {
@@ -19,7 +19,7 @@ const AppLayout = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       {/* Sidebar */}
       {isMobile ? (
         <Drawer
@@ -28,8 +28,9 @@ const AppLayout = () => {
           onClose={handleDrawerToggle}
           ModalProps={{ keepMounted: true }}
           sx={{
-            '& .MuiDrawer-paper': {
+            "& .MuiDrawer-paper": {
               width: drawerWidth,
+              mt: "64px", // Moves below header
             },
           }}
         >
@@ -38,44 +39,56 @@ const AppLayout = () => {
       ) : (
         <Box
           sx={{
+            position: "absolute", // Floating sidebar
+            top: "64px", // Under header
+            left: 0,
             width: drawerWidth,
-            flexShrink: 0,
-            bgcolor: 'background.paper',
-            borderRight: '1px solid #ddd',
+            height: "calc(100vh - 64px)",
+            bgcolor: "background.paper",
+            borderRight: "1px solid #ddd",
+            zIndex: 1200,
           }}
         >
           <Sidebar />
         </Box>
       )}
-
       {/* Main content area */}
       <Box
         sx={{
-          display: 'grid',
-          gridTemplateRows: '64px 1fr 40px', // Header | Main | Footer
+          display: "grid",
+          gridTemplateRows: "64px 1fr 40px",
           flexGrow: 1,
-          height: '100vh',
-          overflow: 'hidden',
+          height: "100vh",
+          overflow: "hidden",
         }}
       >
-        {/* Header */}
-        <Box sx={{ gridRow: '1', borderBottom: '1px solid #ddd', minHeight: '64px' }}>
+        {/* Header full width */}
+        <Box
+          sx={{
+            gridRow: "1",
+            borderBottom: "1px solid #ddd",
+            minHeight: "64px",
+            width: "100vw",
+          }}
+        >
           <Header onToggleSidebar={handleDrawerToggle} />
         </Box>
 
         {/* Scrollable Main */}
         <Box
           sx={{
-            gridRow: '2',
-            overflowY: 'auto',
+            gridRow: "2",
+            overflowY: "auto",
             p: { xs: 2, sm: 2 },
-            bgcolor: 'background.default',
+            bgcolor: "background.default",
+            ml: { md: `${drawerWidth}px` }, // Push main content for desktop
           }}
         >
-         <Outlet /> 
+          <Outlet />
         </Box>
+
         {/* Footer */}
-        <Box sx={{ gridRow: '3' }}>
+        <Box sx={{ gridRow: "3", ml: { md: `${drawerWidth}px` } }}>
           <Footer />
         </Box>
       </Box>

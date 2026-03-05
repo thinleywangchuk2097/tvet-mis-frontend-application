@@ -105,7 +105,7 @@ const ACSLevel1Dashboard = () => {
   const [infoPage, setInfoPage] = useState(0);
   const [infoRowsPerPage, setInfoRowsPerPage] = useState(5);
   return (
-    <Paper sx={{ p: 3, borderRadius: 2 }}>
+    <Paper sx={{ p: 3, borderRadius: 1 }}>
       <Typography variant="h6" fontWeight={700} mb={3}>
         ACS Level 1 Dashboard
       </Typography>
@@ -223,7 +223,6 @@ const ACSLevel1Dashboard = () => {
           </Formik>
         </CardContent>
       </Card>
-
       {/* Charts Section */}
       <Grid container spacing={3} mb={3}>
         {/* Line Chart */}
@@ -309,7 +308,6 @@ const ACSLevel1Dashboard = () => {
           </Paper>
         </Grid>
       </Grid>
-
       {/* Table Section */}
       <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
         <CardContent>
