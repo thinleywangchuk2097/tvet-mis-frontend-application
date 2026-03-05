@@ -129,8 +129,6 @@ const graphData = [
   { month: "Dec", value: 9490 },
 ];
 
-
-
 const PublicIndex = () => {
   const theme = useTheme();
   const [activeSlide, setActiveSlide] = useState(0);
@@ -210,38 +208,44 @@ const PublicIndex = () => {
   ];
 
   const tvetIndicators = [
-  {
-    id: 1,
-    name: "Registered Training Provider",
-    ttiGovt: 14,
-    pvtOthers: 130,
-    total: 144,
-  },
-  {
-    id: 2,
-    name: "Accredited Courses",
-    ttiGovt: 173,
-    pvtOthers: 69,
-    total: 242,
-  },
-  { id: 3, name: "Other Courses", ttiGovt: 164, pvtOthers: 556, total: 720 },
-  {
-    id: 4,
-    name: "Enrolment in Accredited Courses",
-    ttiGovt: 8094,
-    pvtOthers: 16990,
-    total: 25084,
-  },
-  {
-    id: 5,
-    name: "Enrolment in other Courses",
-    ttiGovt: 5732,
-    pvtOthers: 45951,
-    total: 51683,
-  },
-  { id: 6, name: "ToT Certified", ttiGovt: 124, pvtOthers: 50, total: 174 },
-  { id: 7, name: "RPL Certified (MoLHR)", ttiGovt: 0, pvtOthers: 0, total: 0 },
-];
+    {
+      id: 1,
+      name: "Registered Training Provider",
+      ttiGovt: 14,
+      pvtOthers: 130,
+      total: 144,
+    },
+    {
+      id: 2,
+      name: "Accredited Courses",
+      ttiGovt: 173,
+      pvtOthers: 69,
+      total: 242,
+    },
+    { id: 3, name: "Other Courses", ttiGovt: 164, pvtOthers: 556, total: 720 },
+    {
+      id: 4,
+      name: "Enrolment in Accredited Courses",
+      ttiGovt: 8094,
+      pvtOthers: 16990,
+      total: 25084,
+    },
+    {
+      id: 5,
+      name: "Enrolment in other Courses",
+      ttiGovt: 5732,
+      pvtOthers: 45951,
+      total: 51683,
+    },
+    { id: 6, name: "ToT Certified", ttiGovt: 124, pvtOthers: 50, total: 174 },
+    {
+      id: 7,
+      name: "RPL Certified (MoLHR)",
+      ttiGovt: 0,
+      pvtOthers: 0,
+      total: 0,
+    },
+  ];
 
   const recentOngoingCourses = [
     {
@@ -258,21 +262,21 @@ const PublicIndex = () => {
       applicationDate: "05-Dec-2025",
       courseDate: "10-Dec-2025",
     },
-     {
+    {
       course: "Mathematics 201",
       certification: "Level 2",
       status: "COMPLETED",
       applicationDate: "05-Dec-2025",
       courseDate: "10-Dec-2025",
     },
-     {
+    {
       course: "Mathematics 201",
       certification: "Level 2",
       status: "ONGOING",
       applicationDate: "05-Dec-2025",
       courseDate: "10-Dec-2025",
     },
-     {
+    {
       course: "Mathematics 201",
       certification: "Level 2",
       status: "COMPLETED",
@@ -311,7 +315,29 @@ const PublicIndex = () => {
     },
     { title: "Grade", value: "A+", color: "warning", icon: <TrendingUpIcon /> },
   ];
-
+  const notifications = [
+    {
+      id: 1,
+      message:
+        "New Course Applications are now open! Apply before 10th March 2026.",
+      icon: <NotificationsActiveIcon fontSize="small" />,
+    },
+    {
+      id: 2,
+      message: "Institute registrations for 2026 are due soon.",
+      icon: <NotificationsActiveIcon fontSize="small" />,
+    },
+    {
+      id: 3,
+      message: "Check your application status using the search bar above.",
+      icon: <NotificationsActiveIcon fontSize="small" />,
+    },
+    {
+      id: 4,
+      message: "New courses added in Thimphu and Paro locations.",
+      icon: <NotificationsActiveIcon fontSize="small" />,
+    }
+  ];
   // Modal search
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [searchError, setSearchError] = useState(false);
@@ -471,6 +497,55 @@ const PublicIndex = () => {
           >
             Search
           </Button>
+        </Box>
+        {/* Moving Notification */}
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 16,
+            width: "100%",
+            overflow: "hidden",
+            zIndex: 2,
+          }}
+        >
+          <Box
+            component="style"
+            children={`
+      @keyframes slideLeftRight {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+    `}
+          />
+
+          <Box
+            sx={{
+              display: "flex",
+              gap: 6,
+              whiteSpace: "nowrap",
+              animation: "slideLeftRight 20s linear infinite",
+            }}
+          >
+            {notifications.map((notif) => (
+              <Box
+                key={notif.id}
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 2,
+                  py: 0.5,
+                  bgcolor: alpha(theme.palette.primary.main, 0.85),
+                  borderRadius: 1,
+                  color: "#fff",
+                  fontSize: { xs: "0.6rem", md: "0.75rem" },
+                }}
+              >
+                {notif.icon}
+                {notif.message}
+              </Box>
+            ))}
+          </Box>
         </Box>
       </Box>
       <Paper
