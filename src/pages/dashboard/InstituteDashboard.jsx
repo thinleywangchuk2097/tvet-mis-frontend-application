@@ -221,7 +221,7 @@ const InstituteDashboard = () => {
 
       {/* -------------------- Charts -------------------- */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4 }}>
           <Paper
             sx={{
               p: 2,
@@ -246,7 +246,7 @@ const InstituteDashboard = () => {
             </ResponsiveContainer>
           </Paper>
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4 }}>
           <Paper
             sx={{
               p: 2,
@@ -268,7 +268,7 @@ const InstituteDashboard = () => {
             </ResponsiveContainer>
           </Paper>
         </Grid>
-        <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
+        <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
           <Paper
             sx={{
               p: 2,
