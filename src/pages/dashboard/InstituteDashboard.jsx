@@ -51,7 +51,7 @@ const InstituteDashboard = () => {
     { month: "May", students: 300 },
     { month: "Jun", students: 280 },
     { month: "Jul", students: 350 },
-    { month: "Aug", students: 400 },  
+    { month: "Aug", students: 400 },
     { month: "Sep", students: 380 },
     { month: "Oct", students: 420 },
     { month: "Nv", students: 450 },
@@ -74,11 +74,10 @@ const InstituteDashboard = () => {
     { month: "Jun", courses: 10 },
     { month: "Jul", courses: 4 },
     { month: "Aug", courses: 6 },
-    { month: "Sep", courses: 8 }, 
+    { month: "Sep", courses: 8 },
     { month: "Oct", courses: 5 },
     { month: "Nov", courses: 7 },
-    { month: "Dec", courses: 9 }, 
-
+    { month: "Dec", courses: 9 },
   ];
 
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
@@ -159,9 +158,24 @@ const InstituteDashboard = () => {
   };
 
   const metrics = [
-    { title: "Total Students", value: "1,240", color: "primary", icon: <PeopleIcon /> },
-    { title: "New Courses", value: "32", color: "secondary", icon: <BarChartIcon /> },
-    { title: "Staff Members", value: "8", color: "success", icon: <CheckCircleIcon /> },
+    {
+      title: "Total Students",
+      value: "1,240",
+      color: "primary",
+      icon: <PeopleIcon />,
+    },
+    {
+      title: "New Courses",
+      value: "32",
+      color: "secondary",
+      icon: <BarChartIcon />,
+    },
+    {
+      title: "Staff Members",
+      value: "8",
+      color: "success",
+      icon: <CheckCircleIcon />,
+    },
     { title: "Grade", value: "A+", color: "warning", icon: <TrendingUpIcon /> },
   ];
 
@@ -186,7 +200,12 @@ const InstituteDashboard = () => {
                 borderColor: "divider",
               }}
             >
-              <Avatar sx={{ bgcolor: `${metric.color}.light`, color: `${metric.color}.main` }}>
+              <Avatar
+                sx={{
+                  bgcolor: `${metric.color}.light`,
+                  color: `${metric.color}.main`,
+                }}
+              >
                 {metric.icon}
               </Avatar>
               <Box>
@@ -203,7 +222,14 @@ const InstituteDashboard = () => {
       {/* -------------------- Charts -------------------- */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
-          <Paper sx={{ p: 2, height: 300 }}>
+          <Paper
+            sx={{
+              p: 2,
+              height: 300,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
             <Typography fontWeight={600}>Monthly Enrollments</Typography>
             <ResponsiveContainer width="100%" height="90%">
               <LineChart data={lineData}>
@@ -211,13 +237,24 @@ const InstituteDashboard = () => {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip />
-                <Line type="monotone" dataKey="students" stroke={theme.palette.primary.main} />
+                <Line
+                  type="monotone"
+                  dataKey="students"
+                  stroke={theme.palette.primary.main}
+                />
               </LineChart>
             </ResponsiveContainer>
           </Paper>
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
-          <Paper sx={{ p: 2, height: 300 }}>
+          <Paper
+            sx={{
+              p: 2,
+              height: 300,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
             <Typography fontWeight={600}>Students Distribution</Typography>
             <ResponsiveContainer width="100%" height="90%">
               <PieChart>
@@ -232,7 +269,14 @@ const InstituteDashboard = () => {
           </Paper>
         </Grid>
         <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
-          <Paper sx={{ p: 2, height: 300 }}>
+          <Paper
+            sx={{
+              p: 2,
+              height: 300,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
             <Typography fontWeight={600}>Courses per Month</Typography>
             <ResponsiveContainer width="100%" height="90%">
               <BarChart data={barData}>
@@ -240,7 +284,11 @@ const InstituteDashboard = () => {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip />
-                <Bar barSize={40} dataKey="courses" fill={theme.palette.secondary.main} />
+                <Bar
+                  barSize={40}
+                  dataKey="courses"
+                  fill={theme.palette.secondary.main}
+                />
               </BarChart>
             </ResponsiveContainer>
           </Paper>
@@ -260,10 +308,15 @@ const InstituteDashboard = () => {
               <Table size="small" sx={tableStyle}>
                 <TableBody>
                   {instituteInfo
-                    .slice(infoPage * infoRowsPerPage, infoPage * infoRowsPerPage + infoRowsPerPage)
+                    .slice(
+                      infoPage * infoRowsPerPage,
+                      infoPage * infoRowsPerPage + infoRowsPerPage,
+                    )
                     .map((row, index) => (
                       <TableRow key={index}>
-                        <TableCell sx={{ fontWeight: 600 }}>{row.label}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>
+                          {row.label}
+                        </TableCell>
                         <TableCell>{row.value}</TableCell>
                       </TableRow>
                     ))}
@@ -305,14 +358,21 @@ const InstituteDashboard = () => {
                 </TableHead>
                 <TableBody>
                   {recentApplications
-                    .slice(appPage * appRowsPerPage, appPage * appRowsPerPage + appRowsPerPage)
+                    .slice(
+                      appPage * appRowsPerPage,
+                      appPage * appRowsPerPage + appRowsPerPage,
+                    )
                     .map((app) => (
                       <TableRow key={app.id}>
                         <TableCell>{app.id}</TableCell>
                         <TableCell>{app.service}</TableCell>
                         <TableCell>{app.submissionDate}</TableCell>
                         <TableCell>
-                          <Chip label={app.status} size="small" color={statusColors[app.status]} />
+                          <Chip
+                            label={app.status}
+                            size="small"
+                            color={statusColors[app.status]}
+                          />
                         </TableCell>
                         <TableCell>{app.remarks}</TableCell>
                       </TableRow>
@@ -337,7 +397,7 @@ const InstituteDashboard = () => {
         </Grid>
 
         {/* Courses */}
-        <Grid item size={{ xs: 12, sm: 12, md: 12}}>
+        <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
           <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
             <Typography fontWeight={600} sx={{ mb: 2 }}>
               Recent Ongoing Course Details
@@ -358,7 +418,7 @@ const InstituteDashboard = () => {
                   {recentOngoingCourses
                     .slice(
                       coursePage * courseRowsPerPage,
-                      coursePage * courseRowsPerPage + courseRowsPerPage
+                      coursePage * courseRowsPerPage + courseRowsPerPage,
                     )
                     .map((course, index) => (
                       <TableRow key={index}>
@@ -372,8 +432,8 @@ const InstituteDashboard = () => {
                               course.status === "ONGOING"
                                 ? "warning"
                                 : course.status === "COMPLETED"
-                                ? "success"
-                                : "error"
+                                  ? "success"
+                                  : "error"
                             }
                           />
                         </TableCell>

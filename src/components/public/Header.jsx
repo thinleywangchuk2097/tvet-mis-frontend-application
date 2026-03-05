@@ -398,9 +398,24 @@ const Header = () => {
 
             {/* Collapsible sections */}
             {[
-              { label: "Registration", open: mobileRegisterOpen, setOpen: setMobileRegisterOpen, items: registerItems },
-              { label: "Courses", open: mobileCoursesOpen, setOpen: setMobileCoursesOpen, items: courses },
-              { label: "Reports", open: mobileReportsOpen, setOpen: setMobileReportsOpen, items: reports },
+              {
+                label: "Registration",
+                open: mobileRegisterOpen,
+                setOpen: setMobileRegisterOpen,
+                items: registerItems,
+              },
+              {
+                label: "Courses",
+                open: mobileCoursesOpen,
+                setOpen: setMobileCoursesOpen,
+                items: courses,
+              },
+              {
+                label: "Reports",
+                open: mobileReportsOpen,
+                setOpen: setMobileReportsOpen,
+                items: reports,
+              },
             ].map(({ label, open, setOpen, items }) => (
               <Box key={label}>
                 <MenuItem
@@ -417,7 +432,12 @@ const Header = () => {
                         navigate(item.path);
                         handleMenuClose();
                       }}
-                      sx={{ py: 0.35, px: 3, minHeight: "auto", fontSize: "0.85rem" }}
+                      sx={{
+                        py: 0.35,
+                        px: 3,
+                        minHeight: "auto",
+                        fontSize: "0.85rem",
+                      }}
                     >
                       {item.label}
                     </MenuItem>,

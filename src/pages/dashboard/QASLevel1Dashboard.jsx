@@ -33,6 +33,7 @@ import {
 } from "recharts";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
+import SearchIcon from "@mui/icons-material/Search";
 
 const pieData = [
   { name: "Approved", value: 40 },
@@ -128,7 +129,7 @@ const QASLevel1Dashboard = () => {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Formik
-              initialValues={{ fromDate: "", toDate: "" }}
+              initialValues={{ fromDate: "", toDate: "", search: "" }}
               validationSchema={validationSchema}
               onSubmit={(values) => {
                 console.log(values);
@@ -137,7 +138,21 @@ const QASLevel1Dashboard = () => {
               {({ values, handleChange, errors, touched }) => (
                 <Form>
                   <Grid container spacing={2} alignItems="center">
-                    <Grid item size={{ xs: 12, sm: 5, md: 5 }}>
+                    {/* Search Field */}
+                    <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        placeholder="Search..."
+                        name="search"
+                        size="small"
+                        value={values.search}
+                        onChange={handleChange}
+                        InputProps={{
+                          startAdornment: <SearchIcon sx={{ mr: 1 }} />,
+                        }}
+                      />
+                    </Grid>
+                    <Grid item size={{ xs: 12, sm: 5, md: 3 }}>
                       <TextField
                         fullWidth
                         type="date"
@@ -152,7 +167,7 @@ const QASLevel1Dashboard = () => {
                       />
                     </Grid>
 
-                    <Grid item size={{ xs: 12, sm: 5, md: 5 }}>
+                    <Grid item size={{ xs: 12, sm: 5, md: 3 }}>
                       <TextField
                         fullWidth
                         type="date"

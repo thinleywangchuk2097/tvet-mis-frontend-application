@@ -30,6 +30,7 @@ import {
   Legend,
   CartesianGrid,
 } from "recharts";
+import SearchIcon from "@mui/icons-material/Search";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
 
@@ -113,15 +114,29 @@ const ACSLevel1Dashboard = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Formik
-            initialValues={{ fromDate: "", toDate: "" }}
+            initialValues={{ fromDate: "", toDate: "", search: "" }}
             validationSchema={validationSchema}
             onSubmit={(values) => console.log(values)}
           >
             {({ values, handleChange, errors, touched }) => (
               <Form>
-                <Grid container spacing={2} mt={1}>
-                  {/*  Filter Cases by Date: */}
-                  <Grid item size={{ xs: 12, sm: 5, md: 5 }}>
+                <Grid container spacing={2} mt={1} alignItems="center">
+                  {/* Search Field */}
+                  <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      placeholder="Search..."
+                      name="search"
+                      size="small"
+                      value={values.search}
+                      onChange={handleChange}
+                      InputProps={{
+                        startAdornment: <SearchIcon sx={{ mr: 1 }} />,
+                      }}
+                    />
+                  </Grid>
+                  {/* Filter Cases by Date */}
+                  <Grid item size={{ xs: 12, sm: 5, md: 3 }}>
                     <TextField
                       fullWidth
                       type="date"
@@ -135,7 +150,7 @@ const ACSLevel1Dashboard = () => {
                       helperText={touched.fromDate && errors.fromDate}
                     />
                   </Grid>
-                  <Grid item size={{ xs: 12, sm: 5, md: 5 }}>
+                  <Grid item size={{ xs: 12, sm: 5, md: 3 }}>
                     <TextField
                       fullWidth
                       type="date"
@@ -149,7 +164,7 @@ const ACSLevel1Dashboard = () => {
                       helperText={touched.toDate && errors.toDate}
                     />
                   </Grid>
-                  <Grid item size={{ xs: 12, sm: 2, md: 2 }}>
+                  <Grid item xs={12} sm={2} md={2}>
                     <Button type="submit" variant="contained" fullWidth>
                       Apply Filter
                     </Button>
@@ -161,7 +176,7 @@ const ACSLevel1Dashboard = () => {
                       sx={{ p: 2, border: "1px solid", borderColor: "divider" }}
                     >
                       <Typography fontWeight={600} sx={{ mb: 2 }}>
-                        TVET Indicators
+                        Application Details
                       </Typography>
 
                       <TableContainer>
@@ -186,6 +201,11 @@ const ACSLevel1Dashboard = () => {
 
                           <TableBody>
                             {tvetIndicators
+                              .filter((row) =>
+                                row.name
+                                  .toLowerCase()
+                                  .includes(values.search.toLowerCase()),
+                              )
                               .slice(
                                 infoPage * infoRowsPerPage,
                                 infoPage * infoRowsPerPage + infoRowsPerPage,
@@ -205,7 +225,13 @@ const ACSLevel1Dashboard = () => {
 
                       <TablePagination
                         component="div"
-                        count={tvetIndicators.length}
+                        count={
+                          tvetIndicators.filter((row) =>
+                            row.name
+                              .toLowerCase()
+                              .includes(values.search.toLowerCase()),
+                          ).length
+                        }
                         page={infoPage}
                         onPageChange={(e, newPage) => setInfoPage(newPage)}
                         rowsPerPage={infoRowsPerPage}
