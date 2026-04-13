@@ -15,7 +15,6 @@ import {
   Typography,
   InputAdornment,
   Paper,
-  Link,
   CircularProgress,
 } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
@@ -35,12 +34,11 @@ const validationSchema = Yup.object({
 });
 
 const Login = () => {
-
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const redirectToBhutanNDI = () => {
-    navigate("/login-ndi-qrcode"); 
+    navigate("/auth/login-ndi-qrcode");
     console.log("Redirecting to Bhutan NDI...");
   };
 
@@ -65,13 +63,13 @@ const Login = () => {
           "/api/v1/auth/authenticate",
           values,
         );
-
         const {
           access_token,
           refresh_token,
           current_role,
           userId,
           locationId,
+          id
         } = response.data;
 
         const { roles } = getTokenData(access_token);
@@ -90,6 +88,7 @@ const Login = () => {
             refresh_token,
             current_role,
             locationId,
+            id
           }),
         );
 
@@ -98,8 +97,6 @@ const Login = () => {
             current_role,
             access_token,
           );
-console.log("Fetched privileges from API:", privilegesData.data);
-
           const privileges =
             privilegesData.data?.map((item) => ({
               id: item.id,
@@ -304,16 +301,30 @@ console.log("Fetched privileges from API:", privilegesData.data);
               </Button>
 
               <Box display="flex" justifyContent="flex-end">
-                <Link
-                  component={RouterLink}
-                  to="/forgot-password"
-                  underline="none"
+                <Box
                   display="flex"
                   alignItems="center"
+                  sx={{
+                    cursor: "pointer",
+                    color: "primary.main", // normal color
+                    transition: "color 0.2s ease, text-decoration 0.2s ease",
+                    "&:hover": {
+                      color: "primary.dark", // darker on hover
+                      textDecoration: "underline", // underline on hover
+                    },
+                  }}
+                  onClick={() => navigate("/auth/forgot-password")}
                 >
-                  <HelpOutlineIcon fontSize="small" sx={{ mr: 0.5 }} />
+                  <HelpOutlineIcon
+                    fontSize="small"
+                    sx={{
+                      mr: 0.5,
+                      color: "inherit",
+                      transition: "color 0.2s ease",
+                    }}
+                  />
                   <Typography variant="body2">Forgot Password?</Typography>
-                </Link>
+                </Box>
               </Box>
             </Box>
           </Box>

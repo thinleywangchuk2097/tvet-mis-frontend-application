@@ -67,12 +67,12 @@ const QMSAuditor = () => {
     const checked = event.target.checked;
     setHasCitizenID(checked);
     if (!checked) {
-      navigate("/login-ndi-qrcode");
+      navigate("/auth/login-ndi-qrcode");
     }
   };
 
   return (
-    <Box sx={{ m: { xs: 2, md: 6 } }}>
+    <Box sx={{ m: { xs: 2, md: 2 } }}>
       {/* Toggle for Citizen ID */}
       <Box textAlign="center" sx={{ mb: 4 }}>
         <FormControlLabel
@@ -97,7 +97,6 @@ const QMSAuditor = () => {
           sx={{
             p: { xs: 2, md: 4 },
             width: "100%",
-            borderRadius: 3,
             boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
           }}
         >

@@ -58,7 +58,7 @@ const GroupTaskList = () => {
   const assignedUserId = useSelector((state) => state.auth.userId);
   const locationId = useSelector((state) => state.auth.locationId);
 
-  const taskStatusId = 98; // Replace with appropriate status ID or get from props/state
+  const taskStatusId = 18; //unclaimed statusId
 
   // Fetch tasks from API
   useEffect(() => {
@@ -128,10 +128,10 @@ const GroupTaskList = () => {
       const claimPayload = {
         applicationNo: selectedTask.applicationNo,
         assignedUserId: assignedUserId,
-        taskStatusId: 99, // Assuming 99 is the status for claimed tasks
+        taskStatusId: 19, //claimed taskStatusId
         assignedRoleId: currentRoleId,
         locationId: locationId,
-        serviceId: selectedTask.serviceId || 1, // Use serviceId from task data
+        serviceId: selectedTask.serviceId, // Use serviceId from task data
         actorId: assignedUserId,
       };
 
@@ -222,7 +222,7 @@ const GroupTaskList = () => {
   );
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Paper sx={{ p: 3, mt: 1 }}>
       <Box
         sx={{
           display: "flex",
@@ -455,7 +455,7 @@ const GroupTaskList = () => {
           <ListItemText primary="Claim" />
         </MenuItem>
       </Menu>
-    </Box>
+    </Paper>
   );
 };
 

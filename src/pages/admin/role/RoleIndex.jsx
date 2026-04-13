@@ -2,12 +2,10 @@ import { useState, useEffect } from "react";
 import PrivilegeService from "../../../api/services/PrivilegeService";
 import UserRoleManagementService from "../../../api/services/UserRoleManagementService";
 import { useSelector } from "react-redux";
-import { useTheme } from "@mui/material/styles";
 import { toast } from "react-toastify";
 import {
   Box,
   Typography,
-  Container,
   Paper,
   Table,
   TableBody,
@@ -53,7 +51,6 @@ const RoleIndex = () => {
   const [open, setOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentRole, setCurrentRole] = useState(null);
-  const theme = useTheme();
   const [formData, setFormData] = useState({
     roleName: "",
     description: "",
@@ -218,7 +215,7 @@ const RoleIndex = () => {
     return selectedCount > 0 && selectedCount < privilegeIds.length;
   };
 
-  // ✅ UPDATED: Child checkbox always adds parent
+  //UPDATED: Child checkbox always adds parent
   const handlePrivilegeChange = (childId, parentId) => {
     const currentPrivileges = formData.assignedPrivilegeId;
     const isSelected = currentPrivileges.includes(childId);
@@ -388,8 +385,8 @@ const RoleIndex = () => {
   };
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ my: 4 }}>
+    <Paper sx={{ p: 3, mt: 1 }}>
+      <Box>
         {/* TOPBAR */}
         <Stack
           direction="row"
@@ -416,7 +413,7 @@ const RoleIndex = () => {
                   ),
                 },
               }}
-              sx={{ width: 250 }}
+              sx={{ width: 300 }}
             />
             <Button
               variant="contained"
@@ -429,35 +426,30 @@ const RoleIndex = () => {
         </Stack>
 
         {/* TABLE */}
-        <TableContainer component={Paper} sx={{ border: "1px solid #e0e0e0" }}>
+        <TableContainer component={Paper}>
           <Table
             sx={{
-              borderCollapse: "separate",
-              borderSpacing: 0,
-              "& th, & td": {
-                borderRight: `1px solid ${theme.palette.divider}`,
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                "&:last-child": { borderRight: "none" },
+              border: "1px solid #e0e0e0",
+              borderCollapse: "collapse",
+              "& .MuiTableCell-root": {
+                border: "1px solid #e0e0e0",
               },
-              "& th": {
-                backgroundColor:
-                  theme.palette.mode === "dark" ? "#333" : "#f5f5f5",
-                color: theme.palette.mode === "dark" ? "#fff" : "#000",
-                fontWeight: "bold",
-                borderTop: `1px solid ${theme.palette.divider}`,
-              },
-              "& tr:last-child td": { borderBottom: "none" },
             }}
           >
             <TableHead>
               <TableRow
-                sx={{ "& .MuiTableCell-root": { textAlign: "center" } }}
+                sx={{
+                  "& .MuiTableCell-root": {
+                    textAlign: "center",
+                    fontWeight: 600,
+                  },
+                }}
               >
                 <TableCell sx={{ width: "5%" }}>ID</TableCell>
                 <TableCell sx={{ width: "15%" }}>Role Name</TableCell>
                 <TableCell sx={{ width: "25%" }}>Description</TableCell>
                 <TableCell sx={{ width: "45%" }}>Privileges</TableCell>
-                <TableCell sx={{ width: "10%" }}>Actions</TableCell>
+                <TableCell sx={{ width: "10%" }}>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -685,9 +677,17 @@ const RoleIndex = () => {
             </Typography>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleDeleteCanceled}>Cancel</Button>
+            <Button
+              color="secondary"
+              variant="contained"
+              size="small"
+              onClick={handleDeleteCanceled}
+            >
+              Cancel
+            </Button>
             <Button
               color="error"
+              size="small"
               variant="contained"
               onClick={handleDeleteConfirmed}
             >
@@ -696,7 +696,7 @@ const RoleIndex = () => {
           </DialogActions>
         </Dialog>
       </Box>
-    </Container>
+    </Paper>
   );
 };
 

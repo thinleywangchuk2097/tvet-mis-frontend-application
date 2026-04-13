@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Box,
   Paper,
@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import SendIcon from "@mui/icons-material/Send";
+import { useNavigate } from "react-router-dom";
 
 const rowsData = [
   {
@@ -48,14 +49,13 @@ const RPLAssessment = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const navigate = useNavigate();
 
   const filteredRows = rowsData.filter((row) =>
     Object.values(row).join(" ").toLowerCase().includes(search.toLowerCase()),
   );
 
-  const handleApply = (row) => {
-    console.log("Applying for:", row);
-  };
+ 
 
   return (
     <Box sx={{ p: 3 }}>
@@ -184,8 +184,10 @@ const RPLAssessment = () => {
                       <Button
                         variant="contained"
                         size="small"
-                      /*   endIcon={<SendIcon />} */
-                        onClick={() => handleApply(row)}
+                        /*   endIcon={<SendIcon />} */
+                        onClick={() =>
+                          navigate(`/apply-rpl-course/${row.id}`)
+                        }
                         sx={{
                           textTransform: "none",
                           borderRadius: 2,

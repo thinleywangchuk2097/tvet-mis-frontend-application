@@ -12,7 +12,7 @@ import VacanciesTraining from '../pages/public/VacanciesTraining';
 import MyTask from '../pages/tasklist/MyTaskList';
 import GroupTaskList from '../pages/tasklist/GroupTaskList';
 import ResetPassword from '../pages/auth/ResetPassword';
-import  ComplaintIssue  from '../pages/complaint/ComplaintIssue';
+import ComplaintIssue  from '../pages/complaint/ComplaintIssue';
 import DashboardIndex from '../pages/dashboard/DashboardIndex';
 import ComplaintView from '../pages/complaint/ComplaintView';
 import GenerateQRCode from '../pages/auth/bhutanndi/GenerateQRCode';
@@ -21,15 +21,17 @@ import GenerateQRCode from '../pages/auth/bhutanndi/GenerateQRCode';
 import Assessor from '../pages/public/registration/Assessor';
 import AssessmentCentre from '../pages/public/registration/AssessmentCentre';
 import Accreditor from '../pages/public/registration/Accreditor';
-import InstituteProposal from '../pages/public/registration/InstituteProposal'; 
+import InstituteProposal from '../pages/public/proposal/InstituteProposal'; 
 import InstituteRegistration from '../pages/public/registration/InstituteRegistration';
 import QMSAuditor from '../pages/public/registration/QMSAuditor';
-import Trainer from '../pages/public/registration/Trainer';
 import RPLAssessment from '../pages/public/courses/RPLAssessment';
+
 //course announcement paths
 import AccreditatedCourse from '../pages/institute/courseannouncement/AccreditatedCourse';
 import NonAccreditedCourse from '../pages/institute/courseannouncement/NonAccreditedCourse';
 import RPLAssessment1 from '../pages/institute/courseannouncement/RPLAssessment';
+// assessment result path
+import AssessmentResult from '../pages/public/assessment/AssessmentResult';
 
 //trainee course application
 import ApplyCourse from '../pages/trainee/ApplyCourse';
@@ -45,12 +47,13 @@ export const publicRoutes = [
   { path: '/register/assessor', element: <Assessor /> },
   { path: '/register/assessment-centre', element: <AssessmentCentre /> },
   { path: '/register/accreditor', element: <Accreditor /> },
-  { path: '/register/institute-proposal', element: <InstituteProposal /> },
+  { path: '/proposal/:title', element: <InstituteProposal /> },
   { path: '/register/institute', element: <InstituteRegistration /> },
   { path: '/register/qms-auditor', element: <QMSAuditor /> },
-  { path: '/register/trainer', element: <Trainer /> },
   { path: '/apply/rpl-assessment', element: <RPLAssessment /> },
   { path: '/apply-course/:application_no', element: <ApplyCourse /> },
+  { path: '/assessment-result', element: <AssessmentResult /> },
+ 
 
 ];
 
@@ -58,11 +61,11 @@ export const publicRoutes = [
 export const privateRoutes = [
   { path: '/', element: <DashboardIndex /> }, // role-based dashboard
   { path: '/create-role', element: <RoleIndex /> },
+  { path: '/create-user', element: <UserIndex /> },
+  { path: '/create-dropdown', element: <DropdownIndex /> },
   { path: '/user-profile', element: <UserProfile /> },
   { path: '/change-password', element: <PasswordChange /> },
   { path: '/switch-role', element: <SwitchRole /> },
-  { path: '/create-user', element: <UserIndex /> },
-  { path: '/create-dropdown', element: <DropdownIndex /> },
   { path: '/report-index', element: <ReportIndex /> },
   { path: '/my-task-index', element: <MyTask /> },
   { path: '/group-task-index', element: <GroupTaskList /> },

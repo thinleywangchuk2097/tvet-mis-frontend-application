@@ -126,9 +126,9 @@ const MyTaskList = () => {
       const payload = {
         applicationNo: selectedTask.application_no,
         assignedUserId: null,
-        taskStatusId: 98, // From your payload example
-        assignedRoleId: 1,
-        serviceId: selectedTask.service_id || 1, // Use task's service_id if available, otherwise default to 1
+        taskStatusId: null, // uncliam taskStatusId
+        assignedRoleId: null,
+        serviceId: null,
       };
 
       // Call the API to unclaim the task
@@ -240,7 +240,7 @@ const MyTaskList = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Paper sx={{ p: 3, mt: 1 }}>
       <Box
         sx={{
           display: "flex",
@@ -437,7 +437,7 @@ const MyTaskList = () => {
           )}
         </MenuItem>
       </Menu>
-    </Box>
+    </Paper>
   );
 };
 
