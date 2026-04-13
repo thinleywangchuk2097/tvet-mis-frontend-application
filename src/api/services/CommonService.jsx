@@ -7,14 +7,51 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
+  getAllSectors() {
+    return apiClient
+      .get("/api/v1/common/get-sectors")
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  getAllOccupations() {
+    return apiClient
+      .get("/api/v1/common/get-occupations")
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  getAllQualitystandards() {
+    return apiClient
+      .get("/api/v1/common/get-quality-standards")
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  getByParentId(parentId) {
+    return apiClient
+      .get(`/api/v1/common/get-child-dropdown/${parentId}`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
 
-   fetchDocument(fileName, upload_url) {
+  getServiceName(Id) {
+    return apiClient
+      .get(`/api/v1/common/get-service-name/${Id}`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+   getOccupationsBySectorId(sectorId) {
+    return apiClient
+      .get(`/api/v1/common/get-occupations/${sectorId}`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  fetchDocument(fileName, upload_url) {
     return apiClient.get("/api/v1/common/download-document", {
       params: {
         upload_url,
-        fileName
+        fileName,
       },
-      responseType: "blob"
+      responseType: "blob",
     });
   }
 }

@@ -36,67 +36,82 @@ const Header = () => {
   const open = Boolean(anchorEl);
 
   // Mobile collapse menus
+  const [mobileProposalOpen, setMobileProposalOpen] = React.useState(false);
   const [mobileRegisterOpen, setMobileRegisterOpen] = React.useState(false);
-  const [mobileCoursesOpen, setMobileCoursesOpen] = React.useState(false);
+  const [mobileRenewalOpen, setMobileRenewalOpen] = React.useState(false);
   const [mobileReportsOpen, setMobileReportsOpen] = React.useState(false);
 
   // Desktop dropdowns
   const [registerAnchorEl, setRegisterAnchorEl] = React.useState(null);
-  const [coursesAnchorEl, setCoursesAnchorEl] = React.useState(null);
+  const [renewalAnchorEl, setRenewalAnchorEl] = React.useState(null);
   const [reportsAnchorEl, setReportsAnchorEl] = React.useState(null);
+  const [proposalAnchorEl, setProposalAnchorEl] = React.useState(null);
 
+  const proposalOpen = Boolean(proposalAnchorEl);
   const registerOpen = Boolean(registerAnchorEl);
-  const coursesOpen = Boolean(coursesAnchorEl);
+  const renewalOpen = Boolean(renewalAnchorEl);
   const reportsOpen = Boolean(reportsAnchorEl);
 
   const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => {
     setAnchorEl(null);
+    setMobileProposalOpen(false);
     setMobileRegisterOpen(false);
-    setMobileCoursesOpen(false);
+    setMobileRenewalOpen(false);
     setMobileReportsOpen(false);
   };
+  const handleProposalOpen = (event) =>
+    setProposalAnchorEl(event.currentTarget);
+  const handleProposalClose = () => setProposalAnchorEl(null);
 
   const handleRegisterOpen = (event) =>
     setRegisterAnchorEl(event.currentTarget);
+
   const handleRegisterClose = () => setRegisterAnchorEl(null);
-  const handleCoursesOpen = (event) => setCoursesAnchorEl(event.currentTarget);
-  const handleCoursesClose = () => setCoursesAnchorEl(null);
+  const handleRenewalOpen = (event) => setRenewalAnchorEl(event.currentTarget);
+  const handleRenewalClose = () => setRenewalAnchorEl(null);
   const handleReportsOpen = (event) => setReportsAnchorEl(event.currentTarget);
   const handleReportsClose = () => setReportsAnchorEl(null);
 
   const formik = useFormik({
     initialValues: { user_id: "", password: "" },
-    onSubmit: () => navigate("/login"),
+    onSubmit: () => navigate("/auth/login"),
   });
 
   const navItems = [
-    { label: "Vacancies & Trainings", path: "/vancies-training" },
-    { label: "Assessment", path: "/assessment-info" },
-    { label: "Feedback/Complaint", path: "/feedback" },
+    { label: "Assessment Result", path: "/result/assessment-result" },
+    { label: "Feedback & Complaint", path: "/feedback" },
+  ];
+
+  const proposalItems = [
+    { label: "Institute Proposal", path: "/proposal/institute/6" },
+    { label: "SES Centre Proposal", path: "/proposal/ses-centre/34" },
+    { label: "Assessment Centre Proposal", path: "/proposal/assessment-center/35" },
   ];
 
   const registerItems = [
-    { label: "Assessor", path: "/register/assessor" },
-    { label: "Institute Proposal", path: "/register/institute-proposal" },
-    { label: "Institute Registration", path: "/register/institute" },
-    { label: "Accreditor", path: "/register/accreditor" },
-    { label: "Assessment Centre", path: "/register/assessment-centre" },
-    { label: "Trainer", path: "/register/trainer" },
-    { label: "QMS Auditor", path: "/register/qms-auditor" },
+
+    { label: "Institute Registration", path: "/register/institute/7" },
+    { label: "SES Centre Registration", path: "/register/ses-centre/36" },
+    { label: "Assessment Centre Registration", path: "/register/assessment-centre/4" },
+
+    { label: "Assessor Registration", path: "/registration/assessor/32" },
+    { label: "Accreditor Registration", path: "/registration/accreditor/5" },
+    { label: "Quality Auditor Registration", path: "/registration/qms-auditor/3" },
+   
   ];
 
-  const courses = [
-    { label: "RPL Assessment", path: "/apply/rpl-assessment" },
-    { label: "National Certificate", path: "/apply/national-certificate" },
-    { label: "Institute Certificate", path: "/apply/institute-certificate" },
+  const renewalItems = [
+    { label: "Assessor", path: "/renewal/assessor" },
+    { label: "Accreditor", path: "/renewal/accreditor" },
+    { label: "Quality Auditor Registration", path: "/renewal/qms-auditor" },
   ];
 
   const reports = [
     { label: "Assessor", path: "/reports/assessor" },
     { label: "Institute", path: "/reports/institute" },
     { label: "Accreditor", path: "/reports/accreditor" },
-    { label: "Assessment Centre", path: "/reports/assessment-centre" },
+    { label: "Assessment Centre Accreditation", path: "/reports/assessment-centre" },
     { label: "Trainer", path: "/reports/trainer" },
     { label: "QMS Auditor", path: "/reports/qms-auditor" },
     { label: "Courses Accredited", path: "/reports/courses-accredited" },
@@ -162,10 +177,11 @@ const Header = () => {
         {/* Desktop Nav */}
         {!isMobile && (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {navItems.map((item) => (
+            {/* proposal */}
+            <Box>
               <Button
-                key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={handleProposalOpen}
+                endIcon={<ExpandMore sx={{ color: "#fff" }} />}
                 sx={{
                   color: "#fff",
                   textTransform: "none",
@@ -181,11 +197,39 @@ const Header = () => {
                   },
                 }}
               >
-                {item.label}
+                Proposal
               </Button>
-            ))}
-
-            {/* Dropdowns */}
+              <Menu
+                anchorEl={proposalAnchorEl}
+                open={proposalOpen}
+                onClose={handleProposalClose}
+                slots={{ transition: Fade }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      mt: 1,
+                      minWidth: 220,
+                      p: 0,
+                      borderRadius: 1.5,
+                      overflow: "visible",
+                      "&::before": {
+                        content: '""',
+                        position: "absolute",
+                        top: 0,
+                        left: 24,
+                        width: 10,
+                        height: 10,
+                        bgcolor: "#fff",
+                        transform: "translateY(-50%) rotate(45deg)",
+                      },
+                    },
+                  },
+                }}
+              >
+                {renderMenuItems(proposalItems, handleProposalClose)}
+              </Menu>
+            </Box>
+            {/* Registration */}
             <Box>
               <Button
                 onClick={handleRegisterOpen}
@@ -240,7 +284,7 @@ const Header = () => {
 
             <Box>
               <Button
-                onClick={handleCoursesOpen}
+                onClick={handleRenewalOpen}
                 endIcon={<ExpandMore sx={{ color: "#fff" }} />}
                 sx={{
                   color: "#fff",
@@ -257,12 +301,12 @@ const Header = () => {
                   },
                 }}
               >
-                Courses
+                Renewal
               </Button>
               <Menu
-                anchorEl={coursesAnchorEl}
-                open={coursesOpen}
-                onClose={handleCoursesClose}
+                anchorEl={renewalAnchorEl}
+                open={renewalOpen}
+                onClose={handleRenewalClose}
                 slots={{ transition: Fade }}
                 slotProps={{
                   paper: {
@@ -286,7 +330,7 @@ const Header = () => {
                   },
                 }}
               >
-                {renderMenuItems(courses, handleCoursesClose)}
+                {renderMenuItems(renewalItems, handleRenewalClose)}
               </Menu>
             </Box>
 
@@ -341,6 +385,28 @@ const Header = () => {
                 {renderMenuItems(reports, handleReportsClose)}
               </Menu>
             </Box>
+            {navItems.map((item) => (
+              <Button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                sx={{
+                  color: "#fff",
+                  textTransform: "none",
+                  position: "relative",
+                  "&:hover::after": {
+                    content: '""',
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "1px",
+                    bgcolor: "#fff",
+                  },
+                }}
+              >
+                {item.label}
+              </Button>
+            ))}
           </Box>
         )}
 
@@ -399,16 +465,22 @@ const Header = () => {
             {/* Collapsible sections */}
             {[
               {
+                label: "Proposal",
+                open: mobileProposalOpen,
+                setOpen: setMobileProposalOpen,
+                items: proposalItems,
+              },
+              {
                 label: "Registration",
                 open: mobileRegisterOpen,
                 setOpen: setMobileRegisterOpen,
                 items: registerItems,
               },
               {
-                label: "Courses",
-                open: mobileCoursesOpen,
-                setOpen: setMobileCoursesOpen,
-                items: courses,
+                label: "Renewal",
+                open: mobileRenewalOpen,
+                setOpen: setMobileRenewalOpen,
+                items: renewalItems,
               },
               {
                 label: "Reports",

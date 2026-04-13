@@ -180,13 +180,12 @@ const AssessmentCentre = () => {
   };
 
   return (
-    <Box sx={{ m: { xs: 2, md: 6 } }}>
+    <Box sx={{ m: { xs: 2, md: 2 } }}>
       <Paper
         elevation={3}
         sx={{
           p: { xs: 2, md: 4 },
           width: "100%",
-          borderRadius: 3,
           boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
         }}
       >

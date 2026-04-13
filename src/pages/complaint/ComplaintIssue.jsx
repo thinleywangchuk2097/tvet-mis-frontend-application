@@ -105,7 +105,7 @@ const ComplaintIssue = () => {
           currentRoleId: current_roleId,
           locationId,
           serviceId: 1,
-          statusId: 59,
+          statusId: 101,
         };
 
         const response = await ComplaintService.submitComplaint(

@@ -1,4 +1,3 @@
-// src/layout/AppLayout.jsx
 import { Box, Drawer, useMediaQuery } from "@mui/material";
 import { useState } from "react";
 import { useTheme } from "@mui/material/styles";
@@ -19,8 +18,7 @@ const AppLayout = () => {
   const handleDrawerToggle = () => setMobileOpen((prev) => !prev);
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       {/* Sidebar */}
       {isMobile ? (
         <Drawer
@@ -32,8 +30,8 @@ const AppLayout = () => {
           PaperProps={{
             sx: {
               width: drawerWidth,
-              boxSizing: 'border-box',
-              overflow: 'hidden', // no scroll
+              boxSizing: "border-box",
+              overflow: "hidden", // no scroll
             },
           }}
         >
@@ -41,7 +39,7 @@ const AppLayout = () => {
             sx={{
               pt: `${headerHeight}px`,
               height: `calc(100vh - ${headerHeight}px)`,
-              boxSizing: 'border-box',
+              boxSizing: "border-box",
             }}
           >
             <Sidebar />
@@ -50,16 +48,16 @@ const AppLayout = () => {
       ) : (
         <Box
           sx={{
-            position: 'absolute',
+            position: "absolute",
             top: `${headerHeight}px`,
             left: 0,
             width: drawerWidth,
             height: `calc(100vh - ${headerHeight}px)`,
-            bgcolor: 'background.paper',
-            borderRight: '1px solid #ddd',
+            bgcolor: "background.paper",
+            borderRight: "1px solid #ddd",
             zIndex: 1200,
-            boxSizing: 'border-box',
-            overflow: 'hidden', // no scroll
+            boxSizing: "border-box",
+            overflow: "hidden", // no scroll
           }}
         >
           <Sidebar />
@@ -69,27 +67,27 @@ const AppLayout = () => {
       {/* Main layout */}
       <Box
         sx={{
-          display: 'grid',
+          display: "grid",
           gridTemplateRows: `${headerHeight}px 1fr ${footerHeight}px`,
           flexGrow: 1,
-          overflow: 'hidden',
+          overflow: "hidden",
         }}
       >
         {/* Header */}
-        <Box sx={{ borderBottom: '1px solid #ddd', width: '100%' }}>
+        <Box sx={{ borderBottom: "1px solid #ddd", width: "100%" }}>
           <Header onToggleSidebar={handleDrawerToggle} />
         </Box>
 
         {/* Scrollable Main Content */}
         <Box
           sx={{
-            overflowY: 'auto',
-            overflowX: 'hidden',
+            overflowY: "auto",
+            overflowX: "hidden",
             minHeight: 0,
             p: 2,
-            bgcolor: 'background.default',
+            bgcolor: "background.default",
             ml: { md: `${drawerWidth}px` },
-            boxSizing: 'border-box',
+            boxSizing: "border-box",
           }}
         >
           <Outlet />
@@ -99,7 +97,7 @@ const AppLayout = () => {
         <Box
           sx={{
             ml: { md: `${drawerWidth}px` },
-            borderTop: '1px solid #ddd',
+            borderTop: "1px solid #ddd",
           }}
         >
           <Footer />

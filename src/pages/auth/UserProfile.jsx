@@ -9,7 +9,6 @@ import {
   Box,
   Divider,
   Avatar,
-  useTheme,
   Container,
   TextField,
   Button,
@@ -28,6 +27,7 @@ import {
   Cancel,
   Close,
   Lock,
+  Delete,
 } from "@mui/icons-material";
 import UserProfileService from "../../api/services/UserProfileService";
 
@@ -45,7 +45,6 @@ const profileSchema = Yup.object().shape({
 });
 
 const UserProfile = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const access_token = useSelector((state) => state.auth.accessToken);
@@ -59,6 +58,7 @@ const UserProfile = () => {
   const [profilePic, setProfilePic] = useState(currentProfilePic);
   const [profilePicFile, setProfilePicFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeletingImage, setIsDeletingImage] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -94,6 +94,28 @@ const UserProfile = () => {
       reader.onload = () => resolve(reader.result);
       reader.onerror = (error) => reject(error);
     });
+
+  const handleDeleteImage = async () => {
+    setIsDeletingImage(true);
+    try {
+      const response = await UserProfileService.deleteProfileImage(
+        userId,
+        access_token,
+      );
+      if (response.status === 200) {
+        setProfilePic(null);
+        setProfilePicFile(null);
+        toast.success(
+          response.data.message || "Profile image deleted successfully!",
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting profile image:", error);
+      toast.error("Failed to delete profile image");
+    } finally {
+      setIsDeletingImage(false);
+    }
+  };
 
   const formik = useFormik({
     initialValues: {
@@ -184,10 +206,10 @@ const UserProfile = () => {
             position: "absolute",
             right: 16,
             top: 10,
-            color: theme.palette.text.secondary,
+            color: "text.secondary",
             "&:hover": {
-              color: theme.palette.text.primary,
-              backgroundColor: theme.palette.action.hover,
+              color: "text.primary",
+              backgroundColor: "action.hover",
             },
           }}
         >
@@ -196,8 +218,8 @@ const UserProfile = () => {
 
         {/* Header */}
         <Box textAlign="center" mb={1}>
-          <Typography variant="h5" fontWeight={700} color="text.primary">
-            User Profile
+          <Typography variant="h6" fontWeight={700} color="text.primary">
+            User Profile Detail
           </Typography>
         </Box>
 
@@ -207,11 +229,11 @@ const UserProfile = () => {
             <Avatar
               src={profilePic}
               sx={{
-                width: 110,
-                height: 110,
+                width: 90,
+                height: 90,
                 mb: 1,
-                border: `4px solid ${theme.palette.primary.light}`,
-                boxShadow: theme.shadows[3],
+                border: "4px solid #1976d2",
+                boxShadow: 3,
               }}
               onError={() => setProfilePic(null)}
             >
@@ -220,18 +242,50 @@ const UserProfile = () => {
 
             {isEditing && (
               <>
+                {/* Edit/Upload button */}
                 <IconButton
                   onClick={triggerFileInput}
                   sx={{
                     position: "absolute",
                     bottom: 7,
                     right: 0,
-                    backgroundColor: theme.palette.background.paper,
-                    "&:hover": { backgroundColor: theme.palette.action.hover },
+                    backgroundColor: "background.paper",
+                    "&:hover": { backgroundColor: "action.hover" },
+                    zIndex: 1,
                   }}
                 >
                   <Edit fontSize="small" />
                 </IconButton>
+
+                {/* Delete button - only show if there's a profile picture */}
+                {profilePic && (
+                  <IconButton
+                    onClick={handleDeleteImage}
+                    disabled={isDeletingImage}
+                    sx={{
+                      position: "absolute",
+                      bottom: 7,
+                      left: 0,
+                      backgroundColor: "background.paper",
+                      color: "error.main",
+                      "&:hover": {
+                        backgroundColor: "error.light",
+                        color: "error.contrastText",
+                      },
+                      "&.Mui-disabled": {
+                        backgroundColor: "action.disabledBackground",
+                      },
+                      zIndex: 1,
+                    }}
+                  >
+                    {isDeletingImage ? (
+                      <CircularProgress size={20} color="error" />
+                    ) : (
+                      <Delete fontSize="small" />
+                    )}
+                  </IconButton>
+                )}
+
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -323,7 +377,7 @@ const UserProfile = () => {
             <Grid item size={{ xs: 12 }}>
               <Link
                 component={RouterLink}
-                to="/change-password"
+                to="/user/change-password"
                 underline="hover"
                 sx={{
                   display: "flex",

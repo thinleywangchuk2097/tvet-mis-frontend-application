@@ -5,76 +5,139 @@ import {
   Typography,
   Box,
   Paper,
-  useTheme,
-  useMediaQuery,
-  Avatar,
   Chip,
   Divider,
-  alpha,
   Button,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import {
   People as PeopleIcon,
   BarChart as BarChartIcon,
   Settings as SettingsIcon,
   TrendingUp as TrendingUpIcon,
-  NotificationsActive as NotificationsActiveIcon,
-  Security as SecurityIcon,
   Timeline as TimelineIcon,
-  MoreVert as MoreVertIcon,
-  AccessTime as AccessTimeIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
+  PieChart as PieChartIcon,
+  ShowChart as ShowChartIcon,
+  StackedLineChart as StackedLineChartIcon,
+  DonutLarge as DonutLargeIcon,
 } from "@mui/icons-material";
 import {
   LineChart,
   Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  ComposedChart,
+  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
-import { useSelector } from "react-redux";
+
+// Professional color palette
+const COLORS = {
+  primary: "#1976d2",
+  secondary: "#9c27b0",
+  success: "#2e7d32",
+  warning: "#ed6c02",
+  error: "#d32f2f",
+  info: "#0288d1",
+};
 
 // Sample Graph Data
 const graphData = [
-  { month: "Jan", value: 4000 },
-  { month: "Feb", value: 3000 },
-  { month: "Mar", value: 5000 },
-  { month: "Apr", value: 2780 },
-  { month: "May", value: 1890 },
-  { month: "Jun", value: 2390 },
-  { month: "Jul", value: 3490 },
-  { month: "Aug", value: 6490 },
-  { month: "Sep", value: 1490 },
-  { month: "Oct", value: 4490 },
-  { month: "Nov", value: 2490 },
-  { month: "Dec", value: 9490 },
+  { month: "Jan", value: 4000, users: 2400, institutes: 45 },
+  { month: "Feb", value: 3000, users: 2800, institutes: 48 },
+  { month: "Mar", value: 5000, users: 3200, institutes: 52 },
+  { month: "Apr", value: 2780, users: 3800, institutes: 55 },
+  { month: "May", value: 1890, users: 4200, institutes: 58 },
+  { month: "Jun", value: 2390, users: 4800, institutes: 62 },
+  { month: "Jul", value: 3490, users: 5200, institutes: 68 },
+  { month: "Aug", value: 6490, users: 5800, institutes: 65 },
+  { month: "Sep", value: 1490, users: 6200, institutes: 70 },
+  { month: "Oct", value: 4490, users: 6800, institutes: 75 },
+  { month: "Nov", value: 2490, users: 7200, institutes: 78 },
+  { month: "Dec", value: 9490, users: 7800, institutes: 85 },
+];
+
+// Pie Chart Data - Institute Distribution
+const instituteDistribution = [
+  { name: "TTI Thimphu", value: 35, color: "#1976d2" },
+  { name: "TTI bumthang", value: 25, color: "#9c27b0" },
+  { name: "TTI Wangdue", value: 20, color: "#2e7d32" },
+  { name: "TTI Mongar", value: 15, color: "#ed6c02" },
+  { name: "TTI Tashi Yangtse", value: 5, color: "#d32f2f" },
+];
+
+// Donut Chart Data - Status Distribution
+const statusDistribution = [
+  { name: "Completed", value: 45, color: "#2e7d32" },
+  { name: "Pending", value: 25, color: "#ed6c02" },
+  { name: "In Progress", value: 20, color: "#1976d2" },
+  { name: "Rejected", value: 10, color: "#d32f2f" },
+];
+
+// Stacked Bar Chart Data - Monthly Activity
+const monthlyActivity = [
+  { month: "Jan", proposals: 12, registrations: 8, endorsements: 5 },
+  { month: "Feb", proposals: 15, registrations: 10, endorsements: 7 },
+  { month: "Mar", proposals: 18, registrations: 12, endorsements: 9 },
+  { month: "Apr", proposals: 14, registrations: 15, endorsements: 11 },
+  { month: "May", proposals: 20, registrations: 18, endorsements: 13 },
+  { month: "Jun", proposals: 22, registrations: 20, endorsements: 15 },
+];
+
+// Composed Chart Data
+const composedData = [
+  { month: "Jan", revenue: 45000, users: 1200, growth: 15 },
+  { month: "Feb", revenue: 52000, users: 1350, growth: 18 },
+  { month: "Mar", revenue: 48000, users: 1420, growth: 12 },
+  { month: "Apr", revenue: 61000, users: 1580, growth: 22 },
+  { month: "May", revenue: 58000, users: 1650, growth: 19 },
+  { month: "Jun", revenue: 72000, users: 1820, growth: 25 },
 ];
 
 // Stat Card Component
 const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
-  const theme = useTheme();
+  const getColorValue = (colorName) => {
+    const colorMap = {
+      primary: COLORS.primary,
+      secondary: COLORS.secondary,
+      success: COLORS.success,
+      warning: COLORS.warning,
+      error: COLORS.error,
+      info: COLORS.info,
+    };
+    return colorMap[color] || COLORS.primary;
+  };
+
+  const mainColor = getColorValue(color);
+
   return (
     <Card
       elevation={0}
       sx={{
         borderRadius: 2,
         height: "100%",
-        border: "1px solid",
-        borderColor: "divider",
+        border: "1px solid #e0e0e0",
         transition: "all 0.3s ease",
-        background: `linear-gradient(135deg, ${alpha(
-          theme.palette[color].main,
-          0.05,
-        )} 0%, ${theme.palette.background.paper} 100%)`,
+        background: `linear-gradient(135deg, rgba(${parseInt(mainColor.slice(1, 3), 16)}, ${parseInt(mainColor.slice(3, 5), 16)}, ${parseInt(mainColor.slice(5, 7), 16)}, 0.05) 0%, #ffffff 100%)`,
         position: "relative",
         overflow: "hidden",
         "&:hover": {
           transform: "translateY(-4px)",
-          boxShadow: `0 8px 24px ${alpha(theme.palette[color].main, 0.1)}`,
-          borderColor: alpha(theme.palette[color].main, 0.3),
+          boxShadow: `0 8px 24px rgba(0,0,0,0.1)`,
+          borderColor: mainColor,
         },
         "&::before": {
           content: '""',
@@ -83,9 +146,7 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
           left: 0,
           right: 0,
           height: "4px",
-          background: `linear-gradient(90deg, ${
-            theme.palette[color].main
-          }, ${alpha(theme.palette[color].main, 0.7)})`,
+          background: `linear-gradient(90deg, ${mainColor}, ${mainColor}99)`,
         },
       }}
     >
@@ -101,7 +162,7 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
             <Typography
               variant="caption"
               sx={{
-                color: "text.secondary",
+                color: "#666",
                 textTransform: "uppercase",
                 letterSpacing: "0.5px",
                 fontWeight: 500,
@@ -117,8 +178,7 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
             {subtitle && (
               <Typography
                 variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mb: 1 }}
+                sx={{ color: "#666", display: "block", mb: 1 }}
               >
                 {subtitle}
               </Typography>
@@ -131,8 +191,8 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
                 size="small"
                 icon={trend.value > 0 ? <TrendingUpIcon /> : <WarningIcon />}
                 sx={{
-                  bgcolor: trend.value > 0 ? "success.light" : "error.light",
-                  color: trend.value > 0 ? "success.dark" : "error.dark",
+                  bgcolor: trend.value > 0 ? "#e8f5e9" : "#ffebee",
+                  color: trend.value > 0 ? "#2e7d32" : "#d32f2f",
                   fontSize: "0.75rem",
                   height: 24,
                 }}
@@ -142,14 +202,14 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
           <Box
             sx={{
               bgcolor: `${color}.light`,
-              color: `${color}.main`,
+              color: mainColor,
               borderRadius: "12px",
               width: 56,
               height: 56,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: `0 4px 12px ${alpha(theme.palette[color].main, 0.2)}`,
+              boxShadow: `0 4px 12px rgba(0,0,0,0.1)`,
             }}
           >
             {icon}
@@ -160,186 +220,7 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
   );
 };
 
-// Activity Item Component
-const ActivityItem = ({ user, action, time, icon, status = "completed" }) => {
-  const statusColors = {
-    completed: "success",
-    pending: "warning",
-    failed: "error",
-  };
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        py: 2,
-        px: 1,
-        borderRadius: 1,
-        transition: "all 0.2s ease",
-        "&:hover": { bgcolor: "action.hover" },
-      }}
-    >
-      <Avatar
-        sx={{
-          width: 40,
-          height: 40,
-          bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
-          color: "primary.main",
-          mr: 2,
-        }}
-      >
-        {icon || user.charAt(0)}
-      </Avatar>
-      <Box sx={{ flex: 1 }}>
-        <Typography variant="body2" fontWeight={500} sx={{ mb: 0.25 }}>
-          {user}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {action}
-        </Typography>
-      </Box>
-      <Box sx={{ textAlign: "right" }}>
-        <Chip
-          label={status}
-          size="small"
-          sx={{
-            bgcolor: `${statusColors[status]}.light`,
-            color: `${statusColors[status]}.dark`,
-            fontSize: "0.7rem",
-            height: 20,
-            mb: 0.5,
-          }}
-        />
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-        >
-          <AccessTimeIcon sx={{ fontSize: "0.875rem" }} />
-          {time}
-        </Typography>
-      </Box>
-    </Box>
-  );
-};
-
-// Metric Card
-const MetricCard = ({ title, value, color, icon, change }) => (
-  <Box
-    sx={{
-      p: 2,
-      borderRadius: 2,
-      border: "1px solid",
-      borderColor: "divider",
-      bgcolor: "background.paper",
-      height: "100%",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      transition: "all 0.2s ease",
-      "&:hover": {
-        borderColor: color,
-        boxShadow: (theme) =>
-          `0 4px 12px ${alpha(theme.palette[color].main, 0.1)}`,
-      },
-    }}
-  >
-    <Box
-      sx={{
-        width: 48,
-        height: 48,
-        borderRadius: "50%",
-        bgcolor: `${color}.light`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        mb: 2,
-      }}
-    >
-      {icon}
-    </Box>
-    <Typography variant="h3" fontWeight={700} color={color} sx={{ mb: 0.5 }}>
-      {value}
-    </Typography>
-    <Typography variant="caption" color="text.secondary" align="center">
-      {title}
-    </Typography>
-    {change && (
-      <Chip
-        label={change}
-        size="small"
-        sx={{
-          mt: 1,
-          bgcolor: change.includes("+") ? "success.light" : "error.light",
-          color: change.includes("+") ? "success.dark" : "error.dark",
-        }}
-      />
-    )}
-  </Box>
-);
-
 const AdminDashboard = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const userId = useSelector((state) => state.auth.userId);
-  const roles = useSelector((state) => state.auth.roles);
-
-  const recentActivities = [
-    {
-      user: "John Doe",
-      action: "Deployed new microservice",
-      time: "5 min ago",
-      status: "completed",
-      icon: <SecurityIcon />,
-    },
-    {
-      user: "Jane Smith",
-      action: "Updated security policies",
-      time: "12 min ago",
-      status: "completed",
-      icon: <SettingsIcon />,
-    },
-    {
-      user: "Bob Johnson",
-      action: "Onboarded 25 new users",
-      time: "25 min ago",
-      status: "completed",
-      icon: <PeopleIcon />,
-    },
-    {
-      user: "Alice Brown",
-      action: "Generated quarterly report",
-      time: "1 hour ago",
-      status: "completed",
-      icon: <BarChartIcon />,
-    },
-    {
-      user: "System",
-      action: "Scheduled maintenance",
-      time: "2 hours ago",
-      status: "pending",
-      icon: <NotificationsActiveIcon />,
-    },
-  ];
-
-  const systemMetrics = [
-    {
-      title: "Server Uptime",
-      value: "99.9%",
-      color: "success",
-      change: "+0.1%",
-    },
-    { title: "Avg Latency", value: "42ms", color: "info", change: "-5ms" },
-    { title: "Error Rate", value: "0.2%", color: "warning", change: "-0.1%" },
-    {
-      title: "Active Sessions",
-      value: "1.2K",
-      color: "primary",
-      change: "+15%",
-    },
-  ];
-
   const quickActions = [
     { label: "Add User", icon: <PeopleIcon />, color: "primary" },
     { label: "View Reports", icon: <BarChartIcon />, color: "secondary" },
@@ -349,12 +230,9 @@ const AdminDashboard = () => {
 
   return (
     <Paper
-      elevation={1}
       sx={{
-        borderRadius: 2,
-        backgroundColor: theme.palette.background.paper,
-        width: "100%",
-        p: isMobile ? 2 : 3,
+        p: 3,
+        mt: 1,
       }}
     >
       {/* Header */}
@@ -362,57 +240,35 @@ const AdminDashboard = () => {
         <Typography variant="h6" fontWeight={800} gutterBottom>
           Admin Dashboard
         </Typography>
-        <Divider
-          sx={{
-            position: "relative",
-            height: 2,
-            backgroundColor: "grey.400",
-            overflow: "hidden",
-            "&::after": {
-              content: '""',
-              position: "absolute",
-              left: "50%",
-              top: 0,
-              width: 0,
-              height: "100%",
-              bgcolor: "primary.main",
-              transition: "width 0.4s ease, left 0.4s ease",
-              transform: "translateX(-50%)",
-            },
-            "&:hover::after": {
-              width: "100%",
-              left: "50%",
-            },
-          }}
-        />
       </Box>
+
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Active Users"
             value="1,240"
-            subtitle="+142 this week"
+            subtitle="142 this year"
             icon={<PeopleIcon />}
             color="primary"
-            trend={{ value: 12.5, label: "vs last month" }}
+            trend={{ value: 12, label: "vs last month" }}
           />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
-            title="Monthly Visits"
-            value="34.5K"
-            subtitle="Avg. 1.1K daily"
+            title="Active Roles"
+            value="34"
+            subtitle="34 this year"
             icon={<BarChartIcon />}
             color="secondary"
-            trend={{ value: 8.2, label: "vs last month" }}
+            trend={{ value: 8, label: "vs last month" }}
           />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
-            title="System Health"
-            value="98.7%"
-            subtitle="All systems normal"
+            title="Active dropdowns"
+            value="45"
+            subtitle="active dropdowns in tvet mis"
             icon={<CheckCircleIcon />}
             color="success"
             trend={{ value: 0.8, label: "improvement" }}
@@ -420,9 +276,9 @@ const AdminDashboard = () => {
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
-            title="Growth Rate"
-            value="15.4%"
-            subtitle="Quarterly performance"
+            title="Institute Proposal"
+            value="15%"
+            subtitle="monthly"
             icon={<TrendingUpIcon />}
             color="warning"
             trend={{ value: 2.7, label: "vs last quarter" }}
@@ -430,118 +286,363 @@ const AdminDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* System Graph */}
+      {/* Graph Section 1 - Line Chart & Pie Chart */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item size={{ xs: 12, md: 12 }}>
-          <Grid container spacing={3}>
-            <Grid item size={{ xs: 12, md: 12 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  height: 300,
-                }}
-              >
-                <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Monthly Performance
-                </Typography>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={graphData}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke={theme.palette.divider}
-                    />
-                    <XAxis
-                      dataKey="month"
-                      stroke={theme.palette.text.secondary}
-                    />
-                    <YAxis stroke={theme.palette.text.secondary} />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 8,
-                        border: `1px solid ${theme.palette.divider}`,
-                        backgroundColor: theme.palette.background.paper,
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke={theme.palette.primary.main}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Paper>
-            </Grid>
-          </Grid>
-        </Grid>
-      </Grid>
-
-      {/* Recent Activity & System Metrics */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/*  Recent Activity */}
-        <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              borderRadius: 2,
-              border: "1px solid",
-              borderColor: "divider",
-              overflow: "hidden",
-              height: "100%",
-            }}
-          >
-            <Box
-              sx={{
-                p: 3,
-                borderBottom: "1px solid",
-                borderColor: "divider",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Typography variant="h6" fontWeight={600}>
-                Recent Activity
-              </Typography>
-              <Button size="small" endIcon={<MoreVertIcon />}>
-                View All
-              </Button>
-            </Box>
-            <Box sx={{ p: 2 }}>
-              {recentActivities.map((activity, index) => (
-                <ActivityItem key={index} {...activity} />
-              ))}
-            </Box>
-          </Paper>
-        </Grid>
-        {/*  System Metrics */}
-        <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+        <Grid item size={{ xs: 12, md: 8 }}>
           <Paper
             elevation={0}
             sx={{
               p: 3,
               borderRadius: 2,
-              border: "1px solid",
-              borderColor: "divider",
-              height: "100%",
+              border: "1px solid #e0e0e0",
+              height: 350,
             }}
           >
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              System Metrics
-            </Typography>
-            <Grid container spacing={2}>
-              {systemMetrics.map((metric, index) => (
-                <Grid item size={{ xs: 12, sm: 6, md: 6 }} key={index}>
-                  <MetricCard {...metric} />
-                </Grid>
-              ))}
-            </Grid>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography variant="h7" fontWeight={600}>
+                Monthly Performance
+              </Typography>
+              <Tooltip title="Revenue Trend">
+                <IconButton size="small">
+                  <ShowChartIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <ResponsiveContainer width="100%" height="85%">
+              <LineChart data={graphData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis dataKey="month" stroke="#666" />
+                <YAxis stroke="#666" />
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid #e0e0e0",
+                    backgroundColor: "#ffffff",
+                  }}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  name="Revenue"
+                  stroke={COLORS.primary}
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="users"
+                  name="Users"
+                  stroke={COLORS.secondary}
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        <Grid item size={{ xs: 12, md: 4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              border: "1px solid #e0e0e0",
+              height: 350,
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 1,
+              }}
+            >
+              <Typography variant="h7" fontWeight={600}>
+                Institute Distribution
+              </Typography>
+              <Tooltip title="Pie Chart">
+                <IconButton size="small">
+                  <PieChartIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <ResponsiveContainer width="100%" height="85%">
+              <PieChart>
+                <Pie
+                  data={instituteDistribution}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label
+                >
+                  {instituteDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid #e0e0e0",
+                    backgroundColor: "#ffffff",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Graph Section 2 - Bar Chart & Donut Chart */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item size={{ xs: 12, md: 6 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              border: "1px solid #e0e0e0",
+              height: 350,
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
+              <Typography variant="h7" fontWeight={600}>
+                Monthly Activity
+              </Typography>
+              <Tooltip title="Stacked Bar Chart">
+                <IconButton size="small">
+                  <BarChartIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <ResponsiveContainer width="100%" height="85%">
+              <BarChart data={monthlyActivity}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis dataKey="month" stroke="#666" />
+                <YAxis stroke="#666" />
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid #e0e0e0",
+                    backgroundColor: "#ffffff",
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="proposals" stackId="a" fill={COLORS.primary} />
+                <Bar
+                  dataKey="registrations"
+                  stackId="a"
+                  fill={COLORS.secondary}
+                />
+                <Bar dataKey="endorsements" stackId="a" fill={COLORS.success} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        <Grid item size={{ xs: 12, md: 6 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              border: "1px solid #e0e0e0",
+              height: 350,
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 1,
+              }}
+            >
+              <Typography variant="h7" fontWeight={600}>
+                Application Status Distribution
+              </Typography>
+              <Tooltip title="Donut Chart">
+                <IconButton size="small">
+                  <DonutLargeIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <ResponsiveContainer width="100%" height="85%">
+              <PieChart>
+                <Pie
+                  data={statusDistribution}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label
+                >
+                  {statusDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid #e0e0e0",
+                    backgroundColor: "#ffffff",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Graph Section 4 - Area Chart & Composed Chart */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item size={{ xs: 12, md: 6 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              border: "1px solid #e0e0e0",
+              height: 350,
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 1,
+              }}
+            >
+              <Typography variant="h7" fontWeight={600}>
+                Revenue Trend
+              </Typography>
+              <Tooltip title="Area Chart">
+                <IconButton size="small">
+                  <ShowChartIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <ResponsiveContainer width="100%" height="85%">
+              <AreaChart data={graphData}>
+                <defs>
+                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor={COLORS.primary}
+                      stopOpacity={0.3}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={COLORS.primary}
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis dataKey="month" stroke="#666" />
+                <YAxis stroke="#666" />
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid #e0e0e0",
+                    backgroundColor: "#ffffff",
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  name="Revenue"
+                  stroke={COLORS.primary}
+                  strokeWidth={2}
+                  fill="url(#colorValue)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        <Grid item size={{ xs: 12, md: 6 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              border: "1px solid #e0e0e0",
+              height: 350,
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography variant="h7" fontWeight={600}>
+                Growth Analytics
+              </Typography>
+              <Tooltip title="Composed Chart">
+                <IconButton size="small">
+                  <StackedLineChartIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <ResponsiveContainer width="100%" height="85%">
+              <ComposedChart data={composedData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis dataKey="month" stroke="#666" />
+                <YAxis yAxisId="left" stroke="#666" />
+                <YAxis yAxisId="right" orientation="right" stroke="#666" />
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid #e0e0e0",
+                    backgroundColor: "#ffffff",
+                  }}
+                />
+                <Legend />
+                <Bar
+                  yAxisId="left"
+                  dataKey="revenue"
+                  barSize={20}
+                  fill={COLORS.primary}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="users"
+                  stroke={COLORS.secondary}
+                  strokeWidth={2}
+                />
+                <Scatter
+                  yAxisId="right"
+                  dataKey="growth"
+                  fill={COLORS.success}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           </Paper>
         </Grid>
       </Grid>
@@ -552,12 +653,9 @@ const AdminDashboard = () => {
         sx={{
           p: 3,
           borderRadius: 2,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
         }}
       >
-        <Typography variant="h6" fontWeight={600} gutterBottom>
+        <Typography variant="h7" fontWeight={600} gutterBottom>
           Quick Actions
         </Typography>
         <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -570,9 +668,8 @@ const AdminDashboard = () => {
                 sx={{
                   p: 2,
                   justifyContent: "flex-start",
-                  borderColor: "divider",
                   "&:hover": {
-                    borderColor: `${action.color}.main`,
+                    borderColor: COLORS[action.color],
                     bgcolor: `${action.color}.light`,
                   },
                 }}

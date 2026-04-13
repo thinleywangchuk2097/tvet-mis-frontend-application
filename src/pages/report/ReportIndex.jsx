@@ -1,70 +1,29 @@
-import { useState } from "react";
-import { useTheme } from "@mui/material/styles";
+import React, { useState } from "react";
 import {
-  Box,
-  Typography,
-  Container,
   Paper,
+  Typography,
   Grid,
-  Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  TextField,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
   TableHead,
   TableRow,
-  TextField,
+  TableCell,
+  TableBody,
+  TableContainer,
   InputAdornment,
-  IconButton,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  Button,
+  Box,
+  Divider,
   TablePagination,
 } from "@mui/material";
-import {
-  Search as SearchIcon,
-  Clear as ClearIcon,
-  FileDownload as DownloadIcon,
-} from "@mui/icons-material";
+import SearchIcon from "@mui/icons-material/Search";
+import DownloadIcon from "@mui/icons-material/Download";
 
 const ReportIndex = () => {
-  const theme = useTheme();
-  // Report types
-  const reportTypes = [
-    { id: 1, name: "Tvet Report" },
-    { id: 2, name: "Inventory Report" },
-    { id: 3, name: "Customer Report" },
-    { id: 4, name: "Financial Report" },
-    { id: 5, name: "Performance Report" },
-    { id: 6, name: "Marketing Report" },
-    { id: 7, name: "HR Report" },
-    { id: 8, name: "Operations Report" },
-  ];
-
-  // Locations
-  const locations = [
-    { id: 1, name: "Thimphu" },
-    { id: 2, name: "Paro" },
-    { id: 3, name: "Wangdue" },
-    { id: 4, name: "Trongsa" },
-    { id: 5, name: "Bumthang" },
-    { id: 6, name: "chukha" },
-    { id: 7, name: "samtse" },
-    { id: 8, name: "Trashigang" },
-  ];
-
-  // Statuses
-  const statuses = [
-    { id: 1, name: "Pending" },
-    { id: 2, name: "Completed" },
-    { id: 3, name: "Failed" },
-    { id: 4, name: "In Progress" },
-    { id: 5, name: "Approved" },
-    { id: 6, name: "Rejected" },
-  ];
-
-  // State for filters
   const [filters, setFilters] = useState({
     reportType: "",
     location: "",
@@ -76,103 +35,127 @@ const ReportIndex = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
+  // Report types
+  const reportTypes = [
+    { id: 1, name: "Institute Proposal" },
+    { id: 2, name: "Institute Registration" },
+    { id: 3, name: "Curriculum Endorse" },
+  ];
+
+  // Locations
+  const locations = [
+    { id: 1, name: "Thimphu" },
+    { id: 2, name: "Paro" },
+    { id: 3, name: "Wangdue" },
+    { id: 4, name: "Tashi Yangtse" },
+    { id: 5, name: "Mongar" },
+  ];
+
+  // Statuses
+  const statuses = [
+    { id: 1, name: "Pending" },
+    { id: 2, name: "Completed" },
+    { id: 3, name: "Approved" },
+    { id: 4, name: "Rejected" },
+  ];
+
   // Sample report data
-  const [reports, setReports] = useState([
+  const [reports] = useState([
     {
       id: 1,
-      name: "Q1 Sales Report",
-      type: "Sales Report",
-      location: "New York",
-      status: "Completed",
-      date: "2023-03-15",
+      name: "New Technical Institute - Thimphu",
+      type: "Institute Proposal",
+      location: "Thimphu",
+      status: "Approved",
+      date: "2024-01-15",
     },
     {
       id: 2,
-      name: "Inventory Audit",
-      type: "Inventory Report",
-      location: "Chicago",
+      name: "Paro Vocational Training Center",
+      type: "Institute Proposal",
+      location: "Paro",
       status: "Pending",
-      date: "2023-04-02",
+      date: "2024-02-02",
     },
     {
       id: 3,
-      name: "Customer Survey",
-      type: "Customer Report",
-      location: "Los Angeles",
-      status: "In Progress",
-      date: "2023-04-10",
+      name: "Wangdue Institute Registration",
+      type: "Institute Registration",
+      location: "Wangdue",
+      status: "Completed",
+      date: "2024-01-10",
     },
     {
       id: 4,
-      name: "Annual Financial",
-      type: "Financial Report",
-      location: "Houston",
-      status: "Completed",
-      date: "2023-01-20",
+      name: "Tashi Yangtse Campus Registration",
+      type: "Institute Registration",
+      location: "Tashi Yangtse",
+      status: "Pending",
+      date: "2024-02-20",
     },
     {
       id: 5,
-      name: "Store Performance",
-      type: "Performance Report",
-      location: "Miami",
-      status: "Failed",
-      date: "2023-02-28",
+      name: "Mongar Curriculum Endorsement",
+      type: "Curriculum Endorse",
+      location: "Mongar",
+      status: "Approved",
+      date: "2024-01-28",
     },
     {
       id: 6,
-      name: "Marketing Campaign",
-      type: "Marketing Report",
-      location: "San Francisco",
-      status: "Approved",
-      date: "2023-05-15",
+      name: "Thimphu IT Curriculum Review",
+      type: "Curriculum Endorse",
+      location: "Thimphu",
+      status: "Pending",
+      date: "2024-02-15",
     },
     {
       id: 7,
-      name: "Employee Satisfaction",
-      type: "HR Report",
-      location: "Boston",
-      status: "Completed",
-      date: "2023-03-22",
+      name: "Paro Institute Renewal",
+      type: "Institute Registration",
+      location: "Paro",
+      status: "Pending",
+      date: "2024-02-28",
     },
     {
       id: 8,
-      name: "Warehouse Efficiency",
-      type: "Operations Report",
-      location: "Seattle",
-      status: "Rejected",
-      date: "2023-04-18",
+      name: "Mongar Polytechnic Proposal",
+      type: "Institute Proposal",
+      location: "Mongar",
+      status: "Approved",
+      date: "2024-01-30",
     },
     {
       id: 9,
-      name: "Q2 Sales Report",
-      type: "Sales Report",
-      location: "New York",
-      status: "Pending",
-      date: "2023-06-15",
+      name: "Thimphu Curriculum Update",
+      type: "Curriculum Endorse",
+      location: "Thimphu",
+      status: "Completed",
+      date: "2024-02-10",
     },
     {
       id: 10,
-      name: "Product Analysis",
-      type: "Marketing Report",
-      location: "Chicago",
+      name: "Wangdue Craft School Registration",
+      type: "Institute Registration",
+      location: "Wangdue",
       status: "Completed",
-      date: "2023-05-30",
+      date: "2024-02-18",
     },
     {
       id: 11,
-      name: "Annual Budget",
-      type: "Financial Report",
-      location: "Los Angeles",
-      status: "Approved",
-      date: "2023-01-10",
+      name: "Tashi Yangtse Curriculum Endorsement",
+      type: "Curriculum Endorse",
+      location: "Tashi Yangtse",
+      status: "Pending",
+      date: "2024-02-25",
     },
     {
       id: 12,
-      name: "Employee Performance",
-      type: "HR Report",
-      location: "Houston",
-      status: "Completed",
-      date: "2023-04-25",
+      name: "Paro Agriculture Institute Proposal",
+      type: "Institute Proposal",
+      location: "Paro",
+      status: "Rejected",
+      date: "2024-01-05",
     },
   ]);
 
@@ -223,305 +206,230 @@ const ReportIndex = () => {
   // Paginated reports
   const paginatedReports = filteredReports.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   // Download report
   const handleDownload = (reportId) => {
     console.log(`Downloading report ${reportId}`);
-    // In a real app, this would trigger a download
   };
 
   return (
-    <Container maxWidth="lg" sx={{ my: 2 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
+    <Paper sx={{ p: 2, mt: 1 }}>
+      <Typography variant="h6" mb={3}>
         Reports
       </Typography>
 
       {/* Filter Section */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Filter Reports
-        </Typography>
-        <Grid container spacing={3}>
-          {/* Report Type Dropdown */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Report Type</InputLabel>
-              <Select
-                name="reportType"
-                value={filters.reportType} 
-                onChange={handleFilterChange}
-                label="Report Type"
-                size="small"
-                MenuProps={{
-                  PaperProps: {
-                    style: {
-                      maxHeight: 300, // Increased dropdown height
-                    },
-                  },
-                }}
-              >
-                <MenuItem value="">
-                  <em>All Report Types</em>
-                </MenuItem>
-                {reportTypes.map((type) => (
-                  <MenuItem key={type.id} value={type.name}>
-                    {type.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Location Dropdown */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Location</InputLabel>
-              <Select
-                name="location"
-                value={filters.location}
-                onChange={handleFilterChange}
-                label="Location"
-                size="small"
-                MenuProps={{
-                  PaperProps: {
-                    style: {
-                      maxHeight: 300, // Increased dropdown height
-                    },
-                  },
-                }}
-              >
-                <MenuItem value="">
-                  <em>All Locations</em>
-                </MenuItem>
-                {locations.map((location) => (
-                  <MenuItem key={location.id} value={location.name}>
-                    {location.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Status Dropdown */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status</InputLabel>
-              <Select
-                name="status"
-                value={filters.status}
-                onChange={handleFilterChange}
-                label="Status"
-                size="small"
-                MenuProps={{
-                  PaperProps: {
-                    style: {
-                      maxHeight: 300, // Increased dropdown height
-                    },
-                  },
-                }}
-              >
-                <MenuItem value="">
-                  <em>All Statuses</em>
-                </MenuItem>
-                {statuses.map((status) => (
-                  <MenuItem key={status.id} value={status.name}>
-                    {status.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Search Field */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="Search reports..."
-              name="search"
-              size="small"
-              value={filters.search}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item size={{ xs: 12, md: 3 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Report Type</InputLabel>
+            <Select
+              name="reportType"
+              value={filters.reportType}
               onChange={handleFilterChange}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-                endAdornment: filters.search && (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() =>
-                        setFilters((prev) => ({ ...prev, search: "" }))
-                      }
-                    >
-                      <ClearIcon />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-
-          {/* Action Buttons */}
-          <Grid item size={{ xs: 12, md: 4 }}>
-            <Box sx={{ display: "flex", gap: 2 }}>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={handleClearFilters}
-                startIcon={<ClearIcon />}
-              >
-                Clear Filters
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<DownloadIcon />}
-                disabled={filteredReports.length === 0}
-              >
-                Export 
-              </Button>
-            </Box>
-          </Grid>
+              label="Report Type"
+            >
+              <MenuItem value="">All Report Types</MenuItem>
+              {reportTypes.map((type) => (
+                <MenuItem key={type.id} value={type.name}>
+                  {type.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Grid>
-      </Paper>
+
+        <Grid item size={{ xs: 12, md: 3 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Location</InputLabel>
+            <Select
+              name="location"
+              value={filters.location}
+              onChange={handleFilterChange}
+              label="Location"
+            >
+              <MenuItem value="">All Locations</MenuItem>
+              {locations.map((location) => (
+                <MenuItem key={location.id} value={location.name}>
+                  {location.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item size={{ xs: 12, md: 3 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Status</InputLabel>
+            <Select
+              name="status"
+              value={filters.status}
+              onChange={handleFilterChange}
+              label="Status"
+            >
+              <MenuItem value="">All Statuses</MenuItem>
+              {statuses.map((status) => (
+                <MenuItem key={status.id} value={status.name}>
+                  {status.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item size={{ xs: 12, md: 2 }}>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button
+              variant="contained"
+              size="small"
+              color="secondary"
+              onClick={handleClearFilters}
+              fullWidth
+            >
+              Clear
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<DownloadIcon />}
+              disabled={filteredReports.length === 0}
+              fullWidth
+            >
+              Export
+            </Button>
+          </Box>
+        </Grid>
+      </Grid>
+
+      {/* Divider after filters */}
+      <Divider sx={{ my: 2 }} />
+
+      {/* Search - Right aligned */}
+      <Grid container justifyContent="flex-end" sx={{ mb: 2 }}>
+        <Grid item>
+          <TextField
+            size="small"
+            placeholder="Search reports..."
+            name="search"
+            value={filters.search}
+            onChange={handleFilterChange}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Grid>
+      </Grid>
 
       {/* Reports Table */}
-      <Paper sx={{ p: 2 }}>
-        <TableContainer>
-          <Table
-            sx={{
-              borderCollapse: "separate",
-              borderSpacing: 0,
-              "& th, & td": {
-                borderRight: `1px solid ${theme.palette.divider}`,
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                "&:last-child": { borderRight: "none" },
-              },
-              "& th": {
-                backgroundColor:
-                  theme.palette.mode === "dark" ? "#333" : "#f5f5f5",
-                color: theme.palette.mode === "dark" ? "#fff" : "#000",
-                fontWeight: "bold",
-                borderTop: `1px solid ${theme.palette.divider}`,
-              },
-              "& tr:last-child td": { borderBottom: "none" },
-            }}
-          >
-            <TableHead>
-              <TableRow
-                sx={{
-                  backgroundColor: "#f5f5f5",
-                  "& .MuiTableCell-root": {
-                    fontWeight: "bold",
-                    borderRight: "1px solid rgba(224, 224, 224, 1)",
-                    "&:last-child": {
-                      borderRight: "none",
-                    },
-                  },
-                }}
-              >
-                <TableCell>Report Name</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedReports.length > 0 ? (
-                paginatedReports.map((report) => (
-                  <TableRow key={report.id} hover>
-                    <TableCell
-                      sx={{ borderRight: "1px solid rgba(224, 224, 224, 1)" }}
+      <TableContainer>
+        <Table
+          size="small"
+          sx={{
+            border: "1px solid #ccc",
+            "& th, & td": {
+              border: "1px solid #ccc",
+              padding: "8px",
+            },
+          }}
+        >
+          <TableHead>
+            <TableRow sx={{ background: "#f5f5f5" }}>
+              <TableCell>#</TableCell>
+              <TableCell>Report Name</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Location</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Date</TableCell>
+              <TableCell align="center">Action</TableCell>
+            </TableRow>
+          </TableHead>
+
+          <TableBody>
+            {paginatedReports.length > 0 ? (
+              paginatedReports.map((report, index) => (
+                <TableRow key={report.id} hover>
+                  <TableCell>{page * rowsPerPage + index + 1}</TableCell>
+                  <TableCell>{report.name}</TableCell>
+                  <TableCell>{report.type}</TableCell>
+                  <TableCell>{report.location}</TableCell>
+                  <TableCell>
+                    <Box
+                      sx={{
+                        display: "inline-block",
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
+                        fontSize: "0.75rem",
+                        backgroundColor:
+                          report.status === "Approved"
+                            ? "#e8f5e9"
+                            : report.status === "Pending"
+                              ? "#fff3e0"
+                              : report.status === "Completed"
+                                ? "#e3f2fd"
+                                : report.status === "Rejected"
+                                  ? "#ffebee"
+                                  : "#f5f5f5",
+                        color:
+                          report.status === "Approved"
+                            ? "#2e7d32"
+                            : report.status === "Pending"
+                              ? "#ed6c02"
+                              : report.status === "Completed"
+                                ? "#1565c0"
+                                : report.status === "Rejected"
+                                  ? "#d32f2f"
+                                  : "#000",
+                      }}
                     >
-                      {report.name}
-                    </TableCell>
-                    <TableCell
-                      sx={{ borderRight: "1px solid rgba(224, 224, 224, 1)" }}
+                      {report.status}
+                    </Box>
+                  </TableCell>
+                  <TableCell>{report.date}</TableCell>
+                  <TableCell align="center">
+                    <Button
+                      variant="text"
+                      size="small"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => handleDownload(report.id)}
+                      sx={{ textTransform: "none" }}
                     >
-                      {report.type}
-                    </TableCell>
-                    <TableCell
-                      sx={{ borderRight: "1px solid rgba(224, 224, 224, 1)" }}
-                    >
-                      {report.location}
-                    </TableCell>
-                    <TableCell
-                      sx={{ borderRight: "1px solid rgba(224, 224, 224, 1)" }}
-                    >
-                      <Box
-                        sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          px: 1.5,
-                          py: 0.5,
-                          borderRadius: 1,
-                          backgroundColor:
-                            report.status === "Completed"
-                              ? "#e8f5e9"
-                              : report.status === "Pending"
-                              ? "#fff8e1"
-                              : report.status === "Failed"
-                              ? "#ffebee"
-                              : report.status === "Approved"
-                              ? "#e3f2fd"
-                              : report.status === "Rejected"
-                              ? "#ffebee"
-                              : "#f5f5f5",
-                          color:
-                            report.status === "Completed"
-                              ? "#2e7d32"
-                              : report.status === "Pending"
-                              ? "#ff8f00"
-                              : report.status === "Failed"
-                              ? "#c62828"
-                              : report.status === "Approved"
-                              ? "#1565c0"
-                              : report.status === "Rejected"
-                              ? "#c62828"
-                              : "#000000",
-                        }}
-                      >
-                        {report.status}
-                      </Box>
-                    </TableCell>
-                    <TableCell
-                      sx={{ borderRight: "1px solid rgba(224, 224, 224, 1)" }}
-                    >
-                      {report.date}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<DownloadIcon />}
-                        onClick={() => handleDownload(report.id)}
-                      >
-                        Download
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    align="center"
-                    sx={{ borderRight: "1px solid rgba(224, 224, 224, 1)" }}
-                  >
-                    No reports found matching your criteria
+                      Download
+                    </Button>
                   </TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                  No reports found matching your criteria
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
-        {/* Pagination */}
+      {/* Divider before pagination */}
+      <Divider sx={{ my: 2 }} />
+
+      {/* Pagination */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          Showing {paginatedReports.length} of {filteredReports.length} reports
+        </Typography>
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
@@ -531,11 +439,16 @@ const ReportIndex = () => {
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
           sx={{
-            borderTop: "1px solid rgba(224, 224, 224, 1)",
+            ".MuiTablePagination-select": {
+              borderRadius: 1,
+            },
+            ".MuiTablePagination-displayedRows": {
+              margin: 0,
+            },
           }}
         />
-      </Paper>
-    </Container>
+      </Box>
+    </Paper>
   );
 };
 

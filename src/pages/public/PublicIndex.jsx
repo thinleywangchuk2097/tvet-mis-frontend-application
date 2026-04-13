@@ -99,10 +99,13 @@ const applicationDetails = [
 
 // Pie chart
 const pieData = [
-  { name: "Approved", value: 1 },
-  { name: "Pending", value: 2 },
-  { name: "Rejected", value: 3 },
-  { name: "Forwarded", value: 5 },
+  { name: "Construction", value: 1 },
+  { name: "Power", value: 2 },
+  { name: "Automobile", value: 3 },
+  { name: "Manufacturing", value: 5 },
+  { name: "Tourism & Hospitality", value: 1 },
+  { name: "Transportation", value: 2 },
+  { name: "Zorig Chusum", value: 3 },
 ];
 const COLORS = [
   "#4caf50",
@@ -111,22 +114,33 @@ const COLORS = [
   "#2196f3",
   "#9c27b0",
   "#ff5722",
+  "#3f51b5",
+  "#009688",
+
 ];
 
-// Line chart
+// Line & bar chart
 const graphData = [
-  { month: "Jan", value: 4000 },
-  { month: "Feb", value: 3000 },
-  { month: "Mar", value: 5000 },
-  { month: "Apr", value: 2780 },
-  { month: "May", value: 1890 },
-  { month: "Jun", value: 2390 },
-  { month: "Jul", value: 3490 },
-  { month: "Aug", value: 6490 },
-  { month: "Sep", value: 1490 },
-  { month: "Oct", value: 4490 },
-  { month: "Nov", value: 2490 },
-  { month: "Dec", value: 9490 },
+  { month: "Thimphu", value: 3 },
+  { month: "Bumthang", value: 1 },
+  { month: "Wangdue", value: 1 },
+  { month: "Tgang", value: 1 },
+  { month: "Punakha", value: 3 },
+];
+
+const graphLineData = [
+  { month: "jan", value: 12 },
+  { month: "feb", value: 17 },
+  { month: "mar", value: 20 },
+  { month: "apr", value: 50 },
+  { month: "may", value: 40 },
+  { month: "jun", value: 100 },
+  { month: "jul", value: 150 },
+  { month: "aug", value: 50 },
+  { month: "sep", value: 67 },
+  { month: "oct", value: 100 },
+  { month: "nov", value: 175 },
+  { month: "dec", value: 200 },
 ];
 
 const PublicIndex = () => {
@@ -336,7 +350,7 @@ const PublicIndex = () => {
       id: 4,
       message: "New courses added in Thimphu and Paro locations.",
       icon: <NotificationsActiveIcon fontSize="small" />,
-    }
+    },
   ];
   // Modal search
   const [modalSearchQuery, setModalSearchQuery] = useState("");
@@ -555,13 +569,12 @@ const PublicIndex = () => {
         <Grid container spacing={2} mb={4}>
           {/* Line Chart */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Paper sx={{ p: { xs: 2, md: 2 }, borderRadius: 2, boxShadow: 2 }}>
+            <Paper sx={{ p: 2, borderRadius: 2, boxShadow: 2 }}>
               <Typography variant="h7" fontWeight={600} mb={1}>
-                Monthly Performance
+                Monthly Applications
               </Typography>
-
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={graphData}>
+              <ResponsiveContainer width="100%" height={236}>
+                <LineChart data={graphLineData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -580,52 +593,92 @@ const PublicIndex = () => {
           <Grid size={{ xs: 12, md: 4 }}>
             <Paper
               sx={{
-                p: { xs: 2, md: 2 },
+                p: 2,
                 borderRadius: 2,
                 boxShadow: 2,
-                overflow: "visible",
               }}
             >
-              <Typography variant="h7" fontWeight={600} mb={1}>
-                Application Status
+              <Typography fontWeight={600} mb={2}>
+                Institute By Sector
               </Typography>
 
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={70} //pie chart size
-                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                {/* Pie Chart */}
+                <Box sx={{ width: "60%", height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                        label={({ percent }) =>
+                          `${(percent * 100).toFixed(0)}%`
+                        }
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell
+                            key={index}
+                            fill={COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
 
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 8,
-                      border: "none",
-                      boxShadow: "0px 4px 20px rgba(0,0,0,0.1)",
-                    }}
-                  />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 8,
+                          border: "none",
+                          boxShadow: "0px 4px 20px rgba(0,0,0,0.1)",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
 
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-              </ResponsiveContainer>
+                {/* Legend List */}
+                <Box
+                  sx={{
+                    width: "40%",
+                    pl: 2,
+                    maxHeight: 180,
+                    overflowY: "auto",
+                  }}
+                >
+                  {pieData.map((item, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        mb: 1,
+                        fontSize: 13,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          bgcolor: COLORS[index % COLORS.length],
+                          mr: 1,
+                        }}
+                      />
+                      {item.name}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
             </Paper>
           </Grid>
           {/* Bar Chart */}
           <Grid size={{ xs: 12, md: 4 }}>
             <Paper sx={{ p: { xs: 2, md: 2 }, borderRadius: 2, boxShadow: 2 }}>
               <Typography variant="h7" fontWeight={600} mb={1}>
-                Monthly Applications
+                Institute By Dzongkhang Location
               </Typography>
-              <ResponsiveContainer width="100%" height={220}>
+              <ResponsiveContainer width="100%" height={236}>
                 <BarChart data={graphData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
@@ -806,7 +859,9 @@ const PublicIndex = () => {
                                 size="small"
                                 color="primary"
                                 onClick={() =>
-                                  navigate(`/apply-course/${app.applicationNo}`)
+                                  navigate(
+                                    `/course/apply-course/${app.applicationNo}`,
+                                  )
                                 }
                                 sx={{
                                   cursor: "pointer",

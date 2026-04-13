@@ -2,7 +2,7 @@ import apiClient from "../axios"
 
 class TaskListService {
 
-    getGroupTaskListDetails(taskStatusId,currentRoleId,locationId,token) {
+    getTaskListDetails(taskStatusId,currentRoleId,locationId,token) {
         return apiClient
             .get(`/api/v1/auth/tasklist/get-group-tasklist-dtl/${taskStatusId}/${currentRoleId}/${locationId}`, {
                 headers: {

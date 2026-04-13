@@ -28,7 +28,7 @@ class UserProfileService {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        responseType: 'arraybuffer', // Important for binary data
+        responseType: "arraybuffer", // Important for binary data
       })
       .then((response) => response)
       .catch((error) => error);
@@ -57,9 +57,7 @@ class UserProfileService {
 
   reSetPasswordConfirmation(data) {
     return apiClient
-      .post(`/api/v1/auth/public-password/reset-password`, data, {
-       
-      })
+      .post(`/api/v1/auth/public-password/reset-password`, data, {})
       .then((response) => response)
       .catch((error) => error);
   }
@@ -72,7 +70,7 @@ class UserProfileService {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       )
       .then((response) => response)
       .catch((error) => error);
@@ -97,7 +95,21 @@ class UserProfileService {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  deleteProfileImage(userId, token) {
+    return apiClient
+      .post(
+        `/api/v1/user/management/user-profile/delete-profile-image/${userId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       )
       .then((response) => response)
       .catch((error) => error);

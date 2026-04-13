@@ -100,12 +100,12 @@ const Accreditor = () => {
 
     if (!checked) {
       // Redirect if toggle is "No"
-      navigate("/login-ndi-qrcode");
+      navigate("/auth/login-ndi-qrcode");
     }
   };
 
   return (
-    <Box sx={{ m: { xs: 2, md: 6 } }}>
+    <Box sx={{ m: { xs: 2, md: 2 } }}>
       {/* Toggle Button */}
       <Box textAlign="center" sx={{ mb: 4 }}>
         <FormControlLabel
@@ -131,7 +131,6 @@ const Accreditor = () => {
           sx={{
             p: { xs: 2, md: 4 },
             width: "100%",
-            borderRadius: 3,
             boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
           }}
         >

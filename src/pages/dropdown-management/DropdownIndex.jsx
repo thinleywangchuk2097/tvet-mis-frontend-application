@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   Box,
   Typography,
-  Container,
   Paper,
   Table,
   TableBody,
@@ -297,7 +296,7 @@ const DropdownIndex = () => {
   }, [open, formik.values]);
 
   return (
-    <Container maxWidth="lg">
+    <Paper sx={{ p: 3, mt: 1 }}>
       <Box sx={{ my: 4 }}>
         <Stack
           direction="row"
@@ -315,14 +314,16 @@ const DropdownIndex = () => {
               size="small"
               value={searchTerm}
               onChange={handleSearchChange}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                },
               }}
-              sx={{ width: 250 }}
+              sx={{ width: 300 }}
             />
             <Button
               variant="contained"
@@ -569,6 +570,7 @@ const DropdownIndex = () => {
             <DialogActions>
               <Button
                 color="error"
+                size="small"
                 variant="contained"
                 onClick={() => setOpen(false)}
               >
@@ -576,6 +578,7 @@ const DropdownIndex = () => {
               </Button>
               <Button
                 type="submit"
+                size="small"
                 variant="contained"
                 disabled={!isFormValid()}
               >
@@ -602,12 +605,18 @@ const DropdownIndex = () => {
             </Typography>
           </DialogContent>
           <DialogActions>
-            <Button variant="contained" onClick={handleCancelDelete}>
+            <Button
+              variant="contained"
+              size="small"
+              color="secondary"
+              onClick={handleCancelDelete}
+            >
               Cancel
             </Button>
             <Button
               onClick={handleConfirmDelete}
               color="error"
+              size="small"
               variant="contained"
             >
               Delete
@@ -615,7 +624,7 @@ const DropdownIndex = () => {
           </DialogActions>
         </Dialog>
       </Box>
-    </Container>
+    </Paper>
   );
 };
 

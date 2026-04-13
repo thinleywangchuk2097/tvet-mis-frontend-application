@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -8,6 +8,7 @@ import {
   MenuItem,
   Divider,
   Button,
+  IconButton,
   CircularProgress,
 } from "@mui/material";
 import { useFormik } from "formik";
@@ -19,103 +20,45 @@ import LockResetIcon from "@mui/icons-material/LockReset";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import InstituteProposalService from "../../../api/services/InstituteProposalService";
-
-// ===== Static Data =====
-const ownershipTypes = [
-  { id: 1, name: "Company" },
-  { id: 2, name: "Others (Organisation/Agency/Cooperatives/Group)" },
-  { id: 3, name: "Partnership" },
-  { id: 4, name: "Sole Proprietorship" },
-];
-
-const otherOwnershipTypes = [
-  { id: 1, name: "Agency" },
-  { id: 2, name: "Cooperative" },
-  { id: 4, name: "Group" },
-  { id: 5, name: "Organization" },
-];
-
-const dzongkhags = [
-  { id: 1, name: "Thimphu" },
-  { id: 2, name: "Paro" },
-  { id: 3, name: "Punakha" },
-  { id: 4, name: "Wangdue" },
-  { id: 5, name: "Bumthang" },
-];
-
-const fieldsOfTraining = [
-  { id: 1, name: "Agriculture & Forestry" },
-  { id: 2, name: "Automobile" },
-  { id: 3, name: "Business and Finance" },
-  { id: 4, name: "Construction" },
-  { id: 5, name: "Creative Arts" },
-  { id: 6, name: "Film and Music" },
-  { id: 7, name: "Garment and Tailoring" },
-  { id: 8, name: "Hydro Power" },
-  { id: 9, name: "ICT" },
-  { id: 10, name: "Language" },
-  { id: 11, name: "Manufacturing" },
-  { id: 12, name: "Power" },
-  { id: 13, name: "Service" },
-  { id: 14, name: "Social Works" },
-  { id: 15, name: "Sports and Games" },
-  { id: 16, name: "Tourism & Hospitality" },
-  { id: 17, name: "Transportation" },
-  { id: 18, name: "Wood Based Occupations" },
-  { id: 19, name: "Zorig Chusum" },
-];
-
-const activityLevels = [
-  {
-    id: 1,
-    name: "Leading to Diploma/Certificate level except for differently abled",
-  },
-  {
-    id: 2,
-    name: "Below the level of higher education except for differently abled",
-  },
-  { id: 3, name: "For differently abled students" },
-  {
-    id: 4,
-    name: "Leading to Degree/Certificate level except for differently abled",
-  },
-  { id: 5, name: "Professional motor driving school" },
-];
-
+import CommonService from "../../../api/services/CommonService";
+import { useParams, useNavigate } from "react-router-dom";
 // ===== Validation Schema =====
 const validationSchema = Yup.object({
-  ownershipType: Yup.string().required("Ownership Type is required"),
+  ownershipTypeId: Yup.string().required("Ownership Type is required"),
 
-  otherOwnershipType: Yup.string().when("ownershipType", {
-    is: "Others (Organisation/Agency/Cooperatives/Group)",
+  otherOwnershipTypeId: Yup.string().when("ownershipTypeId", {
+    is: (val) => val === "2", // ID for "Others (Organisation/Agency/Cooperatives/Group)"
     then: (schema) => schema.required("Please select the type of 'Others'"),
   }),
 
-  registrationNo: Yup.string().when(["ownershipType", "otherOwnershipType"], {
-    is: (ownershipType, otherOwnershipType) =>
-      ownershipType === "Company" ||
-      (ownershipType === "Others (Organisation/Agency/Cooperatives/Group)" &&
-        (otherOwnershipType === "Cooperative" ||
-          otherOwnershipType === "Group")),
-    then: (schema) => schema.required("Registration No is required"),
-  }),
+  registrationNo: Yup.string().when(
+    ["ownershipTypeId", "otherOwnershipTypeId"],
+    {
+      is: (ownershipTypeId, otherOwnershipTypeId) =>
+        ownershipTypeId === "1" || // Company
+        (ownershipTypeId === "2" && // Others
+          (otherOwnershipTypeId === "6" || // Cooperative
+            otherOwnershipTypeId === "7")), // Group
+      then: (schema) => schema.required("Registration No is required"),
+    },
+  ),
 
-  companyName: Yup.string().when(["ownershipType", "otherOwnershipType"], {
-    is: (ownershipType, otherOwnershipType) =>
-      ownershipType === "Company" ||
-      (ownershipType === "Others (Organisation/Agency/Cooperatives/Group)" &&
-        (otherOwnershipType === "Cooperative" ||
-          otherOwnershipType === "Group")),
+  companyName: Yup.string().when(["ownershipTypeId", "otherOwnershipTypeId"], {
+    is: (ownershipTypeId, otherOwnershipTypeId) =>
+      ownershipTypeId === "1" || // Company
+      (ownershipTypeId === "2" && // Others
+        (otherOwnershipTypeId === "6" || // Cooperative
+          otherOwnershipTypeId === "7")), // Group
     then: (schema) => schema.required("Company Name is required"),
   }),
 
-  otherName: Yup.string().when("otherOwnershipType", {
-    is: (val) => val === "Agency" || val === "Organization",
+  otherName: Yup.string().when("otherOwnershipTypeId", {
+    is: (val) => val === "5" || val === "8", // Agency (5) or Organization (8)
     then: (schema) => schema.required("Name is required"),
   }),
 
-  otherAddress: Yup.string().when("otherOwnershipType", {
-    is: (val) => val === "Agency" || val === "Organization",
+  otherAddress: Yup.string().when("otherOwnershipTypeId", {
+    is: (val) => val === "5" || val === "8", // Agency (5) or Organization (8)
     then: (schema) => schema.required("Address is required"),
   }),
 
@@ -123,58 +66,144 @@ const validationSchema = Yup.object({
     "Proposed Institute Name is required",
   ),
 
-  promoterCitizenId: Yup.string().when("ownershipType", {
-    is: "Sole Proprietorship",
+  promoterCitizenId: Yup.string().when("ownershipTypeId", {
+    is: "4", // Sole Proprietorship
     then: (schema) =>
       schema
         .required("Promoter Citizen ID is required")
         .matches(/^\d{11}$/, "Citizen ID must be exactly 11 digits"),
   }),
 
-  promoterName: Yup.string().when("ownershipType", {
-    is: "Sole Proprietorship",
+  promoterName: Yup.string().when("ownershipTypeId", {
+    is: "4", // Sole Proprietorship
     then: (schema) => schema.required("Promoter Name is required"),
   }),
 
-  dzongkhag: Yup.string().required("Dzongkhag is required"),
+  dzongkhagId: Yup.string().required("Dzongkhag is required"),
   exactLocation: Yup.string().required("Exact location is required"),
   telephoneNo: Yup.string(),
-  mobileNo: Yup.string().required("Mobile No is required"),
+  mobileNo: Yup.string()
+    .required("Mobile No is required")
+    .matches(/^\d{8}$/, "Mobile No must be exactly 8 digits"),
   email: Yup.string().email("Invalid email").required("Email is required"),
-  fieldOfTraining: Yup.string().required("Field of Training is required"),
-  activityLevel: Yup.string().required("Activity Level is required"),
+  sectorId: Yup.string().required("Field of Training is required"),
+  activityLevelId: Yup.string().required("Activity Level is required"),
   files: Yup.array().min(1, "Please upload at least one supporting document"),
 
   partners: Yup.array().of(
     Yup.object().shape({
       typeOfOwner: Yup.string().required("Type of Owner is required"),
       citizenId: Yup.string().when("typeOfOwner", {
-        is: "Individual",
+        is: "22", // ID for Individual
         then: (schema) =>
           schema
             .required("Citizen ID is required")
             .matches(/^\d{11}$/, "Citizen ID must be exactly 11 digits"),
       }),
       partnerName: Yup.string().when("typeOfOwner", {
-        is: "Individual",
+        is: "22", // ID for Individual
         then: (schema) => schema.required("Partner Name is required"),
       }),
       registrationNo: Yup.string().when("typeOfOwner", {
-        is: "Company",
+        is: "23", // ID for Company
         then: (schema) =>
           schema.required("Partner Company Registration No is required"),
       }),
       companyName: Yup.string().when("typeOfOwner", {
-        is: "Company",
+        is: "23", // ID for Company
         then: (schema) => schema.required("Partner Company Name is required"),
       }),
     }),
   ),
 });
 
-// ===== Component =====
 const InstituteProposal = () => {
   const [loading, setLoading] = useState(false);
+  const [sectors, setSectors] = useState([]);
+  const [serviceName, setServiceName] = useState();
+  const [dzongkhags, setDzongkhags] = useState([]);
+  const [ownershipTypes, setOwnershipTypes] = useState([]);
+  const [otherOwnershipTypes, setOtherOwnershipTypes] = useState([]);
+  const [activityLevels, setActivityLevels] = useState([]);
+  const [typeOfOwners, setTypeOfOwners] = useState([]);
+  const navigate = useNavigate();
+  const { serviceId } = useParams();
+
+  useEffect(() => {
+    fetchSectors();
+    fetchDzongkhags();
+    fetchOwnershipTypes();
+    fetchOtherOwnershipTypes();
+    fetchActivityLevels();
+    fetchTypeOfOwner();
+  }, []);
+
+  useEffect(() => {
+    fetchServiceName();
+  }, [serviceId]);
+
+  const fetchSectors = async () => {
+    try {
+      const response = await CommonService.getAllSectors();
+      setSectors(response.data);
+    } catch (error) {
+      console.error("Error fetching sectors:", error);
+    }
+  };
+  const fetchServiceName = async () => {
+    try {
+      const response = await CommonService.getServiceName(serviceId);
+      setServiceName(response.data.serviceName);
+    } catch (error) {
+      console.error("Error fetching sectors:", error);
+    }
+  };
+
+  const fetchDzongkhags = async () => {
+    try {
+      const dzongkhagLists = await CommonService.getAllDzongkhags();
+      setDzongkhags(dzongkhagLists.data);
+    } catch (error) {
+      console.error("Error fetching dzongkhags:", error);
+    }
+  };
+
+  const fetchOwnershipTypes = async () => {
+    try {
+      const ownershipTypes = await CommonService.getByParentId(1);
+      setOwnershipTypes(ownershipTypes.data);
+    } catch (error) {
+      console.error("Error fetching ownershipTypes:", error);
+    }
+  };
+
+  const fetchOtherOwnershipTypes = async () => {
+    try {
+      const otherOwnershipTypes = await CommonService.getByParentId(2);
+      setOtherOwnershipTypes(otherOwnershipTypes.data);
+    } catch (error) {
+      console.error("Error fetching other ownership types:", error);
+    }
+  };
+
+  const fetchActivityLevels = async () => {
+    try {
+      const activityLevels = await CommonService.getByParentId(3);
+      setActivityLevels(activityLevels.data);
+    } catch (error) {
+      console.error("Error fetching activity levels:", error);
+    }
+  };
+
+  const fetchTypeOfOwner = async () => {
+    try {
+      const typeOfOwnerdata = await CommonService.getByParentId(6);
+      console.log("response", typeOfOwnerdata.data);
+      setTypeOfOwners(typeOfOwnerdata.data);
+    } catch (error) {
+      console.error("Error fetching activity levels:", error);
+    }
+  };
 
   const fileToBase64 = (file) =>
     new Promise((resolve, reject) => {
@@ -191,25 +220,24 @@ const InstituteProposal = () => {
 
   const formik = useFormik({
     initialValues: {
-      // Ownership Information
-      ownershipType: "",
-      otherOwnershipType: "",
+      ownershipTypeId: "",
+      otherOwnershipTypeId: "",
       registrationNo: "",
       companyName: "",
       otherName: "",
       otherAddress: "",
-      partners: [], // Added for Partnership owners
+      partners: [],
       // Training Provider Profile
       proposedInstituteName: "",
-      dzongkhag: "",
+      dzongkhagId: "",
       exactLocation: "",
       telephoneNo: "",
       mobileNo: "",
       email: "",
       promoterCitizenId: "",
       promoterName: "",
-      fieldOfTraining: "",
-      activityLevel: "",
+      sectorId: "",
+      activityLevelId: "",
       // Supporting Documents
       files: [],
     },
@@ -221,40 +249,41 @@ const InstituteProposal = () => {
         const documents = await Promise.all(
           values.files.map((file) => fileToBase64(file)),
         );
+
         const payload = {
-          ownershipType: values.ownershipType || null,
-          otherOwnershipType: values.otherOwnershipType || null,
+          ownershipTypeId: values.ownershipTypeId || null,
+          otherOwnershipTypeId: values.otherOwnershipTypeId || null,
           registrationNo: values.registrationNo || null,
           companyName: values.companyName || null,
           otherName: values.otherName || null,
           otherAddress: values.otherAddress || null,
           proposedInstituteName: values.proposedInstituteName || null,
-          dzongkhagId: 14,
+          dzongkhagId: parseInt(values.dzongkhagId) || null,
           exactLocation: values.exactLocation,
           telephoneNo: values.telephoneNo || null,
           mobileNo: values.mobileNo || null,
           email: values.email || null,
           promoterCitizenId: values.promoterCitizenId || null,
           promoterName: values.promoterName || null,
-          fieldOfTraining: values.fieldOfTraining || null,
-          activityLevel: values.activityLevel || null,
-          serviceId: 6,
-          currentRoleId: 1,
-          statusId: 101,
-          userId: "11606000208",
+          sectorId: values.sectorId || null,
+          activityLevelId: values.activityLevelId || null,
+          serviceId: serviceId,
+          assignedRoleId: 7,
+          statusId: 55,
+          userId: null,
           documents,
           partners: values.partners || [], // Include partners in the payload
         };
 
-        console.log("Payload to submit:", payload); // Debug log to check payload structure
         const response =
           await InstituteProposalService.submitInstituteProposal(payload);
-        console.log("API Response:", response); // Debug log to check API response
         if (response.status == 201) {
           toast.success(
-            `Institute Proposal submitted successfully! Application No: ${response.data.applicationNo}`,
+            `${serviceName} form submitted successfully! Application No: ${response.data.applicationNo}`,
           );
+
           resetForm();
+          navigate("/");
         } else {
           toast.error("Submission failed. Please try again.");
         }
@@ -266,34 +295,37 @@ const InstituteProposal = () => {
     },
   });
 
+  // Helper function to check if ownership type is "Others"
+  const isOthersType = () => {
+    return formik.values.ownershipTypeId === "2"; // ID for Others
+  };
+
+  // Helper function to check if other ownership type is Agency or Organization
+  const isAgencyOrOrganization = () => {
+    const id = formik.values.otherOwnershipTypeId;
+    return id === "5" || id === "8"; // Agency (5) or Organization (8)
+  };
+
+  // Helper function to check if other ownership type is Cooperative or Group
+  const isCooperativeOrGroup = () => {
+    const id = formik.values.otherOwnershipTypeId;
+    return id === "6" || id === "7"; // Cooperative (6) or Group (7)
+  };
+
   return (
-    <Box sx={{ m: { xs: 2, md: 6 } }}>
+    <Box sx={{ m: 1 }}>
       <Paper
-        elevation={3}
         sx={{
-          p: { xs: 2, md: 4 },
-          borderRadius: 3,
+          p: 2,
         }}
       >
-        <Box textAlign="center" sx={{ mb: 6 }}>
+        <Box textAlign="center" sx={{ mb: 4 }}>
           <Typography
-            variant="h5"
-            fontWeight={600}
-            sx={{
-              letterSpacing: 0.7,
-              borderBottom: "3px solid #0d47a1",
-              color: "#0d47a1",
-              display: "inline-block",
-              fontFamily: "'Roboto', 'Arial', sans-serif",
-              textTransform: "capitalize",
-              transition: "color 0.3s ease, border-color 0.3s ease", // animate both
-              "&:hover": {
-                color: "#0d47a1",
-                borderColor: "#0d47a1", // underline matches text on hover
-              },
-            }}
+            textTransform="uppercase"
+            fontWeight="bold"
+            sx={{ textDecoration: "underline", fontSize: "1.3rem" }}
           >
-            Application for Institute Proposal
+            {serviceName} Form
           </Typography>
         </Box>
 
@@ -316,13 +348,13 @@ const InstituteProposal = () => {
                       Ownership Type <span style={{ color: "red" }}>*</span>
                     </span>
                   }
-                  name="ownershipType"
+                  name="ownershipTypeId"
                   size="small"
-                  value={formik.values.ownershipType}
+                  value={formik.values.ownershipTypeId}
                   onChange={(e) => {
                     formik.handleChange(e);
                     // reset dependent fields
-                    formik.setFieldValue("otherOwnershipType", "");
+                    formik.setFieldValue("otherOwnershipTypeId", "");
                     formik.setFieldValue("registrationNo", "");
                     formik.setFieldValue("companyName", "");
                     formik.setFieldValue("otherName", "");
@@ -330,16 +362,17 @@ const InstituteProposal = () => {
                     formik.setFieldValue("partners", []);
                   }}
                   error={
-                    formik.touched.ownershipType &&
-                    Boolean(formik.errors.ownershipType)
+                    formik.touched.ownershipTypeId &&
+                    Boolean(formik.errors.ownershipTypeId)
                   }
                   helperText={
-                    formik.touched.ownershipType && formik.errors.ownershipType
+                    formik.touched.ownershipTypeId &&
+                    formik.errors.ownershipTypeId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
                   {ownershipTypes.map((type) => (
-                    <MenuItem key={type.id} value={type.name}>
+                    <MenuItem key={type.id} value={type.id.toString()}>
                       {type.name}
                     </MenuItem>
                   ))}
@@ -347,7 +380,7 @@ const InstituteProposal = () => {
               </Grid>
 
               {/* Company section */}
-              {formik.values.ownershipType === "Company" && (
+              {formik.values.ownershipTypeId === "1" && ( // Company
                 <>
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
@@ -397,7 +430,7 @@ const InstituteProposal = () => {
               )}
 
               {/* Partnership Section */}
-              {formik.values.ownershipType === "Partnership" && (
+              {formik.values.ownershipTypeId === "3" && ( // Partnership
                 <>
                   {formik.values.partners.map((partner, index) => (
                     <Box
@@ -438,13 +471,19 @@ const InstituteProposal = () => {
                             }
                           >
                             <MenuItem value="">Select</MenuItem>
-                            <MenuItem value="Individual">Individual</MenuItem>
-                            <MenuItem value="Company">Company</MenuItem>
+                            {typeOfOwners.map((type) => (
+                              <MenuItem
+                                key={type.id}
+                                value={type.id.toString()}
+                              >
+                                {type.name}
+                              </MenuItem>
+                            ))}
                           </TextField>
                         </Grid>
 
-                        {/* Individual Partner */}
-                        {partner.typeOfOwner === "Individual" && (
+                        {/* Individual Partner - using ID comparison */}
+                        {partner.typeOfOwner === "22" && ( // ID for Individual
                           <>
                             <Grid item size={{ xs: 12, md: 3 }}>
                               <TextField
@@ -500,8 +539,8 @@ const InstituteProposal = () => {
                           </>
                         )}
 
-                        {/* Company Partner */}
-                        {partner.typeOfOwner === "Company" && (
+                        {/* Company Partner - using ID comparison */}
+                        {partner.typeOfOwner === "23" && ( // ID for Company
                           <>
                             <Grid item size={{ xs: 12, md: 3 }}>
                               <TextField
@@ -516,6 +555,18 @@ const InstituteProposal = () => {
                                 size="small"
                                 value={partner.registrationNo}
                                 onChange={formik.handleChange}
+                                error={
+                                  formik.touched.partners &&
+                                  Boolean(
+                                    formik.errors.partners?.[index]
+                                      ?.registrationNo,
+                                  )
+                                }
+                                helperText={
+                                  formik.touched.partners &&
+                                  formik.errors.partners?.[index]
+                                    ?.registrationNo
+                                }
                               />
                             </Grid>
                             <Grid item size={{ xs: 12, md: 3 }}>
@@ -531,6 +582,17 @@ const InstituteProposal = () => {
                                 size="small"
                                 value={partner.companyName}
                                 onChange={formik.handleChange}
+                                error={
+                                  formik.touched.partners &&
+                                  Boolean(
+                                    formik.errors.partners?.[index]
+                                      ?.companyName,
+                                  )
+                                }
+                                helperText={
+                                  formik.touched.partners &&
+                                  formik.errors.partners?.[index]?.companyName
+                                }
                               />
                             </Grid>
                           </>
@@ -538,26 +600,16 @@ const InstituteProposal = () => {
 
                         {/* Remove Button */}
                         <Grid item size={{ xs: 12, md: 1 }}>
-                          <Button
+                          <IconButton
                             color="error"
-                            variant="contained"
-                            size="small" // smaller button
-                            startIcon={<DeleteIcon />} // added icon here
                             onClick={() => {
                               const updated = [...formik.values.partners];
                               updated.splice(index, 1);
                               formik.setFieldValue("partners", updated);
                             }}
-                            sx={{
-                              py: 0.3, // smaller vertical padding
-                              px: 1.2, // smaller horizontal padding
-                              minWidth: "90px", // keep it compact but readable
-                              textTransform: "none", // keeps text normal
-                              fontSize: "0.85rem", // smaller text
-                            }}
                           >
-                            Remove
-                          </Button>
+                            <DeleteIcon />
+                          </IconButton>
                         </Grid>
                       </Grid>
                     </Box>
@@ -567,8 +619,8 @@ const InstituteProposal = () => {
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <Button
                       variant="contained"
-                      size="small" // smaller button
-                      startIcon={<AddIcon />} // added icon here
+                      size="small"
+                      startIcon={<AddIcon />}
                       onClick={() =>
                         formik.setFieldValue("partners", [
                           ...formik.values.partners,
@@ -589,8 +641,7 @@ const InstituteProposal = () => {
               )}
 
               {/* Others Section */}
-              {formik.values.ownershipType ===
-                "Others (Organisation/Agency/Cooperatives/Group)" && (
+              {isOthersType() && (
                 <>
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
@@ -601,9 +652,9 @@ const InstituteProposal = () => {
                           Types of Other <span style={{ color: "red" }}>*</span>
                         </span>
                       }
-                      name="otherOwnershipType"
+                      name="otherOwnershipTypeId"
                       size="small"
-                      value={formik.values.otherOwnershipType}
+                      value={formik.values.otherOwnershipTypeId}
                       onChange={(e) => {
                         formik.handleChange(e);
                         formik.setFieldValue("registrationNo", "");
@@ -612,17 +663,17 @@ const InstituteProposal = () => {
                         formik.setFieldValue("otherAddress", "");
                       }}
                       error={
-                        formik.touched.otherOwnershipType &&
-                        Boolean(formik.errors.otherOwnershipType)
+                        formik.touched.otherOwnershipTypeId &&
+                        Boolean(formik.errors.otherOwnershipTypeId)
                       }
                       helperText={
-                        formik.touched.otherOwnershipType &&
-                        formik.errors.otherOwnershipType
+                        formik.touched.otherOwnershipTypeId &&
+                        formik.errors.otherOwnershipTypeId
                       }
                     >
                       <MenuItem value="">Select</MenuItem>
                       {otherOwnershipTypes.map((type) => (
-                        <MenuItem key={type.id} value={type.name}>
+                        <MenuItem key={type.id} value={type.id.toString()}>
                           {type.name}
                         </MenuItem>
                       ))}
@@ -630,8 +681,7 @@ const InstituteProposal = () => {
                   </Grid>
 
                   {/* Agency & Organization */}
-                  {(formik.values.otherOwnershipType === "Agency" ||
-                    formik.values.otherOwnershipType === "Organization") && (
+                  {isAgencyOrOrganization() && (
                     <>
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
@@ -681,8 +731,7 @@ const InstituteProposal = () => {
                   )}
 
                   {/* Cooperative & Group */}
-                  {(formik.values.otherOwnershipType === "Cooperative" ||
-                    formik.values.otherOwnershipType === "Group") && (
+                  {isCooperativeOrGroup() && (
                     <>
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
@@ -735,8 +784,9 @@ const InstituteProposal = () => {
                   )}
                 </>
               )}
+
               {/* Sole Proprietorship Section */}
-              {formik.values.ownershipType === "Sole Proprietorship" && (
+              {formik.values.ownershipTypeId === "4" && ( // Sole Proprietorship
                 <>
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
@@ -837,23 +887,26 @@ const InstituteProposal = () => {
                       <span style={{ color: "red" }}>*</span>
                     </span>
                   }
-                  name="dzongkhag"
+                  name="dzongkhagId"
                   size="small"
-                  value={formik.values.dzongkhag}
+                  value={formik.values.dzongkhagId}
                   onChange={formik.handleChange}
                   error={
-                    formik.touched.dzongkhag && Boolean(formik.errors.dzongkhag)
+                    formik.touched.dzongkhagId &&
+                    Boolean(formik.errors.dzongkhagId)
                   }
                   helperText={
-                    formik.touched.dzongkhag && formik.errors.dzongkhag
+                    formik.touched.dzongkhagId && formik.errors.dzongkhagId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {dzongkhags.map((dz) => (
-                    <MenuItem key={dz.id} value={dz.name}>
-                      {dz.name}
-                    </MenuItem>
-                  ))}
+
+                  {Array.isArray(dzongkhags) &&
+                    dzongkhags.map((dz) => (
+                      <MenuItem key={dz.id} value={dz.id.toString()}>
+                        {dz.dzonkhagName}
+                      </MenuItem>
+                    ))}
                 </TextField>
               </Grid>
 
@@ -882,11 +935,7 @@ const InstituteProposal = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label={
-                    <span>
-                      Telephone No <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label="Telephone No"
                   name="telephoneNo"
                   size="small"
                   value={formik.values.telephoneNo}
@@ -903,6 +952,7 @@ const InstituteProposal = () => {
                     </span>
                   }
                   name="mobileNo"
+                  type="number"
                   size="small"
                   value={formik.values.mobileNo}
                   onChange={formik.handleChange}
@@ -936,28 +986,26 @@ const InstituteProposal = () => {
                   fullWidth
                   label={
                     <span>
-                      Field of Training <span style={{ color: "red" }}>*</span>
+                      Sector <span style={{ color: "red" }}>*</span>
                     </span>
                   }
-                  name="fieldOfTraining"
+                  name="sectorId"
                   size="small"
-                  value={formik.values.fieldOfTraining}
+                  value={formik.values.sectorId}
                   onChange={formik.handleChange}
                   error={
-                    formik.touched.fieldOfTraining &&
-                    Boolean(formik.errors.fieldOfTraining)
+                    formik.touched.sectorId && Boolean(formik.errors.sectorId)
                   }
-                  helperText={
-                    formik.touched.fieldOfTraining &&
-                    formik.errors.fieldOfTraining
-                  }
+                  helperText={formik.touched.sectorId && formik.errors.sectorId}
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {fieldsOfTraining.map((field) => (
-                    <MenuItem key={field.id} value={field.name}>
-                      {field.name}
-                    </MenuItem>
-                  ))}
+
+                  {Array.isArray(sectors) &&
+                    sectors.map((field) => (
+                      <MenuItem key={field.id} value={field.id.toString()}>
+                        {field.sectorName}
+                      </MenuItem>
+                    ))}
                 </TextField>
               </Grid>
 
@@ -970,21 +1018,22 @@ const InstituteProposal = () => {
                       Activity Level <span style={{ color: "red" }}>*</span>
                     </span>
                   }
-                  name="activityLevel"
+                  name="activityLevelId"
                   size="small"
-                  value={formik.values.activityLevel}
+                  value={formik.values.activityLevelId}
                   onChange={formik.handleChange}
                   error={
-                    formik.touched.activityLevel &&
-                    Boolean(formik.errors.activityLevel)
+                    formik.touched.activityLevelId &&
+                    Boolean(formik.errors.activityLevelId)
                   }
                   helperText={
-                    formik.touched.activityLevel && formik.errors.activityLevel
+                    formik.touched.activityLevelId &&
+                    formik.errors.activityLevelId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
                   {activityLevels.map((level) => (
-                    <MenuItem key={level.id} value={level.name}>
+                    <MenuItem key={level.id} value={level.id.toString()}>
                       {level.name}
                     </MenuItem>
                   ))}

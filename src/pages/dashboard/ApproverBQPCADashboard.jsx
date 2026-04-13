@@ -15,7 +15,6 @@ import {
   TableRow,
   Paper,
   TablePagination,
-
 } from "@mui/material";
 import {
   LineChart,
@@ -34,7 +33,7 @@ import {
 } from "recharts";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
-import SearchIcon from '@mui/icons-material/Search';
+import SearchIcon from "@mui/icons-material/Search";
 
 // Sample Data
 const lineData = [
@@ -52,40 +51,58 @@ const pieData = [
   { name: "Pending", value: 15 },
 ];
 
-const tvetIndicators = [
+const tvetData = [
   {
     id: 1,
+    applicationNo: "1000023",
     name: "Registered Training Provider",
-    ttiGovt: 14,
+    service: "Institute Proposal",
     pvtOthers: 130,
     total: 144,
   },
   {
     id: 2,
+    applicationNo: "1000024",
     name: "Accredited Courses",
-    ttiGovt: 173,
-    pvtOthers: 69,
-    total: 242,
+    service: "Institute Proposal",
+    total: 24,
   },
-  { id: 3, name: "Other Courses", ttiGovt: 164, pvtOthers: 556, total: 720 },
+  {
+    id: 3,
+    applicationNo: "1000025",
+    name: "Other Courses",
+    service: "Institute Proposal",
+    total: 70,
+  },
   {
     id: 4,
+    applicationNo: "1000026",
     name: "Enrolment in Accredited Courses",
-    ttiGovt: 8094,
-    pvtOthers: 16990,
-    total: 25084,
+    service: "Institute Proposal",
+    total: 25,
   },
   {
     id: 5,
+    applicationNo: "1000027",
     name: "Enrolment in other Courses",
-    ttiGovt: 5732,
-    pvtOthers: 45951,
-    total: 51683,
+    service: "Institute Proposal",
+    total: 51,
   },
-  { id: 6, name: "ToT Certified", ttiGovt: 124, pvtOthers: 50, total: 174 },
-  { id: 7, name: "RPL Certified (MoLHR)", ttiGovt: 0, pvtOthers: 0, total: 0 },
+  {
+    id: 6,
+    applicationNo: "1000028",
+    name: "ToT Certified",
+    service: "Institute Proposal",
+    total: 174,
+  },
+  {
+    id: 7,
+    applicationNo: "1000029",
+    name: "RPL Certified (MoLHR)",
+    service: "Institute Proposal",
+    total: 12,
+  },
 ];
-
 const COLORS = ["#2e7d32", "#d32f2f", "#ed6c02"];
 const tableStyle = {
   border: "1px solid",
@@ -104,11 +121,11 @@ const validationSchema = Yup.object({
 });
 
 const ApproverBQPCADashboard = () => {
-    // -------------------- Pagination --------------------
-    const [infoPage, setInfoPage] = useState(0);
-    const [infoRowsPerPage, setInfoRowsPerPage] = useState(5);
+  // -------------------- Pagination --------------------
+  const [infoPage, setInfoPage] = useState(0);
+  const [infoRowsPerPage, setInfoRowsPerPage] = useState(5);
   return (
-    <Paper elevation={2} sx={{ p: 4, borderRadius: 1 }}>
+    <Paper elevation={2} sx={{ p: 3, mt: 1 }}>
       <Typography variant="h6" fontWeight={700} mb={3}>
         Approver BQPCA Dashboard
       </Typography>
@@ -183,7 +200,7 @@ const ApproverBQPCADashboard = () => {
                       }}
                     >
                       <Typography fontWeight={600} sx={{ mb: 2 }}>
-                        TVET Indicators
+                        Application Information
                       </Typography>
 
                       <TableContainer>
@@ -192,13 +209,13 @@ const ApproverBQPCADashboard = () => {
                             <TableRow>
                               <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
+                                Application No.
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
                                 Name
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
-                                TTI/Govt
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                Pvt/Others
+                                Service
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
                                 Total
@@ -207,7 +224,7 @@ const ApproverBQPCADashboard = () => {
                           </TableHead>
 
                           <TableBody>
-                            {tvetIndicators
+                            {tvetData
                               .slice(
                                 infoPage * infoRowsPerPage,
                                 infoPage * infoRowsPerPage + infoRowsPerPage,
@@ -215,9 +232,9 @@ const ApproverBQPCADashboard = () => {
                               .map((row, index) => (
                                 <TableRow key={index}>
                                   <TableCell>{row.id}</TableCell>
+                                  <TableCell>{row.applicationNo}</TableCell>
                                   <TableCell>{row.name}</TableCell>
-                                  <TableCell>{row.ttiGovt ?? 0}</TableCell>
-                                  <TableCell>{row.pvtOthers ?? 0}</TableCell>
+                                  <TableCell>{row.service}</TableCell>
                                   <TableCell>{row.total ?? 0}</TableCell>
                                 </TableRow>
                               ))}
@@ -227,7 +244,7 @@ const ApproverBQPCADashboard = () => {
 
                       <TablePagination
                         component="div"
-                        count={tvetIndicators.length}
+                        count={tvetData.length}
                         page={infoPage}
                         onPageChange={(e, newPage) => setInfoPage(newPage)}
                         rowsPerPage={infoRowsPerPage}
@@ -250,7 +267,7 @@ const ApproverBQPCADashboard = () => {
       <Grid container spacing={3} mb={3}>
         {/* Line Chart */}
         <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
-         <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
+          <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
                 Monthly Approvals
@@ -312,7 +329,7 @@ const ApproverBQPCADashboard = () => {
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
-                Pending vs Completed
+                Current Year Monthly Application Received
               </Typography>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={lineData}>
