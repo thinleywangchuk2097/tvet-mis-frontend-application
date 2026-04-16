@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -25,169 +25,219 @@ import {
   FormControl,
   FormLabel,
   Box,
+  CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Formik, Form, FieldArray } from "formik";
 import * as Yup from "yup";
+import { useSelector } from "react-redux";
+import { toast } from "react-toastify";
 import FileUpload from "../../../components/file/FileUplaod";
+import CommonService from "../../../api/services/CommonService";
+import CurriculumEndorsementIndexService from "../../../api/services/CurriculumEndorsementIndexService";
+import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
+import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
+
+// Helper function to convert file to base64
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () =>
+      resolve({
+        name: file.name,
+        content: reader.result.split(",")[1],
+        contentType: file.type || "application/octet-stream",
+      });
+    reader.onerror = reject;
+  });
+
+// Helper function to validate ratio format
+const isValidRatio = (value) => {
+  if (!value) return false;
+  const ratioRegex = /^\d+:\d+$/;
+  return ratioRegex.test(value);
+};
 
 const ApplyAccreditedCourse = () => {
+  const access_token = useSelector((state) => state.auth.accessToken);
+  const actionId = useSelector((state) => state.auth.id);
+  const registration_no = useSelector((state) => state.auth.userId);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [openDialog, setOpenDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState("add"); // 'add' or 'view'
+  const [dialogMode, setDialogMode] = useState("add");
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [curriculumTypes, setCurriculumTypes] = useState([]);
+  const [instituteDetails, setInstituteDetails] = useState(null);
+  const [sectors, setSectors] = useState([]);
+  const [selectedSectorId, setSelectedSectorId] = useState("");
+  const [occupations, setOccupations] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [loadingOccupations, setLoadingOccupations] = useState(false);
+  const [loadingCurriculumTypes, setLoadingCurriculumTypes] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [unitLevels, setUnitLevels] = useState([]);
+  const [statusList, setStatusList] = useState([]);
 
-  // Sample data for the table
-  const [courses, setCourses] = useState([
-    {
-      id: 1,
-      applicationNo: "ACC001",
-      courseTitle: "Advanced Electronics",
-      sector: "Electronics",
-      courseFee: 3500,
-      status: "SUBMITTED",
-      // Additional data for view mode
-      registrationNo: "2024060155",
-      instituteName: "Robotics & IoT Training Institute",
-      modules: [
-        {
-          ncsCode: "NCS001",
-          unitName: "Basic Electronics",
-          unitLevel: "Level 3",
-        },
-        {
-          ncsCode: "NCS002",
-          unitName: "Digital Electronics",
-          unitLevel: "Level 4",
-        },
-      ],
-      curriculum: [
-        {
-          moduleNo: "M01",
-          moduleName: "Introduction to Electronics",
-          moduleCode: "ELEC101",
-          theoryDuration: 40,
-          practicalDuration: 20,
-          ojtHrs: 10,
-        },
-        {
-          moduleNo: "M02",
-          moduleName: "Circuit Analysis",
-          moduleCode: "ELEC102",
-          theoryDuration: 30,
-          practicalDuration: 30,
-          ojtHrs: 10,
-        },
-      ],
-      trainingFacilities: {
-        noOfClass: 5,
-        noOfWorkshops: 3,
-        noOfTrainingLab: 4,
-      },
-      otherFacilities: {
-        trainingTools: "Yes",
-        firstAid: "Yes",
-        toilet: "Yes",
-        lighting: "Yes",
-        fireSafety: "Yes",
-      },
-      trainerTraineeRatio: {
-        theory: 20,
-        practical: 15,
-      },
-      maxTrainees: 25,
-      presentTrainees: 18,
-      trainers: [
-        {
-          name: "Dr. Ahmad Bin Abdullah",
-          qualification: "PhD in Electronics",
-          industrialExp: 10,
-          teachingExp: 8,
-          subjectsTaught: "Advanced Electronics",
-          teachingHours: 120,
-        },
-        {
-          name: "Ms. Sarah Lim",
-          qualification: "Master in Robotics",
-          industrialExp: 7,
-          teachingExp: 5,
-          subjectsTaught: "Robotics Programming",
-          teachingHours: 80,
-        },
-      ],
-      supportingDocs: {
-        trainingPlan: "training_plan.pdf",
-        monthlyPlan: "monthly_plan.pdf",
-        lessonPlan: "lesson_plan.pdf",
-        cvCertificates: "staff_cv_certificates.pdf",
-      },
-    },
-    {
-      id: 2,
-      applicationNo: "ACC002",
-      courseTitle: "Robotics Engineering",
-      sector: "Engineering",
-      courseFee: 4200,
-      status: "SUBMITTED",
-      registrationNo: "2024060155",
-      instituteName: "Robotics & IoT Training Institute",
-      modules: [
-        {
-          ncsCode: "ROB001",
-          unitName: "Robotics Fundamentals",
-          unitLevel: "Level 3",
-        },
-      ],
-      curriculum: [
-        {
-          moduleNo: "R01",
-          moduleName: "Introduction to Robotics",
-          moduleCode: "ROB101",
-          theoryDuration: 45,
-          practicalDuration: 35,
-          ojtHrs: 15,
-        },
-      ],
-      trainingFacilities: {
-        noOfClass: 4,
-        noOfWorkshops: 2,
-        noOfTrainingLab: 3,
-      },
-      otherFacilities: {
-        trainingTools: "Yes",
-        firstAid: "Yes",
-        toilet: "Yes",
-        lighting: "Yes",
-        fireSafety: "Yes",
-      },
-      trainerTraineeRatio: {
-        theory: 18,
-        practical: 12,
-      },
-      maxTrainees: 20,
-      presentTrainees: 15,
-      trainers: [
-        {
-          name: "Dr. Robert Wong",
-          qualification: "PhD in Robotics",
-          industrialExp: 12,
-          teachingExp: 10,
-          subjectsTaught: "Robotics Engineering",
-          teachingHours: 100,
-        },
-      ],
-      supportingDocs: {
-        trainingPlan: "robotics_training_plan.pdf",
-        monthlyPlan: "robotics_monthly_plan.pdf",
-        lessonPlan: "robotics_lesson_plan.pdf",
-        cvCertificates: "robotics_staff_cv.pdf",
-      },
-    },
-  ]);
+  useEffect(() => {
+    fetchCurriculumTypes();
+    fetchInstituteDetails();
+    fetchSectors();
+    fetchAppliedCourses();
+    fetchUnitLevels();
+    fetchStatusList();
+  }, []);
+
+  // Fetch occupations when sector changes
+  useEffect(() => {
+    if (selectedSectorId) {
+      fetchOccupationsBySector(selectedSectorId);
+    } else {
+      setOccupations([]);
+    }
+  }, [selectedSectorId]);
+
+  const fetchUnitLevels = async () => {
+    try {
+      const UnitLevels = await CommonService.getByParentId(10);
+      setUnitLevels(UnitLevels.data);
+      console.log("Unit Levels:", UnitLevels.data);
+    } catch (error) {
+      console.error("Error fetching unit levels:", error);
+    }
+  };
+
+  const fetchStatusList = async () => {
+    try {
+      const statusResponse = await CommonService.getByParentId(4);
+      setStatusList(statusResponse.data);
+      console.log("Status List:", statusResponse.data);
+    } catch (error) {
+      console.error("Error fetching status list:", error);
+    }
+  };
+
+  // Helper function to get status name from ID
+  const getStatusName = (statusId) => {
+    const status = statusList.find((s) => s.id == statusId);
+    return status ? status.name : "Pending";
+  };
+
+  // Helper function to get sector name from ID
+  const getSectorName = (sector_id) => {
+    const sector = sectors.find((s) => s.id == sector_id);
+    return sector ? sector.sectorName : sector_id;
+  };
+
+  const fetchInstituteDetails = async () => {
+    try {
+      const response =
+        await InstituteRegistrationService.getInstituteDetails(registration_no);
+      const instituteData = Array.isArray(response.data)
+        ? response.data[0]
+        : response.data;
+      setInstituteDetails(instituteData);
+      console.log("Institute Details:", instituteData);
+    } catch (error) {
+      console.error("Error fetching institute data:", error);
+    }
+  };
+
+  const fetchAppliedCourses = async () => {
+    try {
+      const response =
+        await ApplyAccreditedCourseService.getAccreditedCourseDetailsByUserId(
+          registration_no,
+          access_token,
+        );
+      console.log("Applied Courses Response:", response.data);
+      if (response.data) {
+        const mappedCourses = response.data.map((course, index) => ({
+          id: course.id || index,
+          applicationNo: course.application_no,
+          courseId: course.course_id,
+          course_name: course.course_name, // Direct from API
+          sectorId: course.sector_id,
+          courseFee: course.course_fee,
+          statusId: course.status_id,
+          classNo: course.class_no,
+          workshopNo: course.workshop_no,
+          trainingLabNo: course.training_lab_no,
+          equipmentTool: course.equipment_tool,
+          firstAidFacility: course.first_aid_facility,
+          toiletFacility: course.toilet_facility,
+          lightingPower: course.lighting_power,
+          fireSafety: course.fire_safety,
+          trainerTraineeRatioTheory: course.trainer_trainee_ratio_theory,
+          trainerTraineeRatioPractical: course.trainer_trainee_ratio_practical,
+          maxNoTrainees: course.max_no_trainees,
+          presentNoTrainee: course.present_no_trainee,
+          curriculum_type_id: course.curriculum_type_id,
+          registration_no: course.registration_no,
+          proposed_institute_name: course.proposed_institute_name,
+          institute_id: course.institute_id,
+          // Store the raw JSON strings for parsing in view mode
+          certifications: course.certifications,
+          curriculums: course.curriculums,
+          trainers: course.trainers,
+          ...course,
+        }));
+        setCourses(mappedCourses);
+      }
+    } catch (error) {
+      console.error("Error fetching applied courses:", error);
+      setCourses([]);
+    }
+  };
+
+  const fetchSectors = async () => {
+    try {
+      const sectorDtls = await CommonService.getAllSectors();
+      console.log("Sectors:", sectorDtls.data);
+      setSectors(sectorDtls.data);
+    } catch (error) {
+      console.error("Error fetching sectors:", error);
+    }
+  };
+
+  const fetchOccupationsBySector = async (sectorId) => {
+    setLoadingOccupations(true);
+    try {
+      const occupationLists =
+        await CommonService.getOccupationsBySectorId(sectorId);
+      console.log("Occupations (Courses):", occupationLists.data);
+      setOccupations(occupationLists.data);
+    } catch (error) {
+      console.error("Error fetching occupations:", error);
+      setOccupations([]);
+      toast.error("Failed to fetch courses for selected sector");
+    } finally {
+      setLoadingOccupations(false);
+    }
+  };
+
+  const fetchCurriculumTypes = async () => {
+    setLoadingCurriculumTypes(true);
+    try {
+      const response =
+        await CurriculumEndorsementIndexService.getApprovedCurriculumDataByUserId(
+          registration_no,
+          41,
+          access_token,
+        );
+      setCurriculumTypes(response.data);
+      console.log("Curriculum Types:", response.data);
+    } catch (error) {
+      console.error("Error fetching curriculum types:", error);
+      toast.error("Failed to fetch curriculum types");
+    } finally {
+      setLoadingCurriculumTypes(false);
+    }
+  };
 
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
@@ -197,8 +247,11 @@ const ApplyAccreditedCourse = () => {
 
   const filteredCourses = courses.filter(
     (c) =>
-      c.courseTitle.toLowerCase().includes(search.toLowerCase()) ||
-      c.applicationNo.toLowerCase().includes(search.toLowerCase()),
+      (c.course_name?.toLowerCase() || "").includes(search.toLowerCase()) ||
+      (c.applicationNo?.toLowerCase() || "").includes(search.toLowerCase()) ||
+      (getSectorName(c.sector_id)?.toLowerCase() || "").includes(
+        search.toLowerCase(),
+      ),
   );
 
   const handleView = (course) => {
@@ -210,6 +263,8 @@ const ApplyAccreditedCourse = () => {
   const handleAdd = () => {
     setSelectedCourse(null);
     setDialogMode("add");
+    setSelectedSectorId("");
+    setOccupations([]);
     setOpenDialog(true);
   };
 
@@ -222,17 +277,140 @@ const ApplyAccreditedCourse = () => {
     },
   };
 
-  // Initial form values for add mode
   const getInitialValues = () => {
     if (dialogMode === "view" && selectedCourse) {
-      return selectedCourse;
+      // Parse JSON strings from API response
+      let parsedCertifications = [];
+      let parsedCurriculums = [];
+      let parsedTrainers = [];
+
+      try {
+        parsedCertifications = selectedCourse.certifications
+          ? JSON.parse(selectedCourse.certifications)
+          : [];
+      } catch (e) {
+        console.error("Error parsing certifications:", e);
+        parsedCertifications = [];
+      }
+
+      try {
+        parsedCurriculums = selectedCourse.curriculums
+          ? JSON.parse(selectedCourse.curriculums)
+          : [];
+      } catch (e) {
+        console.error("Error parsing curriculums:", e);
+        parsedCurriculums = [];
+      }
+
+      try {
+        parsedTrainers = selectedCourse.trainers
+          ? JSON.parse(selectedCourse.trainers)
+          : [];
+      } catch (e) {
+        console.error("Error parsing trainers:", e);
+        parsedTrainers = [];
+      }
+
+      return {
+        registrationNo:
+          instituteDetails?.registration_no ||
+          selectedCourse.registration_no ||
+          "",
+        instituteName:
+          instituteDetails?.proposed_institute_name ||
+          selectedCourse.proposed_institute_name ||
+          "",
+        instituteId:
+          instituteDetails?.institute_id || selectedCourse.institute_id || "",
+        curriculumTypeId: selectedCourse.curriculum_type_id || "",
+        sectorId: selectedCourse.sector_id || "",
+        courseId: selectedCourse.course_id || "",
+        courseName: selectedCourse.course_name || "", // Store course name separately for display
+        courseFee: selectedCourse.course_fee || "",
+        modules:
+          parsedCertifications.length > 0
+            ? parsedCertifications.map((cert) => ({
+                ncsCode: cert.certificationCode || "",
+                unitName: cert.certificationModule || "",
+                unitLevel: cert.certificationLevelId || "",
+              }))
+            : [
+                {
+                  ncsCode: "",
+                  unitName: "",
+                  unitLevel: "",
+                },
+              ],
+        curriculum:
+          parsedCurriculums.length > 0
+            ? parsedCurriculums.map((curr) => ({
+                moduleNo: curr.moduleNo || "",
+                moduleName: curr.moduleName || "",
+                moduleCode: curr.ncsCode || "",
+                theoryDuration: curr.theoryHour || "",
+                practicalDuration: curr.practicalHour || "",
+                ojtHrs: curr.ojtHour || "",
+              }))
+            : [
+                {
+                  moduleNo: "",
+                  moduleName: "",
+                  moduleCode: "",
+                  theoryDuration: "",
+                  practicalDuration: "",
+                  ojtHrs: "",
+                },
+              ],
+        trainingFacilities: {
+          noOfClass: selectedCourse.class_no || "",
+          noOfWorkshops: selectedCourse.workshop_no || "",
+          noOfTrainingLab: selectedCourse.training_lab_no || "",
+        },
+        otherFacilities: {
+          trainingTools: selectedCourse.equipment_tool || "",
+          firstAid: selectedCourse.first_aid_facility || "",
+          toilet: selectedCourse.toilet_facility || "",
+          lighting: selectedCourse.lighting_power || "",
+          fireSafety: selectedCourse.fire_safety || "",
+        },
+        trainerTraineeRatio: {
+          theory: selectedCourse.trainer_trainee_ratio_theory || "",
+          practical: selectedCourse.trainer_trainee_ratio_practical || "",
+        },
+        maxTrainees: selectedCourse.max_no_trainees || "",
+        presentTrainees: selectedCourse.present_no_trainee || "",
+        trainers:
+          parsedTrainers.length > 0
+            ? parsedTrainers.map((trainer) => ({
+                name: trainer.trainerName || "",
+                qualification: trainer.acamedicProfessional || "",
+                industrialExp: trainer.industrialExperience || "",
+                teachingExp: trainer.teachingExperience || "",
+                subjectsTaught: trainer.subjectTaught || "",
+                teachingHours: trainer.teachingHour || "",
+              }))
+            : [
+                {
+                  name: "",
+                  qualification: "",
+                  industrialExp: "",
+                  teachingExp: "",
+                  subjectsTaught: "",
+                  teachingHours: "",
+                },
+              ],
+        files: [],
+      };
     }
 
     return {
-      registrationNo: "2024060155",
-      instituteName: "Robotics & IoT Training Institute",
-      sector: "",
-      courseTitle: "",
+      registrationNo: instituteDetails?.registration_no || "",
+      instituteName: instituteDetails?.proposed_institute_name || "",
+      instituteId: instituteDetails?.institute_id || "",
+      curriculumTypeId: "",
+      sectorId: "",
+      courseId: "",
+      courseName: "",
       courseFee: "",
       modules: [
         {
@@ -257,11 +435,11 @@ const ApplyAccreditedCourse = () => {
         noOfTrainingLab: "",
       },
       otherFacilities: {
-        trainingTools: "Yes",
-        firstAid: "Yes",
-        toilet: "Yes",
-        lighting: "Yes",
-        fireSafety: "Yes",
+        trainingTools: "",
+        firstAid: "",
+        toilet: "",
+        lighting: "",
+        fireSafety: "",
       },
       trainerTraineeRatio: {
         theory: "",
@@ -279,21 +457,19 @@ const ApplyAccreditedCourse = () => {
           teachingHours: "",
         },
       ],
-      supportingDocs: {
-        trainingPlan: null,
-        monthlyPlan: null,
-        lessonPlan: null,
-        cvCertificates: null,
-      },
+      files: [],
     };
   };
 
   const validationSchema = Yup.object().shape({
-    sector: Yup.string().required("Sector is required"),
-    courseTitle: Yup.string().required("Course Title is required"),
+    curriculumTypeId: Yup.string().required("Curriculum Type is required"),
+    sectorId: Yup.string().required("Sector is required"),
+    courseId: Yup.string().required("Course Title is required"),
     courseFee: Yup.number()
       .required("Course Fee is required")
-      .positive("Must be positive"),
+      .positive("Course Fee must be a positive number")
+      .typeError("Course Fee must be a valid number"),
+
     modules: Yup.array().of(
       Yup.object().shape({
         ncsCode: Yup.string().required("NCS Code is required"),
@@ -301,61 +477,223 @@ const ApplyAccreditedCourse = () => {
         unitLevel: Yup.string().required("Unit Level is required"),
       }),
     ),
+
     curriculum: Yup.array().of(
       Yup.object().shape({
         moduleNo: Yup.string().required("Module No is required"),
         moduleName: Yup.string().required("Module Name is required"),
         moduleCode: Yup.string().required("Module Code is required"),
-        theoryDuration: Yup.number().required("Theory Duration is required"),
-        practicalDuration: Yup.number().required(
-          "Practical Duration is required",
-        ),
-        ojtHrs: Yup.number().required("OJT Hours is required"),
+        theoryDuration: Yup.number()
+          .required("Theory Duration is required")
+          .positive("Theory Duration must be a positive number")
+          .typeError("Theory Duration must be a valid number"),
+        practicalDuration: Yup.number()
+          .required("Practical Duration is required")
+          .positive("Practical Duration must be a positive number")
+          .typeError("Practical Duration must be a valid number"),
+        ojtHrs: Yup.number()
+          .required("OJT Hours is required")
+          .min(0, "OJT Hours cannot be negative")
+          .typeError("OJT Hours must be a valid number"),
       }),
     ),
+
     trainingFacilities: Yup.object().shape({
-      noOfClass: Yup.number().required("Number of Classes is required"),
-      noOfWorkshops: Yup.number().required("Number of Workshops is required"),
-      noOfTrainingLab: Yup.number().required(
-        "Number of Training Labs is required",
-      ),
+      noOfClass: Yup.number()
+        .required("Number of Classes is required")
+        .positive("Number of Classes must be a positive number")
+        .integer("Number of Classes must be a whole number")
+        .typeError("Number of Classes must be a valid number"),
+      noOfWorkshops: Yup.number()
+        .required("Number of Workshops is required")
+        .min(0, "Number of Workshops cannot be negative")
+        .integer("Number of Workshops must be a whole number")
+        .typeError("Number of Workshops must be a valid number"),
+      noOfTrainingLab: Yup.number()
+        .required("Number of Training Labs is required")
+        .min(0, "Number of Training Labs cannot be negative")
+        .integer("Number of Training Labs must be a whole number")
+        .typeError("Number of Training Labs must be a valid number"),
     }),
+
+    otherFacilities: Yup.object().shape({
+      trainingTools: Yup.string()
+        .required("Please select Yes or No for Training Tools and Equipment")
+        .oneOf(["Y", "N"], "Please select Yes or No"),
+      firstAid: Yup.string()
+        .required("Please select Yes or No for First Aid Facilities")
+        .oneOf(["Y", "N"], "Please select Yes or No"),
+      toilet: Yup.string()
+        .required("Please select Yes or No for Toilet Facilities")
+        .oneOf(["Y", "N"], "Please select Yes or No"),
+      lighting: Yup.string()
+        .required("Please select Yes or No for Lighting/Power Supply")
+        .oneOf(["Y", "N"], "Please select Yes or No"),
+      fireSafety: Yup.string()
+        .required("Please select Yes or No for Fire Safety")
+        .oneOf(["Y", "N"], "Please select Yes or No"),
+    }),
+
     trainerTraineeRatio: Yup.object().shape({
-      theory: Yup.number().required("Theory ratio is required"),
-      practical: Yup.number().required("Practical ratio is required"),
+      theory: Yup.string()
+        .required("Theory ratio is required")
+        .test(
+          "is-valid-ratio",
+          "Please enter a valid ratio format (e.g., 3:3 or 10:30)",
+          (value) => {
+            if (!value) return false;
+            return isValidRatio(value);
+          },
+        ),
+      practical: Yup.string()
+        .required("Practical ratio is required")
+        .test(
+          "is-valid-ratio",
+          "Please enter a valid ratio format (e.g., 3:3 or 10:30)",
+          (value) => {
+            if (!value) return false;
+            return isValidRatio(value);
+          },
+        ),
     }),
-    maxTrainees: Yup.number().required("Max trainees is required"),
-    presentTrainees: Yup.number().required("Present trainees is required"),
+
+    maxTrainees: Yup.number()
+      .required("Max trainees is required")
+      .positive("Max trainees must be a positive number")
+      .integer("Max trainees must be a whole number")
+      .typeError("Max trainees must be a valid number"),
+
+    presentTrainees: Yup.number()
+      .required("Present trainees is required")
+      .min(0, "Present trainees cannot be negative")
+      .integer("Present trainees must be a whole number")
+      .typeError("Present trainees must be a valid number")
+      .max(
+        Yup.ref("maxTrainees"),
+        "Present trainees cannot exceed max trainees",
+      ),
+
     trainers: Yup.array().of(
       Yup.object().shape({
-        name: Yup.string().required("Name is required"),
-        qualification: Yup.string().required("Qualification is required"),
-        industrialExp: Yup.number().required(
-          "Industrial Experience is required",
-        ),
-        teachingExp: Yup.number().required("Teaching Experience is required"),
-        subjectsTaught: Yup.string().required("Subjects taught is required"),
-        teachingHours: Yup.number().required("Teaching hours is required"),
+        name: Yup.string()
+          .required("Trainer name is required")
+          .min(2, "Name must be at least 2 characters"),
+        qualification: Yup.string()
+          .required("Qualification is required")
+          .min(2, "Qualification must be at least 2 characters"),
+        industrialExp: Yup.number()
+          .required("Industrial Experience is required")
+          .min(0, "Industrial Experience cannot be negative")
+          .typeError("Industrial Experience must be a valid number"),
+        teachingExp: Yup.number()
+          .required("Teaching Experience is required")
+          .min(0, "Teaching Experience cannot be negative")
+          .typeError("Teaching Experience must be a valid number"),
+        subjectsTaught: Yup.string()
+          .required("Subjects taught is required")
+          .min(2, "Please specify at least one subject"),
+        teachingHours: Yup.number()
+          .required("Teaching hours is required")
+          .positive("Teaching hours must be a positive number")
+          .typeError("Teaching hours must be a valid number"),
       }),
     ),
+
     files: Yup.array().min(1, "Upload at least one document"),
   });
 
-  const handleSubmit = (values, { resetForm }) => {
-    if (dialogMode === "add") {
-      const newCourse = {
-        id: courses.length + 1,
-        applicationNo: `ACC${String(courses.length + 1).padStart(3, "0")}`,
-        courseTitle: values.courseTitle,
-        sector: values.sector,
-        courseFee: values.courseFee,
-        status: "SUBMITTED",
-        ...values,
-      };
-      setCourses([...courses, newCourse]);
+  const handleSubmit = async (values, { resetForm, setSubmitting }) => {
+    setLoading(true);
+    try {
+      if (dialogMode === "add") {
+        // Convert files to base64
+        const documents = await Promise.all(
+          values.files.map((file) => fileToBase64(file)),
+        );
+
+        // Prepare data according to InstituteAccreditedCoursedto
+        const submissionData = {
+          instituteId: values.instituteId,
+          applicantName: values.instituteName,
+          courseId: values.courseId,
+          courseFee: values.courseFee,
+          curriculumTypeId: values.curriculumTypeId,
+          classNo: values.trainingFacilities.noOfClass,
+          workshopNo: values.trainingFacilities.noOfWorkshops,
+          trainingLabNo: values.trainingFacilities.noOfTrainingLab,
+          equipmentTool: values.otherFacilities.trainingTools,
+          firstAidFacility: values.otherFacilities.firstAid,
+          toiletFacility: values.otherFacilities.toilet,
+          lightingPower: values.otherFacilities.lighting,
+          fireSafety: values.otherFacilities.fireSafety,
+          trainerTraineeRatioTheory: values.trainerTraineeRatio.theory,
+          trainerTraineeRatioPractical: values.trainerTraineeRatio.practical,
+          maxNoTrainees: values.maxTrainees,
+          presentNoTrainee: values.presentTrainees,
+          sectorId: values.sectorId,
+          is_active: "Y",
+          registration_date: new Date().toISOString(),
+          validity_date: null,
+          createdBy: actionId,
+          serviceId: 26,
+          assignedRoleId: 7,
+          statusId: 55, // SUBMITTED status
+
+          instituteAccreditedCertifications: values.modules.map((module) => ({
+            certificationCode: module.ncsCode,
+            certificationModule: module.unitName,
+            certificationLevelId: module.unitLevel,
+          })),
+
+          instituteAccreditedCurriculums: values.curriculum.map(
+            (curriculum) => ({
+              moduleNo: curriculum.moduleNo,
+              moduleName: curriculum.moduleName,
+              ncsCode: curriculum.moduleCode,
+              theoryHour: curriculum.theoryDuration,
+              practicalHour: curriculum.practicalDuration,
+              ojtHour: curriculum.ojtHrs,
+            }),
+          ),
+
+          instituteAccreditedTrainers: values.trainers.map((trainer) => ({
+            trainerName: trainer.name,
+            acamedicProfessional: trainer.qualification,
+            industrialExperience: trainer.industrialExp,
+            teachingExperience: trainer.teachingExp,
+            subjectTaught: trainer.subjectsTaught,
+            teachingHour: trainer.teachingHours,
+          })),
+
+          documents: documents,
+        };
+
+        console.log("Submitting payload:", submissionData);
+
+        const response =
+          await ApplyAccreditedCourseService.submitAccreditedCourse(
+            submissionData,
+            access_token,
+          );
+
+        if (response.status === 200 || response.status === 201) {
+          toast.success(
+            "Course accreditation application submitted successfully!",
+          );
+          await fetchAppliedCourses();
+          resetForm();
+          setOpenDialog(false);
+        } else {
+          toast.error(response.message || "Failed to submit application");
+        }
+      }
+    } catch (error) {
+      console.error("Error submitting application:", error);
+      toast.error("An error occurred while submitting the application");
+    } finally {
+      setLoading(false);
+      setSubmitting(false);
     }
-    resetForm();
-    setOpenDialog(false);
   };
 
   const CourseForm = ({ formik, mode }) => (
@@ -374,7 +712,11 @@ const ApplyAccreditedCourse = () => {
               name="registrationNo"
               size="small"
               value={formik.values.registrationNo}
-              disabled
+              slotProps={{
+                input: {
+                  readOnly: true,
+                },
+              }}
             />
           </Grid>
           <Grid item size={{ xs: 12, md: 3 }}>
@@ -384,57 +726,120 @@ const ApplyAccreditedCourse = () => {
               name="instituteName"
               size="small"
               value={formik.values.instituteName}
-              disabled
+              slotProps={{
+                input: {
+                  readOnly: true,
+                },
+              }}
             />
           </Grid>
           <Grid item size={{ xs: 12, md: 3 }}>
             <TextField
               select
               fullWidth
-              label="Sector"
-              name="sector"
+              label="Curriculum Type"
+              name="curriculumTypeId"
               size="small"
-              value={formik.values.sector}
+              value={formik.values.curriculumTypeId}
               onChange={formik.handleChange}
               onBlur={formik.handleBlur}
-              error={formik.touched.sector && Boolean(formik.errors.sector)}
-              helperText={formik.touched.sector && formik.errors.sector}
+              error={
+                formik.touched.curriculumTypeId &&
+                Boolean(formik.errors.curriculumTypeId)
+              }
+              helperText={
+                formik.touched.curriculumTypeId &&
+                formik.errors.curriculumTypeId
+              }
               disabled={mode === "view"}
             >
               <MenuItem value="">-select-</MenuItem>
-              <MenuItem value="Electronics">Electronics</MenuItem>
-              <MenuItem value="Engineering">Engineering</MenuItem>
-              <MenuItem value="ICT">ICT</MenuItem>
-              <MenuItem value="Robotics">Robotics</MenuItem>
+              {loadingCurriculumTypes ? (
+                <MenuItem disabled>
+                  <CircularProgress size={20} /> Loading curriculum types...
+                </MenuItem>
+              ) : (
+                curriculumTypes.map((curriculum) => (
+                  <MenuItem key={curriculum.id} value={curriculum.id}>
+                    {curriculum.curriculum_name}
+                  </MenuItem>
+                ))
+              )}
             </TextField>
           </Grid>
           <Grid item size={{ xs: 12, md: 3 }}>
             <TextField
               select
               fullWidth
-              label="Course Title"
-              name="courseTitle"
+              label="Sector"
+              name="sectorId"
               size="small"
-              value={formik.values.courseTitle}
-              onChange={formik.handleChange}
+              value={formik.values.sectorId}
+              onChange={(e) => {
+                formik.handleChange(e);
+                if (mode !== "view") {
+                  setSelectedSectorId(e.target.value);
+                }
+              }}
               onBlur={formik.handleBlur}
-              error={
-                formik.touched.courseTitle && Boolean(formik.errors.courseTitle)
-              }
-              helperText={
-                formik.touched.courseTitle && formik.errors.courseTitle
-              }
+              error={formik.touched.sectorId && Boolean(formik.errors.sectorId)}
+              helperText={formik.touched.sectorId && formik.errors.sectorId}
               disabled={mode === "view"}
             >
               <MenuItem value="">-select-</MenuItem>
-              <MenuItem value="Advanced Electronics">
-                Advanced Electronics
-              </MenuItem>
-              <MenuItem value="Robotics Engineering">
-                Robotics Engineering
-              </MenuItem>
-              <MenuItem value="IoT Development">IoT Development</MenuItem>
+              {sectors.map((sector) => (
+                <MenuItem key={sector.id} value={sector.id}>
+                  {sector.sectorName}
+                </MenuItem>
+              ))}
             </TextField>
+          </Grid>
+          <Grid item size={{ xs: 12, md: 3 }}>
+            {mode === "view" ? (
+              <TextField
+                fullWidth
+                label="Course"
+                name="courseName"
+                size="small"
+                value={formik.values.courseName}
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                  },
+                }}
+              />
+            ) : (
+              <TextField
+                select
+                fullWidth
+                label="Course"
+                name="courseId"
+                size="small"
+                value={formik.values.courseId}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.courseId && Boolean(formik.errors.courseId)
+                }
+                helperText={formik.touched.courseId && formik.errors.courseId}
+                disabled={!formik.values.sectorId}
+              >
+                <MenuItem value="">-select-</MenuItem>
+                {loadingOccupations ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} /> Loading courses...
+                  </MenuItem>
+                ) : (
+                  occupations.map((occupation) => (
+                    <MenuItem key={occupation.id} value={occupation.id}>
+                      {occupation.occupationName ||
+                        occupation.title ||
+                        occupation.name}
+                    </MenuItem>
+                  ))
+                )}
+              </TextField>
+            )}
           </Grid>
           <Grid item size={{ xs: 12, md: 3 }}>
             <TextField
@@ -451,13 +856,18 @@ const ApplyAccreditedCourse = () => {
               }
               helperText={formik.touched.courseFee && formik.errors.courseFee}
               disabled={mode === "view"}
-              InputProps={{ readOnly: mode === "view" }}
+              inputProps={{ min: 1 }}
+              slotProps={{
+                input: {
+                  readOnly: mode === "view",
+                },
+              }}
             />
           </Grid>
         </Grid>
       </Paper>
 
-      {/* Section 2: Modules */}
+      {/* Section 2: Modules/Certifications */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
           2. Details of Modules, Code and Level Certification
@@ -494,8 +904,11 @@ const ApplyAccreditedCourse = () => {
                             formik.touched.modules?.[index]?.ncsCode &&
                             formik.errors.modules?.[index]?.ncsCode
                           }
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 3.5 }}>
@@ -517,8 +930,11 @@ const ApplyAccreditedCourse = () => {
                             formik.touched.modules?.[index]?.unitName &&
                             formik.errors.modules?.[index]?.unitName
                           }
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 3.5 }}>
@@ -544,10 +960,11 @@ const ApplyAccreditedCourse = () => {
                           disabled={mode === "view"}
                         >
                           <MenuItem value="">-select-</MenuItem>
-                          <MenuItem value="Level 1">Level 1</MenuItem>
-                          <MenuItem value="Level 2">Level 2</MenuItem>
-                          <MenuItem value="Level 3">Level 3</MenuItem>
-                          <MenuItem value="Level 4">Level 4</MenuItem>
+                          {unitLevels.map((level) => (
+                            <MenuItem key={level.id} value={level.id}>
+                              {level.name}
+                            </MenuItem>
+                          ))}
                         </TextField>
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1 }}>
@@ -632,8 +1049,16 @@ const ApplyAccreditedCourse = () => {
                             formik.touched.curriculum?.[index]?.moduleNo &&
                             Boolean(formik.errors.curriculum?.[index]?.moduleNo)
                           }
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]?.moduleNo &&
+                            formik.errors.curriculum?.[index]?.moduleNo
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1.8 }}>
@@ -645,8 +1070,23 @@ const ApplyAccreditedCourse = () => {
                           value={curr.moduleName}
                           onChange={formik.handleChange}
                           onBlur={formik.handleBlur}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          error={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]?.moduleName &&
+                            Boolean(
+                              formik.errors.curriculum?.[index]?.moduleName,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]?.moduleName &&
+                            formik.errors.curriculum?.[index]?.moduleName
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1.8 }}>
@@ -658,8 +1098,23 @@ const ApplyAccreditedCourse = () => {
                           value={curr.moduleCode}
                           onChange={formik.handleChange}
                           onBlur={formik.handleBlur}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          error={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]?.moduleCode &&
+                            Boolean(
+                              formik.errors.curriculum?.[index]?.moduleCode,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]?.moduleCode &&
+                            formik.errors.curriculum?.[index]?.moduleCode
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1.4 }}>
@@ -671,8 +1126,26 @@ const ApplyAccreditedCourse = () => {
                           size="small"
                           value={curr.theoryDuration}
                           onChange={formik.handleChange}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]
+                              ?.theoryDuration &&
+                            Boolean(
+                              formik.errors.curriculum?.[index]?.theoryDuration,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]
+                              ?.theoryDuration &&
+                            formik.errors.curriculum?.[index]?.theoryDuration
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1.4 }}>
@@ -684,8 +1157,27 @@ const ApplyAccreditedCourse = () => {
                           size="small"
                           value={curr.practicalDuration}
                           onChange={formik.handleChange}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]
+                              ?.practicalDuration &&
+                            Boolean(
+                              formik.errors.curriculum?.[index]
+                                ?.practicalDuration,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]
+                              ?.practicalDuration &&
+                            formik.errors.curriculum?.[index]?.practicalDuration
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1.4 }}>
@@ -697,8 +1189,22 @@ const ApplyAccreditedCourse = () => {
                           size="small"
                           value={curr.ojtHrs}
                           onChange={formik.handleChange}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]?.ojtHrs &&
+                            Boolean(formik.errors.curriculum?.[index]?.ojtHrs)
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.curriculum?.[index]?.ojtHrs &&
+                            formik.errors.curriculum?.[index]?.ojtHrs
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1 }}>
@@ -753,6 +1259,7 @@ const ApplyAccreditedCourse = () => {
           </Grid>
         </Grid>
       </Paper>
+
       {/* Section 4: Training Facilities */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
@@ -775,8 +1282,16 @@ const ApplyAccreditedCourse = () => {
                 formik.touched.trainingFacilities?.noOfClass &&
                 Boolean(formik.errors.trainingFacilities?.noOfClass)
               }
-              disabled={mode === "view"}
-              InputProps={{ readOnly: mode === "view" }}
+              helperText={
+                mode === "add" &&
+                formik.touched.trainingFacilities?.noOfClass &&
+                formik.errors.trainingFacilities?.noOfClass
+              }
+              slotProps={{
+                input: {
+                  readOnly: mode === "view",
+                },
+              }}
             />
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -788,8 +1303,22 @@ const ApplyAccreditedCourse = () => {
               size="small"
               value={formik.values.trainingFacilities.noOfWorkshops}
               onChange={formik.handleChange}
-              disabled={mode === "view"}
-              InputProps={{ readOnly: mode === "view" }}
+              onBlur={formik.handleBlur}
+              error={
+                mode === "add" &&
+                formik.touched.trainingFacilities?.noOfWorkshops &&
+                Boolean(formik.errors.trainingFacilities?.noOfWorkshops)
+              }
+              helperText={
+                mode === "add" &&
+                formik.touched.trainingFacilities?.noOfWorkshops &&
+                formik.errors.trainingFacilities?.noOfWorkshops
+              }
+              slotProps={{
+                input: {
+                  readOnly: mode === "view",
+                },
+              }}
             />
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -801,12 +1330,27 @@ const ApplyAccreditedCourse = () => {
               size="small"
               value={formik.values.trainingFacilities.noOfTrainingLab}
               onChange={formik.handleChange}
-              disabled={mode === "view"}
-              InputProps={{ readOnly: mode === "view" }}
+              onBlur={formik.handleBlur}
+              error={
+                mode === "add" &&
+                formik.touched.trainingFacilities?.noOfTrainingLab &&
+                Boolean(formik.errors.trainingFacilities?.noOfTrainingLab)
+              }
+              helperText={
+                mode === "add" &&
+                formik.touched.trainingFacilities?.noOfTrainingLab &&
+                formik.errors.trainingFacilities?.noOfTrainingLab
+              }
+              slotProps={{
+                input: {
+                  readOnly: mode === "view",
+                },
+              }}
             />
           </Grid>
         </Grid>
       </Paper>
+
       {/* Section 5: Other Facilities */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
@@ -819,27 +1363,46 @@ const ApplyAccreditedCourse = () => {
               component="fieldset"
               size="small"
               disabled={mode === "view"}
+              error={
+                mode === "add" &&
+                formik.touched.otherFacilities?.trainingTools &&
+                Boolean(formik.errors.otherFacilities?.trainingTools)
+              }
+              required
             >
               <FormLabel component="legend">
-                1. Training Tools and Equipment
+                1. Training Tools and Equipment{" "}
+                <span style={{ color: "red" }}>*</span>
               </FormLabel>
               <RadioGroup
                 row
                 name="otherFacilities.trainingTools"
                 value={formik.values.otherFacilities.trainingTools}
                 onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
               >
                 <FormControlLabel
-                  value="Yes"
+                  value="Y"
                   control={<Radio size="small" />}
                   label="Yes"
                 />
                 <FormControlLabel
-                  value="No"
+                  value="N"
                   control={<Radio size="small" />}
                   label="No"
                 />
               </RadioGroup>
+              {mode === "add" &&
+                formik.touched.otherFacilities?.trainingTools &&
+                formik.errors.otherFacilities?.trainingTools && (
+                  <Typography
+                    color="error"
+                    variant="caption"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    {formik.errors.otherFacilities?.trainingTools}
+                  </Typography>
+                )}
             </FormControl>
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -847,25 +1410,45 @@ const ApplyAccreditedCourse = () => {
               component="fieldset"
               size="small"
               disabled={mode === "view"}
+              error={
+                mode === "add" &&
+                formik.touched.otherFacilities?.firstAid &&
+                Boolean(formik.errors.otherFacilities?.firstAid)
+              }
+              required
             >
-              <FormLabel component="legend">2. First Aid Facilities</FormLabel>
+              <FormLabel component="legend">
+                2. First Aid Facilities <span style={{ color: "red" }}>*</span>
+              </FormLabel>
               <RadioGroup
                 row
                 name="otherFacilities.firstAid"
                 value={formik.values.otherFacilities.firstAid}
                 onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
               >
                 <FormControlLabel
-                  value="Yes"
+                  value="Y"
                   control={<Radio size="small" />}
                   label="Yes"
                 />
                 <FormControlLabel
-                  value="No"
+                  value="N"
                   control={<Radio size="small" />}
                   label="No"
                 />
               </RadioGroup>
+              {mode === "add" &&
+                formik.touched.otherFacilities?.firstAid &&
+                formik.errors.otherFacilities?.firstAid && (
+                  <Typography
+                    color="error"
+                    variant="caption"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    {formik.errors.otherFacilities?.firstAid}
+                  </Typography>
+                )}
             </FormControl>
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -873,25 +1456,45 @@ const ApplyAccreditedCourse = () => {
               component="fieldset"
               size="small"
               disabled={mode === "view"}
+              error={
+                mode === "add" &&
+                formik.touched.otherFacilities?.toilet &&
+                Boolean(formik.errors.otherFacilities?.toilet)
+              }
+              required
             >
-              <FormLabel component="legend">3. Toilet Facilities</FormLabel>
+              <FormLabel component="legend">
+                3. Toilet Facilities <span style={{ color: "red" }}>*</span>
+              </FormLabel>
               <RadioGroup
                 row
                 name="otherFacilities.toilet"
                 value={formik.values.otherFacilities.toilet}
                 onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
               >
                 <FormControlLabel
-                  value="Yes"
+                  value="Y"
                   control={<Radio size="small" />}
                   label="Yes"
                 />
                 <FormControlLabel
-                  value="No"
+                  value="N"
                   control={<Radio size="small" />}
                   label="No"
                 />
               </RadioGroup>
+              {mode === "add" &&
+                formik.touched.otherFacilities?.toilet &&
+                formik.errors.otherFacilities?.toilet && (
+                  <Typography
+                    color="error"
+                    variant="caption"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    {formik.errors.otherFacilities?.toilet}
+                  </Typography>
+                )}
             </FormControl>
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -899,25 +1502,45 @@ const ApplyAccreditedCourse = () => {
               component="fieldset"
               size="small"
               disabled={mode === "view"}
+              error={
+                mode === "add" &&
+                formik.touched.otherFacilities?.lighting &&
+                Boolean(formik.errors.otherFacilities?.lighting)
+              }
+              required
             >
-              <FormLabel component="legend">4. Lighting/Power Supply</FormLabel>
+              <FormLabel component="legend">
+                4. Lighting/Power Supply <span style={{ color: "red" }}>*</span>
+              </FormLabel>
               <RadioGroup
                 row
                 name="otherFacilities.lighting"
                 value={formik.values.otherFacilities.lighting}
                 onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
               >
                 <FormControlLabel
-                  value="Yes"
+                  value="Y"
                   control={<Radio size="small" />}
                   label="Yes"
                 />
                 <FormControlLabel
-                  value="No"
+                  value="N"
                   control={<Radio size="small" />}
                   label="No"
                 />
               </RadioGroup>
+              {mode === "add" &&
+                formik.touched.otherFacilities?.lighting &&
+                formik.errors.otherFacilities?.lighting && (
+                  <Typography
+                    color="error"
+                    variant="caption"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    {formik.errors.otherFacilities?.lighting}
+                  </Typography>
+                )}
             </FormControl>
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -925,25 +1548,45 @@ const ApplyAccreditedCourse = () => {
               component="fieldset"
               size="small"
               disabled={mode === "view"}
+              error={
+                mode === "add" &&
+                formik.touched.otherFacilities?.fireSafety &&
+                Boolean(formik.errors.otherFacilities?.fireSafety)
+              }
+              required
             >
-              <FormLabel component="legend">5. Fire Safety</FormLabel>
+              <FormLabel component="legend">
+                5. Fire Safety <span style={{ color: "red" }}>*</span>
+              </FormLabel>
               <RadioGroup
                 row
                 name="otherFacilities.fireSafety"
                 value={formik.values.otherFacilities.fireSafety}
                 onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
               >
                 <FormControlLabel
-                  value="Yes"
+                  value="Y"
                   control={<Radio size="small" />}
                   label="Yes"
                 />
                 <FormControlLabel
-                  value="No"
+                  value="N"
                   control={<Radio size="small" />}
                   label="No"
                 />
               </RadioGroup>
+              {mode === "add" &&
+                formik.touched.otherFacilities?.fireSafety &&
+                formik.errors.otherFacilities?.fireSafety && (
+                  <Typography
+                    color="error"
+                    variant="caption"
+                    sx={{ mt: 0.5, display: "block" }}
+                  >
+                    {formik.errors.otherFacilities?.fireSafety}
+                  </Typography>
+                )}
             </FormControl>
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -951,13 +1594,26 @@ const ApplyAccreditedCourse = () => {
               fullWidth
               label="Trainer-Trainee Ratio (Theory)"
               name="trainerTraineeRatio.theory"
-              type="number"
               size="small"
               value={formik.values.trainerTraineeRatio.theory}
               onChange={formik.handleChange}
-              placeholder="e.g., 20"
-              disabled={mode === "view"}
-              InputProps={{ readOnly: mode === "view" }}
+              onBlur={formik.handleBlur}
+              error={
+                mode === "add" &&
+                formik.touched.trainerTraineeRatio?.theory &&
+                Boolean(formik.errors.trainerTraineeRatio?.theory)
+              }
+              helperText={
+                mode === "add" &&
+                formik.touched.trainerTraineeRatio?.theory &&
+                formik.errors.trainerTraineeRatio?.theory
+              }
+              placeholder="e.g., 3:3 or 10:30"
+              slotProps={{
+                input: {
+                  readOnly: mode === "view",
+                },
+              }}
             />
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -965,13 +1621,26 @@ const ApplyAccreditedCourse = () => {
               fullWidth
               label="Trainer-Trainee Ratio (Practical)"
               name="trainerTraineeRatio.practical"
-              type="number"
               size="small"
               value={formik.values.trainerTraineeRatio.practical}
               onChange={formik.handleChange}
-              placeholder="e.g., 15"
-              disabled={mode === "view"}
-              InputProps={{ readOnly: mode === "view" }}
+              onBlur={formik.handleBlur}
+              error={
+                mode === "add" &&
+                formik.touched.trainerTraineeRatio?.practical &&
+                Boolean(formik.errors.trainerTraineeRatio?.practical)
+              }
+              helperText={
+                mode === "add" &&
+                formik.touched.trainerTraineeRatio?.practical &&
+                formik.errors.trainerTraineeRatio?.practical
+              }
+              placeholder="e.g., 3:3 or 10:30"
+              slotProps={{
+                input: {
+                  readOnly: mode === "view",
+                },
+              }}
             />
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -983,8 +1652,22 @@ const ApplyAccreditedCourse = () => {
               size="small"
               value={formik.values.maxTrainees}
               onChange={formik.handleChange}
-              disabled={mode === "view"}
-              InputProps={{ readOnly: mode === "view" }}
+              onBlur={formik.handleBlur}
+              error={
+                mode === "add" &&
+                formik.touched.maxTrainees &&
+                Boolean(formik.errors.maxTrainees)
+              }
+              helperText={
+                mode === "add" &&
+                formik.touched.maxTrainees &&
+                formik.errors.maxTrainees
+              }
+              slotProps={{
+                input: {
+                  readOnly: mode === "view",
+                },
+              }}
             />
           </Grid>
           <Grid item size={{ xs: 12, md: 4 }}>
@@ -996,12 +1679,27 @@ const ApplyAccreditedCourse = () => {
               size="small"
               value={formik.values.presentTrainees}
               onChange={formik.handleChange}
-              disabled={mode === "view"}
-              InputProps={{ readOnly: mode === "view" }}
+              onBlur={formik.handleBlur}
+              error={
+                mode === "add" &&
+                formik.touched.presentTrainees &&
+                Boolean(formik.errors.presentTrainees)
+              }
+              helperText={
+                mode === "add" &&
+                formik.touched.presentTrainees &&
+                formik.errors.presentTrainees
+              }
+              slotProps={{
+                input: {
+                  readOnly: mode === "view",
+                },
+              }}
             />
           </Grid>
         </Grid>
       </Paper>
+
       {/* Section 6: Trainers */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
@@ -1018,7 +1716,7 @@ const ApplyAccreditedCourse = () => {
                       container
                       spacing={2}
                       key={index}
-                      sx={{ mb: 2, alignItems: "center" }}
+                      sx={{ mb: 2, alignItems: "flex-start" }}
                     >
                       <Grid item size={{ xs: 12, md: 2.4 }}>
                         <TextField
@@ -1034,8 +1732,16 @@ const ApplyAccreditedCourse = () => {
                             formik.touched.trainers?.[index]?.name &&
                             Boolean(formik.errors.trainers?.[index]?.name)
                           }
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.name &&
+                            formik.errors.trainers?.[index]?.name
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 2.4 }}>
@@ -1046,34 +1752,82 @@ const ApplyAccreditedCourse = () => {
                           size="small"
                           value={trainer.qualification}
                           onChange={formik.handleChange}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.qualification &&
+                            Boolean(
+                              formik.errors.trainers?.[index]?.qualification,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.qualification &&
+                            formik.errors.trainers?.[index]?.qualification
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1.5 }}>
                         <TextField
                           fullWidth
-                          label="Industrial Exp"
+                          label="Industrial Exp (Years)"
                           name={`trainers.${index}.industrialExp`}
                           type="number"
                           size="small"
                           value={trainer.industrialExp}
                           onChange={formik.handleChange}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.industrialExp &&
+                            Boolean(
+                              formik.errors.trainers?.[index]?.industrialExp,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.industrialExp &&
+                            formik.errors.trainers?.[index]?.industrialExp
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1.5 }}>
                         <TextField
                           fullWidth
-                          label="Teaching Exp"
+                          label="Teaching Exp (Years)"
                           name={`trainers.${index}.teachingExp`}
                           type="number"
                           size="small"
                           value={trainer.teachingExp}
                           onChange={formik.handleChange}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.teachingExp &&
+                            Boolean(
+                              formik.errors.trainers?.[index]?.teachingExp,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.teachingExp &&
+                            formik.errors.trainers?.[index]?.teachingExp
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 2.4 }}>
@@ -1084,8 +1838,24 @@ const ApplyAccreditedCourse = () => {
                           size="small"
                           value={trainer.subjectsTaught}
                           onChange={formik.handleChange}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.subjectsTaught &&
+                            Boolean(
+                              formik.errors.trainers?.[index]?.subjectsTaught,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.subjectsTaught &&
+                            formik.errors.trainers?.[index]?.subjectsTaught
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 1.2 }}>
@@ -1097,13 +1867,29 @@ const ApplyAccreditedCourse = () => {
                           size="small"
                           value={trainer.teachingHours}
                           onChange={formik.handleChange}
-                          disabled={mode === "view"}
-                          InputProps={{ readOnly: mode === "view" }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.teachingHours &&
+                            Boolean(
+                              formik.errors.trainers?.[index]?.teachingHours,
+                            )
+                          }
+                          helperText={
+                            mode === "add" &&
+                            formik.touched.trainers?.[index]?.teachingHours &&
+                            formik.errors.trainers?.[index]?.teachingHours
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: mode === "view",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 0.6 }}>
                         {mode === "add" && (
-                          <>
+                          <Box sx={{ display: "flex", gap: 0.5 }}>
                             {index === form.values.trainers.length - 1 && (
                               <IconButton
                                 color="primary"
@@ -1122,7 +1908,6 @@ const ApplyAccreditedCourse = () => {
                                 sx={{
                                   bgcolor: "#e3f2fd",
                                   "&:hover": { bgcolor: "#bbdefb" },
-                                  mr: 1,
                                 }}
                               >
                                 <AddIcon fontSize="small" />
@@ -1142,17 +1927,38 @@ const ApplyAccreditedCourse = () => {
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
                             )}
-                          </>
+                          </Box>
                         )}
                       </Grid>
                     </Grid>
                   ))}
+                  {mode === "add" && form.values.trainers.length === 0 && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<AddIcon />}
+                      onClick={() =>
+                        push({
+                          name: "",
+                          qualification: "",
+                          industrialExp: "",
+                          teachingExp: "",
+                          subjectsTaught: "",
+                          teachingHours: "",
+                        })
+                      }
+                      sx={{ mt: 1 }}
+                    >
+                      Add Trainer
+                    </Button>
+                  )}
                 </Box>
               )}
             </FieldArray>
           </Grid>
         </Grid>
       </Paper>
+
       {/* Section 7: Supporting Documents */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
@@ -1161,112 +1967,6 @@ const ApplyAccreditedCourse = () => {
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={3}>
           <Grid item size={{ xs: 12 }}>
-            {/*   {mode === "view" ? (
-              <>
-                <TextField
-                  fullWidth
-                  label="1. Training plan for the entire course"
-                  size="small"
-                  value={
-                    formik.values.supportingDocs?.trainingPlan || "Not uploaded"
-                  }
-                  disabled
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="2. Monthly/Weekly plan"
-                  size="small"
-                  value={
-                    formik.values.supportingDocs?.monthlyPlan || "Not uploaded"
-                  }
-                  disabled
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="3. Lesson plan"
-                  size="small"
-                  value={
-                    formik.values.supportingDocs?.lessonPlan || "Not uploaded"
-                  }
-                  disabled
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="4. CV and certificates of the academic staff"
-                  size="small"
-                  value={
-                    formik.values.supportingDocs?.cvCertificates ||
-                    "Not uploaded"
-                  }
-                  disabled
-                />
-              </>
-            ) : (
-              <>
-                <TextField
-                  fullWidth
-                  type="file"
-                  size="small"
-                  label="1. Training plan for the entire course"
-                  name="supportingDocs.trainingPlan"
-                  InputLabelProps={{ shrink: true }}
-                  onChange={(event) =>
-                    formik.setFieldValue(
-                      "supportingDocs.trainingPlan",
-                      event.currentTarget.files[0],
-                    )
-                  }
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  type="file"
-                  size="small"
-                  label="2. Monthly/Weekly plan"
-                  name="supportingDocs.monthlyPlan"
-                  InputLabelProps={{ shrink: true }}
-                  onChange={(event) =>
-                    formik.setFieldValue(
-                      "supportingDocs.monthlyPlan",
-                      event.currentTarget.files[0],
-                    )
-                  }
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  type="file"
-                  size="small"
-                  label="3. Lesson plan"
-                  name="supportingDocs.lessonPlan"
-                  InputLabelProps={{ shrink: true }}
-                  onChange={(event) =>
-                    formik.setFieldValue(
-                      "supportingDocs.lessonPlan",
-                      event.currentTarget.files[0],
-                    )
-                  }
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  type="file"
-                  size="small"
-                  label="4. CV and certificates of the academic staff"
-                  name="supportingDocs.cvCertificates"
-                  InputLabelProps={{ shrink: true }}
-                  onChange={(event) =>
-                    formik.setFieldValue(
-                      "supportingDocs.cvCertificates",
-                      event.currentTarget.files[0],
-                    )
-                  }
-                />
-              </>
-            )} */}
             <Box
               component="ol"
               sx={{
@@ -1287,6 +1987,9 @@ const ApplyAccreditedCourse = () => {
             <FileUpload
               files={formik.values.files}
               onFilesChange={(files) => formik.setFieldValue("files", files)}
+              disabled={mode === "view"}
+              error={formik.touched.files && Boolean(formik.errors.files)}
+              helperText={formik.touched.files && formik.errors.files}
             />
           </Grid>
         </Grid>
@@ -1297,10 +2000,9 @@ const ApplyAccreditedCourse = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        Accreditated Course Application
+        Accredited Course Application
       </Typography>
 
-      {/* Search + Add Button */}
       <Grid
         container
         spacing={1}
@@ -1338,7 +2040,6 @@ const ApplyAccreditedCourse = () => {
         </Grid>
       </Grid>
 
-      {/* Table */}
       <TableContainer component={Paper} elevation={1}>
         <Table size="small" sx={tableStyle}>
           <TableHead>
@@ -1347,7 +2048,7 @@ const ApplyAccreditedCourse = () => {
               <TableCell>Application No</TableCell>
               <TableCell>Course Title</TableCell>
               <TableCell>Sector</TableCell>
-              <TableCell>Course Fee (RM)</TableCell>
+              <TableCell>Course Fee (Nu.)</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Action</TableCell>
             </TableRow>
@@ -1356,26 +2057,45 @@ const ApplyAccreditedCourse = () => {
             {filteredCourses.length > 0 ? (
               filteredCourses
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((course, index) => (
-                  <TableRow key={course.id}>
-                    <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
-                    <TableCell>{course.applicationNo}</TableCell>
-                    <TableCell>{course.courseTitle}</TableCell>
-                    <TableCell>{course.sector}</TableCell>
-                    <TableCell>RM {course.courseFee}</TableCell>
-                    <TableCell>{course.status}</TableCell>
-                    <TableCell align="center">
-                      <IconButton
-                        color="primary"
-                        size="small"
-                        onClick={() => handleView(course)}
-                        title="View Details"
-                      >
-                        <VisibilityIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
+                .map((course, index) => {
+                  const statusName = getStatusName(course.status_id);
+                  const sectorName = getSectorName(course.sector_id);
+
+                  return (
+                    <TableRow key={course.id || index}>
+                      <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
+                      <TableCell>{course.applicationNo}</TableCell>
+                      <TableCell>{course.course_name}</TableCell>
+                      <TableCell>{sectorName}</TableCell>
+                      <TableCell>Nu. {course.courseFee}</TableCell>
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            backgroundColor: "#e8f5e9",
+                            borderRadius: "16px",
+                            display: "inline-block",
+                            px: 1.5,
+                            py: 0.5,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {statusName}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <IconButton
+                          color="primary"
+                          size="small"
+                          onClick={() => handleView(course)}
+                          title="View Details"
+                        >
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
             ) : (
               <TableRow>
                 <TableCell colSpan={7} align="center">
@@ -1396,7 +2116,6 @@ const ApplyAccreditedCourse = () => {
         />
       </TableContainer>
 
-      {/* Shared Dialog for Add/View */}
       <Dialog
         open={openDialog}
         onClose={() => setOpenDialog(false)}
@@ -1410,6 +2129,11 @@ const ApplyAccreditedCourse = () => {
             : "Accreditation Application Details"}
         </DialogTitle>
         <Formik
+          key={
+            dialogMode +
+            (selectedCourse?.id || "") +
+            (instituteDetails?.registration_no || "")
+          }
           initialValues={getInitialValues()}
           validationSchema={dialogMode === "add" ? validationSchema : null}
           onSubmit={handleSubmit}
@@ -1426,6 +2150,7 @@ const ApplyAccreditedCourse = () => {
                   variant="contained"
                   color={dialogMode === "add" ? "error" : "inherit"}
                   onClick={() => setOpenDialog(false)}
+                  disabled={loading}
                 >
                   {dialogMode === "add" ? "Cancel" : "Close"}
                 </Button>
@@ -1435,8 +2160,9 @@ const ApplyAccreditedCourse = () => {
                     type="submit"
                     variant="contained"
                     color="primary"
+                    disabled={loading}
                   >
-                    Submit
+                    {loading ? "Submitting..." : "Submit"}
                   </Button>
                 )}
               </DialogActions>

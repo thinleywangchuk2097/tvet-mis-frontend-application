@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -20,6 +20,7 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import ApplyNonAccreditedCourseService from "../../../api/services/ApplyNonAccreditedCourseService";
 import CommonService from "../../../api/services/CommonService";
 import FileDownload from "../../../components/file/FileDownload";
@@ -40,9 +41,12 @@ const ViewApplyNonAccreditedCourse = () => {
 
   // Dialog states
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
-  const [currentAction, setCurrentAction] = useState(null);
+  const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [remarks, setRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
+
+  // Convert roleId to string for comparison
+  const roleId = currentRoleId?.toString();
 
   useEffect(() => {
     if (applicationNo) {
@@ -56,7 +60,7 @@ const ViewApplyNonAccreditedCourse = () => {
       await Promise.all([
         fetchCourseDetails(),
         fetchCertificateLevels(),
-        fetchCurriculumTypes()
+        fetchCurriculumTypes(),
       ]);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -86,12 +90,13 @@ const ViewApplyNonAccreditedCourse = () => {
 
   const fetchCourseDetails = async () => {
     try {
-      const response = await ApplyNonAccreditedCourseService.getNonAccreditedCourseByApplicationNo(
-        applicationNo,
-        access_token,
-      );
+      const response =
+        await ApplyNonAccreditedCourseService.getNonAccreditedCourseByApplicationNo(
+          applicationNo,
+          access_token,
+        );
       console.log("Course details response:", response.data);
-      
+
       let data = response.data;
       if (Array.isArray(data) && data.length > 0) {
         data = data[0];
@@ -146,8 +151,11 @@ const ViewApplyNonAccreditedCourse = () => {
       const certificateLevel = certificateLevels.find(
         (level) => level.id === parseInt(courseData.certificate_level_id),
       );
-      return certificateLevel 
-        ? (certificateLevel.name || certificateLevel.value || certificateLevel.certificate_level_name || "N/A") 
+      return certificateLevel
+        ? certificateLevel.name ||
+            certificateLevel.value ||
+            certificateLevel.certificate_level_name ||
+            "N/A"
         : "N/A";
     }
     return courseData?.certificate_level_id || "N/A";
@@ -158,15 +166,33 @@ const ViewApplyNonAccreditedCourse = () => {
       const curriculumType = curriculumTypes.find(
         (type) => type.id === parseInt(courseData.curriculum_type_id),
       );
-      return curriculumType 
-        ? (curriculumType.name || curriculumType.curriculum_name || "N/A") 
+      return curriculumType
+        ? curriculumType.name || curriculumType.curriculum_name || "N/A"
         : "N/A";
     }
     return courseData?.curriculum_type_id || "N/A";
   };
 
+  const openActionDialog = (statusId) => {
+    setSelectedStatusId(statusId);
+    setRemarks("");
+    setRemarksError("");
+    setActionDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setActionDialogOpen(false);
+    setSelectedStatusId(null);
+    setRemarks("");
+    setRemarksError("");
+  };
+
   const handleAction = async () => {
-    if (currentAction === 58 && !remarks.trim()) {
+    // Check if remarks are required for rejection
+    if (
+      (selectedStatusId === 58 || selectedStatusId === 60) &&
+      !remarks.trim()
+    ) {
       setRemarksError("Remarks are required for rejection");
       return;
     }
@@ -175,80 +201,86 @@ const ViewApplyNonAccreditedCourse = () => {
     try {
       const payload = {
         applicationNo: applicationNo,
-        statusId: currentAction,
+        statusId: selectedStatusId,
         serviceId: 13,
-        assignedRoleId: 21,
-        remarks: currentAction === 58 ? remarks : remarks || "Application processed",
+        assignedRoleId: currentRoleId,
+        remarks: remarks || "Application processed",
         updatedBy: actionId,
         documents: newDocuments,
       };
-console.log("Action payload:", payload);
-      const response = await ApplyNonAccreditedCourseService.verifyNonAccreditedCourse(
-        payload,
-        access_token,
-      );
+      console.log("Action payload:", payload);
+
+      const response =
+        await ApplyNonAccreditedCourseService.verifyNonAccreditedCourse(
+          payload,
+          access_token,
+        );
 
       if (response.status === 200 || response.status === 201) {
-        toast.success(
-          `Course application ${currentAction === 57 ? "approved" : "rejected"} successfully!`,
-        );
+        let successMessage;
+        switch (selectedStatusId) {
+          case 56:
+            successMessage = "Course verified successfully";
+            break;
+          case 62:
+            successMessage = "Course verified successfully";
+            break;
+          case 59:
+            successMessage = "Course endorsed successfully";
+            break;
+          case 57:
+            successMessage = "Course approved successfully";
+            break;
+          case 58:
+             successMessage = "Course rejected successfully";
+            break;
+          case 60:
+            successMessage = "Forwarded back to QAS Level 1";
+            break;
+          default:
+            successMessage = "Action completed successfully";
+        }
+
+        toast.success(successMessage);
         closeDialog();
         await fetchCourseDetails();
         setNewDocuments([]);
-        setTimeout(() => {
-          navigate("/tasklist/task-details-index");
-        }, 2000);
+        navigate("/tasklist/task-details-index");
       }
     } catch (error) {
-      console.error(
-        `Error ${currentAction === 57 ? "approving" : "rejecting"} course:`,
-        error,
-      );
-      toast.error(
-        error.response?.data?.message ||
-          `Failed to ${currentAction === 57 ? "approve" : "reject"} course`,
-      );
+      console.error("Error performing action:", error);
+      toast.error(error.response?.data?.message || "Failed to process course");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const openDialog = (action) => {
-    setCurrentAction(action);
-    setRemarks("");
-    setRemarksError("");
-    setActionDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setActionDialogOpen(false);
-    setCurrentAction(null);
-    setRemarks("");
-    setRemarksError("");
-  };
-
   const getDialogTitle = () => {
-    return currentAction === 57
-      ? "Approve Course Application"
-      : "Reject Course Application";
+    switch (selectedStatusId) {
+      case 56:
+        return "Verify Course Application";
+      case 62:
+        return "Verify Course Application";
+      case 59:
+        return "Endorse Course Application";
+      case 57:
+        return "Approve Course Application";
+      case 58:
+        return "Reject Course Application";
+      case 60:
+        return "Forward Back to QAS Level 1";
+      default:
+        return "Confirm Action";
+    }
   };
 
   const getDialogContent = () => {
-    if (currentAction === 57) {
-      return (
-        <DialogContentText>
-          Are you sure you want to approve this non-accredited course application?
-          <br />
-          <strong>Application No: {applicationNo}</strong>
-          <br />
-          <strong>Course Title: {courseData?.course_title}</strong>
-        </DialogContentText>
-      );
-    } else {
+    if (selectedStatusId === 58 || selectedStatusId === 60) {
       return (
         <>
           <DialogContentText sx={{ mb: 2 }}>
-            Please provide remarks for rejecting this non-accredited course application:
+            Please provide remarks for rejecting this non-accredited course
+            application:
             <br />
             <strong>Application No: {applicationNo}</strong>
             <br />
@@ -272,16 +304,63 @@ console.log("Action payload:", payload);
           />
         </>
       );
+    } else {
+      const actionText =
+        selectedStatusId === 56 || selectedStatusId === 62
+          ? "verify"
+          : selectedStatusId === 59
+            ? "endorse"
+            : "approve";
+
+      return (
+        <DialogContentText>
+          Are you sure you want to {actionText} this non-accredited course
+          application?
+          <br />
+          <strong>Application No: {applicationNo}</strong>
+          <br />
+          <strong>Course Title: {courseData?.course_title}</strong>
+        </DialogContentText>
+      );
     }
   };
 
   const getConfirmButtonColor = () => {
-    return currentAction === 57 ? "success" : "error";
+    switch (selectedStatusId) {
+      case 56:
+         return "success";
+      case 62:
+         return "success";
+      case 57:
+        return "success";
+      case 58:
+        return "error";
+      case 60:
+        return "success";
+      case 59:
+        return "primary";
+      default:
+        return "primary";
+    }
   };
 
   const getConfirmButtonText = () => {
     if (actionLoading) return <CircularProgress size={24} />;
-    return currentAction === 57 ? "Confirm Approve" : "Confirm Reject";
+    switch (selectedStatusId) {
+      case 56:
+        return "Confirm Verify";
+      case 62:
+        return "Confirm Verify";
+      case 59:
+        return "Confirm Endorse";
+      case 57:
+        return "Confirm Approve";
+      case 58:
+      case 60:
+        return "Confirm Reject";
+      default:
+        return "Confirm";
+    }
   };
 
   if (loading) {
@@ -303,7 +382,8 @@ console.log("Action payload:", payload);
     return (
       <Box sx={{ m: 3 }}>
         <Alert severity="error">
-          Non-Accredited Course with Application No: <strong>{applicationNo}</strong> not found
+          Non-Accredited Course with Application No:{" "}
+          <strong>{applicationNo}</strong> not found
         </Alert>
       </Box>
     );
@@ -458,28 +538,95 @@ console.log("Action payload:", payload);
           </Paper>
         )}
 
-        {/* Action Buttons - Always visible */}
-        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<CheckCircleIcon />}
-            onClick={() => openDialog(57)}
-            disabled={actionLoading}
-            sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-          >
-            Approve
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            startIcon={<CancelIcon />}
-            onClick={() => openDialog(58)}
-            disabled={actionLoading}
-            sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-          >
-            Reject
-          </Button>
+        {/* Role-based Action Buttons */}
+        <Box
+          sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}
+        >
+          {/* Role 7: First Verifier */}
+          {roleId === "7" && (
+            <>
+              <Button
+                variant="contained"
+                color="success"
+                size="small"
+                startIcon={<CheckCircleIcon />}
+                onClick={() => openActionDialog(56)}
+                disabled={actionLoading}
+                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+              >
+                Verify1
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                size="small"
+                startIcon={<CancelIcon />}
+                onClick={() => openActionDialog(58)}
+                disabled={actionLoading}
+                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+
+          {/* Role 10: Second Verifier */}
+          {roleId === "10" && (
+            <>
+              <Button
+                variant="contained"
+                color="success"
+                size="small"
+                startIcon={<CheckCircleIcon />}
+                onClick={() => openActionDialog(62)}
+                disabled={actionLoading}
+                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+              >
+                Verify2
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                size="small"
+                startIcon={<CancelIcon />}
+                onClick={() => openActionDialog(60)}
+                disabled={actionLoading}
+                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+
+          {/* Role 23: Endorser */}
+          {roleId === "23" && (
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<VerifiedIcon />}
+              onClick={() => openActionDialog(59)}
+              disabled={actionLoading}
+              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+            >
+              Endorse
+            </Button>
+          )}
+
+          {/* Role 22: Approver */}
+          {roleId === "22" && (
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              startIcon={<CheckCircleIcon />}
+              onClick={() => openActionDialog(57)}
+              disabled={actionLoading}
+              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+            >
+              Approve
+            </Button>
+          )}
         </Box>
       </Paper>
 
@@ -507,7 +654,11 @@ console.log("Action payload:", payload);
             color={getConfirmButtonColor()}
             variant="contained"
             size="small"
-            disabled={actionLoading || (currentAction === 58 && !remarks.trim())}
+            disabled={
+              actionLoading ||
+              ((selectedStatusId === 58 || selectedStatusId === 60) &&
+                !remarks.trim())
+            }
           >
             {getConfirmButtonText()}
           </Button>

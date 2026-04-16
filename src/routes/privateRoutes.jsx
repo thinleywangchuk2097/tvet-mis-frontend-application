@@ -33,6 +33,7 @@ import ApplyAccreditedCourse from "../pages/institute/service/ApplyAccreditedCou
 import InstituteChange from "../pages/institute/service/InstituteChange";
 import RenewRegistration from "../pages/institute/service/RenewRegistration";
 import ViewApplyNonAccreditedCourse from "../pages/institute/service/ViewApplyNonAccreditedCourse";
+import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";     
 
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
@@ -116,6 +117,11 @@ export const privateRoutes = [
         path: "view-curriculum-endorsement/:applicationNo",
         element: <ViewCurriculumEndorsementIndex />,
       },
+      {
+        path: "view-accredited-course/:applicationNo",
+        element: <ViewApplyAccreditedCourse />,
+
+      }
     ],
   },
   {

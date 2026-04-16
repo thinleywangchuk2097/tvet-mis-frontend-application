@@ -58,8 +58,6 @@ const TABLE_STYLE = {
 const ViewInstituteRegistration = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
-
-  console.log("Current Role ID:", currentRoleId);
   const { applicationNo } = useParams();
   const navigate = useNavigate();
 
@@ -324,15 +322,6 @@ const ViewInstituteRegistration = () => {
     [certificateLevel],
   );
 
-  const getYesNoName = useCallback(
-    (id) => {
-      if (!id) return "";
-      const yn = yesNoOption.find((y) => y.id.toString() === id.toString());
-      return yn ? yn.name : id;
-    },
-    [yesNoOption],
-  );
-
   const openActionDialog = (statusId) => {
     setSelectedStatusId(statusId);
     setRemarks("");
@@ -411,6 +400,10 @@ const ViewInstituteRegistration = () => {
         case 59:
           successMessage = "Registration endorsed successfully";
           break;
+        case 60:
+          successMessage =
+            "Registration forwarded back to QAS LEVEL 1 successfully";
+          break;
         case 62:
           successMessage = "Registration verified successfully";
           break;
@@ -441,6 +434,8 @@ const ViewInstituteRegistration = () => {
         return "Reject Registration";
       case 59:
         return "Endorse Registration";
+      case 60:
+        return "Forwarded Back TO QAS LEVEL 1";
       case 62:
         return "Verify Registration";
       default:
@@ -649,7 +644,7 @@ const ViewInstituteRegistration = () => {
       <Box>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-            Institute Registration Details
+            Application Details
           </Typography>
           <Typography textAlign="center" color="error">
             Registration with Application No: {applicationNo} not found
@@ -663,7 +658,7 @@ const ViewInstituteRegistration = () => {
     <Box>
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-          Institute Registration Details
+          Application Details
         </Typography>
         <Divider />
 
@@ -1134,7 +1129,7 @@ const ViewInstituteRegistration = () => {
                 size="small"
                 startIcon={<CancelIcon />}
                 onClick={() => openActionDialog(58)}
-            //    disabled={registrationData.task_status_id !== "19"}
+                //    disabled={registrationData.task_status_id !== "19"}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Reject
@@ -1150,7 +1145,6 @@ const ViewInstituteRegistration = () => {
                 size="small"
                 startIcon={<CheckCircleIcon />}
                 onClick={() => openActionDialog(62)}
-              //  disabled={registrationData.task_status_id !== "19"}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Verify
@@ -1160,8 +1154,7 @@ const ViewInstituteRegistration = () => {
                 color="error"
                 size="small"
                 startIcon={<CancelIcon />}
-                onClick={() => openActionDialog(58)}
-               // disabled={registrationData.task_status_id !== "19"}
+                onClick={() => openActionDialog(60)}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Reject
@@ -1181,7 +1174,7 @@ const ViewInstituteRegistration = () => {
               >
                 Endorse
               </Button>
-              <Button
+             {/*  <Button
                 variant="contained"
                 color="error"
                 size="small"
@@ -1190,7 +1183,7 @@ const ViewInstituteRegistration = () => {
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Reject
-              </Button>
+              </Button> */}
             </>
           )}
 
@@ -1206,7 +1199,7 @@ const ViewInstituteRegistration = () => {
               >
                 Approve
               </Button>
-              <Button
+             {/*  <Button
                 variant="contained"
                 color="error"
                 size="small"
@@ -1215,7 +1208,7 @@ const ViewInstituteRegistration = () => {
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Reject
-              </Button>
+              </Button> */}
             </>
           )}
         </Box>

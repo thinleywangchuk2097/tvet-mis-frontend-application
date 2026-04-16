@@ -256,6 +256,7 @@ const ApplyNonAccreditedCourse = () => {
 
       const payload = {
         courseTitle: values.courseTitle,
+        applicantName: values.instituteName,
         theoryHour: parseInt(values.theoryHour),
         practicalHour: parseInt(values.practicalHour),
         ojtHour: parseInt(values.ojtHour),
@@ -265,7 +266,7 @@ const ApplyNonAccreditedCourse = () => {
         curriculumTypeId: values.curriculumTypeId,
         instituteId: instituteDetails?.institute_id || "",
         serviceId: 13,
-        assignedRoleId: 21,
+        assignedRoleId: 7,
         statusId: 55,
         createdBy: actionId,
         documents: documents,
