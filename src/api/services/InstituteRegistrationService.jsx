@@ -7,10 +7,10 @@ class InstituteRegistrationService {
       .catch((error) => error);
   }
 
-   getApplicationExistOrNot(application_no) {
+   getApplicationExistOrNot(application_no, service_id) {
     return apiClient
       .get(
-        `/api/v1/public/institute-registration/get-application-status/${application_no}`,
+        `/api/v1/public/institute-registration/get-application-status/${application_no}/${service_id}`,
         {},
       )
       .then((response) => response)

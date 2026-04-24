@@ -33,6 +33,7 @@ import ApplyAccreditedCourse from "../pages/institute/service/ApplyAccreditedCou
 import InstituteChange from "../pages/institute/service/InstituteChange";
 import RenewRegistration from "../pages/institute/service/RenewRegistration";
 import ViewApplyNonAccreditedCourse from "../pages/institute/service/ViewApplyNonAccreditedCourse";
+import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";     
 
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
@@ -55,6 +56,8 @@ import AddTraineeIndex from "../pages/dwps1/AddTraineeIndex";
 
 //service 
 import ViewCurriculumEndorsementIndex from "../pages/institute/service/ViewCurriculumEndorsementIndex";
+//track application status
+import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
 
 export const privateRoutes = [
   {
@@ -116,6 +119,11 @@ export const privateRoutes = [
         path: "view-curriculum-endorsement/:applicationNo",
         element: <ViewCurriculumEndorsementIndex />,
       },
+      {
+        path: "view-accredited-course/:applicationNo",
+        element: <ViewApplyAccreditedCourse />,
+
+      }
     ],
   },
   {
@@ -181,7 +189,12 @@ export const privateRoutes = [
   },
   {
     path: "report",
-    children: [{ path: "report-index", element: <ReportIndex /> }],
+    children: [
+      { path: "report-index", element: <ReportIndex /> },
+      { path: "track-application-status", element: <TrackApplicationStatus /> }
+
+
+    ],
   },
 
   //without children

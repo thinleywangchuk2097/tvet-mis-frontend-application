@@ -16,6 +16,7 @@ import ApplyCourse from "../pages/trainee/ApplyCourse";
 import ResetPassword from "../pages/auth/ResetPassword";
 import GenerateQRCode from "../pages/auth/bhutanndi/GenerateQRCode";
 import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
+import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex"; 
 
 //public routes ..
 export const publicRoutes = [
@@ -66,4 +67,10 @@ export const publicRoutes = [
       { path: "apply-course/:application_no", element: <ApplyCourse /> },
     ],
   },
+  {
+    path: "birms",
+    children: [ 
+      { path: "payment-index", element: <BirmsPaymentIndex /> }
+    ]
+  }
 ];

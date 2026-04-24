@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -30,6 +30,7 @@ import MenuBookIcon from "@mui/icons-material/MenuBook";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import FileDownload from "../../../components/file/FileDownload";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -58,8 +59,7 @@ const TABLE_STYLE = {
 const ViewInstituteRegistration = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
-
-  console.log("Current Role ID:", currentRoleId);
+  const actionId = useSelector((state) => state.auth.id);
   const { applicationNo } = useParams();
   const navigate = useNavigate();
 
@@ -74,13 +74,14 @@ const ViewInstituteRegistration = () => {
   const [qualityData, setQualityData] = useState([]);
 
   const [sectors, setSectors] = useState([]);
+  const [coursesMap, setCoursesMap] = useState({});
   const [dzongkhags, setDzongkhags] = useState([]);
   const [nationality, setNationality] = useState([]);
   const [gender, setGender] = useState([]);
   const [jobType, setJobType] = useState([]);
   const [certificateLevel, setCertificateLevel] = useState([]);
   const [ownershipTypes, setOwnershipTypes] = useState([]);
-  const [yesNoOption, setYesNoOption] = useState([]);
+  const [rawQualityStandards, setRawQualityStandards] = useState(null);
 
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
@@ -88,15 +89,50 @@ const ViewInstituteRegistration = () => {
   const [endorseRemarks, setEndorseRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
 
+  const isTuitionService =
+    registrationData?.service_id === "36" ||
+    registrationData?.service_id === 36;
+
   useEffect(() => {
     if (applicationNo) {
-      fetchRegistrationData();
       fetchMasterData();
     }
   }, [applicationNo]);
 
+  useEffect(() => {
+    if (qualityData.length > 0 && rawQualityStandards) {
+      const { responses, remarks } = parseQualityStandardsWithData(
+        rawQualityStandards,
+        qualityData,
+      );
+      setQualityResponses(responses);
+      setQualityRemarks(remarks);
+    }
+  }, [qualityData, rawQualityStandards]);
+
   const fetchMasterData = async () => {
     try {
+      // First fetch registration data to get service_id
+      const registrationRes =
+        await InstituteRegistrationService.getInstituteRegistrationDetails(
+          applicationNo,
+          access_token,
+        );
+
+      let data = registrationRes.data;
+      console.log("Raw registration data:", data);
+
+      if (Array.isArray(data) && data.length > 0) {
+        data = data[0];
+      }
+
+      // Get the service_id from registration data to fetch correct quality standards
+      const serviceIdForQuality = data?.service_id || 7;
+      console.log(
+        "Using serviceId for quality standards:",
+        serviceIdForQuality,
+      );
+
       const [
         sectorsRes,
         dzongkhagsRes,
@@ -105,7 +141,6 @@ const ViewInstituteRegistration = () => {
         genderRes,
         jobTypeRes,
         certificateLevelRes,
-        yesNoRes,
         qualityRes,
       ] = await Promise.all([
         CommonService.getAllSectors(),
@@ -115,8 +150,7 @@ const ViewInstituteRegistration = () => {
         CommonService.getByParentId(8),
         CommonService.getByParentId(11),
         CommonService.getByParentId(10),
-        CommonService.getByParentId(12),
-        CommonService.getAllQualitystandards(),
+        CommonService.getAllQualitystandards(serviceIdForQuality),
       ]);
 
       setSectors(sectorsRes.data || []);
@@ -126,9 +160,9 @@ const ViewInstituteRegistration = () => {
       setGender(genderRes.data || []);
       setJobType(jobTypeRes.data || []);
       setCertificateLevel(certificateLevelRes.data || []);
-      setYesNoOption(yesNoRes.data || []);
 
-      if (qualityRes.data) {
+      // Process quality data
+      if (qualityRes.data && qualityRes.data.length > 0) {
         const mainCategories = qualityRes.data.filter(
           (item) => item.parentId === 0,
         );
@@ -145,11 +179,121 @@ const ViewInstituteRegistration = () => {
               value: sub.dropdownName || sub.description,
             })),
         }));
+        console.log("Structured quality data:", structured);
         setQualityData(structured);
+      }
+
+      // Process registration data
+      const trainers = parseTrainers(data.trainers);
+      const courses = parseCourses(data.courses);
+      const tuitionDetails = parseTuitionDetails(data.tuition_details);
+      const parsedDocuments = parseDocuments(data.documents);
+
+      setRegistrationData({
+        ...data,
+        parsedTrainers: trainers,
+        parsedCourses: courses,
+        parsedTuitionDetails: tuitionDetails,
+      });
+      setDocuments(parsedDocuments);
+
+      // Store raw quality standards for later parsing
+      if (data.quality_standard_responses) {
+        console.log(
+          "Raw quality standards from API:",
+          data.quality_standard_responses,
+        );
+        setRawQualityStandards(data.quality_standard_responses);
+      }
+
+      // Fetch courses for each course's sector
+      if (courses && courses.length > 0) {
+        courses.forEach(async (course) => {
+          if (course.sectorId) {
+            await fetchCoursesBySector(course.sectorId);
+          }
+        });
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
-      toast.error("Failed to load master data");
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const parseQualityStandardsWithData = (qualityStr, qualityDataRef) => {
+    try {
+      if (!qualityStr) return { responses: {}, remarks: {} };
+
+      // Parse if string, otherwise use as is
+      const data =
+        typeof qualityStr === "string" ? JSON.parse(qualityStr) : qualityStr;
+      console.log("Parsed quality standards data:", data);
+      console.log("Quality data reference:", qualityDataRef);
+
+      const responseMap = {};
+      const remarksMap = {};
+
+      data.forEach((item) => {
+        const subQuestionId = item.standardId?.toString();
+        const responseValue = item.responseId;
+        const remarkValue = item.remarks || "";
+
+        console.log(
+          `Processing standardId: ${subQuestionId}, responseId: ${responseValue}`,
+        );
+
+        // Find which category this sub-question belongs to
+        let categoryId = null;
+        for (const category of qualityDataRef) {
+          const foundRow = category.rows.find(
+            (row) => row.id === subQuestionId,
+          );
+          if (foundRow) {
+            categoryId = category.id;
+            console.log(
+              `Found category ${categoryId} for standardId ${subQuestionId}`,
+            );
+            break;
+          }
+        }
+
+        if (categoryId && subQuestionId) {
+          if (!responseMap[categoryId]) responseMap[categoryId] = {};
+          if (!remarksMap[categoryId]) remarksMap[categoryId] = {};
+
+          responseMap[categoryId][subQuestionId] = responseValue;
+          remarksMap[categoryId][subQuestionId] = remarkValue;
+        } else {
+          console.warn(`No category found for standardId: ${subQuestionId}`);
+        }
+      });
+
+      console.log("Final response map:", responseMap);
+      return { responses: responseMap, remarks: remarksMap };
+    } catch (error) {
+      console.error("Error parsing quality standards:", error);
+      return { responses: {}, remarks: {} };
+    }
+  };
+
+  const fetchCoursesBySector = async (sectorId) => {
+    if (!sectorId) return;
+    if (coursesMap[sectorId]) return;
+
+    try {
+      const response = await CommonService.getOccupationsBySectorId(sectorId);
+      setCoursesMap((prev) => ({
+        ...prev,
+        [sectorId]: response.data || [],
+      }));
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      setCoursesMap((prev) => ({
+        ...prev,
+        [sectorId]: [],
+      }));
     }
   };
 
@@ -175,29 +319,14 @@ const ViewInstituteRegistration = () => {
     }
   };
 
-  const parseQualityStandards = (qualityStr) => {
+  const parseTuitionDetails = (tuitionStr) => {
     try {
-      if (!qualityStr) return { responses: {}, remarks: {} };
-      const data = JSON.parse(qualityStr);
-      const responseMap = {};
-      const remarksMap = {};
-
-      data.forEach((item) => {
-        const standardId = item.standardId?.toString();
-        const rowId = item.qualityStandardId?.toString();
-        if (standardId && rowId) {
-          if (!responseMap[standardId]) responseMap[standardId] = {};
-          if (!remarksMap[standardId]) remarksMap[standardId] = {};
-
-          responseMap[standardId][rowId] = item.responseId?.toString();
-          remarksMap[standardId][rowId] = item.remarks || "";
-        }
-      });
-
-      return { responses: responseMap, remarks: remarksMap };
+      if (!tuitionStr) return [];
+      const tuition = JSON.parse(tuitionStr);
+      return Array.isArray(tuition) ? tuition : [];
     } catch (error) {
-      console.error("Error parsing quality standards:", error);
-      return { responses: {}, remarks: {} };
+      console.error("Error parsing tuition details:", error);
+      return [];
     }
   };
 
@@ -216,43 +345,6 @@ const ViewInstituteRegistration = () => {
     }
   };
 
-  const fetchRegistrationData = async () => {
-    setLoading(true);
-    try {
-      const response =
-        await InstituteRegistrationService.getInstituteRegistrationDetails(
-          applicationNo,
-          access_token,
-        );
-
-      let data = response.data;
-
-      if (Array.isArray(data) && data.length > 0) {
-        data = data[0];
-      }
-
-      const trainers = parseTrainers(data.trainers);
-      const courses = parseCourses(data.courses);
-      const { responses: qualityStandards, remarks: qualityRemarksData } =
-        parseQualityStandards(data.quality_standard_responses);
-      const parsedDocuments = parseDocuments(data.documents);
-
-      setRegistrationData({
-        ...data,
-        parsedTrainers: trainers,
-        parsedCourses: courses,
-      });
-      setDocuments(parsedDocuments);
-      setQualityResponses(qualityStandards);
-      setQualityRemarks(qualityRemarksData);
-    } catch (error) {
-      console.error("Error fetching registration:", error);
-      toast.error("Failed to load registration data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleFileUpload = useCallback((uploadedFiles) => {
     setNewDocuments(uploadedFiles || []);
   }, []);
@@ -264,6 +356,19 @@ const ViewInstituteRegistration = () => {
       return sector ? sector.sectorName : id;
     },
     [sectors],
+  );
+
+  const getCourseName = useCallback(
+    (sectorId, courseId) => {
+      if (!courseId) return "";
+      const courses = coursesMap[sectorId];
+      if (!courses) return courseId;
+      const course = courses.find(
+        (c) => c.id.toString() === courseId.toString(),
+      );
+      return course ? course.occupationName || course.name : courseId;
+    },
+    [coursesMap],
   );
 
   const getDzongkhagName = useCallback(
@@ -324,14 +429,57 @@ const ViewInstituteRegistration = () => {
     [certificateLevel],
   );
 
-  const getYesNoName = useCallback(
-    (id) => {
-      if (!id) return "";
-      const yn = yesNoOption.find((y) => y.id.toString() === id.toString());
-      return yn ? yn.name : id;
-    },
-    [yesNoOption],
-  );
+  const handleQualityResponseChange = (categoryId, subQuestionId, value) => {
+    setQualityResponses((prev) => {
+      const newResponses = { ...prev };
+
+      if (!newResponses[categoryId]) {
+        newResponses[categoryId] = {};
+      }
+
+      if (newResponses[categoryId][subQuestionId] === value) {
+        delete newResponses[categoryId][subQuestionId];
+        if (Object.keys(newResponses[categoryId]).length === 0) {
+          delete newResponses[categoryId];
+        }
+      } else {
+        newResponses[categoryId][subQuestionId] = value;
+      }
+
+      return newResponses;
+    });
+  };
+
+  const handleQualityRemarkChange = (categoryId, subQuestionId, value) => {
+    setQualityRemarks((prev) => ({
+      ...prev,
+      [categoryId]: {
+        ...prev[categoryId],
+        [subQuestionId]: value,
+      },
+    }));
+  };
+
+  const prepareQualityStandardsForBackend = () => {
+    const qualityStandardsData = [];
+
+    Object.keys(qualityResponses).forEach((categoryId) => {
+      Object.keys(qualityResponses[categoryId]).forEach((subQuestionId) => {
+        const responseId = qualityResponses[categoryId][subQuestionId];
+        const remark = qualityRemarks[categoryId]?.[subQuestionId] || "";
+
+        if (responseId && responseId !== "") {
+          qualityStandardsData.push({
+            standardId: parseInt(subQuestionId),
+            responseId: responseId,
+            remarks: remark,
+          });
+        }
+      });
+    });
+
+    return qualityStandardsData;
+  };
 
   const openActionDialog = (statusId) => {
     setSelectedStatusId(statusId);
@@ -362,6 +510,8 @@ const ViewInstituteRegistration = () => {
 
     setActionLoading(true);
     try {
+      const qualityStandardsData = prepareQualityStandardsForBackend();
+
       const payload = {
         applicationNo: registrationData.application_no,
         instituteName: registrationData.proposed_institute_name,
@@ -383,6 +533,7 @@ const ViewInstituteRegistration = () => {
         serviceId: registrationData.service_id,
         assignedRoleId: currentRoleId,
         statusId: selectedStatusId,
+        updatedBy: actionId,
         documents: newDocuments,
         remarks:
           selectedStatusId === 58
@@ -390,8 +541,9 @@ const ViewInstituteRegistration = () => {
             : selectedStatusId === 59
               ? endorseRemarks
               : "",
+        qualityStandards: qualityStandardsData,
       };
-
+      console.log("Payload for action:", payload);
       await InstituteRegistrationService.verifyInstituteRegistration(
         payload,
         access_token,
@@ -411,6 +563,10 @@ const ViewInstituteRegistration = () => {
         case 59:
           successMessage = "Registration endorsed successfully";
           break;
+        case 60:
+          successMessage =
+            "Registration forwarded back to QAS LEVEL 1 successfully";
+          break;
         case 62:
           successMessage = "Registration verified successfully";
           break;
@@ -421,7 +577,6 @@ const ViewInstituteRegistration = () => {
       toast.success(successMessage);
       navigate(-1);
       closeDialog();
-      fetchRegistrationData();
       setNewDocuments([]);
     } catch (error) {
       console.error(`Error performing action:`, error);
@@ -441,6 +596,8 @@ const ViewInstituteRegistration = () => {
         return "Reject Registration";
       case 59:
         return "Endorse Registration";
+      case 60:
+        return "Forwarded Back TO QAS LEVEL 1";
       case 62:
         return "Verify Registration";
       default:
@@ -551,9 +708,6 @@ const ViewInstituteRegistration = () => {
 
   const renderChecklist = useCallback(
     (standard) => {
-      const yesOption = yesNoOption.find((opt) => opt.label === "Yes");
-      const noOption = yesNoOption.find((opt) => opt.label === "No");
-
       return (
         <Grid item xs={12} key={standard.id}>
           <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
@@ -577,8 +731,10 @@ const ViewInstituteRegistration = () => {
                 </TableHead>
                 <TableBody>
                   {standard.rows.map((row, index) => {
-                    const responseId = qualityResponses[standard.id]?.[row.id];
-                    const isYes = responseId === yesOption?.id;
+                    const selectedValue =
+                      qualityResponses[standard.id]?.[row.id];
+                    const isYes = selectedValue === "Y";
+                    const isNo = selectedValue === "N";
                     const remark = qualityRemarks[standard.id]?.[row.id] || "";
 
                     return (
@@ -590,24 +746,44 @@ const ViewInstituteRegistration = () => {
                             size="small"
                             sx={{ p: 0.25 }}
                             checked={isYes}
-                            //disabled={true}
-                            slotProps={{ input: { readOnly: true } }}
+                            onChange={() => {
+                              const newValue = isYes ? undefined : "Y";
+                              handleQualityResponseChange(
+                                standard.id,
+                                row.id,
+                                newValue,
+                              );
+                            }}
                           />
                         </TableCell>
                         <TableCell align="center">
                           <Radio
                             size="small"
                             sx={{ p: 0.25 }}
-                            checked={!isYes && responseId === noOption?.id}
-                            slotProps={{ input: { readOnly: true } }}
+                            checked={isNo}
+                            onChange={() => {
+                              const newValue = isNo ? undefined : "N";
+                              handleQualityResponseChange(
+                                standard.id,
+                                row.id,
+                                newValue,
+                              );
+                            }}
                           />
                         </TableCell>
                         <TableCell>
                           <TextField
                             fullWidth
                             size="small"
-                            placeholder="No remarks provided"
+                            placeholder="Enter remarks"
                             value={remark}
+                            onChange={(e) =>
+                              handleQualityRemarkChange(
+                                standard.id,
+                                row.id,
+                                e.target.value,
+                              )
+                            }
                             slotProps={{
                               input: {
                                 sx: { fontSize: "0.75rem" },
@@ -627,10 +803,32 @@ const ViewInstituteRegistration = () => {
         </Grid>
       );
     },
-    [qualityResponses, qualityRemarks, yesNoOption],
+    [qualityResponses, qualityRemarks],
   );
 
-  // Convert currentRoleId to string for comparison (handle both string and number)
+  const getTabs = () => {
+    const baseTabs = [{ icon: <BusinessIcon />, label: "Basic informations" }];
+
+    if (isTuitionService) {
+      baseTabs.push({
+        icon: <MenuBookIcon />,
+        label: "Tuition/Coaching Details",
+      });
+    } else {
+      baseTabs.push(
+        { icon: <SchoolIcon />, label: "Trainer Details" },
+        { icon: <MenuBookIcon />, label: "Course Details" },
+      );
+    }
+
+    baseTabs.push(
+      { icon: <VerifiedIcon />, label: "Quality Standards" },
+      { icon: <FileOpenIcon />, label: "Supporting Documents" },
+    );
+
+    return baseTabs;
+  };
+
   const roleId = currentRoleId?.toString();
 
   if (loading) {
@@ -649,7 +847,7 @@ const ViewInstituteRegistration = () => {
       <Box>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-            Institute Registration Details
+            Application Details
           </Typography>
           <Typography textAlign="center" color="error">
             Registration with Application No: {applicationNo} not found
@@ -663,7 +861,7 @@ const ViewInstituteRegistration = () => {
     <Box>
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-          Institute Registration Details
+          Application Details
         </Typography>
         <Divider />
 
@@ -675,11 +873,9 @@ const ViewInstituteRegistration = () => {
             "& .MuiTab-root": { textTransform: "none", fontWeight: 600 },
           }}
         >
-          <Tab icon={<BusinessIcon />} label="Institute Details" />
-          <Tab icon={<SchoolIcon />} label="Trainer Details" />
-          <Tab icon={<MenuBookIcon />} label="Course Details" />
-          <Tab icon={<VerifiedIcon />} label="Quality Standards" />
-          <Tab icon={<FileOpenIcon />} label="Supporting Documents" />
+          {getTabs().map((tab, index) => (
+            <Tab key={index} icon={tab.icon} label={tab.label} />
+          ))}
         </Tabs>
 
         {/* Institute Details Tab */}
@@ -692,16 +888,6 @@ const ViewInstituteRegistration = () => {
                   size="small"
                   label="Name of Training Provider / Institution"
                   value={registrationData.proposed_institute_name || ""}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Sector"
-                  value={getSectorName(registrationData.sector_id) || ""}
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
@@ -845,7 +1031,7 @@ const ViewInstituteRegistration = () => {
         )}
 
         {/* Trainer Details Tab */}
-        {tabValue === 1 && (
+        {!isTuitionService && tabValue === 1 && (
           <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
             <Grid container spacing={3}>
               {registrationData.parsedTrainers &&
@@ -960,8 +1146,8 @@ const ViewInstituteRegistration = () => {
           </Paper>
         )}
 
-        {/* Course Details Tab - Multiple Courses Support */}
-        {tabValue === 2 && (
+        {/* Course Details Tab */}
+        {!isTuitionService && tabValue === 2 && (
           <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
             <Grid container spacing={3}>
               {registrationData.parsedCourses &&
@@ -979,8 +1165,21 @@ const ViewInstituteRegistration = () => {
                           <TextField
                             fullWidth
                             size="small"
+                            label="Sector"
+                            value={getSectorName(course.sectorId) || ""}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
                             label="Course Title"
-                            value={course.courseTitle || ""}
+                            value={
+                              getCourseName(course.sectorId, course.courseId) ||
+                              ""
+                            }
                             slotProps={{ input: { readOnly: true } }}
                           />
                         </Grid>
@@ -1067,17 +1266,126 @@ const ViewInstituteRegistration = () => {
           </Paper>
         )}
 
-        {/* Quality Standards Tab - Read Only with Remarks */}
-        {tabValue === 3 && (
+        {/* Tuition/Coaching Details Tab */}
+        {isTuitionService && tabValue === 1 && (
+          <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
+            <Grid container spacing={3}>
+              {registrationData.parsedTuitionDetails &&
+              registrationData.parsedTuitionDetails.length > 0 ? (
+                registrationData.parsedTuitionDetails.map((tuition, index) => (
+                  <Grid item size={{ xs: 12 }} key={index}>
+                    <Paper
+                      sx={{ p: 2, border: "1px solid", borderColor: "divider" }}
+                    >
+                      <Typography variant="subtitle2" fontWeight={600} mb={2}>
+                        Tuition/Coaching {index + 1}
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Class Level"
+                            value={tuition.classLevel || ""}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Subjects"
+                            value={tuition.subjects || ""}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            type="number"
+                            fullWidth
+                            size="small"
+                            label="Duration (Hours/Months)"
+                            value={tuition.duration || ""}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            type="number"
+                            fullWidth
+                            size="small"
+                            label="Fees (Nu.)"
+                            value={tuition.fees || ""}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Tutor Name"
+                            value={tuition.tutorName || ""}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Tutor CID"
+                            value={tuition.tutorCid || ""}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Tutor Qualification"
+                            value={tuition.tutorQualification || ""}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  </Grid>
+                ))
+              ) : (
+                <Grid item xs={12}>
+                  <Typography textAlign="center" color="text.secondary">
+                    No tuition/coaching information available
+                  </Typography>
+                </Grid>
+              )}
+            </Grid>
+          </Paper>
+        )}
+
+        {/* Quality Standards Tab */}
+        {tabValue === (isTuitionService ? 2 : 3) && (
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item size={{ xs: 12 }}>
-              {qualityData.slice(0, 3).map(renderChecklist)}
+              {qualityData.length > 0 ? (
+                qualityData.slice(0, 3).map(renderChecklist)
+              ) : (
+                <Paper sx={{ p: 3, textAlign: "center" }}>
+                  <Typography color="text.secondary">
+                    No quality standards available for this service
+                  </Typography>
+                </Paper>
+              )}
             </Grid>
           </Grid>
         )}
 
         {/* Supporting Documents Tab */}
-        {tabValue === 4 && (
+        {tabValue === (isTuitionService ? 3 : 4) && (
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item size={{ xs: 12 }}>
               <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
@@ -1134,7 +1442,6 @@ const ViewInstituteRegistration = () => {
                 size="small"
                 startIcon={<CancelIcon />}
                 onClick={() => openActionDialog(58)}
-            //    disabled={registrationData.task_status_id !== "19"}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Reject
@@ -1150,7 +1457,6 @@ const ViewInstituteRegistration = () => {
                 size="small"
                 startIcon={<CheckCircleIcon />}
                 onClick={() => openActionDialog(62)}
-              //  disabled={registrationData.task_status_id !== "19"}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Verify
@@ -1160,8 +1466,7 @@ const ViewInstituteRegistration = () => {
                 color="error"
                 size="small"
                 startIcon={<CancelIcon />}
-                onClick={() => openActionDialog(58)}
-               // disabled={registrationData.task_status_id !== "19"}
+                onClick={() => openActionDialog(60)}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Reject
@@ -1170,53 +1475,29 @@ const ViewInstituteRegistration = () => {
           )}
 
           {roleId === "23" && (
-            <>
-              <Button
-                variant="contained"
-                color="primary"
-                size="small"
-                startIcon={<VerifiedIcon />}
-                onClick={() => openActionDialog(59)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Endorse
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                size="small"
-                startIcon={<CancelIcon />}
-                onClick={() => openActionDialog(58)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Reject
-              </Button>
-            </>
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<VerifiedIcon />}
+              onClick={() => openActionDialog(59)}
+              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+            >
+              Endorse
+            </Button>
           )}
 
           {roleId === "22" && (
-            <>
-              <Button
-                variant="contained"
-                color="success"
-                size="small"
-                startIcon={<CheckCircleIcon />}
-                onClick={() => openActionDialog(57)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                size="small"
-                startIcon={<CancelIcon />}
-                onClick={() => openActionDialog(58)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Reject
-              </Button>
-            </>
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              startIcon={<CheckCircleIcon />}
+              onClick={() => openActionDialog(57)}
+              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+            >
+              Approve
+            </Button>
           )}
         </Box>
       </Paper>

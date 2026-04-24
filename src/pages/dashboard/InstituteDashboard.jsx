@@ -185,7 +185,7 @@ const InstituteDashboard = () => {
   return (
     <Paper sx={{ p: 2, mt: 1 }}>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-        Institute Dashboard
+         Dashboard
       </Typography>
 
       {/* -------------------- Metric Cards -------------------- */}

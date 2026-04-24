@@ -19,9 +19,9 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
-  getAllQualitystandards() {
+  getAllQualitystandards(serviceId) {
     return apiClient
-      .get("/api/v1/common/get-quality-standards")
+      .get(`/api/v1/common/get-quality-standards/${serviceId}`)
       .then((response) => response)
       .catch((error) => error);
   }

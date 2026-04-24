@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Paper,
@@ -22,6 +22,8 @@ import AddIcon from "@mui/icons-material/Add";
 import InstituteProposalService from "../../../api/services/InstituteProposalService";
 import CommonService from "../../../api/services/CommonService";
 import { useParams, useNavigate } from "react-router-dom";
+import DatahubService from "../../../api/services/external/DatahubService";
+
 // ===== Validation Schema =====
 const validationSchema = Yup.object({
   ownershipTypeId: Yup.string().required("Ownership Type is required"),
@@ -87,6 +89,7 @@ const validationSchema = Yup.object({
     .matches(/^\d{8}$/, "Mobile No must be exactly 8 digits"),
   email: Yup.string().email("Invalid email").required("Email is required"),
   sectorId: Yup.string().required("Field of Training is required"),
+  courseId: Yup.string().required("Course is required"),
   activityLevelId: Yup.string().required("Activity Level is required"),
   files: Yup.array().min(1, "Please upload at least one supporting document"),
 
@@ -126,8 +129,20 @@ const InstituteProposal = () => {
   const [otherOwnershipTypes, setOtherOwnershipTypes] = useState([]);
   const [activityLevels, setActivityLevels] = useState([]);
   const [typeOfOwners, setTypeOfOwners] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+
   const navigate = useNavigate();
   const { serviceId } = useParams();
+
+  // Debounce function
+  const debounce = (func, delay) => {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func(...args), delay);
+    };
+  };
 
   useEffect(() => {
     fetchSectors();
@@ -150,12 +165,72 @@ const InstituteProposal = () => {
       console.error("Error fetching sectors:", error);
     }
   };
+
+  const fetchCitizenDetails = async (citizenId, index) => {
+    if (!citizenId || citizenId.length !== 11) {
+      return;
+    }
+
+    try {
+      const response =
+        await DatahubService.getDetailsByCitizenshipNo(citizenId);
+      const citizenData =
+        response.data?.citizenDetailsResponse?.citizenDetail?.[0];
+
+      if (citizenData) {
+        // Construct full name from firstName and lastName
+        const fullName =
+          `${citizenData.firstName || ""} ${citizenData.lastName || ""}`.trim();
+
+        // Update the partner name field
+        formik.setFieldValue(`partners[${index}].partnerName`, fullName);
+      } else {
+        toast.warning("No citizen found with this ID");
+        // Clear the partner name if no citizen found
+        formik.setFieldValue(`partners[${index}].partnerName`, "");
+      }
+    } catch (error) {
+      console.error("Error fetching citizen details:", error);
+      toast.error("Failed to fetch citizen details");
+      formik.setFieldValue(`partners[${index}].partnerName`, "");
+    }
+  };
+
+  // Create debounced version of fetchCitizenDetails
+  const debouncedFetchCitizen = useCallback(
+    debounce((citizenId, index) => {
+      if (citizenId && citizenId.length === 11) {
+        fetchCitizenDetails(citizenId, index);
+      }
+    }, 500),
+    [],
+  );
+
+  const fetchCoursesBySector = async (sectorId) => {
+    if (!sectorId) {
+      setCourses([]);
+      return;
+    }
+
+    setLoadingCourses(true);
+    try {
+      const response = await CommonService.getOccupationsBySectorId(sectorId);
+      setCourses(response.data);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      toast.error("Failed to load courses for selected sector");
+      setCourses([]);
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
+
   const fetchServiceName = async () => {
     try {
       const response = await CommonService.getServiceName(serviceId);
       setServiceName(response.data.serviceName);
     } catch (error) {
-      console.error("Error fetching sectors:", error);
+      console.error("Error fetching service name:", error);
     }
   };
 
@@ -237,6 +312,7 @@ const InstituteProposal = () => {
       promoterCitizenId: "",
       promoterName: "",
       sectorId: "",
+      courseId: "",
       activityLevelId: "",
       // Supporting Documents
       files: [],
@@ -266,6 +342,7 @@ const InstituteProposal = () => {
           promoterCitizenId: values.promoterCitizenId || null,
           promoterName: values.promoterName || null,
           sectorId: values.sectorId || null,
+          courseId: values.courseId || null,
           activityLevelId: values.activityLevelId || null,
           serviceId: serviceId,
           assignedRoleId: 7,
@@ -497,7 +574,11 @@ const InstituteProposal = () => {
                                 name={`partners[${index}].citizenId`}
                                 size="small"
                                 value={partner.citizenId}
-                                onChange={formik.handleChange}
+                                onChange={(e) => {
+                                  formik.handleChange(e);
+                                  // Debounced fetch as user types
+                                  debouncedFetchCitizen(e.target.value, index);
+                                }}
                                 error={
                                   formik.touched.partners &&
                                   Boolean(
@@ -534,6 +615,9 @@ const InstituteProposal = () => {
                                   formik.touched.partners &&
                                   formik.errors.partners?.[index]?.partnerName
                                 }
+                                InputProps={{
+                                  readOnly: true, // Make the field read-only since it's auto-populated
+                                }}
                               />
                             </Grid>
                           </>
@@ -992,7 +1076,13 @@ const InstituteProposal = () => {
                   name="sectorId"
                   size="small"
                   value={formik.values.sectorId}
-                  onChange={formik.handleChange}
+                  onChange={(e) => {
+                    formik.handleChange(e);
+                    // Reset course when sector changes
+                    formik.setFieldValue("courseId", "");
+                    // Fetch courses for selected sector
+                    fetchCoursesBySector(e.target.value);
+                  }}
                   error={
                     formik.touched.sectorId && Boolean(formik.errors.sectorId)
                   }
@@ -1004,6 +1094,42 @@ const InstituteProposal = () => {
                     sectors.map((field) => (
                       <MenuItem key={field.id} value={field.id.toString()}>
                         {field.sectorName}
+                      </MenuItem>
+                    ))}
+                </TextField>
+              </Grid>
+
+              <Grid item size={{ xs: 12, md: 4 }}>
+                <TextField
+                  select
+                  fullWidth
+                  label={
+                    <span>
+                      Course <span style={{ color: "red" }}>*</span>
+                    </span>
+                  }
+                  name="courseId"
+                  size="small"
+                  value={formik.values.courseId}
+                  onChange={formik.handleChange}
+                  error={
+                    formik.touched.courseId && Boolean(formik.errors.courseId)
+                  }
+                  helperText={formik.touched.courseId && formik.errors.courseId}
+                  disabled={!formik.values.sectorId || loadingCourses}
+                  InputProps={{
+                    endAdornment: loadingCourses && (
+                      <CircularProgress size={20} />
+                    ),
+                  }}
+                >
+                  <MenuItem value="">
+                    {loadingCourses ? "Loading courses..." : "Select Course"}
+                  </MenuItem>
+                  {Array.isArray(courses) &&
+                    courses.map((course) => (
+                      <MenuItem key={course.id} value={course.id.toString()}>
+                        {course.occupationName || course.name}
                       </MenuItem>
                     ))}
                 </TextField>

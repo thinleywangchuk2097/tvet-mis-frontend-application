@@ -35,6 +35,7 @@ const mapApiDataToTask = (apiData, index) => ({
   submittedDate: apiData.action_date || "N/A",
   currentStatus: apiData.current_status || "N/A",
   applicantName: apiData.application_name || "N/A",
+  remarks: apiData.save_remarks || "",
   route: apiData.route || "",
   serialNo: index + 1,
   serviceId: apiData.service_id || 1,
@@ -76,7 +77,6 @@ const TaskListIndex = () => {
           locationId,
           access_token,
         );
-
         if (response.data && Array.isArray(response.data)) {
           const mappedTasks = response.data.map((task, index) =>
             mapApiDataToTask(task, index),
@@ -260,6 +260,14 @@ const TaskListIndex = () => {
                   >
                     Current Status
                   </TableCell>
+                   <TableCell
+                    sx={{
+                      border: "1px solid #e0e0e0",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Remarks
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -323,6 +331,9 @@ const TaskListIndex = () => {
                             },
                           }}
                         />
+                      </TableCell>
+                       <TableCell sx={{ border: "1px solid #e0e0e0" }}>
+                        {task.remarks || "N/A"}
                       </TableCell>
                     </TableRow>
                   ))
