@@ -1,40 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Button,
-  Stack,
-  IconButton,
-} from '@mui/material';
+import { Card, CardContent, Stack, Typography, Box, Button, IconButton } from '@mui/material';
 import { PuffLoader } from 'react-spinners';
 import { QRCodeCanvas } from 'qrcode.react';
+import BhutanNDIService from '../../Services/BhutanNDIService';
+import Cookies from 'universal-cookie';
 import CloseIcon from '@mui/icons-material/Close';
-import QRNDIlogo from "../../../assets/images/QRNDIlogo.svg";
-import RingingPhoneOutlineIcon from "../../../assets/images/Call.png";
-import MailIcon from "../../../assets/images/Mail.png";
-import slide1 from "../../../assets/slider/slide1.jpg";
-import { useNavigate } from "react-router-dom";
-import useMediaQuery from "@mui/material/useMediaQuery";
-import BhutanNDIService from "../../../api/services/external/BhutanNDIService";
-import { jwtDecode } from "jwt-decode";
+import { useNavigate } from 'react-router-dom';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { connect, StringCodec, nkeyAuthenticator } from 'nats.ws';
-import { useDispatch } from "react-redux";
-import { toast } from "react-toastify";
-import { loginSuccess } from "../../../features/auth/authSlice";
-import { setPrivileges } from "../../../features/privilege/privilegeSlice";
-import { setUserProfile } from "../../../features/auth/userProfileSlice";
-import PrivilegeService from "../../../api/services/PrivilegeService";
-import UserProfileService from "../../../api/services/UserProfileService";
+import AuthenticationService from 'Services/AuthenticationService';
+import { toast } from 'react-toastify';
+import jwtDecode from 'jwt-decode';
+import QRNDIlogo from '../../assets/images/QRNDIlogo.svg';
+import RingingPhoneOutlineIcon from '../../assets/images/Call.png';
+import MailIcon from '../../assets/images/Mail.png';
 
-// stagging NDI NATS server endpoints
- const NATS_URL = "wss://natsdemoclient.bhutanndi.com";
- const SEED = new TextEncoder().encode("SUAPXY7TJFUFE3IX3OEMSLE3JFZJ3FZZRSRSOGSG2ANDIFN77O2MIBHWUM");
+//stagging NDI NATS server endpoints 
+//const NATS_URL = 'wss://natsdemoclient.bhutanndi.com';
+//const SEED = new TextEncoder().encode('SUAPXY7TJFUFE3IX3OEMSLE3JFZJ3FZZRSRSOGSG2ANDIFN77O2MIBHWUM');
 
-// production NDI NATS server endpoints
-//const NATS_URL = 'wss://natsg2c-client.bhutanndi.com';
-//const SEED = new TextEncoder().encode('SUAOCNCDWVZGDKIT63PAJVGCK5O6GMBMEJG3S52LZZILDNP4LTVPNN5FPE');
+//production NDI NATS server endpoints 
+const NATS_URL = 'wss://natsg2c-client.bhutanndi.com';
+const SEED = new TextEncoder().encode('SUAOCNCDWVZGDKIT63PAJVGCK5O6GMBMEJG3S52LZZILDNP4LTVPNN5FPE');
 
 const Loader = () => (
   <Box
@@ -93,30 +80,19 @@ const QRCodeDisplay = ({ value }) => (
   </Box>
 );
 
-const GenerateQRCode = () => {
+const BhutanNDIQRCodeLogin = () => {
   const [qrCodeUrl, setQrCodeUrl] = useState(null);
   const [deepLinkUrl, setDeepLinkUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const cookies = new Cookies();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const isMobile = useMediaQuery("(max-width:768px)");
-
-  const getTokenData = (token) => {
-    try {
-      const decoded = jwtDecode(token);
-      return { roles: decoded.roles || [] };
-    } catch {
-      return { roles: [] };
-    }
-  };
+  const isMobile = useMediaQuery('(max-width:1366px)');
 
   useEffect(() => {
     const fetchQRCode = async () => {
       try {
-        // No token needed for initial QR code request
-        const response = await BhutanNDIService.createProofRequest();
-        console.log('Proof request response:', response); 
+        const response = await BhutanNDIService.createProofRequest(cookies.get('token'));
         if (response.data?.data?.proofRequestURL) {
           setQrCodeUrl(response.data.data.proofRequestURL);
         } else {
@@ -162,12 +138,11 @@ const GenerateQRCode = () => {
         for await (const msg of subscription) {
           const data = JSON.parse(sc.decode(msg.data));
           if (data) {
-            console.log('Received NATS message:', data);
             const authResponse = await BhutanNDIService.bhutanNDIAuthResponse(data);
             if (authResponse.status === 200) {
               await handleSuccessfulLogin(authResponse);
             } else {
-              toast.error(authResponse.response?.data || 'Authentication failed');
+              toast.error(authResponse.response.data);
             }
           }
         }
@@ -181,118 +156,95 @@ const GenerateQRCode = () => {
   };
 
   const handleSuccessfulLogin = async (authResponse) => {
-    const { access_token, refresh_token, current_role, userId, locationId, id } = authResponse.data;
-    const { roles } = getTokenData(access_token);
-    const currentRoleStr = String(current_role);
-    const rolesStr = roles.map(String);
-
-    if (!rolesStr.includes(currentRoleStr)) {
-      toast.error(`Your account doesn't have permission for role ${currentRoleStr}`);
-      return;
+    cookies.set('token', authResponse.data.access_token, { path: '/', sameSite: 'strict' });
+    cookies.set('refreshToken', authResponse.data.refresh_token, { path: '/', sameSite: 'strict' });
+    const tokenDecoded = jwtDecode(authResponse.data.access_token);
+    const role = tokenDecoded.roles || [];
+    cookies.set('role', role, { path: '/', sameSite: 'strict' });
+    cookies.set('user', tokenDecoded.sub);
+    cookies.set('refreshSession', false);
+    cookies.set('switchRefreshSession', true);
+    if (role.length === 1) {
+      await fetchUserDetails(role[0]);
+    } else {
+      await handleMultipleRoles();
     }
+    window.location.reload(true);
+  };
 
-    // Dispatch login success to Redux
-    dispatch(
-      loginSuccess({
-        access_token,
-        refresh_token,
-        current_role,
-        locationId,
-        id
-      })
+  const fetchUserDetails = async (currentRole) => {
+    cookies.set('current_role', currentRole);
+    const data = { role: currentRole };
+    const response = await AuthenticationService.fetchSideMenu(data, cookies.get('token'));
+    const privilegesResponse = await AuthenticationService.fetchUserPrivileges(data, cookies.get('token'));
+    const userDetails = await AuthenticationService.fetchUserDetails(
+      { userId: cookies.get('user'), role: currentRole },
+      cookies.get('token')
     );
+    cookies.set('userId', userDetails.data.userId, { path: '/', sameSite: 'strict' });
+    cookies.set('locationId', userDetails.data.locationId);
+    cookies.set('roleId', userDetails.data.roleId, { path: '/', sameSite: 'strict' });
+    cookies.set('menu', response.data, { path: '/', sameSite: 'strict' });
+    cookies.set('privileges', privilegesResponse.data, { path: '/', sameSite: 'strict' });
 
-    // Fetch and set privileges
-    try {
-      const privilegesData = await PrivilegeService.getPrivileges(
-        current_role,
-        access_token,
-      );
-      const privileges = privilegesData.data?.map((item) => ({
-        id: item.id,
-        display_order: item.disPlayOrder,
-        is_display: item.display,
-        parent_id: item.parentId,
-        privilege_name: item.privilegeName,
-        route_name: item.routeName,
-        menuIcon: item.menuIcon,
-      })) || [];
-      dispatch(setPrivileges(privileges));
-    } catch (err) {
-      console.error("Privilege fetch error", err);
-    }
-
-    // Fetch and set user profile
-    try {
-      const profileRes = await UserProfileService.getUserNameCurrentRoleName(
-        userId,
-        access_token,
-      );
-      dispatch(
-        setUserProfile({
-          username: profileRes.data.username,
-          current_role_name: profileRes.data.current_role_name,
-        })
-      );
-    } catch (err) {
-      console.error("Profile fetch error", err);
-    }
-
-    toast.success("Login successfully!");
     navigate('/dashboard');
   };
 
-  const handleClose = () => navigate("/auth/login");
+  const handleMultipleRoles = async () => {
+    const data = { userId: cookies.get('user') };
+    const preResponse = await AuthenticationService.fetchPreviousLogInRole(data, cookies.get('token'));
+
+    if (preResponse.data.previousRole) {
+      await fetchUserDetails(preResponse.data.roleName);
+    } else {
+      navigate('/SelectRole');
+    }
+  };
+
+  const handleClose = () => {
+    navigate('/');
+  };
 
   return (
     <Box
       sx={{
-        flex: 1,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        position: "relative",
-        padding: 3,
-        backgroundImage: `url(${slide1})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.3)",
-          backdropFilter: "blur(8px)",
-          zIndex: 1,
-        },
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 9999,
+        backgroundColor: 'rgba(0,0,0,0.5)', // Optional: adds a semi-transparent overlay
+        overflowY: 'auto', // Enable scrolling for the overlay
+        padding: 2 // Add some padding
       }}
     >
       <Card
         sx={{
-          width: isMobile ? "100%" : 600,
-          maxHeight: "90vh",
-          margin: "auto",
-          textAlign: "center",
+          width: 500,
+          maxHeight: '90vh', // Limit card height to viewport
+          margin: 'auto',
+          textAlign: 'center',
           boxShadow: 3,
           padding: 3,
           borderRadius: 2,
-          backgroundColor: "#F8F8F8",
-          fontFamily: "Inter",
-          color: "#A1A0A0",
-          overflowY: "auto",
-          zIndex: 2,
-          position: "relative",
+          position: 'relative',
+          backgroundColor: '#F8F8F8',
+          fontFamily: 'Inter',
+          color: '#A1A0A0',
+          overflowY: 'auto' // Enable scrolling inside card if needed
         }}
       >
         <IconButton
           onClick={handleClose}
           sx={{
-            position: "absolute",
+            position: 'absolute',
             top: 3,
             right: 10,
-            color: "#333",
+            color: '#333'
           }}
         >
           <CloseIcon />
@@ -301,15 +253,15 @@ const GenerateQRCode = () => {
         <CardContent
           sx={{
             paddingBottom: 2,
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
           }}
         >
           {isMobile ? (
             <>
-              <Typography variant="h4" fontWeight="bold" mb={1}>
-                Login with <span style={{ color: "#5AC994" }}>Bhutan NDI</span> Wallet
+              <Typography variant="h2" fontWeight="bold" mb={1}>
+                Login with <span style={{ color: '#5AC994' }}>Bhutan NDI</span> Wallet
               </Typography>
               <Button
                 variant="contained"
@@ -341,16 +293,15 @@ const GenerateQRCode = () => {
               </Typography>
             </>
           ) : (
-            <Typography variant="h4" fontWeight="bold" mb={1}>
-              Scan with <span style={{ color: "#5AC994" }}>Bhutan NDI </span>
-              Wallet
+            <Typography variant="h2" fontWeight="bold" mb={1}>
+              Scan with <span style={{ color: '#5AC994' }}>Bhutan NDI </span>Wallet
             </Typography>
           )}
 
           {loading ? <Loader /> : error ? <ErrorMessage message={error} /> : <QRCodeDisplay value={qrCodeUrl} />}
 
           <Typography
-            component="div"
+            component="div" // Add this to render as div instead of p
             variant="body2"
             sx={{
               lineHeight: 1.8,
@@ -386,7 +337,6 @@ const GenerateQRCode = () => {
               <span style={{ paddingLeft: '18px' }}>menu bar and scan the QR code</span>
             </Box>
           </Typography>
-
           <Button
             variant="outlined"
             endIcon={
@@ -416,11 +366,13 @@ const GenerateQRCode = () => {
           </Button>
 
           <Box sx={{ textAlign: 'center', mb: 2 }}>
+            {' '}
+            {/* Container for both elements */}
             <Typography
               sx={{
                 mt: 1,
                 textAlign: 'center',
-                mb: 1
+                mb: 1 // 10px margin bottom (1.25 * 8px = 10px in MUI spacing)
               }}
             >
               Don&apos;t have the Bhutan NDI Wallet?
@@ -463,6 +415,8 @@ const GenerateQRCode = () => {
           </Box>
 
           <Box sx={{ mb: 1 }}>
+            {' '}
+            {/* Container with bottom margin */}
             <Typography
               fontWeight="bold"
               sx={{
@@ -509,4 +463,4 @@ const GenerateQRCode = () => {
   );
 };
 
-export default GenerateQRCode;
+export default BhutanNDIQRCodeLogin;

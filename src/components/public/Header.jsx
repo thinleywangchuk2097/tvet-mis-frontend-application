@@ -22,10 +22,11 @@ import {
   ExpandLess,
 } from "@mui/icons-material";
 import { useFormik } from "formik";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
 
   // --- FIXED: Use md breakpoint for responsiveness ---
@@ -52,6 +53,35 @@ const Header = () => {
   const renewalOpen = Boolean(renewalAnchorEl);
   const reportsOpen = Boolean(reportsAnchorEl);
 
+  // Define the paths that should trigger a page refresh
+  const refreshPaths = [
+    "/register/institute/7",
+    "/register/ses-centre/36",
+    "/register/assessment-centre/4",
+  ];
+
+  // Function to handle navigation with conditional refresh
+  const handleNavigateWithRefresh = (path, closeFn) => {
+    // Check if the current path is one of the refresh paths
+    const isRefreshPath = refreshPaths.includes(path);
+    const currentIsRefreshPath = refreshPaths.includes(location.pathname);
+
+    // Close menu if closeFn is provided
+    if (closeFn) closeFn();
+
+    // Navigate to the new path
+    navigate(path);
+
+    // Only refresh if we're moving FROM a refresh path TO another refresh path
+    // OR if we're moving TO a refresh path from a non-refresh path
+    if (isRefreshPath) {
+      // Use setTimeout to ensure navigation happens before refresh
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    }
+  };
+
   const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => {
     setAnchorEl(null);
@@ -60,6 +90,7 @@ const Header = () => {
     setMobileRenewalOpen(false);
     setMobileReportsOpen(false);
   };
+
   const handleProposalOpen = (event) =>
     setProposalAnchorEl(event.currentTarget);
   const handleProposalClose = () => setProposalAnchorEl(null);
@@ -81,24 +112,31 @@ const Header = () => {
   const navItems = [
     { label: "Assessment Result", path: "/result/assessment-result" },
     { label: "Feedback & Complaint", path: "/feedback" },
+    { label: "Birms Payment", path: "/birms/payment-index" },
   ];
 
   const proposalItems = [
     { label: "Institute Proposal", path: "/proposal/institute/6" },
     { label: "SES Centre Proposal", path: "/proposal/ses-centre/34" },
-    { label: "Assessment Centre Proposal", path: "/proposal/assessment-center/35" },
+    {
+      label: "Assessment Centre Proposal",
+      path: "/proposal/assessment-center/35",
+    },
   ];
 
   const registerItems = [
-
     { label: "Institute Registration", path: "/register/institute/7" },
     { label: "SES Centre Registration", path: "/register/ses-centre/36" },
-    { label: "Assessment Centre Registration", path: "/register/assessment-centre/4" },
-
+    {
+      label: "Assessment Centre Accreditation",
+      path: "/register/assessment-centre/4",
+    },
     { label: "Assessor Registration", path: "/registration/assessor/32" },
     { label: "Accreditor Registration", path: "/registration/accreditor/5" },
-    { label: "Quality Auditor Registration", path: "/registration/qms-auditor/3" },
-   
+    {
+      label: "Quality Auditor Registration",
+      path: "/registration/qms-auditor/3",
+    },
   ];
 
   const renewalItems = [
@@ -111,7 +149,10 @@ const Header = () => {
     { label: "Assessor", path: "/reports/assessor" },
     { label: "Institute", path: "/reports/institute" },
     { label: "Accreditor", path: "/reports/accreditor" },
-    { label: "Assessment Centre Accreditation", path: "/reports/assessment-centre" },
+    {
+      label: "Assessment Centre Accreditation",
+      path: "/reports/assessment-centre",
+    },
     { label: "Trainer", path: "/reports/trainer" },
     { label: "QMS Auditor", path: "/reports/qms-auditor" },
     { label: "Courses Accredited", path: "/reports/courses-accredited" },
@@ -122,8 +163,13 @@ const Header = () => {
       <MenuItem
         key={item.path}
         onClick={() => {
-          navigate(item.path);
-          closeFn();
+          // Check if this item is in refreshPaths
+          if (refreshPaths.includes(item.path)) {
+            handleNavigateWithRefresh(item.path, closeFn);
+          } else {
+            navigate(item.path);
+            if (closeFn) closeFn();
+          }
         }}
         sx={{
           py: 0.4,
@@ -142,7 +188,7 @@ const Header = () => {
   return (
     <AppBar
       position="static"
-      sx={{ backgroundColor: "#283593", height: { xs: 60, sm: 70, md: 70 } }} // minor height fix
+      sx={{ backgroundColor: "#283593", height: { xs: 60, sm: 70, md: 70 } }}
     >
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
         {/* Left side */}
@@ -153,7 +199,10 @@ const Header = () => {
             </IconButton>
           ) : (
             <IconButton
-              onClick={() => navigate("/")}
+              onClick={() => {
+                // Home button - no refresh needed
+                navigate("/");
+              }}
               sx={{ color: "#fff", mr: 2 }}
             >
               <HomeIcon
@@ -388,7 +437,10 @@ const Header = () => {
             {navItems.map((item) => (
               <Button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  // Regular navigation - no refresh
+                  navigate(item.path);
+                }}
                 sx={{
                   color: "#fff",
                   textTransform: "none",
@@ -501,8 +553,13 @@ const Header = () => {
                     <MenuItem
                       key={item.path}
                       onClick={() => {
-                        navigate(item.path);
-                        handleMenuClose();
+                        // Check if this item is in refreshPaths
+                        if (refreshPaths.includes(item.path)) {
+                          handleNavigateWithRefresh(item.path, handleMenuClose);
+                        } else {
+                          navigate(item.path);
+                          handleMenuClose();
+                        }
                       }}
                       sx={{
                         py: 0.35,

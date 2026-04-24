@@ -322,7 +322,11 @@ const UserProfile = () => {
                 label="User ID"
                 size="small"
                 value={userId || "Not available"}
-                disabled
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                  },
+                }}
                 sx={{ borderRadius: 2 }}
               />
             </Grid>
@@ -339,7 +343,11 @@ const UserProfile = () => {
                   formik.touched.username && Boolean(formik.errors.username)
                 }
                 helperText={formik.touched.username && formik.errors.username}
-                disabled={!isEditing}
+                slotProps={{
+                  input: {
+                    readOnly: !isEditing, // or disabled: !isEditing
+                  },
+                }}
               />
             </Grid>
             <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
@@ -353,7 +361,11 @@ const UserProfile = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.email && Boolean(formik.errors.email)}
                 helperText={formik.touched.email && formik.errors.email}
-                disabled={!isEditing}
+                slotProps={{
+                  input: {
+                    readOnly: !isEditing,
+                  },
+                }}
               />
             </Grid>
             <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
@@ -369,7 +381,11 @@ const UserProfile = () => {
                   formik.touched.mobile_no && Boolean(formik.errors.mobile_no)
                 }
                 helperText={formik.touched.mobile_no && formik.errors.mobile_no}
-                disabled={!isEditing}
+                slotProps={{
+                  input: {
+                    readOnly: !isEditing, 
+                  },
+                }}
               />
             </Grid>
 

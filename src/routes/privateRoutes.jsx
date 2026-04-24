@@ -56,6 +56,8 @@ import AddTraineeIndex from "../pages/dwps1/AddTraineeIndex";
 
 //service 
 import ViewCurriculumEndorsementIndex from "../pages/institute/service/ViewCurriculumEndorsementIndex";
+//track application status
+import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
 
 export const privateRoutes = [
   {
@@ -187,7 +189,12 @@ export const privateRoutes = [
   },
   {
     path: "report",
-    children: [{ path: "report-index", element: <ReportIndex /> }],
+    children: [
+      { path: "report-index", element: <ReportIndex /> },
+      { path: "track-application-status", element: <TrackApplicationStatus /> }
+
+
+    ],
   },
 
   //without children

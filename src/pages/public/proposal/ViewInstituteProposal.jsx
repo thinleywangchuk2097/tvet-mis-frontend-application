@@ -39,6 +39,7 @@ const ViewInstituteProposal = () => {
   const [documents, setDocuments] = useState([]);
   const [newDocuments, setNewDocuments] = useState([]);
   const [sectors, setSectors] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [dzongkhags, setDzongkhags] = useState([]);
   const [ownershipTypes, setOwnershipTypes] = useState([]);
   const [otherOwnershipTypes, setOtherOwnershipTypes] = useState([]);
@@ -56,6 +57,7 @@ const ViewInstituteProposal = () => {
     mobile_no: "",
     email_id: "",
     sector_id: "",
+    course_id: "",
     activity_level_id: "",
   });
 
@@ -92,6 +94,15 @@ const ViewInstituteProposal = () => {
     };
   }, [serviceId]);
 
+  // Fetch courses when sector changes
+  useEffect(() => {
+    if (editableData.sector_id) {
+      fetchCoursesBySector(editableData.sector_id);
+    } else {
+      setCourses([]);
+    }
+  }, [editableData.sector_id]);
+
   const fetchMasterData = async () => {
     try {
       const [
@@ -122,6 +133,17 @@ const ViewInstituteProposal = () => {
     }
   };
 
+  const fetchCoursesBySector = async (sectorId) => {
+    if (!sectorId) return;
+    try {
+      const response = await CommonService.getOccupationsBySectorId(sectorId);
+      setCourses(response.data || []);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      setCourses([]);
+    }
+  };
+
   const fetchProposalData = async () => {
     setLoading(true);
     try {
@@ -131,6 +153,7 @@ const ViewInstituteProposal = () => {
           access_token,
         );
       let data = response.data;
+      console.log("response api", response);
       if (Array.isArray(data) && data.length > 0) {
         data = data[0];
       }
@@ -147,6 +170,7 @@ const ViewInstituteProposal = () => {
         mobile_no: data.mobile_no || "",
         email_id: data.email_id || "",
         sector_id: data.sector_id || "",
+        course_id: data.course_id || "",
         activity_level_id: data.activity_level_id || "",
       });
 
@@ -236,6 +260,12 @@ const ViewInstituteProposal = () => {
     return sector ? sector.sectorName : id;
   };
 
+  const getCourseName = (id) => {
+    if (!id) return "";
+    const course = courses.find((c) => c.id.toString() === id.toString());
+    return course ? (course.occupationName || course.name) : id;
+  };
+
   const getActivityLevelName = (id) => {
     if (!id) return "";
     const level = activityLevels.find((l) => l.id.toString() === id.toString());
@@ -285,6 +315,7 @@ const ViewInstituteProposal = () => {
           mobileNo: editableData.mobile_no,
           emailId: editableData.email_id,
           sectorId: editableData.sector_id,
+          courseId: editableData.course_id,
           activityLevelId: editableData.activity_level_id,
         }),
       };
@@ -921,13 +952,46 @@ const ViewInstituteProposal = () => {
                 }
                 size="small"
                 value={editableData.sector_id}
-                onChange={(e) =>
-                  handleEditableChange("sector_id", e.target.value)
-                }
+                onChange={(e) => {
+                  handleEditableChange("sector_id", e.target.value);
+                  // Reset course when sector changes
+                  handleEditableChange("course_id", "");
+                }}
               >
                 {sectors.map((sector) => (
                   <MenuItem key={sector.id} value={sector.id}>
                     {sector.sectorName}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                select
+                fullWidth
+                label={
+                  <span>
+                    Course <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                size="small"
+                value={editableData.course_id}
+                onChange={(e) =>
+                  handleEditableChange("course_id", e.target.value)
+                }
+                disabled={!editableData.sector_id}
+              >
+                <MenuItem value="">
+                  {!editableData.sector_id
+                    ? "Select sector first"
+                    : courses.length === 0
+                    ? "No courses available"
+                    : "Select Course"}
+                </MenuItem>
+                {courses.map((course) => (
+                  <MenuItem key={course.id} value={course.id}>
+                    {course.occupationName || course.name}
                   </MenuItem>
                 ))}
               </TextField>

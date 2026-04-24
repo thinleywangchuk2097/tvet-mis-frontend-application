@@ -36,6 +36,8 @@ import { toast } from "react-toastify";
 import CommonService from "../../../api/services/CommonService";
 import InstituteProposalService from "../../../api/services/InstituteProposalService";
 import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
+import DatahubService from "../../../api/services/external/DatahubService";
+
 import { useParams } from "react-router-dom";
 
 // Constants
@@ -59,7 +61,6 @@ const TABLE_STYLE = {
 
 const REQUIRED_FIELDS = [
   "instituteName",
-  "sector",
   "dzongkhag",
   "location",
   "telephone",
@@ -84,7 +85,8 @@ const TRAINER_FIELDS = [
 ];
 
 const COURSE_FIELDS = [
-  "courseTitle",
+  "sector",
+  "course",
   "theoryHours",
   "practicalHours",
   "ojtHours",
@@ -93,106 +95,15 @@ const COURSE_FIELDS = [
   "courseLevel",
 ];
 
-// Validation Schema
-const validationSchema = Yup.object({
-  instituteName: Yup.string().required(
-    "Name of Training Provider / Institution is required",
-  ),
-  sector: Yup.string().required("Sector is required"),
-  dzongkhag: Yup.string().required("Dzongkhag is required"),
-  location: Yup.string().required("Location of the Institute is required"),
-  telephone: Yup.string()
-    .matches(/^[0-9]{8,15}$/, "Invalid telephone number")
-    .required("Telephone No is required"),
-  mobile: Yup.string()
-    .matches(/^[0-9]{8}$/, "Invalid mobile number")
-    .required("Mobile No is required"),
-  email: Yup.string()
-    .email("Invalid email")
-    .required("Email Address is required"),
-  website: Yup.string().url("Invalid website URL").nullable(),
-  ownershipType: Yup.string().required("Type of Ownership is required"),
-  bhutaneseEmployees: Yup.number()
-    .typeError("Enter a valid number")
-    .min(0, "Cannot be negative")
-    .required("Bhutanese Nationals count is required"),
-  nonBhutaneseEmployees: Yup.number()
-    .typeError("Enter a valid number")
-    .min(0, "Cannot be negative")
-    .required("Non Bhutanese count is required"),
-  businessLicenseNo: Yup.string().required("Business License No is required"),
-  keyContactName: Yup.string().required(
-    "Name of key contact person is required",
-  ),
-  keyContactDesignation: Yup.string().required(
-    "Designation of key contact person is required",
-  ),
-  keyContactMobileNo: Yup.string()
-    .matches(/^[0-9]{8}$/, "Invalid mobile number")
-    .required("Key Contact Person Mobile No is required"),
-
-  trainers: Yup.array()
-    .of(
-      Yup.object({
-        nationality: Yup.string().required("Nationality is required"),
-        cid: Yup.string().nullable(),
-        workPermit: Yup.string().nullable(),
-        name: Yup.string().required("Name is required"),
-        gender: Yup.string().required("Gender is required"),
-        qualification: Yup.string().required("Qualification is required"),
-        experience: Yup.number()
-          .typeError("Enter a valid number")
-          .min(0, "Experience cannot be negative")
-          .required("Experience is required"),
-        type: Yup.string().required("Employment type is required"),
-      }).test(
-        "cid-or-workpermit",
-        "CID is required for Bhutanese nationals or Work Permit is required for Non-Bhutanese nationals",
-        function (value) {
-          const { nationality, cid, workPermit } = value;
-          if (nationality === "Bhutanese") {
-            return cid && cid.length > 0 && /^[0-9]{11}$/.test(cid);
-          }
-          if (nationality === "Non-Bhutanese") {
-            return workPermit && workPermit.length > 0;
-          }
-          return true;
-        },
-      ),
-    )
-    .min(1, "At least one trainer is required"),
-
-  courses: Yup.array()
-    .of(
-      Yup.object({
-        courseTitle: Yup.string().required("Course Title is required"),
-        theoryHours: Yup.number()
-          .typeError("Enter a valid number")
-          .min(0, "Hours cannot be negative")
-          .required("Theory Hours is required"),
-        practicalHours: Yup.number()
-          .typeError("Enter a valid number")
-          .min(0, "Hours cannot be negative")
-          .required("Practical Hours is required"),
-        ojtHours: Yup.number()
-          .typeError("Enter a valid number")
-          .min(0, "Hours cannot be negative")
-          .required("OJT Hours is required"),
-        feesPerTrainee: Yup.number()
-          .typeError("Enter a valid number")
-          .min(0, "Fees cannot be negative")
-          .required("Fees per Trainee is required"),
-        enrollmentCapacity: Yup.number()
-          .typeError("Enter a valid number")
-          .min(1, "Capacity must be at least 1")
-          .required("Enrollment Capacity per Batch is required"),
-        courseLevel: Yup.string().required("Level Certificate/Diploma is required"),
-      }),
-    )
-    .min(1, "At least one course is required"),
-
-  files: Yup.array().min(1, "Upload at least one document"),
-});
+const TUITION_FIELDS = [
+  "classLevel",
+  "subjects",
+  "duration",
+  "fees",
+  "tutorName",
+  "tutorCid",
+  "tutorQualification",
+];
 
 const initialTrainer = {
   nationality: "",
@@ -206,7 +117,8 @@ const initialTrainer = {
 };
 
 const initialCourse = {
-  courseTitle: "",
+  sector: "",
+  course: "",
   theoryHours: "",
   practicalHours: "",
   ojtHours: "",
@@ -215,9 +127,20 @@ const initialCourse = {
   courseLevel: "",
 };
 
+const initialTuition = {
+  classLevel: "",
+  subjects: "",
+  duration: "",
+  fees: "",
+  tutorName: "",
+  tutorCid: "",
+  tutorQualification: "",
+};
+
 const InstituteRegistration = () => {
   // State
   const [loading, setLoading] = useState(false);
+  const [fetchingCitizen, setFetchingCitizen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [applicationFound, setApplicationFound] = useState(false);
   const [tabValue, setTabValue] = useState(0);
@@ -225,21 +148,183 @@ const InstituteRegistration = () => {
   const [qualityData, setQualityData] = useState([]);
   const [applicationNo, setApplicationNo] = useState();
   const [sectors, setSectors] = useState([]);
+  const [coursesMap, setCoursesMap] = useState({});
+  const [loadingCourses, setLoadingCourses] = useState({});
   const [dzongkhags, setDzongkhags] = useState([]);
   const [nationality, setNationality] = useState([]);
   const [gender, setGender] = useState([]);
   const [jobType, setJobType] = useState([]);
   const [certificateLevel, setCertificateLevel] = useState([]);
   const [ownershipTypes, setOwnershipTypes] = useState([]);
-  const [yesNoOption, setYesNoOption] = useState([]);
   const [trainerError, setTrainerError] = useState("");
   const [courseError, setCourseError] = useState("");
+  const [tuitionError, setTuitionError] = useState("");
   const [serviceName, setServiceName] = useState();
+
   const [pendingMappings, setPendingMappings] = useState({
     sectorId: null,
     dzongkhagId: null,
+    courseId: null,
   });
   const { serviceId } = useParams();
+
+  // Check if it's tuition service
+  const isTuitionService = serviceId === "36" || serviceId === 36;
+
+  // Validation Schema
+  const validationSchema = useMemo(
+    () =>
+      Yup.object({
+        instituteName: Yup.string().required(
+          "Name of Training Provider / Institution is required",
+        ),
+        dzongkhag: Yup.string().required("Dzongkhag is required"),
+        location: Yup.string().required(
+          "Location of the Institute is required",
+        ),
+        telephone: Yup.string()
+          .matches(/^[0-9]{8,15}$/, "Invalid telephone number")
+          .required("Telephone No is required"),
+        mobile: Yup.string()
+          .matches(/^[0-9]{8}$/, "Invalid mobile number")
+          .required("Mobile No is required"),
+        email: Yup.string()
+          .email("Invalid email")
+          .required("Email Address is required"),
+        website: Yup.string().url("Invalid website URL").nullable(),
+        ownershipType: Yup.string().required("Type of Ownership is required"),
+        bhutaneseEmployees: Yup.number()
+          .typeError("Enter a valid number")
+          .min(0, "Cannot be negative")
+          .required("Bhutanese Nationals count is required"),
+        nonBhutaneseEmployees: Yup.number()
+          .typeError("Enter a valid number")
+          .min(0, "Cannot be negative")
+          .required("Non Bhutanese count is required"),
+        businessLicenseNo: Yup.string().required(
+          "Business License No is required",
+        ),
+        keyContactName: Yup.string().required(
+          "Name of key contact person is required",
+        ),
+        keyContactDesignation: Yup.string().required(
+          "Designation of key contact person is required",
+        ),
+        keyContactMobileNo: Yup.string()
+          .matches(/^[0-9]{8}$/, "Invalid mobile number")
+          .required("Key Contact Person Mobile No is required"),
+
+        trainers: Yup.array().when([], {
+          is: () => !isTuitionService,
+          then: (schema) =>
+            schema
+              .of(
+                Yup.object({
+                  nationality: Yup.string().required("Nationality is required"),
+                  cid: Yup.string().nullable(),
+                  workPermit: Yup.string().nullable(),
+                  name: Yup.string().required("Name is required"),
+                  gender: Yup.string().required("Gender is required"),
+                  qualification: Yup.string().required(
+                    "Qualification is required",
+                  ),
+                  experience: Yup.number()
+                    .typeError("Enter a valid number")
+                    .min(0, "Experience cannot be negative")
+                    .required("Experience is required"),
+                  type: Yup.string().required("Employment type is required"),
+                }).test(
+                  "cid-or-workpermit",
+                  "CID is required for Bhutanese nationals or Work Permit is required for Non-Bhutanese nationals",
+                  function (value) {
+                    const { nationality, cid, workPermit } = value;
+                    if (nationality === "Bhutanese") {
+                      return cid && cid.length > 0 && /^[0-9]{11}$/.test(cid);
+                    }
+                    if (nationality === "Non-Bhutanese") {
+                      return workPermit && workPermit.length > 0;
+                    }
+                    return true;
+                  },
+                ),
+              )
+              .min(1, "At least one trainer is required"),
+          otherwise: (schema) => schema.nullable(),
+        }),
+
+        courses: Yup.array().when([], {
+          is: () => !isTuitionService,
+          then: (schema) =>
+            schema
+              .of(
+                Yup.object({
+                  sector: Yup.string().required("Sector is required"),
+                  course: Yup.string().required("Course is required"),
+                  theoryHours: Yup.number()
+                    .typeError("Enter a valid number")
+                    .min(0, "Hours cannot be negative")
+                    .required("Theory Hours is required"),
+                  practicalHours: Yup.number()
+                    .typeError("Enter a valid number")
+                    .min(0, "Hours cannot be negative")
+                    .required("Practical Hours is required"),
+                  ojtHours: Yup.number()
+                    .typeError("Enter a valid number")
+                    .min(0, "Hours cannot be negative")
+                    .required("OJT Hours is required"),
+                  feesPerTrainee: Yup.number()
+                    .typeError("Enter a valid number")
+                    .min(0, "Fees cannot be negative")
+                    .required("Fees per Trainee is required"),
+                  enrollmentCapacity: Yup.number()
+                    .typeError("Enter a valid number")
+                    .min(1, "Capacity must be at least 1")
+                    .required("Enrollment Capacity per Batch is required"),
+                  courseLevel: Yup.string().required(
+                    "Level Certificate/Diploma is required",
+                  ),
+                }),
+              )
+              .min(1, "At least one course is required"),
+          otherwise: (schema) => schema.nullable(),
+        }),
+
+        tuitionDetails: Yup.array().when([], {
+          is: () => isTuitionService,
+          then: (schema) =>
+            schema
+              .of(
+                Yup.object({
+                  classLevel: Yup.string().required("Class Level is required"),
+                  subjects: Yup.string().required("Subjects is required"),
+                  duration: Yup.number()
+                    .typeError("Enter a valid number")
+                    .min(1, "Duration must be at least 1 hour/month")
+                    .required("Duration is required"),
+                  fees: Yup.number()
+                    .typeError("Enter a valid number")
+                    .min(0, "Fees cannot be negative")
+                    .required("Fees is required"),
+                  tutorName: Yup.string().required("Tutor Name is required"),
+                  tutorCid: Yup.string()
+                    .matches(
+                      /^[0-9]{11}$/,
+                      "Invalid CID number (11 digits required)",
+                    )
+                    .required("Tutor CID is required"),
+                  tutorQualification: Yup.string().required(
+                    "Tutor Qualification is required",
+                  ),
+                }),
+              )
+              .min(1, "At least one tuition/coaching detail is required"),
+          otherwise: (schema) => schema.nullable(),
+        }),
+
+        files: Yup.array().min(1, "Upload at least one document"),
+      }),
+    [isTuitionService],
+  );
 
   useEffect(() => {
     fetchServiceName();
@@ -253,7 +338,87 @@ const InstituteRegistration = () => {
       console.error("Error fetching sectors:", error);
     }
   };
-  
+
+  // Function to fetch and auto-fill citizen details for trainer
+  const fetchAndFillCitizenDetails = async (cid, index) => {
+    if (!cid || cid.length !== 11) {
+      toast.warning("Please enter a valid 11-digit CID");
+      return;
+    }
+
+    setFetchingCitizen(true);
+    try {
+      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
+      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
+        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
+
+        let genderValue = "";
+        if (citizen.gender === "M") {
+          const genderOption = genderOptions.find(
+            (opt) => opt.label === "Male",
+          );
+          genderValue = genderOption?.value || "";
+        } else if (citizen.gender === "F") {
+          const genderOption = genderOptions.find(
+            (opt) => opt.label === "Female",
+          );
+          genderValue = genderOption?.value || "";
+        } else {
+          const genderOption = genderOptions.find(
+            (opt) => opt.label === "Others",
+          );
+          genderValue = genderOption?.value || "";
+        }
+
+        const fullName =
+          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
+        formik.setFieldValue(`trainers[${index}].name`, fullName);
+        formik.setFieldValue(`trainers[${index}].gender`, genderValue);
+
+        toast.success(`Citizen details fetched successfully for ${fullName}`);
+      } else {
+        toast.warning("No citizen details found for this CID");
+      }
+    } catch (error) {
+      console.error("Error fetching citizen details:", error);
+      toast.error(
+        "Failed to fetch citizen details. Please check the CID number.",
+      );
+    } finally {
+      setFetchingCitizen(false);
+    }
+  };
+
+  // Function to fetch and auto-fill tutor details
+  const fetchAndFillTutorDetails = async (cid, index) => {
+    if (!cid || cid.length !== 11) {
+      toast.warning("Please enter a valid 11-digit CID");
+      return;
+    }
+
+    setFetchingCitizen(true);
+    try {
+      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
+      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
+        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
+        
+        const fullName = `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
+        
+        // Auto-fill tutor name based on CID
+        formik.setFieldValue(`tuitionDetails[${index}].tutorName`, fullName);
+        
+        toast.success(`Tutor details fetched successfully for ${fullName}`);
+      } else {
+        toast.warning("No citizen details found for this CID");
+      }
+    } catch (error) {
+      console.error("Error fetching citizen details:", error);
+      toast.error("Failed to fetch tutor details. Please check the CID number.");
+    } finally {
+      setFetchingCitizen(false);
+    }
+  };
+
   // File to Base64 conversion function
   const fileToBase64 = (file) =>
     new Promise((resolve, reject) => {
@@ -268,7 +433,48 @@ const InstituteRegistration = () => {
       reader.onerror = reject;
     });
 
-  // Memoized dropdown options - Store both id and name
+  // Fetch courses for a specific sector
+  const fetchCoursesBySector = async (sectorId) => {
+    if (!sectorId) return;
+
+    setLoadingCourses((prev) => ({ ...prev, [sectorId]: true }));
+    try {
+      const response = await CommonService.getOccupationsBySectorId(sectorId);
+      setCoursesMap((prev) => ({
+        ...prev,
+        [sectorId]: response.data || [],
+      }));
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      setCoursesMap((prev) => ({
+        ...prev,
+        [sectorId]: [],
+      }));
+    } finally {
+      setLoadingCourses((prev) => ({ ...prev, [sectorId]: false }));
+    }
+  };
+
+  // Transform quality selections to DTO format
+  // selections structure: { categoryId: { subQuestionId: "Y" or "N" } }
+  const transformQualityStandards = (selections) => {
+    const qualityStandardsList = [];
+
+    Object.keys(selections).forEach((categoryId) => {
+      const categorySelections = selections[categoryId];
+      Object.keys(categorySelections).forEach((subQuestionId) => {
+        qualityStandardsList.push({
+          standardId: parseInt(subQuestionId), // Use sub-question ID as standardId
+          responseId: categorySelections[subQuestionId], // "Y" or "N"
+          remarks: null,
+        });
+      });
+    });
+
+    return qualityStandardsList;
+  };
+
+  // Memoized dropdown options
   const sectorOptions = useMemo(
     () =>
       sectors.map((s) => ({
@@ -339,16 +545,6 @@ const InstituteRegistration = () => {
     [certificateLevel],
   );
 
-  const yesNoOptions = useMemo(
-    () =>
-      yesNoOption.map((yn) => ({
-        id: yn.id,
-        value: yn.id,
-        label: yn.name,
-      })),
-    [yesNoOption],
-  );
-
   // Helper function to get ID from name
   const getIdFromName = (name, options) => {
     const option = options.find((opt) => opt.label === name);
@@ -359,7 +555,6 @@ const InstituteRegistration = () => {
   const formik = useFormik({
     initialValues: {
       instituteName: "",
-      sector: "",
       dzongkhag: "",
       location: "",
       telephone: "",
@@ -373,8 +568,9 @@ const InstituteRegistration = () => {
       keyContactName: "",
       keyContactDesignation: "",
       keyContactMobileNo: "",
-      trainers: [{ ...initialTrainer }],
-      courses: [{ ...initialCourse }],
+      trainers: isTuitionService ? [] : [{ ...initialTrainer }],
+      courses: isTuitionService ? [] : [{ ...initialCourse }],
+      tuitionDetails: isTuitionService ? [{ ...initialTuition }] : [],
       files: [],
     },
     validationSchema,
@@ -387,8 +583,10 @@ const InstituteRegistration = () => {
         const documents = await Promise.all(
           values.files.map((file) => fileToBase64(file)),
         );
-
-        // Prepare the submit data with converted documents
+        // Transform quality standards to DTO format
+        const qualityStandardsList =
+          transformQualityStandards(qualitySelections);
+        // Prepare the submit data
         const submitData = {
           applicationNo: applicationNo,
           instituteName: values.instituteName,
@@ -396,7 +594,6 @@ const InstituteRegistration = () => {
           exactLocation: values.location,
           emailId: values.email,
           mobileNo: values.mobile,
-          sectorId: values.sector,
           telephoneNo: values.telephone,
           website: values.website || null,
           ownershipTypeId: getIdFromName(
@@ -409,7 +606,17 @@ const InstituteRegistration = () => {
           keyContactName: values.keyContactName,
           keyContactDesignation: values.keyContactDesignation,
           keyContactMobileNo: values.keyContactMobileNo,
-          trainers: values.trainers.map((trainer) => ({
+          serviceId: serviceId,
+          assignedRoleId: 7,
+          statusId: 55,
+          userId: null,
+          documents: documents,
+          qualityStandards: qualityStandardsList,
+        };
+
+        // Add conditional data based on service type
+        if (!isTuitionService) {
+          submitData.trainers = values.trainers.map((trainer) => ({
             nationalityId: getIdFromName(
               trainer.nationality,
               nationalityOptions,
@@ -421,9 +628,11 @@ const InstituteRegistration = () => {
             qualification: trainer.qualification,
             experience: parseInt(trainer.experience) || 0,
             typeId: getIdFromName(trainer.type, jobTypeOptions),
-          })),
-          courses: values.courses.map((course) => ({
-            courseTitle: course.courseTitle,
+          }));
+
+          submitData.courses = values.courses.map((course) => ({
+            sectorId: course.sector,
+            courseId: course.course,
             theoryHours: parseInt(course.theoryHours) || 0,
             practicalHours: parseInt(course.practicalHours) || 0,
             ojtHours: parseInt(course.ojtHours) || 0,
@@ -433,18 +642,22 @@ const InstituteRegistration = () => {
               course.courseLevel,
               certificateLevelOptions,
             ),
-          })),
-          serviceId: serviceId,
-          assignedRoleId: 7,
-          statusId: 55, // Submitted statusId
-          userId: null,
-          documents: documents,
-          qualityStandards: qualitySelections,
-        };
+          }));
+        } else {
+          submitData.tuitionDetails = values.tuitionDetails.map((tuition) => ({
+            classLevel: tuition.classLevel,
+            subjects: tuition.subjects,
+            duration: parseInt(tuition.duration) || 0,
+            fees: parseInt(tuition.fees) || 0,
+            tutorName: tuition.tutorName,
+            tutorCid: tuition.tutorCid,
+            tutorQualification: tuition.tutorQualification,
+          }));
+        }
+        console.log("Submit Data:", submitData);
 
         const response =
           await InstituteRegistrationService.registerInstitute(submitData);
-
         if (response.status === 201 || response.status === 200) {
           toast.success("Institute Registration submitted successfully!");
           resetForm();
@@ -452,7 +665,12 @@ const InstituteRegistration = () => {
           setTabValue(0);
           setTrainerError("");
           setCourseError("");
-          setPendingMappings({ sectorId: null, dzongkhagId: null });
+          setTuitionError("");
+          setPendingMappings({
+            sectorId: null,
+            dzongkhagId: null,
+            courseId: null,
+          });
           setApplicationFound(false);
           setSearchValue("");
           setApplicationNo(null);
@@ -480,17 +698,15 @@ const InstituteRegistration = () => {
         genderRes,
         jobTypeRes,
         certificateLevelRes,
-        yesNoRes,
       ] = await Promise.all([
-        CommonService.getAllQualitystandards(),
+        CommonService.getAllQualitystandards(serviceId),
         CommonService.getAllSectors(),
         CommonService.getAllDzongkhags(),
         CommonService.getByParentId(7),
-        CommonService.getByParentId(9), // Nationality
-        CommonService.getByParentId(8), // Gender
-        CommonService.getByParentId(11), // Job Type
-        CommonService.getByParentId(10), // Certificate Level
-        CommonService.getByParentId(12), // Yes/No Option for Quality Standards
+        CommonService.getByParentId(9),
+        CommonService.getByParentId(8),
+        CommonService.getByParentId(11),
+        CommonService.getByParentId(10),
       ]);
 
       if (qualityRes.data) {
@@ -506,7 +722,7 @@ const InstituteRegistration = () => {
           rows: subCategories
             .filter((sub) => sub.parentId === category.id)
             .map((sub) => ({
-              id: sub.id.toString(),
+              id: sub.id.toString(), // This is the sub-question ID (54, 55, 56, etc.)
               value: sub.dropdownName || sub.description,
             })),
         }));
@@ -520,12 +736,11 @@ const InstituteRegistration = () => {
       setGender(genderRes.data || []);
       setJobType(jobTypeRes.data || []);
       setCertificateLevel(certificateLevelRes.data || []);
-      setYesNoOption(yesNoRes.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Error loading form data");
     }
-  }, []);
+  }, [serviceId]);
 
   const fetchApplicationDetails = useCallback(
     async (applicationNo) => {
@@ -539,7 +754,6 @@ const InstituteRegistration = () => {
           toast.error("No application found");
           return;
         }
-
         const app = response.data[0];
         const updates = {
           instituteName: app.proposed_institute_name || "",
@@ -551,14 +765,11 @@ const InstituteRegistration = () => {
 
         formik.setValues({ ...formik.values, ...updates });
 
-        // Handle mappings
-        const newMappings = { sectorId: null, dzongkhagId: null };
-        if (app.sector_id) {
-          const sectorId = parseInt(app.sector_id);
-          const sector = sectors.find((s) => s.id === sectorId);
-          if (sector) formik.setFieldValue("sector", sector.id);
-          else newMappings.sectorId = sectorId;
-        }
+        const newMappings = {
+          sectorId: null,
+          dzongkhagId: null,
+          courseId: null,
+        };
 
         if (app.dzongkhag_id) {
           const dzongkhagId = parseInt(app.dzongkhag_id);
@@ -567,9 +778,41 @@ const InstituteRegistration = () => {
           else newMappings.dzongkhagId = dzongkhagId;
         }
 
-        // If there are quality standards from the application, they should already have IDs
-        if (app.quality_standards) {
-          setQualitySelections(app.quality_standards);
+        if (app.sector_id && app.course_id && !isTuitionService) {
+          const sectorId = parseInt(app.sector_id);
+          const courseId = parseInt(app.course_id);
+
+          const sector = sectors.find((s) => s.id === sectorId);
+          if (sector) {
+            formik.setFieldValue("courses[0].sector", sector.id);
+            await fetchCoursesBySector(sectorId);
+            formik.setFieldValue("courses[0].course", courseId);
+          } else {
+            newMappings.sectorId = sectorId;
+            newMappings.courseId = courseId;
+          }
+        }
+
+        // Transform quality standards from array to nested object for UI
+        // Expected backend format: [{ standardId: 54, responseId: "Y", remarks: null }, ...]
+        if (app.quality_standards && Array.isArray(app.quality_standards)) {
+          const selections = {};
+          app.quality_standards.forEach((qs) => {
+            const subQuestionId = qs.standardId.toString(); // This is the sub-question ID (54, 55, 56, etc.)
+            const responseValue = qs.responseId; // "Y" or "N"
+
+            // Find which category this sub-question belongs to
+            const category = qualityData.find((cat) =>
+              cat.rows.some((row) => row.id === subQuestionId),
+            );
+            if (category) {
+              if (!selections[category.id]) {
+                selections[category.id] = {};
+              }
+              selections[category.id][subQuestionId] = responseValue;
+            }
+          });
+          setQualitySelections(selections);
         }
 
         setPendingMappings(newMappings);
@@ -580,7 +823,7 @@ const InstituteRegistration = () => {
         toast.error("Error fetching application details");
       }
     },
-    [sectors, dzongkhags, formik],
+    [dzongkhags, sectors, formik, isTuitionService, qualityData],
   );
 
   // Effects
@@ -589,42 +832,71 @@ const InstituteRegistration = () => {
   }, [fetchData]);
 
   useEffect(() => {
-    if (pendingMappings.sectorId && sectors.length) {
-      const sector = sectors.find((s) => s.id === pendingMappings.sectorId);
-      if (sector) {
-        formik.setFieldValue("sector", sector.sectorName);
-        setPendingMappings((prev) => ({ ...prev, sectorId: null }));
-      }
-    }
-  }, [sectors, pendingMappings.sectorId, formik]);
-
-  useEffect(() => {
     if (pendingMappings.dzongkhagId && dzongkhags.length) {
       const dzongkhag = dzongkhags.find(
         (d) => d.id === pendingMappings.dzongkhagId,
       );
       if (dzongkhag) {
-        formik.setFieldValue("dzongkhag", dzongkhag.dzonkhagName);
+        formik.setFieldValue("dzongkhag", dzongkhag.id);
         setPendingMappings((prev) => ({ ...prev, dzongkhagId: null }));
       }
     }
   }, [dzongkhags, pendingMappings.dzongkhagId, formik]);
 
-  //Search Handler
+  useEffect(() => {
+    const applyPendingCourseMapping = async () => {
+      if (pendingMappings.sectorId && sectors.length) {
+        const sector = sectors.find((s) => s.id === pendingMappings.sectorId);
+        if (sector) {
+          formik.setFieldValue("courses[0].sector", sector.id);
+          await fetchCoursesBySector(pendingMappings.sectorId);
+
+          if (pendingMappings.courseId) {
+            formik.setFieldValue("courses[0].course", pendingMappings.courseId);
+          }
+          setPendingMappings((prev) => ({
+            ...prev,
+            sectorId: null,
+            courseId: null,
+          }));
+        }
+      }
+    };
+
+    applyPendingCourseMapping();
+  }, [sectors, pendingMappings.sectorId, pendingMappings.courseId, formik]);
+
+  // Search Handler
   const handleSearch = async () => {
     const trimmedValue = searchValue.trim();
     if (!trimmedValue) return toast.error("Please enter Application No");
     setLoading(true);
     try {
-      const { status, data } = await InstituteRegistrationService.getApplicationExistOrNot(trimmedValue);
-      
+      let currentServiceId = "";
+      if (serviceId == 7) {
+        currentServiceId = 6;
+      }
+      if (serviceId == 36) {
+        currentServiceId = 34;
+      }
+      if (serviceId == 4) {
+        currentServiceId = 35;
+      }
+      const { status, data } =
+        await InstituteRegistrationService.getApplicationExistOrNot(
+          trimmedValue,
+          currentServiceId,
+        );
+
       if (status === 200) {
         toast.info(data.message);
-        
-        if (data.data?.proposalStatusId === 57 && data.data?.registrationStatusId === null) {
+        if (
+          data.data?.proposalStatusId === 57 &&
+          data.data?.registrationStatusId === null
+        ) {
           await fetchApplicationDetails(trimmedValue);
         }
-        
+
         setApplicationNo(trimmedValue);
       } else {
         toast.error("No application found with this number");
@@ -643,20 +915,22 @@ const InstituteRegistration = () => {
     setTabValue(0);
     setTrainerError("");
     setCourseError("");
-    setPendingMappings({ sectorId: null, dzongkhagId: null });
+    setTuitionError("");
+    setPendingMappings({ sectorId: null, dzongkhagId: null, courseId: null });
     toast.info("Form has been reset");
   };
 
-  const handleRadioChange = (standardId, rowId, valueId) => {
+  const handleRadioChange = (standardId, rowId, value) => {
     setQualitySelections((prev) => ({
       ...prev,
       [standardId]: {
         ...prev[standardId],
-        [rowId]: valueId,
+        [rowId]: value,
       },
     }));
   };
 
+  // Trainer handlers
   const handleAddTrainer = () => {
     const trainers = formik.values.trainers;
     const lastTrainer = trainers[trainers.length - 1];
@@ -682,6 +956,7 @@ const InstituteRegistration = () => {
     formik.setFieldValue("trainers", updated);
   };
 
+  // Course handlers
   const handleAddCourse = () => {
     const courses = formik.values.courses;
     const lastCourse = courses[courses.length - 1];
@@ -704,26 +979,69 @@ const InstituteRegistration = () => {
     formik.setFieldValue("courses", updated);
   };
 
+  const handleSectorChange = (index, sectorId) => {
+    formik.setFieldValue(`courses[${index}].sector`, sectorId);
+    formik.setFieldValue(`courses[${index}].course`, "");
+    if (sectorId) {
+      fetchCoursesBySector(sectorId);
+    }
+  };
+
+  // Tuition handlers
+  const handleAddTuition = () => {
+    const tuitionDetails = formik.values.tuitionDetails;
+    const lastTuition = tuitionDetails[tuitionDetails.length - 1];
+
+    const isComplete = TUITION_FIELDS.every((field) => lastTuition[field]);
+
+    if (!isComplete) {
+      setTuitionError(
+        "Please fill all required fields for the current tuition/coaching detail before adding a new one",
+      );
+      return;
+    }
+
+    setTuitionError("");
+    formik.setFieldValue("tuitionDetails", [
+      ...tuitionDetails,
+      { ...initialTuition },
+    ]);
+  };
+
+  const handleDeleteTuition = (index) => {
+    const updated = formik.values.tuitionDetails.filter((_, i) => i !== index);
+    formik.setFieldValue("tuitionDetails", updated);
+  };
+
   // Check if all quality standards are set to "Yes"
   const areAllQualityStandardsYes = useMemo(() => {
-    const yesOption = yesNoOptions.find((opt) => opt.label === "Yes");
-    if (!yesOption || qualityData.length === 0) return false;
+    if (qualityData.length === 0) return false;
 
-    // Check only first 3 standards
     const firstThreeStandards = qualityData.slice(0, 3);
-    
+    let totalRows = 0;
+    let answeredRows = 0;
+
     for (const standard of firstThreeStandards) {
       for (const row of standard.rows) {
+        totalRows++;
         const selectedValue = qualitySelections[standard.id]?.[row.id];
-        if (selectedValue !== yesOption.id) {
-          return false;
+        if (selectedValue === "Y" || selectedValue === "N") {
+          answeredRows++;
         }
       }
     }
-    return true;
-  }, [qualitySelections, qualityData, yesNoOptions]);
 
-  // Validation helpers - Submit button enabled only when all quality standards are "Yes"
+    const allAnswered = totalRows === answeredRows;
+    const allYes = firstThreeStandards.every((standard) =>
+      standard.rows.every(
+        (row) => qualitySelections[standard.id]?.[row.id] === "Y",
+      ),
+    );
+
+    return allAnswered && allYes;
+  }, [qualitySelections, qualityData]);
+
+  // Validation helpers
   const isSubmitEnabled = useMemo(() => {
     if (!formik.isValid) return false;
 
@@ -734,36 +1052,47 @@ const InstituteRegistration = () => {
         formik.values[field] !== undefined,
     );
 
-    const trainersValid =
-      formik.values.trainers.length > 0 &&
-      formik.values.trainers.every(
-        (_, index) => !formik.errors.trainers?.[index],
-      );
+    let trainersValid = true;
+    let coursesValid = true;
+    let tuitionValid = true;
 
-    const coursesValid =
-      formik.values.courses.length > 0 &&
-      formik.values.courses.every(
-        (_, index) => !formik.errors.courses?.[index],
-      );
+    if (!isTuitionService) {
+      trainersValid =
+        formik.values.trainers.length > 0 &&
+        formik.values.trainers.every(
+          (_, index) => !formik.errors.trainers?.[index],
+        );
+
+      coursesValid =
+        formik.values.courses.length > 0 &&
+        formik.values.courses.every(
+          (_, index) => !formik.errors.courses?.[index],
+        );
+    } else {
+      tuitionValid =
+        formik.values.tuitionDetails.length > 0 &&
+        formik.values.tuitionDetails.every(
+          (_, index) => !formik.errors.tuitionDetails?.[index],
+        );
+    }
 
     return (
       allRequiredFilled &&
       areAllQualityStandardsYes &&
       formik.values.files?.length > 0 &&
       trainersValid &&
-      coursesValid
+      coursesValid &&
+      tuitionValid
     );
   }, [
     formik.isValid,
     formik.values,
     formik.errors,
     areAllQualityStandardsYes,
+    isTuitionService,
   ]);
 
   const renderChecklist = (standard) => {
-    const yesOption = yesNoOptions.find((opt) => opt.label === "Yes");
-    const noOption = yesNoOptions.find((opt) => opt.label === "No");
-
     return (
       <Grid item xs={12} key={standard.id}>
         <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
@@ -775,13 +1104,20 @@ const InstituteRegistration = () => {
               <TableHead>
                 <TableRow>
                   <TableCell width="60">Sl. No</TableCell>
-                  <TableCell>Quality Indicator <span style={{ color: "red" }}>*</span></TableCell>
-                  <TableCell align="center" width="100">YES</TableCell>
-                  <TableCell align="center" width="100">NO</TableCell>
+                  <TableCell>
+                    Quality Indicator <span style={{ color: "red" }}>*</span>
+                  </TableCell>
+                  <TableCell align="center" width="100">
+                    YES
+                  </TableCell>
+                  <TableCell align="center" width="100">
+                    NO
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {standard.rows.map((row, index) => {
+                  // row.id is the sub-question ID (54, 55, 56, etc.)
                   const selectedValue =
                     qualitySelections[standard.id]?.[row.id];
 
@@ -793,13 +1129,9 @@ const InstituteRegistration = () => {
                         <Radio
                           size="small"
                           sx={{ p: 0.25 }}
-                          checked={selectedValue === yesOption?.id}
+                          checked={selectedValue === "Y"}
                           onChange={() =>
-                            handleRadioChange(
-                              standard.id,
-                              row.id,
-                              yesOption?.id,
-                            )
+                            handleRadioChange(standard.id, row.id, "Y")
                           }
                         />
                       </TableCell>
@@ -807,9 +1139,9 @@ const InstituteRegistration = () => {
                         <Radio
                           size="small"
                           sx={{ p: 0.25 }}
-                          checked={selectedValue === noOption?.id}
+                          checked={selectedValue === "N"}
                           onChange={() =>
-                            handleRadioChange(standard.id, row.id, noOption?.id)
+                            handleRadioChange(standard.id, row.id, "N")
                           }
                         />
                       </TableCell>
@@ -822,6 +1154,30 @@ const InstituteRegistration = () => {
         </Paper>
       </Grid>
     );
+  };
+
+  // Define tabs based on service type
+  const getTabs = () => {
+    const baseTabs = [{ icon: <BusinessIcon />, label: "Basic Informations" }];
+
+    if (isTuitionService) {
+      baseTabs.push({
+        icon: <MenuBookIcon />,
+        label: "Tuition/Coaching Details",
+      });
+    } else {
+      baseTabs.push(
+        { icon: <SchoolIcon />, label: "Trainer Details" },
+        { icon: <MenuBookIcon />, label: "Course Details" },
+      );
+    }
+
+    baseTabs.push(
+      { icon: <VerifiedIcon />, label: "Quality Standards" },
+      { icon: <FileOpenIcon />, label: "Supporting Documents" },
+    );
+
+    return baseTabs;
   };
 
   return (
@@ -870,18 +1226,15 @@ const InstituteRegistration = () => {
                 "& .MuiTab-root": { textTransform: "none", fontWeight: 600 },
               }}
             >
-              <Tab icon={<BusinessIcon />} label="Institute Details" />
-              <Tab icon={<SchoolIcon />} label="Trainer Details" />
-              <Tab icon={<MenuBookIcon />} label="Course Details" />
-              <Tab icon={<VerifiedIcon />} label="Quality Standards" />
-              <Tab icon={<FileOpenIcon />} label="Supporting Documents" />
+              {getTabs().map((tab, index) => (
+                <Tab key={index} icon={tab.icon} label={tab.label} />
+              ))}
             </Tabs>
 
             {/* Institute Details */}
             {tabValue === 0 && (
               <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
                 <Grid container spacing={2}>
-                  {/* Institute Name */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -907,35 +1260,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Sector */}
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      size="small"
-                      name="sector"
-                      label={
-                        <span>
-                          Sector <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.sector}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.sector && Boolean(formik.errors.sector)
-                      }
-                      helperText={formik.touched.sector && formik.errors.sector}
-                    >
-                      {sectorOptions.map((opt) => (
-                        <MenuItem key={opt.id} value={opt.value}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-
-                  {/* Dzongkhag */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       select
@@ -966,7 +1290,6 @@ const InstituteRegistration = () => {
                     </TextField>
                   </Grid>
 
-                  {/* Location */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -991,7 +1314,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Telephone */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -1015,7 +1337,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Mobile */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -1036,7 +1357,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Email */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -1057,7 +1377,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Website */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -1076,7 +1395,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Business License No */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -1102,7 +1420,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Ownership Type */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       select
@@ -1135,7 +1452,6 @@ const InstituteRegistration = () => {
                     </TextField>
                   </Grid>
 
-                  {/* Bhutanese Employees */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       type="number"
@@ -1162,7 +1478,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Non Bhutanese Employees */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       type="number"
@@ -1189,7 +1504,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Key Contact Person Name */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -1215,7 +1529,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Key Contact Person Designation */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -1241,7 +1554,6 @@ const InstituteRegistration = () => {
                     />
                   </Grid>
 
-                  {/* Key Contact Person Mobile No */}
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
@@ -1271,7 +1583,7 @@ const InstituteRegistration = () => {
             )}
 
             {/* Trainer Details */}
-            {tabValue === 1 && (
+            {!isTuitionService && tabValue === 1 && (
               <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
                 <Grid container spacing={3}>
                   {formik.values.trainers.map((trainer, index) => (
@@ -1284,7 +1596,6 @@ const InstituteRegistration = () => {
                         }}
                       >
                         <Grid container spacing={2} alignItems="center">
-                          {/* Nationality */}
                           <Grid item size={{ xs: 12, md: 3 }}>
                             <TextField
                               select
@@ -1318,7 +1629,6 @@ const InstituteRegistration = () => {
                             </TextField>
                           </Grid>
 
-                          {/* CID (Conditional) */}
                           {trainer.nationality === "Bhutanese" && (
                             <Grid item size={{ xs: 12, md: 3 }}>
                               <TextField
@@ -1332,6 +1642,18 @@ const InstituteRegistration = () => {
                                 name={`trainers[${index}].cid`}
                                 value={trainer.cid}
                                 onChange={formik.handleChange}
+                                onBlur={(e) => {
+                                  formik.handleBlur(e);
+                                  if (
+                                    e.target.value &&
+                                    e.target.value.length === 11
+                                  ) {
+                                    fetchAndFillCitizenDetails(
+                                      e.target.value,
+                                      index,
+                                    );
+                                  }
+                                }}
                                 error={
                                   formik.touched.trainers?.[index]?.cid &&
                                   Boolean(formik.errors.trainers?.[index]?.cid)
@@ -1340,11 +1662,15 @@ const InstituteRegistration = () => {
                                   formik.touched.trainers?.[index]?.cid &&
                                   formik.errors.trainers?.[index]?.cid
                                 }
+                                InputProps={{
+                                  endAdornment: fetchingCitizen && (
+                                    <CircularProgress size={20} />
+                                  ),
+                                }}
                               />
                             </Grid>
                           )}
 
-                          {/* Work Permit (Conditional) */}
                           {trainer.nationality === "Non-Bhutanese" && (
                             <Grid item size={{ xs: 12, md: 3 }}>
                               <TextField
@@ -1375,7 +1701,6 @@ const InstituteRegistration = () => {
                             </Grid>
                           )}
 
-                          {/* Name */}
                           <Grid item size={{ xs: 12, md: 3 }}>
                             <TextField
                               fullWidth
@@ -1399,7 +1724,6 @@ const InstituteRegistration = () => {
                             />
                           </Grid>
 
-                          {/* Gender */}
                           <Grid item size={{ xs: 12, md: 3 }}>
                             <TextField
                               select
@@ -1430,7 +1754,6 @@ const InstituteRegistration = () => {
                             </TextField>
                           </Grid>
 
-                          {/* Qualification */}
                           <Grid item size={{ xs: 12, md: 3 }}>
                             <TextField
                               fullWidth
@@ -1460,7 +1783,6 @@ const InstituteRegistration = () => {
                             />
                           </Grid>
 
-                          {/* Experience */}
                           <Grid item size={{ xs: 12, md: 3 }}>
                             <TextField
                               type="number"
@@ -1488,7 +1810,6 @@ const InstituteRegistration = () => {
                             />
                           </Grid>
 
-                          {/* Type */}
                           <Grid item size={{ xs: 12, md: 3 }}>
                             <TextField
                               select
@@ -1519,7 +1840,6 @@ const InstituteRegistration = () => {
                             </TextField>
                           </Grid>
 
-                          {/* Delete Button */}
                           {index > 0 && (
                             <Grid item size={{ xs: 12, md: 1 }}>
                               <IconButton
@@ -1555,7 +1875,7 @@ const InstituteRegistration = () => {
             )}
 
             {/* Course Details */}
-            {tabValue === 2 && (
+            {!isTuitionService && tabValue === 2 && (
               <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
                 <Grid container spacing={3}>
                   {formik.values.courses.map((course, index) => (
@@ -1571,32 +1891,85 @@ const InstituteRegistration = () => {
                           Course {index + 1}
                         </Typography>
                         <Grid container spacing={2}>
-                          {/* Course Title */}
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
+                              select
                               fullWidth
                               size="small"
-                              name={`courses[${index}].courseTitle`}
+                              name={`courses[${index}].sector`}
                               label={
                                 <span>
-                                  Course Title{" "}
-                                  <span style={{ color: "red" }}>*</span>
+                                  Sector <span style={{ color: "red" }}>*</span>
                                 </span>
                               }
-                              value={course.courseTitle}
-                              onChange={formik.handleChange}
+                              value={course.sector}
+                              onChange={(e) =>
+                                handleSectorChange(index, e.target.value)
+                              }
                               error={
-                                formik.touched.courses?.[index]?.courseTitle &&
-                                Boolean(formik.errors.courses?.[index]?.courseTitle)
+                                formik.touched.courses?.[index]?.sector &&
+                                Boolean(formik.errors.courses?.[index]?.sector)
                               }
                               helperText={
-                                formik.touched.courses?.[index]?.courseTitle &&
-                                formik.errors.courses?.[index]?.courseTitle
+                                formik.touched.courses?.[index]?.sector &&
+                                formik.errors.courses?.[index]?.sector
                               }
-                            />
+                            >
+                              {sectorOptions.map((opt) => (
+                                <MenuItem key={opt.id} value={opt.value}>
+                                  {opt.label}
+                                </MenuItem>
+                              ))}
+                            </TextField>
                           </Grid>
 
-                          {/* Course Level */}
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              select
+                              fullWidth
+                              size="small"
+                              name={`courses[${index}].course`}
+                              label={
+                                <span>
+                                  Course <span style={{ color: "red" }}>*</span>
+                                </span>
+                              }
+                              value={course.course}
+                              onChange={formik.handleChange}
+                              disabled={!course.sector}
+                              error={
+                                formik.touched.courses?.[index]?.course &&
+                                Boolean(formik.errors.courses?.[index]?.course)
+                              }
+                              helperText={
+                                !course.sector
+                                  ? "Select sector first"
+                                  : formik.touched.courses?.[index]?.course &&
+                                    formik.errors.courses?.[index]?.course
+                              }
+                              InputProps={{
+                                endAdornment: loadingCourses[course.sector] && (
+                                  <CircularProgress size={20} />
+                                ),
+                              }}
+                            >
+                              <MenuItem value="">
+                                {!course.sector
+                                  ? "Select sector first"
+                                  : loadingCourses[course.sector]
+                                    ? "Loading courses..."
+                                    : coursesMap[course.sector]?.length === 0
+                                      ? "No courses available"
+                                      : "Select Course"}
+                              </MenuItem>
+                              {coursesMap[course.sector]?.map((opt) => (
+                                <MenuItem key={opt.id} value={opt.id}>
+                                  {opt.occupationName || opt.name}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
                               select
@@ -1613,7 +1986,9 @@ const InstituteRegistration = () => {
                               onChange={formik.handleChange}
                               error={
                                 formik.touched.courses?.[index]?.courseLevel &&
-                                Boolean(formik.errors.courses?.[index]?.courseLevel)
+                                Boolean(
+                                  formik.errors.courses?.[index]?.courseLevel,
+                                )
                               }
                               helperText={
                                 formik.touched.courses?.[index]?.courseLevel &&
@@ -1628,7 +2003,6 @@ const InstituteRegistration = () => {
                             </TextField>
                           </Grid>
 
-                          {/* Theory Hours */}
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
                               type="number"
@@ -1645,7 +2019,9 @@ const InstituteRegistration = () => {
                               onChange={formik.handleChange}
                               error={
                                 formik.touched.courses?.[index]?.theoryHours &&
-                                Boolean(formik.errors.courses?.[index]?.theoryHours)
+                                Boolean(
+                                  formik.errors.courses?.[index]?.theoryHours,
+                                )
                               }
                               helperText={
                                 formik.touched.courses?.[index]?.theoryHours &&
@@ -1654,7 +2030,6 @@ const InstituteRegistration = () => {
                             />
                           </Grid>
 
-                          {/* Practical Hours */}
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
                               type="number"
@@ -1670,17 +2045,21 @@ const InstituteRegistration = () => {
                               value={course.practicalHours}
                               onChange={formik.handleChange}
                               error={
-                                formik.touched.courses?.[index]?.practicalHours &&
-                                Boolean(formik.errors.courses?.[index]?.practicalHours)
+                                formik.touched.courses?.[index]
+                                  ?.practicalHours &&
+                                Boolean(
+                                  formik.errors.courses?.[index]
+                                    ?.practicalHours,
+                                )
                               }
                               helperText={
-                                formik.touched.courses?.[index]?.practicalHours &&
+                                formik.touched.courses?.[index]
+                                  ?.practicalHours &&
                                 formik.errors.courses?.[index]?.practicalHours
                               }
                             />
                           </Grid>
 
-                          {/* OJT Hours */}
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
                               type="number"
@@ -1697,7 +2076,9 @@ const InstituteRegistration = () => {
                               onChange={formik.handleChange}
                               error={
                                 formik.touched.courses?.[index]?.ojtHours &&
-                                Boolean(formik.errors.courses?.[index]?.ojtHours)
+                                Boolean(
+                                  formik.errors.courses?.[index]?.ojtHours,
+                                )
                               }
                               helperText={
                                 formik.touched.courses?.[index]?.ojtHours &&
@@ -1706,7 +2087,6 @@ const InstituteRegistration = () => {
                             />
                           </Grid>
 
-                          {/* Fees per Trainee */}
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
                               type="number"
@@ -1722,17 +2102,21 @@ const InstituteRegistration = () => {
                               value={course.feesPerTrainee}
                               onChange={formik.handleChange}
                               error={
-                                formik.touched.courses?.[index]?.feesPerTrainee &&
-                                Boolean(formik.errors.courses?.[index]?.feesPerTrainee)
+                                formik.touched.courses?.[index]
+                                  ?.feesPerTrainee &&
+                                Boolean(
+                                  formik.errors.courses?.[index]
+                                    ?.feesPerTrainee,
+                                )
                               }
                               helperText={
-                                formik.touched.courses?.[index]?.feesPerTrainee &&
+                                formik.touched.courses?.[index]
+                                  ?.feesPerTrainee &&
                                 formik.errors.courses?.[index]?.feesPerTrainee
                               }
                             />
                           </Grid>
 
-                          {/* Enrollment Capacity */}
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
                               type="number"
@@ -1748,17 +2132,22 @@ const InstituteRegistration = () => {
                               value={course.enrollmentCapacity}
                               onChange={formik.handleChange}
                               error={
-                                formik.touched.courses?.[index]?.enrollmentCapacity &&
-                                Boolean(formik.errors.courses?.[index]?.enrollmentCapacity)
+                                formik.touched.courses?.[index]
+                                  ?.enrollmentCapacity &&
+                                Boolean(
+                                  formik.errors.courses?.[index]
+                                    ?.enrollmentCapacity,
+                                )
                               }
                               helperText={
-                                formik.touched.courses?.[index]?.enrollmentCapacity &&
-                                formik.errors.courses?.[index]?.enrollmentCapacity
+                                formik.touched.courses?.[index]
+                                  ?.enrollmentCapacity &&
+                                formik.errors.courses?.[index]
+                                  ?.enrollmentCapacity
                               }
                             />
                           </Grid>
 
-                          {/* Delete Button */}
                           {index > 0 && (
                             <Grid item size={{ xs: 12 }}>
                               <Box display="flex" justifyContent="flex-end">
@@ -1795,8 +2184,276 @@ const InstituteRegistration = () => {
               </Paper>
             )}
 
+            {/* Tuition/Coaching Details */}
+            {isTuitionService && tabValue === 1 && (
+              <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
+                <Grid container spacing={3}>
+                  {formik.values.tuitionDetails.map((tuition, index) => (
+                    <Grid item size={{ xs: 12 }} key={index}>
+                      <Paper
+                        sx={{
+                          p: 2,
+                          border: "1px solid",
+                          borderColor: "divider",
+                        }}
+                      >
+                        <Typography variant="subtitle2" fontWeight={600} mb={2}>
+                          Tuition/Coaching {index + 1}
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              name={`tuitionDetails[${index}].classLevel`}
+                              label={
+                                <span>
+                                  Class Level{" "}
+                                  <span style={{ color: "red" }}>*</span>
+                                </span>
+                              }
+                              value={tuition.classLevel}
+                              onChange={formik.handleChange}
+                              error={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.classLevel &&
+                                Boolean(
+                                  formik.errors.tuitionDetails?.[index]
+                                    ?.classLevel,
+                                )
+                              }
+                              helperText={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.classLevel &&
+                                formik.errors.tuitionDetails?.[index]
+                                  ?.classLevel
+                              }
+                            />
+                          </Grid>
+
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              name={`tuitionDetails[${index}].subjects`}
+                              label={
+                                <span>
+                                  Subjects{" "}
+                                  <span style={{ color: "red" }}>*</span>
+                                </span>
+                              }
+                              value={tuition.subjects}
+                              onChange={formik.handleChange}
+                              error={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.subjects &&
+                                Boolean(
+                                  formik.errors.tuitionDetails?.[index]
+                                    ?.subjects,
+                                )
+                              }
+                              helperText={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.subjects &&
+                                formik.errors.tuitionDetails?.[index]?.subjects
+                              }
+                            />
+                          </Grid>
+
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              type="number"
+                              fullWidth
+                              size="small"
+                              name={`tuitionDetails[${index}].duration`}
+                              label={
+                                <span>
+                                  Duration (Hours/Months){" "}
+                                  <span style={{ color: "red" }}>*</span>
+                                </span>
+                              }
+                              value={tuition.duration}
+                              onChange={formik.handleChange}
+                              error={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.duration &&
+                                Boolean(
+                                  formik.errors.tuitionDetails?.[index]
+                                    ?.duration,
+                                )
+                              }
+                              helperText={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.duration &&
+                                formik.errors.tuitionDetails?.[index]?.duration
+                              }
+                            />
+                          </Grid>
+
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              type="number"
+                              fullWidth
+                              size="small"
+                              name={`tuitionDetails[${index}].fees`}
+                              label={
+                                <span>
+                                  Fees (Nu.){" "}
+                                  <span style={{ color: "red" }}>*</span>
+                                </span>
+                              }
+                              value={tuition.fees}
+                              onChange={formik.handleChange}
+                              error={
+                                formik.touched.tuitionDetails?.[index]?.fees &&
+                                Boolean(
+                                  formik.errors.tuitionDetails?.[index]?.fees,
+                                )
+                              }
+                              helperText={
+                                formik.touched.tuitionDetails?.[index]?.fees &&
+                                formik.errors.tuitionDetails?.[index]?.fees
+                              }
+                            />
+                          </Grid>
+                          
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              name={`tuitionDetails[${index}].tutorCid`}
+                              label={
+                                <span>
+                                  Tutor CID{" "}
+                                  <span style={{ color: "red" }}>*</span>
+                                </span>
+                              }
+                              value={tuition.tutorCid}
+                              onChange={formik.handleChange}
+                              onBlur={(e) => {
+                                formik.handleBlur(e);
+                                if (e.target.value && e.target.value.length === 11) {
+                                  fetchAndFillTutorDetails(e.target.value, index);
+                                }
+                              }}
+                              error={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.tutorCid &&
+                                Boolean(
+                                  formik.errors.tuitionDetails?.[index]
+                                    ?.tutorCid,
+                                )
+                              }
+                              helperText={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.tutorCid &&
+                                formik.errors.tuitionDetails?.[index]?.tutorCid
+                              }
+                              InputProps={{
+                                endAdornment: fetchingCitizen && (
+                                  <CircularProgress size={20} />
+                                ),
+                              }}
+                            />
+                          </Grid>
+                          
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              name={`tuitionDetails[${index}].tutorName`}
+                              label={
+                                <span>
+                                  Subject Wise Tutor Name{" "}
+                                  <span style={{ color: "red" }}>*</span>
+                                </span>
+                              }
+                              value={tuition.tutorName}
+                              onChange={formik.handleChange}
+                              error={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.tutorName &&
+                                Boolean(
+                                  formik.errors.tuitionDetails?.[index]
+                                    ?.tutorName,
+                                )
+                              }
+                              helperText={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.tutorName &&
+                                formik.errors.tuitionDetails?.[index]?.tutorName
+                              }
+                            />
+                          </Grid>
+
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              name={`tuitionDetails[${index}].tutorQualification`}
+                              label={
+                                <span>
+                                  Tutor Qualification{" "}
+                                  <span style={{ color: "red" }}>*</span>
+                                </span>
+                              }
+                              value={tuition.tutorQualification}
+                              onChange={formik.handleChange}
+                              error={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.tutorQualification &&
+                                Boolean(
+                                  formik.errors.tuitionDetails?.[index]
+                                    ?.tutorQualification,
+                                )
+                              }
+                              helperText={
+                                formik.touched.tuitionDetails?.[index]
+                                  ?.tutorQualification &&
+                                formik.errors.tuitionDetails?.[index]
+                                  ?.tutorQualification
+                              }
+                            />
+                          </Grid>
+
+                          {index > 0 && (
+                            <Grid item size={{ xs: 12 }}>
+                              <Box display="flex" justifyContent="flex-end">
+                                <IconButton
+                                  color="error"
+                                  onClick={() => handleDeleteTuition(index)}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Box>
+                            </Grid>
+                          )}
+                        </Grid>
+                      </Paper>
+                    </Grid>
+                  ))}
+
+                  <Grid item xs={12} sx={{ textAlign: "center", mt: 2 }}>
+                    {tuitionError && (
+                      <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                        {tuitionError}
+                      </Typography>
+                    )}
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<AddIcon />}
+                      onClick={handleAddTuition}
+                    >
+                      Add Tuition/Coaching Detail
+                    </Button>
+                  </Grid>
+                </Grid>
+              </Paper>
+            )}
+
             {/* Quality Standards */}
-            {tabValue === 3 && (
+            {tabValue === (isTuitionService ? 2 : 3) && (
               <Grid container spacing={2} sx={{ mt: 1 }}>
                 <Grid item size={{ xs: 12 }}>
                   {qualityData.slice(0, 3).map(renderChecklist)}
@@ -1805,7 +2462,7 @@ const InstituteRegistration = () => {
             )}
 
             {/* Supporting Documents */}
-            {tabValue === 4 && (
+            {tabValue === (isTuitionService ? 3 : 4) && (
               <Grid container spacing={2} sx={{ mt: 1 }}>
                 <Grid item size={{ xs: 12 }}>
                   <Paper
