@@ -64,7 +64,7 @@ export const publicRoutes = [
     path: "course",
     children: [
       { path: "apply/rpl-assessment", element: <RPLAssessment /> },
-      { path: "apply-course/:application_no", element: <ApplyCourse /> },
+      { path: "apply-course/:applicationNo", element: <ApplyCourse /> },
     ],
   },
   {

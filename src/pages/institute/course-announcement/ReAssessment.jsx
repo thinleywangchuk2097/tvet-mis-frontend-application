@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -10,154 +10,302 @@ import {
   TextField,
   Button,
   TablePagination,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   MenuItem,
   Grid,
   Typography,
   Chip,
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
+  IconButton,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import { Formik, Form } from "formik";
+import * as Yup from "yup";
 import RemoveRedEyeIcon from "@mui/icons-material/RemoveRedEye";
-import SearchIcon from "@mui/icons-material/Search";
-import ReplayIcon from "@mui/icons-material/Replay";
+import { useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
+import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
+import CourseEnrollmentService from "../../../api/services/CourseEnrollmentService";
+import CommonService from "../../../api/services/CommonService";
+import FileUpload from "../../../components/file/FileUplaod";
+import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
+
+// Helper function to convert file to base64
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () =>
+      resolve({
+        name: file.name,
+        content: reader.result.split(",")[1],
+        contentType: file.type || "application/octet-stream",
+      });
+    reader.onerror = reject;
+  });
 
 const ReAssessment = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState("all");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [courses, setCourses] = useState([]);
+  const [instituteDetails, setInstituteDetails] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [certificationLevels, setCertificationLevels] = useState([]);
+  const [fundingSources, setFundingSources] = useState([]);
+  const [dzongkhags, setDzongkhags] = useState([]);
+  const [approvedCourses, setApprovedCourses] = useState([]);
+  const [statusList, setStatusList] = useState([]);
 
-  // Sample data for reassessment
-  const [reassessmentData] = useState([
-    {
-      id: 1,
-      applicationNo: "2024060155",
-      course: "Robotics",
-      level: "Beginner",
-      applicationDate: "2026-03-01",
-      courseDate: "2026-03-15",
-      status: "Failed",
-      providerName: "Robotics & IoT Training Institute",
-      registrationNo: "2024060155",
-      courseFee: 1200,
-      totalTrainees: 25,
-      applicationEnd: "2026-03-10",
-      courseEnd: "2026-04-15",
-      fundingSource: "Government",
-      trainingLocation: "Thimphu",
-      courseDescription: "Introductory robotics course for beginners",
-      requiredDocuments: "CV, Passport Copy",
-    },
-    {
-      id: 2,
-      applicationNo: "2024060156",
-      course: "IoT",
-      level: "Intermediate",
-      applicationDate: "2026-03-05",
-      courseDate: "2026-03-20",
-      status: "Failed",
-      providerName: "Robotics & IoT Training Institute",
-      registrationNo: "2024060156",
-      courseFee: 1500,
-      totalTrainees: 20,
-      applicationEnd: "2026-03-15",
-      courseEnd: "2026-04-25",
-      fundingSource: "Private",
-      trainingLocation: "Paro",
-      courseDescription:
-        "Intermediate IoT course for learners with basic knowledge",
-      requiredDocuments: "CV, Passport Copy",
-    },
-    {
-      id: 3,
-      applicationNo: "2024060157",
-      course: "Robotics",
-      level: "Advanced",
-      applicationDate: "2026-03-10",
-      courseDate: "2026-03-25",
-      status: "Failed",
-      providerName: "Robotics & IoT Training Institute",
-      registrationNo: "2024060157",
-      courseFee: 1800,
-      totalTrainees: 15,
-      applicationEnd: "2026-03-20",
-      courseEnd: "2026-05-10",
-      fundingSource: "Government",
-      trainingLocation: "Thimphu",
-      courseDescription: "Advanced robotics course for experienced learners",
-      requiredDocuments: "CV, Passport Copy, Previous Certificates",
-    },
-    {
-      id: 4,
-      applicationNo: "2024060158",
-      course: "IoT",
-      level: "Beginner",
-      applicationDate: "2026-03-12",
-      courseDate: "2026-03-28",
-      status: "Failed",
-      providerName: "Robotics & IoT Training Institute",
-      registrationNo: "2024060158",
-      courseFee: 1100,
-      totalTrainees: 25,
-      applicationEnd: "2026-03-22",
-      courseEnd: "2026-04-30",
-      fundingSource: "Private",
-      trainingLocation: "Paro",
-      courseDescription: "Introduction to IoT concepts",
-      requiredDocuments: "CV, Passport Copy",
-    },
-    {
-      id: 5,
-      applicationNo: "2024060159",
-      course: "Robotics",
-      level: "Intermediate",
-      applicationDate: "2026-03-15",
-      courseDate: "2026-04-01",
-      status: "Failed",
-      providerName: "Robotics & IoT Training Institute",
-      registrationNo: "2024060159",
-      courseFee: 1400,
-      totalTrainees: 20,
-      applicationEnd: "2026-03-25",
-      courseEnd: "2026-05-15",
-      fundingSource: "Government",
-      trainingLocation: "Thimphu",
-      courseDescription: "Intermediate robotics programming",
-      requiredDocuments: "CV, Passport Copy",
-    },
-  ]);
+  const access_token = useSelector((state) => state.auth.accessToken);
+  const actionId = useSelector((state) => state.auth.id);
+  const registration_no = useSelector((state) => state.auth.userId);
+
+  // Fetch institute details and dropdown data on component mount
+  useEffect(() => {
+    fetchInstituteDetails();
+    fetchDropdownData();
+    fetchDzongkhags();
+    fetchApprovedCourses();
+    fetchEnrolledCourses();
+    fetchStatusList();
+  }, []);
+
+  const fetchInstituteDetails = async () => {
+    try {
+      const response =
+        await InstituteRegistrationService.getInstituteDetails(registration_no);
+      setInstituteDetails(response.data);
+      console.log("Institute Details:", response.data);
+    } catch (error) {
+      console.error("Error fetching institute data:", error);
+    }
+  };
+
+  const fetchDropdownData = async () => {
+    try {
+      const levelsResponse = await CommonService.getByParentId(10);
+      setCertificationLevels(levelsResponse.data);
+
+      const fundingResponse = await CommonService.getByParentId(16);
+      setFundingSources(fundingResponse.data);
+    } catch (error) {
+      console.error("Error fetching dropdown data:", error);
+    }
+  };
+
+  const fetchDzongkhags = async () => {
+    try {
+      const dzongkhagLists = await CommonService.getAllDzongkhags();
+      setDzongkhags(dzongkhagLists.data);
+      console.log("Dzongkhags:", dzongkhagLists.data);
+    } catch (error) {
+      console.error("Error fetching dzongkhags:", error);
+    }
+  };
+
+  const fetchApprovedCourses = async () => {
+    try {
+      const approvedCourses =
+        await ApplyAccreditedCourseService.getAccreditedApprovedCourseByUserId(
+          registration_no,
+          access_token,
+        );
+      setApprovedCourses(approvedCourses.data);
+      console.log("Approved Courses:", approvedCourses.data);
+    } catch (error) {
+      console.error("Error fetching approved courses:", error);
+    }
+  };
+
+  const fetchEnrolledCourses = async () => {
+    try {
+      const response =
+        await CourseEnrollmentService.getCourseDetailsAnnouncementByUserId(
+          registration_no,
+          41, // Service ID for Re-assessment
+          access_token,
+        );
+      setCourses(response.data);
+      console.log("Enrolled Courses:", response.data);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+    }
+  };
+
+  const fetchStatusList = async () => {
+    try {
+      const statusResponse = await CommonService.getByParentId(4);
+      setStatusList(statusResponse.data);
+      console.log("Status List:", statusResponse.data);
+    } catch (error) {
+      console.error("Error fetching status list:", error);
+    }
+  };
+
+  const institute = instituteDetails[0] || {};
 
   const handleChangePage = (event, newPage) => setPage(newPage);
-
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(+event.target.value);
     setPage(0);
   };
 
-  const handleReapply = (application) => {
-    console.log("Reapply for application:", application);
-    // Add your reapply logic here
-    alert(`Reapplying for application: ${application.applicationNo}`);
+  const handleViewDetails = (applicationNo) => {
+    navigate(`/announcement/reassessment-trainee-selection/${applicationNo}`);
   };
 
-  // Filter data based on search and filter type
-  const filteredData = reassessmentData.filter((item) => {
-    const matchesSearch =
-      item.course?.toLowerCase().includes(search.toLowerCase()) ||
-      item.applicationNo?.toLowerCase().includes(search.toLowerCase()) ||
-      item.providerName?.toLowerCase().includes(search.toLowerCase());
+  const filteredCourses = courses.filter(
+    (course) =>
+      course.course_name?.toLowerCase().includes(search.toLowerCase()) ||
+      course.application_no?.toLowerCase().includes(search.toLowerCase()),
+  );
 
-    if (filterType === "all") return matchesSearch;
-    if (filterType === "accredited")
-      return matchesSearch && item.course === "Robotics";
-    if (filterType === "non-accredited")
-      return matchesSearch && item.course === "IoT";
-    if (filterType === "rpl") return matchesSearch && item.level === "Advanced";
+  const initialValues = {
+    instituteId: institute.institute_id || "",
+    courseId: "",
+    courseFee: "",
+    totalNoTrainees: "",
+    courseStartDate: "",
+    courseEndDate: "",
+    certificationLevelId: "",
+    fundingSourceId: "",
+    trainingLocationId: "",
+    courseDescription: "",
+    files: [],
+  };
 
-    return matchesSearch;
+  const validationSchema = Yup.object().shape({
+    courseId: Yup.string().required("Course Name is required"),
+    courseFee: Yup.number()
+      .typeError("Must be a number")
+      .required("Course Fee is required"),
+    totalNoTrainees: Yup.number()
+      .typeError("Must be a number")
+      .required("Total number of trainees required"),
+    courseStartDate: Yup.date()
+      .typeError("Invalid date")
+      .required("Course Start Date required"),
+    courseEndDate: Yup.date()
+      .typeError("Invalid date")
+      .required("Course End Date required")
+      .min(
+        Yup.ref("courseStartDate"),
+        "Course end date cannot be before course start date",
+      ),
+    certificationLevelId: Yup.string().required(
+      "Certification Level is required",
+    ),
+    fundingSourceId: Yup.string().required("Funding Source is required"),
+    trainingLocationId: Yup.string().required("Training Location is required"),
+    courseDescription: Yup.string().required("Course Description is required"),
+    files: Yup.array()
+      .min(1, "Please upload required documents")
+      .max(5, "Maximum 5 files allowed"),
   });
+
+  const handleSubmit = async (values, { resetForm, setSubmitting }) => {
+    setLoading(true);
+    try {
+      const documents = await Promise.all(
+        values.files.map((file) => fileToBase64(file)),
+      );
+
+      const payload = {
+        instituteId: values.instituteId,
+        courseId: values.courseId,
+        courseFee: values.courseFee,
+        totalNoTrainees: values.totalNoTrainees,
+        courseStartDate: values.courseStartDate,
+        courseEndDate: values.courseEndDate,
+        certificationLevelId: values.certificationLevelId,
+        fundingSourceId: values.fundingSourceId,
+        trainingLocationId: values.trainingLocationId,
+        courseDescription: values.courseDescription,
+        createdBy: actionId,
+        serviceId: 41, // Service ID for Re-assessment
+        statusId: 55,
+        remarks: "",
+        documents: documents,
+      };
+
+      console.log("Submitting payload:", payload);
+
+      const response = await CourseEnrollmentService.submitCourseAnnouncement(
+        payload,
+        access_token,
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        toast.success("Re-Assessment submitted successfully!");
+        await fetchEnrolledCourses();
+        resetForm();
+        setOpenDialog(false);
+      }
+    } catch (error) {
+      console.error("Error submitting re-assessment:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to submit re-assessment",
+      );
+    } finally {
+      setLoading(false);
+      setSubmitting(false);
+    }
+  };
+
+  const getStatusName = (statusId) => {
+    if (!statusId) return "Pending";
+    const status = statusList.find(
+      (s) => parseInt(s.id) === parseInt(statusId),
+    );
+    return status ? status.name : "Pending";
+  };
+
+  const getStatusColor = (statusId) => {
+    const statusName = getStatusName(statusId);
+    switch (statusName.toLowerCase()) {
+      case "approved":
+        return "#4caf50";
+      case "rejected":
+        return "#f44336";
+      case "pending":
+      default:
+        return "#ff9800";
+    }
+  };
+
+  const getDzongkhagName = (locationId) => {
+    if (!locationId) return "N/A";
+    const dzongkhag = dzongkhags.find(
+      (dzong) => dzong.id === parseInt(locationId),
+    );
+    return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
+  };
+
+  const getCourseName = (courseId) => {
+    if (!courseId) return "N/A";
+    const course = approvedCourses.find((c) => c.id === courseId);
+    return course ? course.course_name : courseId;
+  };
+
+  const getCertificationLevelName = (levelId) => {
+    if (!levelId) return "N/A";
+    const level = certificationLevels.find((l) => l.id === parseInt(levelId));
+    return level ? level.name : levelId;
+  };
+
+  const getFundingSourceName = (sourceId) => {
+    if (!sourceId) return "N/A";
+    const source = fundingSources.find((s) => s.id === parseInt(sourceId));
+    return source ? source.name : sourceId;
+  };
 
   const tableStyle = {
     border: "1px solid",
@@ -168,136 +316,123 @@ const ReAssessment = () => {
     },
   };
 
-  // Status chip color
-  const getStatusChip = (status) => {
-    let color = "error";
-    return (
-      <Chip label={status} color={color} size="small" sx={{ minWidth: 70 }} />
-    );
-  };
-
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
-      <Typography variant="h6" gutterBottom>
-        Re-Assessment Details
+      <Typography variant="h5" gutterBottom>
+        Re-Assessment
       </Typography>
 
-      {/* Filters and Search */}
-      <Grid container spacing={2} sx={{ mb: 3, mt: 2 }}>
-        <Grid item size={{ xs: 12, md: 4 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Filter by Course Type</InputLabel>
-            <Select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              label="Filter by Course Type"
-            >
-              <MenuItem value="all">All Courses</MenuItem>
-              <MenuItem value="accredited">Accredited Course</MenuItem>
-              <MenuItem value="non-accredited">Non-Accredited Course</MenuItem>
-              <MenuItem value="rpl">RPL Assessment</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
+      <Grid
+        container
+        spacing={1}
+        alignItems="center"
+        sx={{ justifyContent: "flex-end", mb: 2 }}
+      >
         <Grid item size={{ xs: 12, md: 4 }}>
           <TextField
-            label="Search by Course, Application No, or Provider"
+            label="Search by Course or Application No"
             variant="outlined"
             size="small"
             fullWidth
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                height: "36px",
+                "& input": { padding: "8px 12px" },
+                "& fieldset": { borderRadius: "4px" },
+              },
             }}
           />
         </Grid>
+        <Grid item size={{ xs: 12, md: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenDialog(true)}
+            sx={{ height: "36px" }}
+          >
+            Add Re-Assessment
+          </Button>
+        </Grid>
       </Grid>
 
-      {/* Table */}
       <TableContainer component={Paper} elevation={1}>
         <Table size="small" sx={tableStyle}>
           <TableHead>
-            <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-              <TableCell>
-                <strong>#</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Application No</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Course</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Level</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Application Date</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Course Date</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Status</strong>
-              </TableCell>
-              <TableCell>
-                <strong>View</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Action</strong>
-              </TableCell>
+            <TableRow>
+              <TableCell>#</TableCell>
+              <TableCell>Application No</TableCell>
+              <TableCell>Course</TableCell>
+              <TableCell>Course Fee</TableCell>
+              <TableCell>Total Trainees</TableCell>
+              <TableCell>Certification Level</TableCell>
+              <TableCell>Funding Source</TableCell>
+              <TableCell>Course Period</TableCell>
+              <TableCell>Training Location</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell align="center">Action</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredData.length > 0 ? (
-              filteredData
+            {filteredCourses.length > 0 ? (
+              filteredCourses
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((item, index) => (
-                  <TableRow key={item.id} hover>
+                .map((course, index) => (
+                  <TableRow key={course.id || index}>
                     <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
-                    <TableCell>{item.applicationNo}</TableCell>
-                    <TableCell>{item.course}</TableCell>
-                    <TableCell>{item.level}</TableCell>
-                    <TableCell>{item.applicationDate}</TableCell>
-                    <TableCell>{item.courseDate}</TableCell>
-                    <TableCell>{getStatusChip(item.status)}</TableCell>
+                    <TableCell>{course.application_no || "N/A"}</TableCell>
+                    <TableCell>{getCourseName(course.course_id)}</TableCell>
+                    <TableCell>Nu. {course.course_fee}</TableCell>
+                    <TableCell>{course.total_no_trainees}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        color="info"
-                        sx={{
-                          minHeight: 20,
-                          padding: "2px 8px",
-                        }}
-                        startIcon={<RemoveRedEyeIcon fontSize="small" />}
-                      >
-                        View
-                      </Button>
+                      {getCertificationLevelName(course.certification_level_id)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="contained"
+                      {getFundingSourceName(course.funding_source_id)}
+                    </TableCell>
+                    <TableCell>
+                      {course.course_start_date && course.course_end_date
+                        ? `${new Date(course.course_start_date).toLocaleDateString()} - ${new Date(course.course_end_date).toLocaleDateString()}`
+                        : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {getDzongkhagName(course.training_location_id)}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={getStatusName(course.status_id)}
                         size="small"
-                        color="warning"
                         sx={{
-                          minHeight: 20,
-                          padding: "2px 8px",
+                          backgroundColor: getStatusColor(course.status_id),
+                          color: "white",
+                          fontWeight: "medium",
+                          minWidth: "80px",
+                          "& .MuiChip-label": {
+                            px: 1.5,
+                            py: 0.5,
+                          },
                         }}
-                        startIcon={<ReplayIcon fontSize="small" />}
-                        onClick={() => handleReapply(item)}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        color="primary"
+                        size="small"
+                        onClick={() => handleViewDetails(course.application_no)}
+                        title="View Details"
                       >
-                        Reapply
-                      </Button>
+                        <RemoveRedEyeIcon fontSize="small" />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
-                  <Typography variant="body1" color="textSecondary">
-                    No data available for reassessment
-                  </Typography>
+                <TableCell colSpan={11} align="center">
+                  No data available in table
                 </TableCell>
               </TableRow>
             )}
@@ -306,7 +441,7 @@ const ReAssessment = () => {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={filteredData.length}
+          count={filteredCourses.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
@@ -314,15 +449,291 @@ const ReAssessment = () => {
         />
       </TableContainer>
 
-      {/* Summary Section */}
-      <Box sx={{ mt: 2, display: "flex", gap: 2, justifyContent: "flex-end" }}>
-        <Typography variant="body2" color="textSecondary">
-          Total Failed Applications: {reassessmentData.length}
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Showing: {filteredData.length} results
-        </Typography>
-      </Box>
+      <Dialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>Create Re-Assessment</DialogTitle>
+        <Formik
+          initialValues={initialValues}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+          enableReinitialize={true}
+          validateOnBlur={true}
+          validateOnChange={true}
+          validateOnMount={false}
+        >
+          {(formik) => (
+            <Form>
+              <DialogContent dividers>
+                <Grid container spacing={2}>
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Course Name"
+                      name="courseId"
+                      size="small"
+                      select
+                      value={formik.values.courseId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.courseId &&
+                        Boolean(formik.errors.courseId)
+                      }
+                      helperText={
+                        formik.touched.courseId && formik.errors.courseId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {approvedCourses.map((course) => (
+                        <MenuItem key={course.id} value={course.id}>
+                          {course.course_name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Course Fee"
+                      name="courseFee"
+                      size="small"
+                      type="number"
+                      value={formik.values.courseFee}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.courseFee &&
+                        Boolean(formik.errors.courseFee)
+                      }
+                      helperText={
+                        formik.touched.courseFee && formik.errors.courseFee
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Certification Level"
+                      name="certificationLevelId"
+                      size="small"
+                      value={formik.values.certificationLevelId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.certificationLevelId &&
+                        Boolean(formik.errors.certificationLevelId)
+                      }
+                      helperText={
+                        formik.touched.certificationLevelId &&
+                        formik.errors.certificationLevelId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {certificationLevels.map((level) => (
+                        <MenuItem key={level.id} value={level.id}>
+                          {level.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Total No of Trainees"
+                      name="totalNoTrainees"
+                      size="small"
+                      type="number"
+                      value={formik.values.totalNoTrainees}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.totalNoTrainees &&
+                        Boolean(formik.errors.totalNoTrainees)
+                      }
+                      helperText={
+                        formik.touched.totalNoTrainees &&
+                        formik.errors.totalNoTrainees
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      type="date"
+                      fullWidth
+                      label="Course Start Date"
+                      name="courseStartDate"
+                      size="small"
+                      value={formik.values.courseStartDate}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      InputLabelProps={{ shrink: true }}
+                      error={
+                        formik.touched.courseStartDate &&
+                        Boolean(formik.errors.courseStartDate)
+                      }
+                      helperText={
+                        formik.touched.courseStartDate &&
+                        formik.errors.courseStartDate
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      type="date"
+                      fullWidth
+                      label="Course End Date"
+                      name="courseEndDate"
+                      size="small"
+                      value={formik.values.courseEndDate}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      InputLabelProps={{ shrink: true }}
+                      error={
+                        formik.touched.courseEndDate &&
+                        Boolean(formik.errors.courseEndDate)
+                      }
+                      helperText={
+                        formik.touched.courseEndDate &&
+                        formik.errors.courseEndDate
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Funding Source"
+                      name="fundingSourceId"
+                      size="small"
+                      value={formik.values.fundingSourceId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.fundingSourceId &&
+                        Boolean(formik.errors.fundingSourceId)
+                      }
+                      helperText={
+                        formik.touched.fundingSourceId &&
+                        formik.errors.fundingSourceId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {fundingSources.map((source) => (
+                        <MenuItem key={source.id} value={source.id}>
+                          {source.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Training Location (Dzongkhag)"
+                      name="trainingLocationId"
+                      size="small"
+                      value={formik.values.trainingLocationId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.trainingLocationId &&
+                        Boolean(formik.errors.trainingLocationId)
+                      }
+                      helperText={
+                        formik.touched.trainingLocationId &&
+                        formik.errors.trainingLocationId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {dzongkhags.map((dzongkhag) => (
+                        <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
+                          {dzongkhag.dzonkhagName}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12 }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      label="Course Description"
+                      name="courseDescription"
+                      size="small"
+                      value={formik.values.courseDescription}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.courseDescription &&
+                        Boolean(formik.errors.courseDescription)
+                      }
+                      helperText={
+                        formik.touched.courseDescription &&
+                        formik.errors.courseDescription
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12 }}>
+                    <FileUpload
+                      files={formik.values.files}
+                      onFilesChange={(files) => {
+                        formik.setFieldValue("files", files);
+                        setTimeout(() => {
+                          formik.validateField("files");
+                        }, 100);
+                      }}
+                      error={
+                        formik.touched.files && Boolean(formik.errors.files)
+                      }
+                      helperText={formik.touched.files && formik.errors.files}
+                    />
+                    {!formik.touched.files &&
+                      formik.values.files.length === 0 && (
+                        <Typography variant="caption" color="textSecondary">
+                          Please upload required documents (PDF, DOC, etc.)
+                        </Typography>
+                      )}
+                  </Grid>
+                </Grid>
+              </DialogContent>
+              <DialogActions>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="error"
+                  onClick={() => setOpenDialog(false)}
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="small"
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={loading}
+                >
+                  {loading ? "Saving..." : "Submit"}
+                </Button>
+              </DialogActions>
+            </Form>
+          )}
+        </Formik>
+      </Dialog>
     </Paper>
   );
 };
