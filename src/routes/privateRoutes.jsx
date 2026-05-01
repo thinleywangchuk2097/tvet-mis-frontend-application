@@ -64,6 +64,9 @@ import ViewCurriculumEndorsementIndex from "../pages/institute/service/ViewCurri
 //track application status
 import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
 
+//Certificate
+import Assessment from "../pages/certificate/Assessment";
+
 export const privateRoutes = [
   {
     path: "/",
@@ -214,7 +217,12 @@ export const privateRoutes = [
       { path: "track-application-status", element: <TrackApplicationStatus /> },
     ],
   },
-
+  {
+    path: "certificate",
+    children: [
+      { path: "assessment", element: <Assessment /> },
+    ],
+  },
   //without children
   { path: "/apply-qms-certification", element: <ApplyQmsCertification /> },
   { path: "/track-trainee", element: <TrackTrainee /> },
