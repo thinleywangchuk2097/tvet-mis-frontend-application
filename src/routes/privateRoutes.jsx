@@ -17,6 +17,11 @@ import AccreditatedCourse from "../pages/institute/course-announcement/Accredita
 import NonAccreditedCourse from "../pages/institute/course-announcement/NonAccreditedCourse";
 import RPLAssessment1 from "../pages/institute/course-announcement/RPLAssessment";
 import ReAssessment from "../pages/institute/course-announcement/ReAssessment";
+import AccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/course-announcement/AccreditatedRPLCourseTraineeSelectionIndex";
+import ViewAccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/course-announcement/ViewAccreditatedRPLCourseTraineeSelectionIndex";
+import NonAccreditedCourseTraineeSelection from "../pages/institute/course-announcement/NonAccreditedCourseTraineeSelection";
+import ReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ReAssessmentTraineeSelectionIndex";
+
 
 //resource-management
 import StaffManagement from "../pages/institute/resource-management/StaffManagement";
@@ -33,7 +38,7 @@ import ApplyAccreditedCourse from "../pages/institute/service/ApplyAccreditedCou
 import InstituteChange from "../pages/institute/service/InstituteChange";
 import RenewRegistration from "../pages/institute/service/RenewRegistration";
 import ViewApplyNonAccreditedCourse from "../pages/institute/service/ViewApplyNonAccreditedCourse";
-import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";     
+import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";
 
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
@@ -54,7 +59,7 @@ import ViewAssessorAccreditorQMSAuditor from "../pages/public/registration/ViewA
 import CreateTotIndex from "../pages/dwps1/CreateTotIndex";
 import AddTraineeIndex from "../pages/dwps1/AddTraineeIndex";
 
-//service 
+//service
 import ViewCurriculumEndorsementIndex from "../pages/institute/service/ViewCurriculumEndorsementIndex";
 //track application status
 import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
@@ -107,7 +112,7 @@ export const privateRoutes = [
         path: "view-assessoraccreditorqmsquditor/:applicationNo",
         element: <ViewAssessorAccreditorQMSAuditor />,
       },
-       {
+      {
         path: "view-assessoraccreditorqmsquditor/:applicationNo",
         element: <ViewAssessorAccreditorQMSAuditor />,
       },
@@ -122,8 +127,11 @@ export const privateRoutes = [
       {
         path: "view-accredited-course/:applicationNo",
         element: <ViewApplyAccreditedCourse />,
-
-      }
+      },
+      {
+        path: "view-trainee-selection/:applicationNo",
+        element: <ViewAccreditatedRPLCourseTraineeSelectionIndex />,
+      },
     ],
   },
   {
@@ -151,6 +159,18 @@ export const privateRoutes = [
       { path: "non-accredited-course", element: <NonAccreditedCourse /> },
       { path: "rpl-assessment", element: <RPLAssessment1 /> },
       { path: "reassessment", element: <ReAssessment /> },
+      {
+        path: "course-trainee-selection/:applicationNo",
+        element: <AccreditatedRPLCourseTraineeSelectionIndex />,
+      },
+      {
+        path: "non-accredited-course-trainee-selection/:applicationNo",
+        element: <NonAccreditedCourseTraineeSelection />,
+      },
+      {
+        path: "reassessment-trainee-selection/:applicationNo",
+        element: <ReAssessmentTraineeSelectionIndex />,
+      }
     ],
   },
   {
@@ -191,9 +211,7 @@ export const privateRoutes = [
     path: "report",
     children: [
       { path: "report-index", element: <ReportIndex /> },
-      { path: "track-application-status", element: <TrackApplicationStatus /> }
-
-
+      { path: "track-application-status", element: <TrackApplicationStatus /> },
     ],
   },
 

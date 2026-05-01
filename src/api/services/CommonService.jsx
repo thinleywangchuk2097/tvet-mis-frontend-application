@@ -7,6 +7,14 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  getGewogByDzongkhagId(dzongkhagId) {
+    return apiClient
+      .get(`/api/v1/common/get-gewog/${dzongkhagId}`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getAllSectors() {
     return apiClient
       .get("/api/v1/common/get-sectors")
@@ -38,9 +46,28 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
-   getOccupationsBySectorId(sectorId) {
+  getOccupationsBySectorId(sectorId) {
     return apiClient
       .get(`/api/v1/common/get-occupations/${sectorId}`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  getAllCourseAnnouncement() {
+    return apiClient
+      .get("/api/v1/common/get-announcement-application-details")
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  getServiceNameCourseAnnouncement() {
+    return apiClient
+      .get("/api/v1/common/get-service-announcement")
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  getCourseAnnouncementByApplicationNo(applicationNo) {
+    return apiClient
+      .get(`/api/v1/common/get-announcement-course/${applicationNo}`)
       .then((response) => response)
       .catch((error) => error);
   }

@@ -70,6 +70,7 @@ const TABLE_STYLE = {
     backgroundColor: "#fafafa",
   },
 };
+
 const tableStyle = {
   border: "1px solid",
   borderColor: "divider",
@@ -78,6 +79,7 @@ const tableStyle = {
     borderColor: "divider",
   },
 };
+
 const ApplyAccreditedCourse = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -188,8 +190,9 @@ const ApplyAccreditedCourse = () => {
           registration_no,
           access_token,
         );
-        console.log("Fetched applied courses:", response.data);
-      if (response.data) {
+      console.log("Fetched applied courses:", response.data);
+
+      if (response.data && Array.isArray(response.data)) {
         const mappedCourses = response.data.map((course, index) => ({
           id: course.id || index,
           applicationNo: course.application_no,
@@ -198,13 +201,31 @@ const ApplyAccreditedCourse = () => {
           sectorId: course.sector_id,
           courseFee: course.course_fee,
           statusId: course.status_id,
-          curriculum_type_id: course.curriculum_id,
+          curriculumId: course.curriculum_id,
+          curriculum_name: course.curriculum_name,
           registration_no: course.registration_no,
           proposed_institute_name: course.proposed_institute_name,
           institute_id: course.institute_id,
-          qualityStandards: course.quality_standard_responses || [],
+          registration_date: course.registration_date,
+          validity_date: course.validity_date,
+          created_by: course.created_by,
+          created_at: course.created_at,
+          // Parse quality standards if it's a string
+          qualityStandards: course.quality_standard_responses
+            ? typeof course.quality_standard_responses === "string"
+              ? JSON.parse(course.quality_standard_responses)
+              : course.quality_standard_responses
+            : [],
+          // Parse documents if needed
+          documents: course.documents
+            ? typeof course.documents === "string"
+              ? JSON.parse(course.documents)
+              : course.documents
+            : [],
         }));
         setCourses(mappedCourses);
+      } else {
+        setCourses([]);
       }
     } catch (error) {
       console.error("Error fetching applied courses:", error);
@@ -245,6 +266,7 @@ const ApplyAccreditedCourse = () => {
           41,
           access_token,
         );
+      console.log("Fetched curriculum types:", response.data);
       setCurriculumTypes(response.data);
     } catch (error) {
       console.error("Error fetching curriculum types:", error);
@@ -264,16 +286,23 @@ const ApplyAccreditedCourse = () => {
     (c) =>
       (c.course_name?.toLowerCase() || "").includes(search.toLowerCase()) ||
       (c.applicationNo?.toLowerCase() || "").includes(search.toLowerCase()) ||
-      (getSectorName(c.sector_id)?.toLowerCase() || "").includes(
+      (getSectorName(c.sectorId)?.toLowerCase() || "").includes(
         search.toLowerCase(),
       ),
   );
 
-  const handleView = (course) => {
+  const handleView = async (course) => {
     setSelectedCourse(course);
     setDialogMode("view");
+    setSelectedSectorId(course.sectorId);
+
+    // Fetch occupations for the sector to display course name properly
+    if (course.sectorId) {
+      await fetchOccupationsBySector(course.sectorId);
+    }
+
     setOpenDialog(true);
-    if (course.qualityStandards) {
+    if (course.qualityStandards && course.qualityStandards.length > 0) {
       populateQualitySelections(course.qualityStandards);
     }
   };
@@ -435,16 +464,40 @@ const ApplyAccreditedCourse = () => {
     );
   };
 
-  const initialValues = {
-    registrationNo: instituteDetails?.registration_no || "",
-    instituteName: instituteDetails?.proposed_institute_name || "",
-    instituteId: instituteDetails?.institute_id || "",
-    curriculumId: "",
-    sectorId: "",
-    courseId: "",
-    courseName: "",
-    courseFee: "",
-    files: [],
+  // Get initial values based on mode
+  const getInitialValues = () => {
+    if (dialogMode === "view" && selectedCourse) {
+      return {
+        registrationNo:
+          selectedCourse.registration_no ||
+          instituteDetails?.registration_no ||
+          "",
+        instituteName:
+          selectedCourse.proposed_institute_name ||
+          instituteDetails?.proposed_institute_name ||
+          "",
+        instituteId:
+          selectedCourse.institute_id || instituteDetails?.institute_id || "",
+        curriculumId: selectedCourse.curriculumId || "",
+        sectorId: selectedCourse.sectorId || "",
+        courseId: selectedCourse.courseId || "",
+        courseName: selectedCourse.course_name || "",
+        courseFee: selectedCourse.courseFee || "",
+        files: [],
+      };
+    }
+
+    return {
+      registrationNo: instituteDetails?.registration_no || "",
+      instituteName: instituteDetails?.proposed_institute_name || "",
+      instituteId: instituteDetails?.institute_id || "",
+      curriculumId: "",
+      sectorId: "",
+      courseId: "",
+      courseName: "",
+      courseFee: "",
+      files: [],
+    };
   };
 
   const validationSchema = Yup.object().shape({
@@ -476,7 +529,6 @@ const ApplyAccreditedCourse = () => {
           courseFee: values.courseFee,
           curriculumId: values.curriculumId,
           sectorId: values.sectorId,
-          is_active: "Y",
           registration_date: new Date().toISOString(),
           validity_date: null,
           createdBy: actionId,
@@ -485,21 +537,6 @@ const ApplyAccreditedCourse = () => {
           statusId: 55,
           documents: documents,
           qualityStandards: qualityStandardsList,
-          instituteAccreditedCertifications: [],
-          instituteAccreditedCurriculums: [],
-          instituteAccreditedTrainers: [],
-          classNo: 0,
-          workshopNo: 0,
-          trainingLabNo: 0,
-          equipmentTool: "N",
-          firstAidFacility: "N",
-          toiletFacility: "N",
-          lightingPower: "N",
-          fireSafety: "N",
-          trainerTraineeRatioTheory: "0:0",
-          trainerTraineeRatioPractical: "0:0",
-          maxNoTrainees: 0,
-          presentNoTrainee: 0,
         };
 
         const response =
@@ -595,8 +632,8 @@ const ApplyAccreditedCourse = () => {
               filteredCourses
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((course, index) => {
-                  const statusName = getStatusName(course.status_id);
-                  const sectorName = getSectorName(course.sector_id);
+                  const statusName = getStatusName(course.statusId);
+                  const sectorName = getSectorName(course.sectorId);
 
                   return (
                     <TableRow key={course.id || index}>
@@ -675,7 +712,7 @@ const ApplyAccreditedCourse = () => {
             (selectedCourse?.id || "") +
             (instituteDetails?.registration_no || "")
           }
-          initialValues={initialValues}
+          initialValues={getInitialValues()}
           validationSchema={dialogMode === "add" ? validationSchema : null}
           onSubmit={handleSubmit}
           enableReinitialize={true}
@@ -743,7 +780,11 @@ const ApplyAccreditedCourse = () => {
                           formik.touched.curriculumId &&
                           formik.errors.curriculumId
                         }
-                        disabled={dialogMode === "view"}
+                        slotProps={{
+                          input: {
+                            readOnly: dialogMode === "view",
+                          },
+                        }}
                       >
                         <MenuItem value="">-select-</MenuItem>
                         {loadingCurriculumTypes ? (
@@ -781,7 +822,12 @@ const ApplyAccreditedCourse = () => {
                         helperText={
                           formik.touched.sectorId && formik.errors.sectorId
                         }
-                        disabled={dialogMode === "view"}
+                        //disabled={dialogMode === "view"}
+                        slotProps={{
+                          input: {
+                            readOnly: dialogMode === "view",
+                          },
+                        }}
                       >
                         <MenuItem value="">-select-</MenuItem>
                         {sectors.map((sector) => (
@@ -815,14 +861,14 @@ const ApplyAccreditedCourse = () => {
                           value={formik.values.courseId}
                           onChange={(e) => {
                             formik.handleChange(e);
-                            const selectedCourse = occupations.find(
+                            const selectedCourseObj = occupations.find(
                               (occ) => occ.id == e.target.value,
                             );
-                            if (selectedCourse) {
+                            if (selectedCourseObj) {
                               formik.setFieldValue(
                                 "courseName",
-                                selectedCourse.occupationName ||
-                                  selectedCourse.name,
+                                selectedCourseObj.occupationName ||
+                                  selectedCourseObj.name,
                               );
                             }
                           }}
@@ -873,13 +919,12 @@ const ApplyAccreditedCourse = () => {
                         helperText={
                           formik.touched.courseFee && formik.errors.courseFee
                         }
-                        disabled={dialogMode === "view"}
-                        inputProps={{ min: 1 }}
                         slotProps={{
                           input: {
                             readOnly: dialogMode === "view",
                           },
                         }}
+                        inputProps={{ min: 1 }}
                       />
                     </Grid>
                   </Grid>

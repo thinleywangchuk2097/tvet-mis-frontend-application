@@ -55,6 +55,20 @@ class ApplyNonAccreditedCourseService {
       .catch((error) => error);
   }
 
+   getNonAccreditedApprovedCourseByUserId(user_id, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/non-accredited-course/get-non-accredited-approved-course-details/${user_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
 }
 
 export default new ApplyNonAccreditedCourseService();

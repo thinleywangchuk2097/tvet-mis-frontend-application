@@ -1,14 +1,20 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Paper,
   Typography,
   Grid,
   TextField,
-  Divider,
   Button,
-  Alert,
+  Tabs,
+  Tab,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  TableContainer,
+  Divider,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -21,14 +27,35 @@ import {
   FormControl,
   FormLabel,
 } from "@mui/material";
-import { useSelector } from "react-redux";
-import { toast } from "react-toastify";
+import FileOpenIcon from "@mui/icons-material/FileOpen";
+import BusinessIcon from "@mui/icons-material/Business";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import VerifiedIcon from "@mui/icons-material/Verified";
+import FileDownload from "../../../components/file/FileDownload";
+import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { useSelector } from "react-redux";
 import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
 import CommonService from "../../../api/services/CommonService";
-import FileDownload from "../../../components/file/FileDownload";
+
+const TABLE_STYLE = {
+  border: "1px solid",
+  borderColor: "divider",
+  "& th, & td": {
+    border: "1px solid",
+    borderColor: "divider",
+    height: 28,
+    padding: "0px 6px",
+    fontSize: "0.80rem",
+    lineHeight: 1.2,
+    verticalAlign: "middle",
+  },
+  "& th": {
+    fontWeight: 600,
+    backgroundColor: "#fafafa",
+  },
+};
 
 const ViewApplyAccreditedCourse = () => {
   const { applicationNo } = useParams();
@@ -39,16 +66,18 @@ const ViewApplyAccreditedCourse = () => {
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
   const [courseData, setCourseData] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [newDocuments, setNewDocuments] = useState([]);
-  const [certifications, setCertifications] = useState([]);
-  const [curriculums, setCurriculums] = useState([]);
-  const [trainersList, setTrainersList] = useState([]);
+
+  // Master data states
   const [sectors, setSectors] = useState([]);
-  const [unitLevels, setUnitLevels] = useState([]);
   const [occupations, setOccupations] = useState([]);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const [qualityData, setQualityData] = useState([]);
+  const [qualityResponses, setQualityResponses] = useState({});
+  const [qualityRemarks, setQualityRemarks] = useState({});
+  const [rawQualityStandards, setRawQualityStandards] = useState(null);
 
   // Dialog states
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
@@ -56,7 +85,6 @@ const ViewApplyAccreditedCourse = () => {
   const [remarks, setRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
 
-  // Convert roleId to string for comparison
   const roleId = currentRoleId?.toString();
 
   useEffect(() => {
@@ -65,21 +93,100 @@ const ViewApplyAccreditedCourse = () => {
     }
   }, [applicationNo]);
 
+  useEffect(() => {
+    if (qualityData.length > 0 && rawQualityStandards) {
+      const { responses, remarks } = parseQualityStandardsWithData(
+        rawQualityStandards,
+        qualityData
+      );
+      setQualityResponses(responses);
+      setQualityRemarks(remarks);
+    }
+  }, [qualityData, rawQualityStandards]);
+
   const fetchAllData = async () => {
     setLoading(true);
     try {
       await Promise.all([
         fetchCourseDetails(),
         fetchSectors(),
-        fetchUnitLevels(),
         fetchOccupations(),
+        fetchQualityStandards(),
       ]);
-      setDataLoaded(true);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load course data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchQualityStandards = async () => {
+    try {
+      const response = await CommonService.getAllQualitystandards(26);
+      if (response.data && response.data.length > 0) {
+        const mainCategories = response.data.filter(
+          (item) => item.parentId === 0
+        );
+        const subCategories = response.data.filter(
+          (item) => item.parentId !== 0
+        );
+        const structured = mainCategories.map((category) => ({
+          id: category.id.toString(),
+          title: category.dropdownName || category.description,
+          rows: subCategories
+            .filter((sub) => sub.parentId === category.id)
+            .map((sub) => ({
+              id: sub.id.toString(),
+              value: sub.dropdownName || sub.description,
+            })),
+        }));
+        setQualityData(structured);
+      }
+    } catch (error) {
+      console.error("Error fetching quality standards:", error);
+    }
+  };
+
+  const parseQualityStandardsWithData = (qualityStr, qualityDataRef) => {
+    try {
+      if (!qualityStr) return { responses: {}, remarks: {} };
+
+      const data =
+        typeof qualityStr === "string" ? JSON.parse(qualityStr) : qualityStr;
+
+      const responseMap = {};
+      const remarksMap = {};
+
+      data.forEach((item) => {
+        const subQuestionId = item.standardId?.toString();
+        const responseValue = item.responseId;
+        const remarkValue = item.remarks || "";
+
+        let categoryId = null;
+        for (const category of qualityDataRef) {
+          const foundRow = category.rows.find(
+            (row) => row.id === subQuestionId
+          );
+          if (foundRow) {
+            categoryId = category.id;
+            break;
+          }
+        }
+
+        if (categoryId && subQuestionId) {
+          if (!responseMap[categoryId]) responseMap[categoryId] = {};
+          if (!remarksMap[categoryId]) remarksMap[categoryId] = {};
+
+          responseMap[categoryId][subQuestionId] = responseValue;
+          remarksMap[categoryId][subQuestionId] = remarkValue;
+        }
+      });
+
+      return { responses: responseMap, remarks: remarksMap };
+    } catch (error) {
+      console.error("Error parsing quality standards:", error);
+      return { responses: {}, remarks: {} };
     }
   };
 
@@ -89,15 +196,6 @@ const ViewApplyAccreditedCourse = () => {
       setSectors(response.data);
     } catch (error) {
       console.error("Error fetching sectors:", error);
-    }
-  };
-
-  const fetchUnitLevels = async () => {
-    try {
-      const response = await CommonService.getByParentId(10);
-      setUnitLevels(response.data);
-    } catch (error) {
-      console.error("Error fetching unit levels:", error);
     }
   };
 
@@ -115,7 +213,7 @@ const ViewApplyAccreditedCourse = () => {
       const response =
         await ApplyAccreditedCourseService.getAccreditedCourseByApplicationNo(
           applicationNo,
-          access_token,
+          access_token
         );
 
       let data = response.data;
@@ -125,49 +223,7 @@ const ViewApplyAccreditedCourse = () => {
 
       setCourseData(data);
 
-      // Parse certifications JSON string
-      if (data.certifications) {
-        try {
-          const parsedCertifications =
-            typeof data.certifications === "string"
-              ? JSON.parse(data.certifications)
-              : data.certifications;
-          setCertifications(parsedCertifications);
-        } catch (e) {
-          console.error("Error parsing certifications:", e);
-          setCertifications([]);
-        }
-      }
-
-      // Parse curriculums JSON string
-      if (data.curriculums) {
-        try {
-          const parsedCurriculums =
-            typeof data.curriculums === "string"
-              ? JSON.parse(data.curriculums)
-              : data.curriculums;
-          setCurriculums(parsedCurriculums);
-        } catch (e) {
-          console.error("Error parsing curriculums:", e);
-          setCurriculums([]);
-        }
-      }
-
-      // Parse trainers JSON string
-      if (data.trainers) {
-        try {
-          const parsedTrainers =
-            typeof data.trainers === "string"
-              ? JSON.parse(data.trainers)
-              : data.trainers;
-          setTrainersList(parsedTrainers);
-        } catch (e) {
-          console.error("Error parsing trainers:", e);
-          setTrainersList([]);
-        }
-      }
-
-      // Parse documents JSON string
+      // Parse documents JSON
       if (data.documents) {
         try {
           let parsedDocs =
@@ -183,15 +239,16 @@ const ViewApplyAccreditedCourse = () => {
               filePath: doc.url,
             }));
             setDocuments(formattedDocs);
-          } else {
-            setDocuments([]);
           }
         } catch (e) {
           console.error("Error parsing documents:", e);
           setDocuments([]);
         }
-      } else {
-        setDocuments([]);
+      }
+
+      // Store raw quality standards
+      if (data.quality_standard_responses) {
+        setRawQualityStandards(data.quality_standard_responses);
       }
     } catch (error) {
       console.error("Error fetching course details:", error);
@@ -203,52 +260,76 @@ const ViewApplyAccreditedCourse = () => {
     setNewDocuments(uploadedFiles || []);
   }, []);
 
-  const getSectorName = () => {
-    if (!dataLoaded) return "Loading...";
+  const getSectorName = useCallback(
+    (id) => {
+      if (!id) return "N/A";
+      const sector = sectors.find((s) => String(s.id) === String(id));
+      return sector ? sector.sectorName || sector.name : id;
+    },
+    [sectors]
+  );
 
-    if (courseData?.sector_id && sectors.length > 0) {
-      const sector = sectors.find(
-        (s) => String(s.id) === String(courseData.sector_id),
-      );
-      if (sector) {
-        return sector.sectorName || sector.name || "N/A";
+  const getCourseName = useCallback(
+    (id) => {
+      if (!id) return "N/A";
+      const occupation = occupations.find((occ) => String(occ.id) === String(id));
+      return occupation
+        ? occupation.occupationName || occupation.title || occupation.name
+        : id;
+    },
+    [occupations]
+  );
+
+  const handleQualityResponseChange = (categoryId, subQuestionId, value) => {
+    setQualityResponses((prev) => {
+      const newResponses = { ...prev };
+
+      if (!newResponses[categoryId]) {
+        newResponses[categoryId] = {};
       }
-      return courseData.sector_id;
-    }
-    return courseData?.sector_id || "N/A";
+
+      if (newResponses[categoryId][subQuestionId] === value) {
+        delete newResponses[categoryId][subQuestionId];
+        if (Object.keys(newResponses[categoryId]).length === 0) {
+          delete newResponses[categoryId];
+        }
+      } else {
+        newResponses[categoryId][subQuestionId] = value;
+      }
+
+      return newResponses;
+    });
   };
 
-  const getCourseName = () => {
-    if (!dataLoaded) return "Loading...";
-
-    if (courseData?.course_id && occupations.length > 0) {
-      const occupation = occupations.find(
-        (occ) => String(occ.id) === String(courseData.course_id),
-      );
-      if (occupation) {
-        return (
-          occupation.occupationName ||
-          occupation.title ||
-          occupation.name ||
-          "N/A"
-        );
-      }
-      return courseData.course_id;
-    }
-    return courseData?.course_id || "N/A";
+  const handleQualityRemarkChange = (categoryId, subQuestionId, value) => {
+    setQualityRemarks((prev) => ({
+      ...prev,
+      [categoryId]: {
+        ...prev[categoryId],
+        [subQuestionId]: value,
+      },
+    }));
   };
 
-  const getUnitLevelName = (levelId) => {
-    if (!dataLoaded) return "Loading...";
+  const prepareQualityStandardsForBackend = () => {
+    const qualityStandardsData = [];
 
-    if (levelId && unitLevels.length > 0) {
-      const level = unitLevels.find((l) => String(l.id) === String(levelId));
-      if (level) {
-        return level.name || level.value || "N/A";
-      }
-      return levelId;
-    }
-    return levelId || "N/A";
+    Object.keys(qualityResponses).forEach((categoryId) => {
+      Object.keys(qualityResponses[categoryId]).forEach((subQuestionId) => {
+        const responseId = qualityResponses[categoryId][subQuestionId];
+        const remark = qualityRemarks[categoryId]?.[subQuestionId] || "";
+
+        if (responseId && responseId !== "") {
+          qualityStandardsData.push({
+            standardId: parseInt(subQuestionId),
+            responseId: responseId,
+            remarks: remark,
+          });
+        }
+      });
+    });
+
+    return qualityStandardsData;
   };
 
   const openActionDialog = (statusId) => {
@@ -266,17 +347,15 @@ const ViewApplyAccreditedCourse = () => {
   };
 
   const handleAction = async () => {
-    // Check if remarks are required for rejection
-    if (
-      (selectedStatusId === 58 || selectedStatusId === 60) &&
-      !remarks.trim()
-    ) {
+    if ((selectedStatusId === 58 || selectedStatusId === 60) && !remarks.trim()) {
       setRemarksError("Remarks are required for rejection");
       return;
     }
 
     setActionLoading(true);
     try {
+      const qualityStandardsData = prepareQualityStandardsForBackend();
+
       const payload = {
         applicationNo: applicationNo,
         statusId: selectedStatusId,
@@ -285,22 +364,22 @@ const ViewApplyAccreditedCourse = () => {
         remarks: remarks || "Application processed",
         updatedBy: actionId,
         documents: newDocuments,
+        qualityStandards: qualityStandardsData,
       };
 
-      const response =
-        await ApplyAccreditedCourseService.verifyAccreditedCourse(
-          payload,
-          access_token,
-        );
+      const response = await ApplyAccreditedCourseService.verifyAccreditedCourse(
+        payload,
+        access_token
+      );
 
       if (response.status === 200 || response.status === 201) {
         let successMessage;
         switch (selectedStatusId) {
           case 56:
-            successMessage = "Course verified 1 successfully";
+            successMessage = "Course verified successfully";
             break;
           case 62:
-            successMessage = "Course verified 2 successfully";
+            successMessage = "Course verified successfully";
             break;
           case 59:
             successMessage = "Course endorsed successfully";
@@ -312,9 +391,8 @@ const ViewApplyAccreditedCourse = () => {
             successMessage = "Course rejected successfully";
             break;
           case 60:
-            successMessage = "Forwarded back to QAS Level 1";
+            successMessage = "Forwarded back to QAS Level 1 successfully";
             break;
-
           default:
             successMessage = "Action completed successfully";
         }
@@ -357,12 +435,11 @@ const ViewApplyAccreditedCourse = () => {
       return (
         <>
           <DialogContentText sx={{ mb: 2 }}>
-            Please provide remarks for rejecting this accredited course
-            application:
+            Please provide remarks for rejecting this accredited course application:
             <br />
             <strong>Application No: {applicationNo}</strong>
             <br />
-            <strong>Course Title: {getCourseName()}</strong>
+            <strong>Course Title: {getCourseName(courseData?.course_id)}</strong>
           </DialogContentText>
           <TextField
             autoFocus
@@ -387,17 +464,16 @@ const ViewApplyAccreditedCourse = () => {
         selectedStatusId === 56 || selectedStatusId === 62
           ? "verify"
           : selectedStatusId === 59
-            ? "endorse"
-            : "approve";
+          ? "endorse"
+          : "approve";
 
       return (
         <DialogContentText>
-          Are you sure you want to {actionText} this accredited course
-          application?
+          Are you sure you want to {actionText} this accredited course application?
           <br />
           <strong>Application No: {applicationNo}</strong>
           <br />
-          <strong>Course Title: {getCourseName()}</strong>
+          <strong>Course Title: {getCourseName(courseData?.course_id)}</strong>
         </DialogContentText>
       );
     }
@@ -406,17 +482,15 @@ const ViewApplyAccreditedCourse = () => {
   const getConfirmButtonColor = () => {
     switch (selectedStatusId) {
       case 56:
-        return "success";
-      case 62:
-        return "success";
       case 57:
+      case 62:
         return "success";
       case 58:
         return "error";
-      case 60:
-        return "success";
       case 59:
         return "primary";
+      case 60:
+        return "warning";
       default:
         return "primary";
     }
@@ -441,17 +515,118 @@ const ViewApplyAccreditedCourse = () => {
     }
   };
 
+  const renderChecklist = useCallback(
+    (standard) => {
+      return (
+        <Grid item xs={12} key={standard.id}>
+          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
+              {standard.title}
+            </Typography>
+            <TableContainer>
+              <Table size="small" sx={TABLE_STYLE}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell width="40">Sl. No</TableCell>
+                    <TableCell>Quality Indicator</TableCell>
+                    <TableCell align="center" width="80">
+                      YES
+                    </TableCell>
+                    <TableCell align="center" width="80">
+                      NO
+                    </TableCell>
+                    <TableCell width="250">Remarks</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {standard.rows.map((row, index) => {
+                    const selectedValue = qualityResponses[standard.id]?.[row.id];
+                    const isYes = selectedValue === "Y";
+                    const isNo = selectedValue === "N";
+                    const remark = qualityRemarks[standard.id]?.[row.id] || "";
+
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>{row.value}</TableCell>
+                        <TableCell align="center">
+                          <Radio
+                            size="small"
+                            sx={{ p: 0.25 }}
+                            checked={isYes}
+                            onChange={() => {
+                              const newValue = isYes ? undefined : "Y";
+                              handleQualityResponseChange(
+                                standard.id,
+                                row.id,
+                                newValue
+                              );
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Radio
+                            size="small"
+                            sx={{ p: 0.25 }}
+                            checked={isNo}
+                            onChange={() => {
+                              const newValue = isNo ? undefined : "N";
+                              handleQualityResponseChange(
+                                standard.id,
+                                row.id,
+                                newValue
+                              );
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Enter remarks"
+                            value={remark}
+                            onChange={(e) =>
+                              handleQualityRemarkChange(
+                                standard.id,
+                                row.id,
+                                e.target.value
+                              )
+                            }
+                            slotProps={{
+                              input: {
+                                sx: { fontSize: "0.75rem" },
+                              },
+                            }}
+                            multiline
+                            rows={2}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Grid>
+      );
+    },
+    [qualityResponses, qualityRemarks]
+  );
+
+  const tabs = [
+    { icon: <BusinessIcon />, label: "Course Information" },
+    { icon: <VerifiedIcon />, label: "Quality Standards" },
+    { icon: <FileOpenIcon />, label: "Supporting Documents" },
+  ];
+
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "50vh",
-        }}
-      >
-        <CircularProgress />
+      <Box sx={{ p: 1, minHeight: "100vh" }}>
+        <Paper sx={{ p: 3, textAlign: "center" }}>
+          <CircularProgress />
+          <Typography sx={{ mt: 2 }}>Loading...</Typography>
+        </Paper>
       </Box>
     );
   }
@@ -459,461 +634,145 @@ const ViewApplyAccreditedCourse = () => {
   if (!courseData) {
     return (
       <Box sx={{ m: 3 }}>
-        <Alert severity="error">
-          Accredited Course with Application No:{" "}
-          <strong>{applicationNo}</strong> not found
-        </Alert>
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
+            Accredited Course Details
+          </Typography>
+          <Alert severity="error">
+            Accredited Course with Application No:{" "}
+            <strong>{applicationNo}</strong> not found
+          </Alert>
+        </Paper>
       </Box>
     );
   }
 
   return (
     <Box>
-      <Paper sx={{ p: { xs: 2, md: 3 } }}>
+      <Paper sx={{ p: 2 }}>
         <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
           Accredited Course Details
         </Typography>
+        <Divider />
 
-        {/* Section 1: Training Provider Details */}
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
-            1. Training Provider Details
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          <Grid container spacing={2}>
-            <Grid item size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Registration No"
-                value={courseData.registration_no || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Institute Name"
-                value={courseData.proposed_institute_name || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Curriculum Type"
-                value={courseData.curriculum_name || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Sector"
-                value={getSectorName()}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Course"
-                value={getCourseName()}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Course Fee (RM)"
-                value={courseData.course_fee || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Application No"
-                value={courseData.application_no || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* Section 2: Modules/Certifications */}
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
-            2. Details of Modules, Code and Level Certification
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          {certifications.map((module, index) => (
-            <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="NCS Code"
-                  value={module.certificationCode || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Unit Name"
-                  value={module.certificationModule || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Unit Level"
-                  value={getUnitLevelName(module.certificationLevelId)}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-            </Grid>
-          ))}
-        </Paper>
-
-        {/* Section 3: Curriculum */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            3. Curriculum and Course Duration
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          {curriculums.map((curr, index) => (
-            <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Module No"
-                  value={curr.moduleNo || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Module Name"
-                  value={curr.moduleName || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Module Code"
-                  value={curr.ncsCode || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Theory (Hrs)"
-                  value={curr.theoryHour || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Practical (Hrs)"
-                  value={curr.practicalHour || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="OJT (Hrs)"
-                  value={curr.ojtHour || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-            </Grid>
-          ))}
-        </Paper>
-
-        {/* Section 4: Training Facilities */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            4. Training Facilities
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          <Grid container spacing={3}>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="No of Class"
-                value={courseData.class_no || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="No of Workshops"
-                value={courseData.workshop_no || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="No of Training Lab"
-                value={courseData.training_lab_no || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* Section 5: Other Facilities */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            5. Other Facilities
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          <Grid container spacing={3}>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <FormControl component="fieldset" size="small">
-                <FormLabel component="legend">
-                  1. Training Tools and Equipment
-                </FormLabel>
-                <RadioGroup row value={courseData.equipment_tool || ""}>
-                  <FormControlLabel
-                    value="Y"
-                    control={<Radio size="small" />}
-                    label="Yes"
-                  />
-                  <FormControlLabel
-                    value="N"
-                    control={<Radio size="small" />}
-                    label="No"
-                  />
-                </RadioGroup>
-              </FormControl>
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <FormControl component="fieldset" size="small">
-                <FormLabel component="legend">
-                  2. First Aid Facilities
-                </FormLabel>
-                <RadioGroup row value={courseData.first_aid_facility || ""}>
-                  <FormControlLabel
-                    value="Y"
-                    control={<Radio size="small" />}
-                    label="Yes"
-                  />
-                  <FormControlLabel
-                    value="N"
-                    control={<Radio size="small" />}
-                    label="No"
-                  />
-                </RadioGroup>
-              </FormControl>
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <FormControl component="fieldset" size="small">
-                <FormLabel component="legend">3. Toilet Facilities</FormLabel>
-                <RadioGroup row value={courseData.toilet_facility || ""}>
-                  <FormControlLabel
-                    value="Y"
-                    control={<Radio size="small" />}
-                    label="Yes"
-                  />
-                  <FormControlLabel
-                    value="N"
-                    control={<Radio size="small" />}
-                    label="No"
-                  />
-                </RadioGroup>
-              </FormControl>
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <FormControl component="fieldset" size="small">
-                <FormLabel component="legend">
-                  4. Lighting/Power Supply
-                </FormLabel>
-                <RadioGroup row value={courseData.lighting_power || ""}>
-                  <FormControlLabel
-                    value="Y"
-                    control={<Radio size="small" />}
-                    label="Yes"
-                  />
-                  <FormControlLabel
-                    value="N"
-                    control={<Radio size="small" />}
-                    label="No"
-                  />
-                </RadioGroup>
-              </FormControl>
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <FormControl component="fieldset" size="small">
-                <FormLabel component="legend">5. Fire Safety</FormLabel>
-                <RadioGroup row value={courseData.fire_safety || ""}>
-                  <FormControlLabel
-                    value="Y"
-                    control={<Radio size="small" />}
-                    label="Yes"
-                  />
-                  <FormControlLabel
-                    value="N"
-                    control={<Radio size="small" />}
-                    label="No"
-                  />
-                </RadioGroup>
-              </FormControl>
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Trainer-Trainee Ratio (Theory)"
-                value={courseData.trainer_trainee_ratio_theory || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Trainer-Trainee Ratio (Practical)"
-                value={courseData.trainer_trainee_ratio_practical || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Max no of Trainees per batch"
-                value={courseData.max_no_trainees || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Present no of Trainees"
-                value={courseData.present_no_trainee || "N/A"}
-                size="small"
-                slotProps={{ input: { readOnly: true } }}
-              />
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* Section 6: Trainers */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            6. Trainer attached to the Course
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          {trainersList.map((trainer, index) => (
-            <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Name"
-                  value={trainer.trainerName || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Qualification"
-                  value={trainer.acamedicProfessional || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Industrial Exp (Years)"
-                  value={trainer.industrialExperience || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Teaching Exp (Years)"
-                  value={trainer.teachingExperience || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Subjects Taught"
-                  value={trainer.subjectTaught || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Teaching Hrs"
-                  value={trainer.teachingHour || "N/A"}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-            </Grid>
-          ))}
-        </Paper>
-
-        {/* Section 7: Supporting Documents */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            7. Supporting Documents
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-          <Grid container spacing={3}>
-            <Grid item size={{ xs: 12 }}>
-              <FileDownload
-                initialFiles={documents}
-                onFileUpload={handleFileUpload}
-                allowUpload={true}
-              />
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* Role-based Action Buttons */}
-        <Box
-          sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}
+        <Tabs
+          value={tabValue}
+          onChange={(e, v) => setTabValue(v)}
+          variant="fullWidth"
+          sx={{
+            "& .MuiTab-root": { textTransform: "none", fontWeight: 600 },
+          }}
         >
-          {/* Role 7: First Verifier */}
+          {tabs.map((tab, index) => (
+            <Tab key={index} icon={tab.icon} label={tab.label} />
+          ))}
+        </Tabs>
+
+        {/* Tab 0: Course Information */}
+        {tabValue === 0 && (
+          <Paper sx={{ p: 3, mb: 2 }} variant="outlined">
+            <Grid container spacing={2}>
+              <Grid item size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Registration No"
+                  value={courseData.registration_no || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid item size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Institute Name"
+                  value={courseData.proposed_institute_name || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid item size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Curriculum Type"
+                  value={courseData.curriculum_name || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid item size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Sector"
+                  value={getSectorName(courseData.sector_id)}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid item size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Course"
+                  value={getCourseName(courseData.course_id)}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid item size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Course Fee (RM)"
+                  value={courseData.course_fee || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid item size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Application No"
+                  value={courseData.application_no || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
+        )}
+
+        {/* Tab 1: Quality Standards */}
+        {tabValue === 1 && (
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item size={{ xs: 12 }}>
+              {qualityData.length > 0 ? (
+                qualityData.map(renderChecklist)
+              ) : (
+                <Paper sx={{ p: 3, textAlign: "center" }}>
+                  <Typography color="text.secondary">
+                    No quality standards available for this service
+                  </Typography>
+                </Paper>
+              )}
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Tab 2: Supporting Documents */}
+        {tabValue === 2 && (
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item size={{ xs: 12 }}>
+              <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+                <FileDownload
+                  initialFiles={documents}
+                  onFileUpload={handleFileUpload}
+                  allowUpload={true}
+                />
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Action Buttons */}
+        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
           {roleId === "7" && (
             <>
               <Button
@@ -922,10 +781,9 @@ const ViewApplyAccreditedCourse = () => {
                 size="small"
                 startIcon={<CheckCircleIcon />}
                 onClick={() => openActionDialog(56)}
-                disabled={actionLoading}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
-                Verify1
+                Verify 1
               </Button>
               <Button
                 variant="contained"
@@ -933,7 +791,6 @@ const ViewApplyAccreditedCourse = () => {
                 size="small"
                 startIcon={<CancelIcon />}
                 onClick={() => openActionDialog(58)}
-                disabled={actionLoading}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Reject
@@ -941,7 +798,6 @@ const ViewApplyAccreditedCourse = () => {
             </>
           )}
 
-          {/* Role 10: Second Verifier */}
           {roleId === "10" && (
             <>
               <Button
@@ -950,10 +806,9 @@ const ViewApplyAccreditedCourse = () => {
                 size="small"
                 startIcon={<CheckCircleIcon />}
                 onClick={() => openActionDialog(62)}
-                disabled={actionLoading}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
-                Verify2
+                Verify 2
               </Button>
               <Button
                 variant="contained"
@@ -961,7 +816,6 @@ const ViewApplyAccreditedCourse = () => {
                 size="small"
                 startIcon={<CancelIcon />}
                 onClick={() => openActionDialog(60)}
-                disabled={actionLoading}
                 sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
               >
                 Reject
@@ -969,7 +823,6 @@ const ViewApplyAccreditedCourse = () => {
             </>
           )}
 
-          {/* Role 23: Endorser */}
           {roleId === "23" && (
             <Button
               variant="contained"
@@ -977,14 +830,12 @@ const ViewApplyAccreditedCourse = () => {
               size="small"
               startIcon={<VerifiedIcon />}
               onClick={() => openActionDialog(59)}
-              disabled={actionLoading}
               sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
             >
               Endorse
             </Button>
           )}
 
-          {/* Role 22: Approver */}
           {roleId === "22" && (
             <Button
               variant="contained"
@@ -992,7 +843,6 @@ const ViewApplyAccreditedCourse = () => {
               size="small"
               startIcon={<CheckCircleIcon />}
               onClick={() => openActionDialog(57)}
-              disabled={actionLoading}
               sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
             >
               Approve
@@ -1002,12 +852,7 @@ const ViewApplyAccreditedCourse = () => {
       </Paper>
 
       {/* Action Dialog */}
-      <Dialog
-        open={actionDialogOpen}
-        onClose={closeDialog}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={actionDialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
         <DialogTitle>{getDialogTitle()}</DialogTitle>
         <DialogContent>{getDialogContent()}</DialogContent>
         <DialogActions>
@@ -1027,8 +872,7 @@ const ViewApplyAccreditedCourse = () => {
             size="small"
             disabled={
               actionLoading ||
-              ((selectedStatusId === 58 || selectedStatusId === 60) &&
-                !remarks.trim())
+              ((selectedStatusId === 58 || selectedStatusId === 60) && !remarks.trim())
             }
           >
             {getConfirmButtonText()}

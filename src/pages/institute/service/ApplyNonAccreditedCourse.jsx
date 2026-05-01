@@ -193,10 +193,9 @@ const ApplyNonAccreditedCourse = () => {
 
       if (response.data && Array.isArray(response.data)) {
         const transformedCourses = response.data.map((item, index) => {
-          const curriculumType = curriculumTypes.find(
-            (type) =>
-              type.curriculum_type_id == item.curriculum_type_id ||
-              type.id == item.curriculum_type_id,
+          // Find curriculum by id
+          let curriculumType = curriculumTypes.find(
+            (type) => String(type.id) === String(item.curriculum_id)
           );
 
           return {
@@ -209,19 +208,15 @@ const ApplyNonAccreditedCourse = () => {
             feesPerTrainee: item.fees_per_trainee || 0,
             enrolmentCapacity: item.enrolment_capacity || 0,
             certificateLevelId: item.certificate_level_id || "",
-            curriculumTypeId: item.curriculum_type_id || "",
-            curriculumTypeName:
-              curriculumType?.curriculum_name || item.curriculum_type_id,
+            curriculumId: item.curriculum_id || "",
+            curriculumName: curriculumType?.curriculum_name || "", // Store the name directly
             attachment: item.attachment || "",
             application_no: item.application_no || "",
             qualityStandards: item.quality_standards || [],
           };
         });
         setCourses(transformedCourses);
-
-        if (response.data[0]?.quality_standards) {
-          populateQualitySelections(response.data[0].quality_standards);
-        }
+        console.log("Transformed courses with curriculum names:", transformedCourses);
       }
     } catch (error) {
       console.error("Error fetching non-accredited course details:", error);
@@ -261,7 +256,12 @@ const ApplyNonAccreditedCourse = () => {
   );
 
   const handleView = (course) => {
-    setSelectedCourse(course);
+    // When viewing, make sure we have the latest curriculum name
+    const curriculumName = getCurriculumTypeName(course.curriculumId);
+    setSelectedCourse({
+      ...course,
+      curriculumDisplayName: curriculumName
+    });
     setOpenView(true);
   };
 
@@ -420,7 +420,7 @@ const ApplyNonAccreditedCourse = () => {
     feesPerTrainee: "",
     enrolmentCapacity: "",
     certificateLevelId: "",
-    curriculumTypeId: "",
+    curriculumId: "",
     files: [],
   };
 
@@ -443,7 +443,7 @@ const ApplyNonAccreditedCourse = () => {
       .positive("Must be positive")
       .integer("Must be a whole number"),
     certificateLevelId: Yup.string().required("Certificate level is required"),
-    curriculumTypeId: Yup.string().required("Curriculum type is required"),
+    curriculumId: Yup.string().required("Curriculum type is required"),
     files: Yup.array().min(1, "Please upload supporting documents"),
   });
 
@@ -454,10 +454,9 @@ const ApplyNonAccreditedCourse = () => {
         values.files.map((file) => fileToBase64(file)),
       );
 
+      // Find the selected curriculum by id
       const selectedCurriculum = curriculumTypes.find(
-        (t) =>
-          t.curriculum_type_id == values.curriculumTypeId ||
-          t.id == values.curriculumTypeId,
+        (t) => String(t.id) === String(values.curriculumId)
       );
 
       const qualityStandardsList = transformQualityStandards(qualitySelections);
@@ -471,7 +470,7 @@ const ApplyNonAccreditedCourse = () => {
         feesPerTrainee: parseInt(values.feesPerTrainee),
         enrolmentCapacity: parseInt(values.enrolmentCapacity),
         certificateLevelId: values.certificateLevelId,
-        curriculumTypeId: values.curriculumTypeId,
+        curriculumId: parseInt(values.curriculumId),
         instituteId: instituteDetails?.institute_id || "",
         serviceId: 13,
         assignedRoleId: 7,
@@ -498,10 +497,11 @@ const ApplyNonAccreditedCourse = () => {
           feesPerTrainee: parseInt(values.feesPerTrainee),
           enrolmentCapacity: parseInt(values.enrolmentCapacity),
           certificateLevelId: values.certificateLevelId,
-          curriculumTypeId: values.curriculumTypeId,
-          curriculumTypeName:
-            selectedCurriculum?.curriculum_name || values.curriculumTypeId,
+          curriculumId: values.curriculumId,
+          curriculumName: selectedCurriculum?.curriculum_name || "",
           attachment: values.files.map((file) => file.name).join(", "),
+          application_no: response.data?.application_no || "",
+          statusName: "submitted",
         };
 
         setCourses([...courses, newCourse]);
@@ -527,20 +527,29 @@ const ApplyNonAccreditedCourse = () => {
   };
 
   const getCertificateLevelName = (levelId) => {
-    const level = certificateLevels.find((l) => l.id == levelId);
+    const level = certificateLevels.find((l) => String(l.id) === String(levelId));
     return (
       level?.name || level?.value || level?.certificate_level_name || levelId
     );
   };
 
-  const getCurriculumTypeName = (curriculumTypeId) => {
-    if (!curriculumTypeId) return "-";
-    const curriculum = curriculumTypes.find(
-      (type) =>
-        type.curriculum_type_id == curriculumTypeId ||
-        type.id == curriculumTypeId,
+  // Get curriculum type name - robust version with fallback
+  const getCurriculumTypeName = (curriculumId) => {
+    if (!curriculumId) return "-";
+    
+    // First try to find by id
+    let curriculum = curriculumTypes.find(
+      (type) => String(type.id) === String(curriculumId)
     );
-    return curriculum?.curriculum_name || curriculumTypeId;
+    
+    // If not found, try by curriculum_type_id
+    if (!curriculum) {
+      curriculum = curriculumTypes.find(
+        (type) => String(type.curriculum_type_id) === String(curriculumId)
+      );
+    }
+    
+    return curriculum?.curriculum_name || curriculumId;
   };
 
   return (
@@ -622,14 +631,14 @@ const ApplyNonAccreditedCourse = () => {
                       {getCertificateLevelName(course.certificateLevelId)}
                     </TableCell>
                     <TableCell>
-                      {getCurriculumTypeName(course.curriculumTypeId)}
+                      {course.curriculumName || getCurriculumTypeName(course.curriculumId)}
                     </TableCell>
                     <TableCell>
                       <Chip
                         label={course.statusName}
                         size="small"
                         sx={{
-                          backgroundColor: "#2196f3",
+                          backgroundColor: course.statusName === "submitted" ? "#2196f3" : "#4caf50",
                           color: "white",
                           fontWeight: "medium",
                           minWidth: "100px",
@@ -665,7 +674,7 @@ const ApplyNonAccreditedCourse = () => {
                 ))
             ) : (
               <TableRow>
-                <TableCell colSpan={10} align="center">
+                <TableCell colSpan={11} align="center">
                   No data available in table
                 </TableCell>
               </TableRow>
@@ -831,7 +840,9 @@ const ApplyNonAccreditedCourse = () => {
                   fullWidth
                   label="Curriculum Type"
                   size="small"
-                  value={getCurriculumTypeName(selectedCourse.curriculumTypeId)}
+                  value={selectedCourse.curriculumDisplayName || 
+                         selectedCourse.curriculumName || 
+                         getCurriculumTypeName(selectedCourse.curriculumId)}
                   slotProps={{
                     input: {
                       readOnly: true,
@@ -1099,26 +1110,23 @@ const ApplyNonAccreditedCourse = () => {
                         select
                         fullWidth
                         label="Curriculum Type"
-                        name="curriculumTypeId"
+                        name="curriculumId"
                         size="small"
-                        value={formik.values.curriculumTypeId}
+                        value={formik.values.curriculumId}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.curriculumTypeId &&
-                          Boolean(formik.errors.curriculumTypeId)
+                          formik.touched.curriculumId &&
+                          Boolean(formik.errors.curriculumId)
                         }
                         helperText={
-                          formik.touched.curriculumTypeId &&
-                          formik.errors.curriculumTypeId
+                          formik.touched.curriculumId &&
+                          formik.errors.curriculumId
                         }
                       >
                         <MenuItem value="">-select-</MenuItem>
                         {curriculumTypes.map((type) => (
-                          <MenuItem
-                            key={type.id}
-                            value={type.curriculum_type_id || type.id}
-                          >
+                          <MenuItem key={type.id} value={type.id}>
                             {type.curriculum_name}
                           </MenuItem>
                         ))}
@@ -1213,7 +1221,7 @@ const ApplyNonAccreditedCourse = () => {
                     formik.values.files.length === 0
                   }
                 >
-                  {loading ? "Saving..." : "Save"}
+                  {loading ? "Saving..." : "Submit"}
                 </Button>
               </DialogActions>
             </Form>
