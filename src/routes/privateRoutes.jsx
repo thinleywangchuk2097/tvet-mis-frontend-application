@@ -33,7 +33,7 @@ import ApplyAccreditedCourse from "../pages/institute/service/ApplyAccreditedCou
 import InstituteChange from "../pages/institute/service/InstituteChange";
 import RenewRegistration from "../pages/institute/service/RenewRegistration";
 import ViewApplyNonAccreditedCourse from "../pages/institute/service/ViewApplyNonAccreditedCourse";
-import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";     
+import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";
 
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
@@ -58,6 +58,9 @@ import AddTraineeIndex from "../pages/dwps1/AddTraineeIndex";
 import ViewCurriculumEndorsementIndex from "../pages/institute/service/ViewCurriculumEndorsementIndex";
 //track application status
 import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
+
+//Certificate
+import Assessment from "../pages/certificate/Assessment";
 
 export const privateRoutes = [
   {
@@ -107,7 +110,7 @@ export const privateRoutes = [
         path: "view-assessoraccreditorqmsquditor/:applicationNo",
         element: <ViewAssessorAccreditorQMSAuditor />,
       },
-       {
+      {
         path: "view-assessoraccreditorqmsquditor/:applicationNo",
         element: <ViewAssessorAccreditorQMSAuditor />,
       },
@@ -196,7 +199,12 @@ export const privateRoutes = [
 
     ],
   },
-
+  {
+    path: "certificate",
+    children: [
+      { path: "assessment", element: <Assessment /> },
+    ],
+  },
   //without children
   { path: "/apply-qms-certification", element: <ApplyQmsCertification /> },
   { path: "/track-trainee", element: <TrackTrainee /> },

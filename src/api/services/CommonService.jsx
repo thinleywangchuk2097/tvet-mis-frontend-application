@@ -38,7 +38,7 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
-   getOccupationsBySectorId(sectorId) {
+  getOccupationsBySectorId(sectorId) {
     return apiClient
       .get(`/api/v1/common/get-occupations/${sectorId}`)
       .then((response) => response)
