@@ -21,7 +21,7 @@ import AccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/cours
 import ViewAccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/course-announcement/ViewAccreditatedRPLCourseTraineeSelectionIndex";
 import NonAccreditedCourseTraineeSelection from "../pages/institute/course-announcement/NonAccreditedCourseTraineeSelection";
 import ReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ReAssessmentTraineeSelectionIndex";
-
+import ViewReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ViewReAssessmentTraineeSelectionIndex"; 
 
 //resource-management
 import StaffManagement from "../pages/institute/resource-management/StaffManagement";
@@ -135,6 +135,10 @@ export const privateRoutes = [
         path: "view-trainee-selection/:applicationNo",
         element: <ViewAccreditatedRPLCourseTraineeSelectionIndex />,
       },
+      {
+        path: "view-reassessment-trainee-selection/:applicationNo",
+        element: <ViewReAssessmentTraineeSelectionIndex />,
+      },
     ],
   },
   {
@@ -171,7 +175,7 @@ export const privateRoutes = [
         element: <NonAccreditedCourseTraineeSelection />,
       },
       {
-        path: "reassessment-trainee-selection/:applicationNo",
+        path: "reassessment-trainee-selection/:applicationNo/:courseId",
         element: <ReAssessmentTraineeSelectionIndex />,
       }
     ],

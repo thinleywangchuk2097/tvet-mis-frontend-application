@@ -269,10 +269,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       setTraineeVivaAssessments(initialViva);
       setTraineeVivaPracticalAssessments(initialVivaPractical);
 
-      console.log("Initialized internal assessments:", initialInternalAssessments);
-      console.log("Initialized viva assessments:", initialViva);
-      console.log("Initialized viva practical assessments:", initialVivaPractical);
-      console.log("Is service_id 39:", isServiceId39);
     } catch (error) {
       console.error("Error fetching applied trainees:", error);
       toast.error("Failed to fetch applied trainees");
