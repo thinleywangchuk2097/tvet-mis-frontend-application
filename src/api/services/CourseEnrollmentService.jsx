@@ -42,39 +42,87 @@ class CourseEnrollmentService {
       .catch((error) => error);
   }
 
-  selectedTrainee(data, token) {
-    return apiClient
-      .post(`/api/v1/public/course-enrollment-trainee/selected-trainees`, data, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      .then((response) => response)
-      .catch((error) => error);
-  }
-   updateTraineeApplication(data, token) {
-    return apiClient
-      .post(`/api/v1/public/course-enrollment-trainee/update-trainees-application`, data, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      .then((response) => response)
-      .catch((error) => error);
-  }
-
-   getFailedTraineeDetails(user_id) {
+    getCourseAppliedTraineesReAssessmentByApplicationNo(application_no) {
     return apiClient
       .get(
-        `/api/v1/public/course-enrollment-trainee/get-trainee-details/${user_id}`,
+        `/api/v1/public/course-enrollment-trainee/get-reassessment-applicant-details/${application_no}`,
       )
       .then((response) => response)
       .catch((error) => error);
   }
 
-   selectUnselectTrainee(data) {
+  selectedTrainee(data, token) {
     return apiClient
-      .post(`/api/v1/public/course-enrollment-trainee/select-unselect-trainees`, data, {})
+      .post(
+        `/api/v1/public/course-enrollment-trainee/selected-trainees`,
+        data,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+   submitReassessmentTrainees(data, token) {
+    return apiClient
+      .post(
+        `/api/v1/public/course-enrollment-trainee/selected-reassessment-trainees`,
+        data,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  updateTraineeApplication(data, token) {
+    return apiClient
+      .post(
+        `/api/v1/public/course-enrollment-trainee/update-trainees-application`,
+        data,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  getFailedTraineeDetails(user_id,course_id) {
+    return apiClient
+      .get(
+        `/api/v1/public/course-enrollment-trainee/get-trainee-details/${user_id}/${course_id}`,
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  selectUnselectTrainee(data) {
+    return apiClient
+      .post(
+        `/api/v1/public/course-enrollment-trainee/select-unselect-trainees`,
+        data,
+        {},
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  getReAssessmentServiceName(token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/course-announcement/get-reassessment-service-name`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
       .then((response) => response)
       .catch((error) => error);
   }

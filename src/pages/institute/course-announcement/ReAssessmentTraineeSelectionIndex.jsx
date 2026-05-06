@@ -36,7 +36,7 @@ import CommonService from "../../../api/services/CommonService";
 import { useSelector } from "react-redux";
 
 const ReAssessmentTraineeSelectionIndex = () => {
-  const { applicationNo } = useParams();
+  const { applicationNo, courseId } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +48,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
   const [searchSelected, setSearchSelected] = useState("");
   const [statusList, setStatusList] = useState([]);
   const access_token = useSelector((state) => state.auth.accessToken);
-  const actionId = useSelector((state) => state.auth.id);
+  const registration_no = useSelector((state) => state.auth.userId);
+
+  //Store status IDs for pending and selected
   const [pendingStatusId, setPendingStatusId] = useState(null);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [academicCompetency, setAcademicCompetency] = useState([]);
@@ -57,8 +59,20 @@ const ReAssessmentTraineeSelectionIndex = () => {
   const [academicQualifications, setAcademicQualifications] = useState([]);
   const [qualificationMap, setQualificationMap] = useState({});
 
-  // State for storing re-assessment marks for selected trainees
-  const [traineeReAssessmentMarks, setTraineeReAssessmentMarks] = useState({});
+  // State for storing internal assessments for selected trainees
+  const [traineeInternalAssessments, setTraineeInternalAssessments] = useState(
+    {},
+  );
+
+  // State for storing theory and practical assessments
+  const [traineeTheoryAssessments, setTraineeTheoryAssessments] = useState({});
+  const [traineePracticalAssessments, setTraineePracticalAssessments] =
+    useState({});
+
+  // State for storing viva and practical assessments for service_id 41
+  const [traineeVivaAssessments, setTraineeVivaAssessments] = useState({});
+  const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] =
+    useState({});
 
   // Separate pagination for pending table
   const [pagePending, setPagePending] = useState(0);
@@ -74,10 +88,26 @@ const ReAssessmentTraineeSelectionIndex = () => {
   // Create competency map for lookup
   const [competencyMap, setCompetencyMap] = useState({});
 
-  // Check if re-assessment marks exist
-  const hasReAssessmentMarks = selectedTrainees.some((trainee) => 
-    trainee.re_assessment_mark && trainee.re_assessment_mark !== ""
-  );
+  // Check if CA dates exist
+  const hasCADates = courseDetails?.ca_start_date && courseDetails?.ca_end_date;
+
+  // Check if service_id is 41 for Viva assessments
+  const isServiceId41 = courseDetails?.service_id === "41";
+
+  // Check if any trainee has assessments (theory/practical for normal, viva/practical for service_id 41)
+  const hasAssessments = selectedTrainees.some((trainee) => {
+    if (isServiceId41) {
+      return (
+        (trainee.viva_assessment && trainee.viva_assessment !== "") ||
+        (trainee.practical_assessment && trainee.practical_assessment !== "")
+      );
+    } else {
+      return (
+        (trainee.theory_assessment && trainee.theory_assessment !== "") ||
+        (trainee.practical_assessment && trainee.practical_assessment !== "")
+      );
+    }
+  });
 
   // Fetch academic qualifications and status list on component mount
   useEffect(() => {
@@ -127,6 +157,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
       const statuses = statusResponse.data;
       setStatusList(statuses);
 
+      // Find status IDs for 'pending' and 'selected'
       const pendingStatus = statuses.find(
         (status) => status.name.toLowerCase() === "pending",
       );
@@ -155,7 +186,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
   };
 
   const fetchData = async () => {
-    await Promise.all([fetchCourseDetails(), fetchCourseAppliedTrainees()]);
+    await Promise.all([fetchCourseDetails(), fetchFailedTraineesLists()]);
   };
 
   const fetchAcademicCompetency = async () => {
@@ -178,7 +209,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
   const fetchCourseDetails = async () => {
     try {
       const response =
-        await CommonService.getReAssessmentAnnouncementByApplicationNo(applicationNo);
+        await CommonService.getReAssessmentAnnouncementByApplicationNo(
+          applicationNo,
+        );
       const courseData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
@@ -190,48 +223,76 @@ const ReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
-  const fetchCourseAppliedTrainees = async () => {
+  const fetchFailedTraineesLists = async () => {
     try {
       setLoading(true);
+
       const response =
-        await CourseEnrollmentService.getReAssessmentAppliedTraineesByApplicationNo(
+        await CourseEnrollmentService.getCourseAppliedTraineesReAssessmentByApplicationNo(
           applicationNo,
         );
+
       console.log("Applied Trainees Response:", response);
-      const trainees = response.data || [];
+
+      let trainees = response.data;
+
+      // If empty → fetch failed trainees
+      if (!trainees || trainees.length === 0) {
+        const failedResponse =
+          await CourseEnrollmentService.getFailedTraineeDetails(
+            registration_no,
+            courseId,
+          );
+
+        console.log("Failed Trainees Response:", failedResponse);
+
+        trainees = failedResponse.data;
+      }
+
+      trainees = trainees || [];
       setAllTrainees(trainees);
-      
+
       const pending = trainees.filter(
-        (trainee) => trainee.status_id === pendingStatusId?.toString(),
+        (t) => t.result_status_id === "95" && t.status_id === "90",
       );
+
       const selected = trainees.filter(
-        (trainee) => trainee.status_id === selectedStatusId?.toString(),
+        (t) =>
+          t.status_id === "90" &&
+          (!t.result_status_id || t.result_status_id === "94"),
       );
 
       setPendingTrainees(pending);
       setSelectedTrainees(selected);
 
-      // Initialize re-assessment marks for selected trainees from API data
-      const initialReAssessmentMarks = {};
+      const initialInternalAssessments = {};
+      const initialTheory = {};
+      const initialPractical = {};
+      const initialViva = {};
+      const initialVivaPractical = {};
 
-      selected.forEach((trainee) => {
-        if (trainee.re_assessment_mark) {
-          initialReAssessmentMarks[trainee.id] = trainee.re_assessment_mark;
-        } else {
-          initialReAssessmentMarks[trainee.id] = "";
-        }
+      selected.forEach((t) => {
+        initialInternalAssessments[t.id] = t.internal_assessment || "";
+        initialTheory[t.id] = t.theory_assessment || "";
+        initialPractical[t.id] = t.practical_assessment || "";
+        initialViva[t.id] = t.viva_assessment || "";
+        initialVivaPractical[t.id] = t.practical_assessment || "";
       });
 
-      setTraineeReAssessmentMarks(initialReAssessmentMarks);
-      console.log("Initialized re-assessment marks:", initialReAssessmentMarks);
+      setTraineeInternalAssessments(initialInternalAssessments);
+      setTraineeTheoryAssessments(initialTheory);
+      setTraineePracticalAssessments(initialPractical);
+      setTraineeVivaAssessments(initialViva);
+      setTraineeVivaPracticalAssessments(initialVivaPractical);
     } catch (error) {
-      console.error("Error fetching applied trainees:", error);
+      console.error("Error fetching failed trainees:", error);
       toast.error("Failed to fetch applied trainees");
     } finally {
       setLoading(false);
     }
   };
 
+  // Helper function to format date
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
@@ -290,8 +351,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
     return competencyMap[competencyId] || competencyId;
   };
 
-  const handleReAssessmentMarkChange = (traineeId, value) => {
-    setTraineeReAssessmentMarks((prev) => ({
+  // Handle internal assessment change
+  const handleInternalAssessmentChange = (traineeId, value) => {
+    setTraineeInternalAssessments((prev) => ({
       ...prev,
       [traineeId]: value,
     }));
@@ -351,10 +413,19 @@ const ReAssessmentTraineeSelectionIndex = () => {
       selectedPendingRows.includes(t.id),
     );
 
-    const newReAssessmentMarks = {};
+    // Initialize assessments for newly moved trainees
+    const newInternalAssessments = {};
+    const newTheory = {};
+    const newPractical = {};
+    const newViva = {};
+    const newVivaPractical = {};
 
     traineesToMove.forEach((trainee) => {
-      newReAssessmentMarks[trainee.id] = "";
+      newInternalAssessments[trainee.id] = "";
+      newTheory[trainee.id] = "";
+      newPractical[trainee.id] = "";
+      newViva[trainee.id] = "";
+      newVivaPractical[trainee.id] = "";
     });
 
     const updatedPending = pendingTrainees.filter(
@@ -364,13 +435,24 @@ const ReAssessmentTraineeSelectionIndex = () => {
       ...selectedTrainees,
       ...traineesToMove.map((t) => ({
         ...t,
-        status_id: selectedStatusId.toString(),
+        status_id: "90",
+        result_status_id: null, // Clear the result status when moving to selected
       })),
     ];
 
     setPendingTrainees(updatedPending);
     setSelectedTrainees(updatedSelected);
-    setTraineeReAssessmentMarks((prev) => ({ ...prev, ...newReAssessmentMarks }));
+    setTraineeInternalAssessments((prev) => ({
+      ...prev,
+      ...newInternalAssessments,
+    }));
+    setTraineeTheoryAssessments((prev) => ({ ...prev, ...newTheory }));
+    setTraineePracticalAssessments((prev) => ({ ...prev, ...newPractical }));
+    setTraineeVivaAssessments((prev) => ({ ...prev, ...newViva }));
+    setTraineeVivaPracticalAssessments((prev) => ({
+      ...prev,
+      ...newVivaPractical,
+    }));
     setSelectedPendingRows([]);
 
     toast.success(
@@ -388,10 +470,19 @@ const ReAssessmentTraineeSelectionIndex = () => {
       selectedSelectedRows.includes(t.id),
     );
 
-    const updatedReAssessmentMarks = { ...traineeReAssessmentMarks };
+    // Remove assessments for moved trainees
+    const updatedInternalAssessments = { ...traineeInternalAssessments };
+    const updatedTheory = { ...traineeTheoryAssessments };
+    const updatedPractical = { ...traineePracticalAssessments };
+    const updatedViva = { ...traineeVivaAssessments };
+    const updatedVivaPractical = { ...traineeVivaPracticalAssessments };
 
     traineesToMove.forEach((trainee) => {
-      delete updatedReAssessmentMarks[trainee.id];
+      delete updatedInternalAssessments[trainee.id];
+      delete updatedTheory[trainee.id];
+      delete updatedPractical[trainee.id];
+      delete updatedViva[trainee.id];
+      delete updatedVivaPractical[trainee.id];
     });
 
     const updatedSelected = selectedTrainees.filter(
@@ -401,13 +492,18 @@ const ReAssessmentTraineeSelectionIndex = () => {
       ...pendingTrainees,
       ...traineesToMove.map((t) => ({
         ...t,
-        status_id: pendingStatusId.toString(),
+        status_id: "90",
+        result_status_id: "95", // Set result status to failed when moving back to pending
       })),
     ];
 
     setSelectedTrainees(updatedSelected);
     setPendingTrainees(updatedPending);
-    setTraineeReAssessmentMarks(updatedReAssessmentMarks);
+    setTraineeInternalAssessments(updatedInternalAssessments);
+    setTraineeTheoryAssessments(updatedTheory);
+    setTraineePracticalAssessments(updatedPractical);
+    setTraineeVivaAssessments(updatedViva);
+    setTraineeVivaPracticalAssessments(updatedVivaPractical);
     setSelectedSelectedRows([]);
 
     toast.info(
@@ -421,29 +517,119 @@ const ReAssessmentTraineeSelectionIndex = () => {
       return;
     }
 
+    // Only validate internal assessments if CA dates exist
+    if (hasCADates) {
+      const missingAssessments = selectedTrainees.filter(
+        (trainee) =>
+          !traineeInternalAssessments[trainee.id] ||
+          traineeInternalAssessments[trainee.id] === "",
+      );
+
+      if (missingAssessments.length > 0) {
+        toast.error(
+          `Please enter CA mark/competency for all selected trainees. Missing for: ${missingAssessments.map((t) => t.applicant_name).join(", ")}`,
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
+      // Prepare trainee internal assessments payload (only if CA dates exist)
+      let traineeInternalAssessmentsList = [];
+      if (hasCADates) {
+        traineeInternalAssessmentsList = selectedTrainees.map((trainee) => ({
+          traineeId: parseInt(trainee.id),
+          internalAssessment:
+            courseDetails?.certification_level_id === "36"
+              ? parseInt(traineeInternalAssessments[trainee.id])
+              : traineeInternalAssessments[trainee.id],
+        }));
+      }
+
+      // Prepare trainee marks payload based on service type
+      let traineeMarksList = [];
+      let traineeVivaAssessmentsList = [];
+
+      if (isServiceId41) {
+        // For service_id 41: Prepare viva assessments
+        traineeVivaAssessmentsList = selectedTrainees.map((trainee) => ({
+          traineeId: parseInt(trainee.id),
+          vivaAssessment: traineeVivaAssessments[trainee.id]
+            ? parseInt(traineeVivaAssessments[trainee.id])
+            : null,
+          practicalAssessment: traineeVivaPracticalAssessments[trainee.id]
+            ? parseInt(traineeVivaPracticalAssessments[trainee.id])
+            : null,
+        }));
+      } else {
+        // For other services: Prepare theory and practical assessments
+        traineeMarksList = selectedTrainees.map((trainee) => ({
+          traineeId: parseInt(trainee.id),
+          theoryAssessment:
+            courseDetails?.certification_level_id === "36"
+              ? traineeTheoryAssessments[trainee.id]
+                ? parseInt(traineeTheoryAssessments[trainee.id])
+                : null
+              : traineeTheoryAssessments[trainee.id] || null,
+          practicalAssessment:
+            courseDetails?.certification_level_id === "36"
+              ? traineePracticalAssessments[trainee.id]
+                ? parseInt(traineePracticalAssessments[trainee.id])
+                : null
+              : traineePracticalAssessments[trainee.id] || null,
+        }));
+      }
+
+      // Prepare trainee status DTO list - only if CA dates DO NOT exist
+      let traineeStatusList = null;
+      if (!hasCADates) {
+        traineeStatusList = selectedTrainees.map((trainee) => ({
+          traineeId: parseInt(trainee.id),
+          statusId: selectedStatusId,
+        }));
+      }
+
+      // Prepare the payload matching the DTO structure
       const payload = {
         applicationNo: applicationNo,
         statusId: 55,
-        courseName: courseDetails?.course_name,
+        userId: registration_no,
+        courseId: courseId,
+        courseName:
+          courseDetails?.re_assessment_name || courseDetails?.course_name || "",
         serviceId: courseDetails?.service_id
           ? parseInt(courseDetails.service_id)
           : null,
         assignedRoleId: 7,
-        traineeReAssessmentMarks: selectedTrainees.map((trainee) => ({
-          traineeId: parseInt(trainee.id),
-          reAssessmentMark: traineeReAssessmentMarks[trainee.id]
-            ? parseInt(traineeReAssessmentMarks[trainee.id])
-            : null,
-        })),
       };
 
+      // Only add traineeIds if CA dates DO NOT exist
+      if (!hasCADates && traineeStatusList) {
+        payload.traineeIds = traineeStatusList;
+      }
+
+      // Only add internal assessments if CA dates exist
+      if (hasCADates && traineeInternalAssessmentsList.length > 0) {
+        payload.traineeInternalAssessments = traineeInternalAssessmentsList;
+      }
+
+      // Add trainee marks for regular services
+      if (!isServiceId41 && traineeMarksList.length > 0) {
+        payload.traineeMarks = traineeMarksList;
+      }
+
+      // Add trainee viva assessments for service_id 41
+      if (isServiceId41 && traineeVivaAssessmentsList.length > 0) {
+        payload.traineeVivaAssessments = traineeVivaAssessmentsList;
+      }
+
       console.log("Final selection payload:", payload);
-      const response = await CourseEnrollmentService.selectedTraineeForReAssessment(
+      const response = await CourseEnrollmentService.submitReassessmentTrainees(
         payload,
         access_token,
       );
+      console.log("Finalize Selection Response:", response);
       if (response.status === 200 || response.status === 201) {
         toast.success(
           `Trainee selection submitted successfully! ${selectedTrainees.length} trainee(s) confirmed.`,
@@ -526,12 +712,196 @@ const ReAssessmentTraineeSelectionIndex = () => {
     },
   };
 
+  // Calculate total columns for selected table
   const getSelectedTableColSpan = () => {
-    let cols = 8;
-    const hasResultStatus = selectedTrainees.some(trainee => trainee.result_status_id);
+    let cols = 8; // checkbox, #, name, cid, contact, email, qualification, status
+
+    // Add result status column if any trainee has result_status_id
+    const hasResultStatus = selectedTrainees.some(
+      (trainee) => trainee.result_status_id,
+    );
     if (hasResultStatus) cols++;
-    if (hasReAssessmentMarks) cols++;
+
+    if (hasCADates) cols++;
+    if (hasAssessments) {
+      if (isServiceId41) {
+        cols += 2; // viva and practical for service_id 41
+      } else {
+        cols += 2; // theory and practical for other services
+      }
+    }
     return cols;
+  };
+
+  // Render assessment columns (read-only) based on service type
+  const renderAssessmentColumns = (trainee) => {
+    if (isServiceId41) {
+      // For service_id 41: Show Viva and Practical columns (read-only)
+      return (
+        <>
+          {/* Viva Assessment Column */}
+          <TableCell>
+            {courseDetails?.certification_level_id === "36" ? (
+              <TextField
+                type="number"
+                size="small"
+                value={traineeVivaAssessments[trainee.id] || "N/A"}
+                fullWidth
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                  },
+                }}
+                sx={{
+                  minWidth: 120,
+                  backgroundColor: "#f5f5f5",
+                }}
+              />
+            ) : (
+              <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
+                <Select
+                  value={traineeVivaAssessments[trainee.id] || ""}
+                  displayEmpty
+                  readOnly
+                  sx={{ backgroundColor: "#f5f5f5" }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select Competency</em>
+                  </MenuItem>
+                  {academicCompetency.map((competency) => (
+                    <MenuItem key={competency.id} value={competency.id}>
+                      {competency.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </TableCell>
+
+          {/* Practical Assessment Column for service_id 41 */}
+          <TableCell>
+            {courseDetails?.certification_level_id === "36" ? (
+              <TextField
+                type="number"
+                size="small"
+                value={traineeVivaPracticalAssessments[trainee.id] || "N/A"}
+                fullWidth
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                  },
+                }}
+                sx={{
+                  minWidth: 120,
+                  backgroundColor: "#f5f5f5",
+                }}
+              />
+            ) : (
+              <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
+                <Select
+                  value={traineeVivaPracticalAssessments[trainee.id] || ""}
+                  displayEmpty
+                  readOnly
+                  sx={{ backgroundColor: "#f5f5f5" }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select Competency</em>
+                  </MenuItem>
+                  {academicCompetency.map((competency) => (
+                    <MenuItem key={competency.id} value={competency.id}>
+                      {competency.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </TableCell>
+        </>
+      );
+    } else {
+      // For other services: Show Theory and Practical columns (read-only)
+      return (
+        <>
+          {/* Theory Assessment Column */}
+          <TableCell>
+            {courseDetails?.certification_level_id === "36" ? (
+              <TextField
+                type="number"
+                size="small"
+                value={traineeTheoryAssessments[trainee.id] || "N/A"}
+                fullWidth
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                  },
+                }}
+                sx={{
+                  minWidth: 120,
+                  backgroundColor: "#f5f5f5",
+                }}
+              />
+            ) : (
+              <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
+                <Select
+                  value={traineeTheoryAssessments[trainee.id] || ""}
+                  displayEmpty
+                  readOnly
+                  sx={{ backgroundColor: "#f5f5f5" }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select Competency</em>
+                  </MenuItem>
+                  {academicCompetency.map((competency) => (
+                    <MenuItem key={competency.id} value={competency.id}>
+                      {competency.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </TableCell>
+
+          {/* Practical Assessment Column for other services */}
+          <TableCell>
+            {courseDetails?.certification_level_id === "36" ? (
+              <TextField
+                type="number"
+                size="small"
+                value={traineePracticalAssessments[trainee.id] || "N/A"}
+                fullWidth
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                  },
+                }}
+                sx={{
+                  minWidth: 120,
+                  backgroundColor: "#f5f5f5",
+                }}
+              />
+            ) : (
+              <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
+                <Select
+                  value={traineePracticalAssessments[trainee.id] || ""}
+                  displayEmpty
+                  readOnly
+                  sx={{ backgroundColor: "#f5f5f5" }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select Competency</em>
+                  </MenuItem>
+                  {academicCompetency.map((competency) => (
+                    <MenuItem key={competency.id} value={competency.id}>
+                      {competency.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </TableCell>
+        </>
+      );
+    }
   };
 
   if (loading && !courseDetails && pendingTrainees.length === 0) {
@@ -549,6 +919,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
 
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 2 }}>
+      {/* Header */}
       <Box
         display="flex"
         justifyContent="space-between"
@@ -568,6 +939,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
         </IconButton>
       </Box>
 
+      {/* Re-Assessment Information Card */}
       {courseDetails && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
@@ -584,7 +956,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
                   {courseDetails.application_no}
                 </Typography>
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Re-Assessment Name:
                 </Typography>
@@ -608,7 +980,15 @@ const ReAssessmentTraineeSelectionIndex = () => {
                   {selectedTrainees.length}
                 </Typography>
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid item size={{ xs: 12, md: 2 }}>
+                <Typography variant="body2" color="textSecondary">
+                  Course Fee:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  Nu. {courseDetails.course_fee}
+                </Typography>
+              </Grid>
+              <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Available Seats:
                 </Typography>
@@ -617,13 +997,45 @@ const ReAssessmentTraineeSelectionIndex = () => {
                     selectedTrainees.length}
                 </Typography>
               </Grid>
+              {/* CA Start Date - Only show if exists */}
+              {courseDetails.ca_start_date && (
+                <Grid item size={{ xs: 12, md: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    CA Start Date:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold" color="primary">
+                    {formatDate(courseDetails.ca_start_date)}
+                  </Typography>
+                </Grid>
+              )}
+              {/* CA End Date - Only show if exists */}
+              {courseDetails.ca_end_date && (
+                <Grid item size={{ xs: 12, md: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    CA End Date:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold" color="primary">
+                    {formatDate(courseDetails.ca_end_date)}
+                  </Typography>
+                </Grid>
+              )}
+              {/* Certification Level */}
+              <Grid item size={{ xs: 12, md: 3 }}>
+                <Typography variant="body2" color="textSecondary">
+                  Certification Level:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {courseDetails.certification_name}
+                </Typography>
+              </Grid>
             </Grid>
           </CardContent>
         </Card>
       )}
 
+      {/* Selected and Pending Tables */}
       <Grid container spacing={3}>
-        {/* Selected Trainees Table */}
+        {/* Selected Trainees Table (Top) */}
         <Grid item size={{ xs: 12, md: 12 }}>
           <Paper elevation={2} sx={{ p: 2 }}>
             <Typography
@@ -678,10 +1090,23 @@ const ReAssessmentTraineeSelectionIndex = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>Qualification</TableCell>
                     <TableCell>Status</TableCell>
-                    {selectedTrainees.some(trainee => trainee.result_status_id) && (
-                      <TableCell>Result Status</TableCell>
+                    {/* Result Status Column - Only show if any trainee has result_status_id */}
+                    {selectedTrainees.some(
+                      (trainee) => trainee.result_status_id,
+                    ) && <TableCell>Result Status</TableCell>}
+                    {/* Only show CA Mark/Competency column if CA dates exist */}
+                    {hasCADates && <TableCell>CA Mark/Competency</TableCell>}
+                    {/* Show assessment columns if they exist */}
+                    {hasAssessments && (
+                      <>
+                        <TableCell>
+                          {isServiceId41
+                            ? "Viva Assessment"
+                            : "Theory Assessment"}
+                        </TableCell>
+                        <TableCell>Practical Assessment</TableCell>
+                      </>
                     )}
-                    {hasReAssessmentMarks && <TableCell>Re-Assessment Mark</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -708,7 +1133,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
                             {index + 1 + pageSelected * rowsPerPageSelected}
                           </TableCell>
                           <TableCell>{trainee.applicant_name}</TableCell>
-                          <TableCell>{trainee.cid_no || trainee.reference_no}</TableCell>
+                          <TableCell>
+                            {trainee.cid_no || trainee.reference_no}
+                          </TableCell>
                           <TableCell>{trainee.mobile_no}</TableCell>
                           <TableCell>{trainee.email_id}</TableCell>
                           <TableCell>
@@ -723,38 +1150,81 @@ const ReAssessmentTraineeSelectionIndex = () => {
                               sx={getStatusColor(trainee.status_id)}
                             />
                           </TableCell>
+                          {/* Result Status Cell - Only show if trainee has result_status_id */}
                           {trainee.result_status_id && (
                             <TableCell>
                               <Chip
-                                label={getResultStatusName(trainee.result_status_id)}
+                                label={getResultStatusName(
+                                  trainee.result_status_id,
+                                )}
                                 size="small"
-                                sx={getResultStatusColor(trainee.result_status_id)}
+                                sx={getResultStatusColor(
+                                  trainee.result_status_id,
+                                )}
                               />
                             </TableCell>
                           )}
-                          {hasReAssessmentMarks && (
+                          {/* Only show CA Mark/Competency input if CA dates exist */}
+                          {hasCADates && (
                             <TableCell>
-                              <TextField
-                                type="number"
-                                size="small"
-                                placeholder="Enter mark"
-                                value={
-                                  traineeReAssessmentMarks[trainee.id] || ""
-                                }
-                                onChange={(e) =>
-                                  handleReAssessmentMarkChange(
-                                    trainee.id,
-                                    e.target.value,
-                                  )
-                                }
-                                fullWidth
-                                InputProps={{
-                                  inputProps: { min: 0, max: 100 },
-                                }}
-                                sx={{ minWidth: 120 }}
-                              />
+                              {courseDetails?.certification_level_id ===
+                              "36" ? (
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  placeholder="Enter CA mark"
+                                  value={
+                                    traineeInternalAssessments[trainee.id] || ""
+                                  }
+                                  onChange={(e) =>
+                                    handleInternalAssessmentChange(
+                                      trainee.id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  fullWidth
+                                  InputProps={{
+                                    inputProps: { min: 0, max: 100 },
+                                  }}
+                                  sx={{ minWidth: 120 }}
+                                />
+                              ) : (
+                                <FormControl
+                                  size="small"
+                                  fullWidth
+                                  sx={{ minWidth: 150 }}
+                                >
+                                  <Select
+                                    value={
+                                      traineeInternalAssessments[trainee.id] ||
+                                      ""
+                                    }
+                                    onChange={(e) =>
+                                      handleInternalAssessmentChange(
+                                        trainee.id,
+                                        e.target.value,
+                                      )
+                                    }
+                                    displayEmpty
+                                  >
+                                    <MenuItem value="" disabled>
+                                      <em>Select Competency</em>
+                                    </MenuItem>
+                                    {academicCompetency.map((competency) => (
+                                      <MenuItem
+                                        key={competency.id}
+                                        value={competency.id}
+                                      >
+                                        {competency.name}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                              )}
                             </TableCell>
                           )}
+                          {/* Show assessment columns (read-only) if they exist */}
+                          {hasAssessments && renderAssessmentColumns(trainee)}
                         </TableRow>
                       ))
                   ) : (
@@ -771,6 +1241,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
               </Table>
             </TableContainer>
 
+            {/* Selected Table Pagination */}
             <TablePagination
               rowsPerPageOptions={[5, 10, 25]}
               component="div"
@@ -828,7 +1299,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
           </Paper>
         </Grid>
 
-        {/* Pending Trainees Table */}
+        {/* Pending Trainees Table (Bottom) */}
         <Grid item size={{ xs: 12, md: 12 }}>
           <Paper elevation={2} sx={{ p: 2 }}>
             <Typography
@@ -881,7 +1352,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
                     <TableCell>Contact</TableCell>
                     <TableCell>Email</TableCell>
                     <TableCell>Qualification</TableCell>
-                    <TableCell>Status</TableCell>
+                    <TableCell>Result Status</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -905,7 +1376,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
                             {index + 1 + pagePending * rowsPerPagePending}
                           </TableCell>
                           <TableCell>{trainee.applicant_name}</TableCell>
-                          <TableCell>{trainee.cid_no || trainee.reference_no}</TableCell>
+                          <TableCell>
+                            {trainee.cid_no || trainee.reference_no}
+                          </TableCell>
                           <TableCell>{trainee.mobile_no}</TableCell>
                           <TableCell>{trainee.email_id}</TableCell>
                           <TableCell>
@@ -915,9 +1388,13 @@ const ReAssessmentTraineeSelectionIndex = () => {
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={getStatusName(trainee.status_id)}
+                              label={getResultStatusName(
+                                trainee.result_status_id,
+                              )}
                               size="small"
-                              sx={getStatusColor(trainee.status_id)}
+                              sx={getResultStatusColor(
+                                trainee.result_status_id,
+                              )}
                             />
                           </TableCell>
                         </TableRow>
@@ -933,6 +1410,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
               </Table>
             </TableContainer>
 
+            {/* Pending Table Pagination */}
             <TablePagination
               rowsPerPageOptions={[5, 10, 25]}
               component="div"

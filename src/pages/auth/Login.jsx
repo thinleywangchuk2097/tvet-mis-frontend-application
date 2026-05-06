@@ -39,7 +39,6 @@ const Login = () => {
 
   const redirectToBhutanNDI = () => {
     navigate("/auth/login-ndi-qrcode");
-    console.log("Redirecting to Bhutan NDI...");
   };
 
   const getTokenData = (token) => {
