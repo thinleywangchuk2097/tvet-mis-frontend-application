@@ -57,7 +57,7 @@ const Header = ({ onToggleSidebar }) => {
         </Box>
 
         {/* Right Side: Theme toggle + Profile */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Tooltip
             title={`Switch to ${mode === "light" ? "dark" : "light"} mode`}
           >

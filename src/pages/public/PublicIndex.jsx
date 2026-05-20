@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -14,14 +14,13 @@ import {
   TableRow,
   Paper,
   Grid,
-  Chip,
-  MenuItem,
   Typography,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TablePagination,
+  Chip,
 } from "@mui/material";
 
 import { Search } from "@mui/icons-material";
@@ -30,7 +29,6 @@ import {
   Pie,
   Cell,
   Tooltip,
-  Legend,
   LineChart,
   Line,
   XAxis,
@@ -39,21 +37,10 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  ScatterChart,
-  Scatter,
 } from "recharts";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
-import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import { useNavigate } from "react-router-dom";
-
-import {
-  People as PeopleIcon,
-  BarChart as BarChartIcon,
-  TrendingUp as TrendingUpIcon,
-  CheckCircle as CheckCircleIcon,
-} from "@mui/icons-material";
+import CourseTraineeAnnouncementsIndex from "./CourseTraineeAnnouncementsIndex";
 
 // Slider images
 import slide1 from "../../assets/slider/slide1.jpg";
@@ -99,11 +86,15 @@ const applicationDetails = [
 
 // Pie chart
 const pieData = [
-  { name: "Approved", value: 1 },
-  { name: "Pending", value: 2 },
-  { name: "Rejected", value: 3 },
-  { name: "Forwarded", value: 5 },
+  { name: "Construction", value: 1 },
+  { name: "Power", value: 2 },
+  { name: "Automobile", value: 3 },
+  { name: "Manufacturing", value: 5 },
+  { name: "Tourism & Hospitality", value: 1 },
+  { name: "Transportation", value: 2 },
+  { name: "Zorig Chusum", value: 3 },
 ];
+
 const COLORS = [
   "#4caf50",
   "#ff9800",
@@ -111,101 +102,45 @@ const COLORS = [
   "#2196f3",
   "#9c27b0",
   "#ff5722",
+  "#3f51b5",
+  "#009688",
 ];
 
-// Line chart
+// Line & bar chart
 const graphData = [
-  { month: "Jan", value: 4000 },
-  { month: "Feb", value: 3000 },
-  { month: "Mar", value: 5000 },
-  { month: "Apr", value: 2780 },
-  { month: "May", value: 1890 },
-  { month: "Jun", value: 2390 },
-  { month: "Jul", value: 3490 },
-  { month: "Aug", value: 6490 },
-  { month: "Sep", value: 1490 },
-  { month: "Oct", value: 4490 },
-  { month: "Nov", value: 2490 },
-  { month: "Dec", value: 9490 },
+  { month: "Thimphu", value: 3 },
+  { month: "Bumthang", value: 1 },
+  { month: "Wangdue", value: 1 },
+  { month: "Tgang", value: 1 },
+  { month: "Punakha", value: 3 },
+];
+
+const graphLineData = [
+  { month: "jan", value: 12 },
+  { month: "feb", value: 17 },
+  { month: "mar", value: 20 },
+  { month: "apr", value: 50 },
+  { month: "may", value: 40 },
+  { month: "jun", value: 100 },
+  { month: "jul", value: 150 },
+  { month: "aug", value: 50 },
+  { month: "sep", value: 67 },
+  { month: "oct", value: 100 },
+  { month: "nov", value: 175 },
+  { month: "dec", value: 200 },
 ];
 
 const PublicIndex = () => {
   const theme = useTheme();
   const [activeSlide, setActiveSlide] = useState(0);
-  const navigate = useNavigate();
+
   // -------------------- Pagination --------------------
   const [infoPage, setInfoPage] = useState(0);
   const [infoRowsPerPage, setInfoRowsPerPage] = useState(5);
-
-  const [appPage, setAppPage] = useState(0);
-  const [appRowsPerPage, setAppRowsPerPage] = useState(5);
-
   const [coursePage, setCoursePage] = useState(0);
   const [courseRowsPerPage, setCourseRowsPerPage] = useState(5);
-  // -------------------- Table Data --------------------
 
-  const courseApplications = [
-    {
-      applicationNo: "9000178",
-      instituteName: "Zorig Institute of Technology",
-      Course: "Massive Open Online Course (MOOC)",
-      fundingSource: "Government",
-      courseFee: "Nu. 5000",
-      loction: "Thimphu",
-      description: "Request for renewal of institute registration",
-      applicationDate: "05-02-2026",
-      courseDate: "10-02-2026",
-      minimumQualification: "N/A",
-    },
-    {
-      applicationNo: "9000179",
-      instituteName: "Chumey Institute of Technology",
-      Course: "Renewal of Institute",
-      fundingSource: "Government",
-      courseFee: "Nu. 5900",
-      loction: "Paro",
-      description: "renewal of institute registration",
-      applicationDate: "05-03-2026",
-      courseDate: "10-03-2026",
-      minimumQualification: "xii",
-    },
-    {
-      applicationNo: "9000180",
-      instituteName: "Athang Institute of Technology",
-      Course: "Renewal of Institute",
-      fundingSource: "Government",
-      courseFee: "Nu. 9000",
-      loction: "Punakha",
-      description: "renewal of institute registration",
-      applicationDate: "05-01-2026",
-      courseDate: "10-01-2026",
-      minimumQualification: "x",
-    },
-    {
-      applicationNo: "9000182",
-      instituteName: "Wangchuk Institute of Technology",
-      Course: "Renewal of Institute",
-      fundingSource: "Government",
-      courseFee: "Nu. 9000",
-      loction: "Gelegphu",
-      description: "Request for renewal of institute registration",
-      applicationDate: "05-02-2026",
-      courseDate: "10-02-2026",
-      minimumQualification: "xii",
-    },
-    {
-      applicationNo: "9000183",
-      instituteName: "Tashi Institute of Technology",
-      Course: "Renewal of Institute",
-      fundingSource: "Government",
-      courseFee: "Nu. 9000",
-      loction: "Thimphu",
-      description: "Request for renewal of institute registration",
-      applicationDate: "05-01-2026",
-      courseDate: "10-01-2026",
-      minimumQualification: "xii",
-    },
-  ];
+  // -------------------- Table Data --------------------
 
   const tvetIndicators = [
     {
@@ -294,27 +229,6 @@ const PublicIndex = () => {
     },
   };
 
-  const metrics = [
-    {
-      title: "Total Students",
-      value: "1,240",
-      color: "primary",
-      icon: <PeopleIcon />,
-    },
-    {
-      title: "New Courses",
-      value: "32",
-      color: "secondary",
-      icon: <BarChartIcon />,
-    },
-    {
-      title: "Staff Members",
-      value: "8",
-      color: "success",
-      icon: <CheckCircleIcon />,
-    },
-    { title: "Grade", value: "A+", color: "warning", icon: <TrendingUpIcon /> },
-  ];
   const notifications = [
     {
       id: 1,
@@ -336,8 +250,9 @@ const PublicIndex = () => {
       id: 4,
       message: "New courses added in Thimphu and Paro locations.",
       icon: <NotificationsActiveIcon fontSize="small" />,
-    }
+    },
   ];
+
   // Modal search
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [searchError, setSearchError] = useState(false);
@@ -381,32 +296,7 @@ const PublicIndex = () => {
         return "#000";
     }
   };
-  const [searchText, setSearchText] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [courseDateFilter, setCourseDateFilter] = useState("");
 
-  // Get unique locations for dropdown
-  const locations = [...new Set(courseApplications.map((app) => app.loction))];
-
-  // Filtering logic
-  const filteredApplications = useMemo(() => {
-    return courseApplications.filter((app) => {
-      const matchesSearch =
-        app.applicationNo.toLowerCase().includes(searchText.toLowerCase()) ||
-        app.instituteName.toLowerCase().includes(searchText.toLowerCase()) ||
-        app.Course.toLowerCase().includes(searchText.toLowerCase());
-
-      const matchesLocation = locationFilter
-        ? app.loction === locationFilter
-        : true;
-
-      const matchesCourseDate = courseDateFilter
-        ? app.courseDate === courseDateFilter
-        : true;
-
-      return matchesSearch && matchesLocation && matchesCourseDate;
-    });
-  }, [searchText, locationFilter, courseDateFilter]);
   return (
     <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
       {/* Slider */}
@@ -416,7 +306,7 @@ const PublicIndex = () => {
           width: "100vw",
           left: "50%",
           marginLeft: "-50vw",
-          height: { xs: 300, md: 200 }, //adjust slider height
+          height: { xs: 300, md: 200 },
           overflow: "hidden",
           borderRadius: 2,
           boxShadow: 3,
@@ -548,6 +438,7 @@ const PublicIndex = () => {
           </Box>
         </Box>
       </Box>
+
       <Paper
         sx={{ p: 4, mb: 6, mt: 1, border: "1px solid", borderColor: "divider" }}
       >
@@ -555,13 +446,12 @@ const PublicIndex = () => {
         <Grid container spacing={2} mb={4}>
           {/* Line Chart */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Paper sx={{ p: { xs: 2, md: 2 }, borderRadius: 2, boxShadow: 2 }}>
+            <Paper sx={{ p: 2, borderRadius: 2, boxShadow: 2 }}>
               <Typography variant="h7" fontWeight={600} mb={1}>
-                Monthly Performance
+                Monthly Applications
               </Typography>
-
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={graphData}>
+              <ResponsiveContainer width="100%" height={236}>
+                <LineChart data={graphLineData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -576,62 +466,101 @@ const PublicIndex = () => {
               </ResponsiveContainer>
             </Paper>
           </Grid>
+
           {/* Pie Chart */}
           <Grid size={{ xs: 12, md: 4 }}>
             <Paper
               sx={{
-                p: { xs: 2, md: 2 },
+                p: 2,
                 borderRadius: 2,
                 boxShadow: 2,
-                overflow: "visible",
               }}
             >
-              <Typography variant="h7" fontWeight={600} mb={1}>
-                Application Status
+              <Typography fontWeight={600} mb={2}>
+                Institute By Sector
               </Typography>
 
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={70} //pie chart size
-                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <Box sx={{ width: "60%", height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                        label={({ percent }) =>
+                          `${(percent * 100).toFixed(0)}%`
+                        }
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell
+                            key={index}
+                            fill={COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
 
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 8,
-                      border: "none",
-                      boxShadow: "0px 4px 20px rgba(0,0,0,0.1)",
-                    }}
-                  />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 8,
+                          border: "none",
+                          boxShadow: "0px 4px 20px rgba(0,0,0,0.1)",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
 
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-              </ResponsiveContainer>
+                <Box
+                  sx={{
+                    width: "40%",
+                    pl: 2,
+                    maxHeight: 180,
+                    overflowY: "auto",
+                  }}
+                >
+                  {pieData.map((item, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        mb: 1,
+                        fontSize: 13,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          bgcolor: COLORS[index % COLORS.length],
+                          mr: 1,
+                        }}
+                      />
+                      {item.name}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
             </Paper>
           </Grid>
+
           {/* Bar Chart */}
           <Grid size={{ xs: 12, md: 4 }}>
             <Paper sx={{ p: { xs: 2, md: 2 }, borderRadius: 2, boxShadow: 2 }}>
               <Typography variant="h7" fontWeight={600} mb={1}>
-                Monthly Applications
+                Institute By Dzongkhang Location
               </Typography>
-              <ResponsiveContainer width="100%" height={220}>
+              <ResponsiveContainer width="100%" height={236}>
                 <BarChart data={graphData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip />
-                  <Legend />
                   <Bar
                     dataKey="value"
                     fill={theme.palette.primary.main}
@@ -642,215 +571,15 @@ const PublicIndex = () => {
               </ResponsiveContainer>
             </Paper>
           </Grid>
-          {/* Scatter Chart */}
-          {/*  <Grid size={{ xs: 12, md: 6 }}>
-            <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, boxShadow: 2 }}>
-              <Typography variant="h6" fontWeight={600} mb={2}>
-                Monthly Applications (Scatter View)
-              </Typography>
-
-              <ResponsiveContainer width="100%" height={380}>
-                <ScatterChart>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis dataKey="value" />
-                  <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-                  <Scatter
-                    name="Applications"
-                    data={graphData}
-                    fill={theme.palette.secondary.main}
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
-            </Paper>
-          </Grid> */}
         </Grid>
-        {/* -------------------- Tables -------------------- */}
+
+        {/* -------------------- Tables Section -------------------- */}
         <Grid container spacing={2}>
-          {/*  Course Announcements */}
+          {/* Course Announcements - Imported Component */}
           <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
-            <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-              <Typography
-                fontWeight={600}
-                sx={{
-                  mb: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1, // space between icon and text
-                }}
-              >
-                <NotificationsActiveIcon />
-                Course Announcements
-              </Typography>
-
-              {/* Filters Section */}
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                {/* Search */}
-                <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-                  <TextField
-                    label="Search"
-                    size="small"
-                    fullWidth
-                    value={searchText}
-                    onChange={(e) => {
-                      setSearchText(e.target.value);
-                      setAppPage(0);
-                    }}
-                  />
-                </Grid>
-
-                {/* Location Filter */}
-                <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-                  <TextField
-                    select
-                    label="Filter by Location"
-                    size="small"
-                    fullWidth
-                    value={locationFilter}
-                    onChange={(e) => {
-                      setLocationFilter(e.target.value);
-                      setAppPage(0);
-                    }}
-                  >
-                    <MenuItem value="">All</MenuItem>
-                    {locations.map((loc) => (
-                      <MenuItem key={loc} value={loc}>
-                        {loc}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-
-                {/* Course Date Filter */}
-                <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-                  <TextField
-                    label="Filter by Course Date"
-                    type="date"
-                    size="small"
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                    value={courseDateFilter}
-                    onChange={(e) => {
-                      setCourseDateFilter(e.target.value);
-                      setAppPage(0);
-                    }}
-                  />
-                </Grid>
-
-                {/* Reset Button */}
-                <Grid
-                  item
-                  size={{ xs: 1, sm: 1, md: 1 }}
-                  sx={{ display: "flex", alignItems: "center" }}
-                >
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    startIcon={<RestartAltIcon />}
-                    fullWidth
-                    onClick={() => {
-                      setSearchText("");
-                      setLocationFilter("");
-                      setCourseDateFilter("");
-                      setAppPage(0);
-                    }}
-                    sx={{ height: 40 }}
-                  >
-                    Reset
-                  </Button>
-                </Grid>
-              </Grid>
-
-              <TableContainer>
-                <Table size="small" sx={tableStyle}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Application No</TableCell>
-                      <TableCell>Institute Name</TableCell>
-                      <TableCell>Location</TableCell>
-                      <TableCell>Course</TableCell>
-                      <TableCell>Funding Source</TableCell>
-                      <TableCell>Course Fee</TableCell>
-                      <TableCell>Application Date</TableCell>
-                      <TableCell>Course Date</TableCell>
-                      <TableCell>Minimum Qualification</TableCell>
-                      <TableCell>Description</TableCell>
-                      <TableCell>Action</TableCell>
-                    </TableRow>
-                  </TableHead>
-
-                  <TableBody>
-                    {filteredApplications.length > 0 ? (
-                      filteredApplications
-                        .slice(
-                          appPage * appRowsPerPage,
-                          appPage * appRowsPerPage + appRowsPerPage,
-                        )
-                        .map((app) => (
-                          <TableRow key={app.applicationNo} hover>
-                            <TableCell>{app.applicationNo}</TableCell>
-                            <TableCell>{app.instituteName}</TableCell>
-                            <TableCell>{app.loction}</TableCell>
-                            <TableCell>{app.Course}</TableCell>
-                            <TableCell>{app.fundingSource}</TableCell>
-                            <TableCell>{app.courseFee}</TableCell>
-                            <TableCell>{app.applicationDate}</TableCell>
-                            <TableCell>{app.courseDate}</TableCell>
-                            <TableCell>{app.minimumQualification}</TableCell>
-                            <TableCell>{app.description}</TableCell>
-                            <TableCell>
-                              <Chip
-                                icon={<ArrowUpwardIcon fontSize="small" />}
-                                label="Apply"
-                                size="small"
-                                color="primary"
-                                onClick={() =>
-                                  navigate(`/apply-course/${app.applicationNo}`)
-                                }
-                                sx={{
-                                  cursor: "pointer",
-                                  transition: "all 0.2s ease-in-out",
-                                  "&:hover": {
-                                    transform: "translateY(-2px)",
-                                    boxShadow: 3,
-                                  },
-                                  "&:active": {
-                                    transform: "scale(0.95)",
-                                  },
-                                }}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={11}
-                          align="center"
-                          sx={{ color: "red", fontWeight: 600 }}
-                        >
-                          No data available
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <TablePagination
-                component="div"
-                count={filteredApplications.length}
-                page={appPage}
-                onPageChange={(e, newPage) => setAppPage(newPage)}
-                rowsPerPage={appRowsPerPage}
-                onRowsPerPageChange={(e) => {
-                  setAppRowsPerPage(parseInt(e.target.value, 10));
-                  setAppPage(0);
-                }}
-                rowsPerPageOptions={[5, 10]}
-              />
-            </Paper>
+            <CourseTraineeAnnouncementsIndex />
           </Grid>
+
           {/* TVET Indicators */}
           <Grid item size={{ xs: 12, sm: 12, md: 6 }}>
             <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
@@ -903,6 +632,7 @@ const PublicIndex = () => {
               />
             </Paper>
           </Grid>
+
           {/* Courses */}
           <Grid item size={{ xs: 12, sm: 12, md: 6 }}>
             <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
@@ -968,6 +698,7 @@ const PublicIndex = () => {
           </Grid>
         </Grid>
       </Paper>
+
       {/* Modal */}
       <Dialog
         open={openModal}

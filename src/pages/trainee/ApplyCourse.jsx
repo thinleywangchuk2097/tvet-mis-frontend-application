@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Paper,
@@ -9,240 +9,649 @@ import {
   Divider,
   Button,
   CircularProgress,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  FormLabel,
+  Card,
+  CardContent,
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import FileUpload from "../../components/file/FileUplaod";
-import { toast } from "react-toastify";
+import { useParams, useNavigate } from "react-router-dom";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
+import FileUpload from "../../components/file/FileUpload";
+import { toast } from "react-toastify";
+import CommonService from "../../api/services/CommonService";
+import CourseEnrollmentService from "../../api/services/CourseEnrollmentService";
+import DatahubService from "../../api/services/external/DatahubService";
 
-// ===== Static Data =====
-const dzongkhags = [
-  { id: 1, name: "Thimphu" },
-  { id: 2, name: "Paro" },
-  { id: 3, name: "Punakha" },
-  { id: 4, name: "Wangdue" },
-  { id: 5, name: "Bumthang" },
-];
+// Helper function to convert file to base64
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () =>
+      resolve({
+        name: file.name,
+        content: reader.result.split(",")[1],
+        contentType: file.type || "application/octet-stream",
+      });
+    reader.onerror = reject;
+  });
 
-const academicQualifications = [
-  { id: 1, name: "High School" },
-  { id: 2, name: "Diploma" },
-  { id: 3, name: "Bachelor's" },
-  { id: 4, name: "Master's" },
-];
+// Debounce function
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
 
-const employmentStatuses = [
-  { id: 1, name: "Employed" },
-  { id: 2, name: "Unemployed" },
-  { id: 3, name: "Student" },
-];
+/* ---------- Validation ---------- */
 
-const maritalStatuses = [
-  { id: 1, name: "Single" },
-  { id: 2, name: "Married" },
-];
-
-const parentOccupations = [
-  { id: 1, name: "Farmer" },
-  { id: 2, name: "Government Employee" },
-  { id: 3, name: "Private Employee" },
-];
-
-// ===== Validation Schema =====
 const validationSchema = Yup.object({
-  referenceNo: Yup.string().required("Reference No is required"),
-  name: Yup.string().required("Name is required"),
-  dateOfBirth: Yup.date().required("Date of Birth is required"),
-  gender: Yup.string().required("Gender is required"),
-  email: Yup.string()
-    .email("Invalid email address")
-    .required("Email is required"),
+  hasCid: Yup.string().required(),
+
+  cidNo: Yup.string().when("hasCid", {
+    is: "yes",
+    then: (schema) =>
+      schema
+        .matches(/^[0-9]{11}$/, "Citizen ID must be exactly 11 digits")
+        .required("Citizen ID No required"),
+  }),
+
+  referenceNo: Yup.string().when("hasCid", {
+    is: "no",
+    then: (schema) => schema.required("Reference No required"),
+  }),
+
+  name: Yup.string().when("hasCid", {
+    is: "yes",
+    then: (schema) => schema.required("Name required"),
+    otherwise: (schema) => schema.required("Name required"),
+  }),
+
+  genderId: Yup.string().when("hasCid", {
+    is: "no",
+    then: (schema) => schema.required("Gender is required"),
+  }),
+
+  email: Yup.string().email("Invalid email format").required("Email required"),
+
   mobileNo: Yup.string()
-    .matches(/^\d{8}$/, "Mobile No must be exactly 8 digits")
-    .required("Mobile No is required"),
-  academicQualification: Yup.string().required(
-    "Academic Qualification is required",
-  ),
-  employmentStatus: Yup.string().required("Employment Status is required"),
-  maritalStatus: Yup.string().required("Marital Status is required"),
-  remarks: Yup.string(),
+    .matches(/^[0-9]{8}$/, "Mobile must be exactly 8 digits")
+    .required("Mobile required"),
 
-  permanentDzongkhag: Yup.string().required("Permanent Dzongkhag is required"),
-  permanentGewog: Yup.string().required("Permanent Gewog is required"),
-  permanentVillage: Yup.string().required("Permanent Village is required"),
+  traineeTypeId: Yup.string().required("Select trainee type"),
+  employmentStatusId: Yup.string().required("Select employment status"),
+  academicQualificationId: Yup.string().required("Select qualification"),
 
-  presentDzongkhag: Yup.string().required("Present Dzongkhag is required"),
-  presentGewog: Yup.string().required("Present Gewog is required"),
+  presentDzongkhagId: Yup.string().required("Dzongkhag required"),
+  presentGewogId: Yup.string().required("Gewog required"),
 
-  parentOccupation: Yup.string().required("Parental Occupation is required"),
-  parentMaritalStatus: Yup.string().required(
-    "Parental Marital Status is required",
-  ),
-  parentContactNo: Yup.string()
-    .matches(/^\d{8}$/, "Parental Contact No must be exactly 8 digits")
-    .required("Parental Contact No is required"),
+  parentOccupationId: Yup.string().required("Select occupation"),
+  parentMaritalStatusId: Yup.string().required("Select marital status"),
 
-  files: Yup.array().min(1, "Please upload at least one supporting document"),
+  files: Yup.array().min(1, "Upload at least one document"),
 });
 
-// ===== Component =====
-const ApplyCourse = () => {
-  const [loading, setLoading] = useState(false);
+/* ---------- Component ---------- */
 
-  const fileToBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () =>
-        resolve({
-          name: file.name,
-          content: reader.result.split(",")[1],
-          contentType: file.type || "application/octet-stream",
-        });
-      reader.onerror = reject;
-    });
+const ApplyCourse = () => {
+  const { applicationNo } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [courseDetails, setCourseDetails] = useState(null);
+  const [fetchingCourse, setFetchingCourse] = useState(true);
+  const [fetchingCitizen, setFetchingCitizen] = useState(false);
+  const [fetchingGewogs, setFetchingGewogs] = useState(false);
+  const [dzongkhags, setDzongkhags] = useState([]);
+  const [genders, setGenders] = useState([]);
+  const [traineeTypes, setTraineeTypes] = useState([]);
+  const [employmentStatuses, setEmploymentStatuses] = useState([]);
+  const [academicQualifications, setAcademicQualifications] = useState([]);
+  const [parentOccupations, setParentOccupations] = useState([]);
+  const [maritalStatuses, setMaritalStatuses] = useState([]);
+  const [gewogs, setGewogs] = useState([]);
+
+  // Fetch dzongkhags and other data on component mount
+  useEffect(() => {
+    fetchDzongkhags();
+    fetchGenders();
+    fetchTraineeType();
+    fetchEmploymentStatus();
+    fetchAcademicQualification();
+    fetchParentalOccupation();
+    fetchMaritalStatus();
+  }, []);
+
+  // Fetch course details based on application number
+  useEffect(() => {
+    if (applicationNo) {
+      fetchCourseDetails();
+    }
+  }, [applicationNo]);
+
+  const fetchDzongkhags = async () => {
+    try {
+      const dzongkhagLists = await CommonService.getAllDzongkhags();
+      setDzongkhags(dzongkhagLists.data);
+      console.log("Dzongkhags:", dzongkhagLists.data);
+    } catch (error) {
+      console.error("Error fetching dzongkhags:", error);
+    }
+  };
+
+  const fetchGewogDetails = async (dzongkhagId) => {
+    if (!dzongkhagId) return;
+
+    setFetchingGewogs(true);
+    try {
+      const gewogLists = await CommonService.getGewogByDzongkhagId(dzongkhagId);
+      setGewogs(gewogLists.data);
+      console.log("Gewogs:", gewogLists.data);
+    } catch (error) {
+      console.error("Error fetching Gewogs:", error);
+      toast.error("Failed to fetch gewogs");
+    } finally {
+      setFetchingGewogs(false);
+    }
+  };
+
+  const fetchGenders = async () => {
+    try {
+      const genderDt = await CommonService.getByParentId(8);
+      setGenders(genderDt.data);
+      console.log("Genders:", genderDt.data);
+    } catch (error) {
+      console.error("Error fetching genders:", error);
+    }
+  };
+
+  const fetchTraineeType = async () => {
+    try {
+      const TraineeType = await CommonService.getByParentId(21);
+      setTraineeTypes(TraineeType.data);
+      console.log("Trainee Type:", TraineeType.data);
+    } catch (error) {
+      console.error("Error fetching Trainee Type:", error);
+    }
+  };
+
+  const fetchEmploymentStatus = async () => {
+    try {
+      const EmploymentStatus = await CommonService.getByParentId(17);
+      setEmploymentStatuses(EmploymentStatus.data);
+      console.log("Employment Status :", EmploymentStatus.data);
+    } catch (error) {
+      console.error("Error fetching Employment Status:", error);
+    }
+  };
+
+  const fetchAcademicQualification = async () => {
+    try {
+      const AcademicQualification = await CommonService.getByParentId(18);
+      setAcademicQualifications(AcademicQualification.data);
+      console.log("Academic Qualification :", AcademicQualification.data);
+    } catch (error) {
+      console.error("Error fetching Academic Qualification :", error);
+    }
+  };
+
+  const fetchParentalOccupation = async () => {
+    try {
+      const ParentalOccupation = await CommonService.getByParentId(19);
+      setParentOccupations(ParentalOccupation.data);
+      console.log("Parental Occupation :", ParentalOccupation.data);
+    } catch (error) {
+      console.error("Error fetching Parental Occupation :", error);
+    }
+  };
+
+  const fetchMaritalStatus = async () => {
+    try {
+      const MaritalStatus = await CommonService.getByParentId(20);
+      setMaritalStatuses(MaritalStatus.data);
+      console.log("Marital Status :", MaritalStatus.data);
+    } catch (error) {
+      console.error("Error fetching Marital Status :", error);
+    }
+  };
+
+  const fetchCourseDetails = async () => {
+    try {
+      setFetchingCourse(true);
+      const response =
+        await CommonService.getCourseAnnouncementByApplicationNo(applicationNo);
+      // Handle response that returns an array
+      const courseData = Array.isArray(response.data)
+        ? response.data[0]
+        : response.data;
+      setCourseDetails(courseData);
+      console.log("Course Details:", courseData);
+    } catch (error) {
+      console.error("Error fetching course details:", error);
+      toast.error("Failed to fetch course details");
+    } finally {
+      setFetchingCourse(false);
+    }
+  };
+
+  // Function to fetch citizen details from Datahub
+  const fetchCitizenDetails = async (citizenId) => {
+    if (!citizenId || citizenId.length !== 11) {
+      return;
+    }
+
+    setFetchingCitizen(true);
+    try {
+      const response =
+        await DatahubService.getDetailsByCitizenshipNo(citizenId);
+      const citizenData =
+        response.data?.citizenDetailsResponse?.citizenDetail?.[0];
+
+      if (citizenData) {
+        // Construct full name from firstName and lastName
+        const fullName =
+          `${citizenData.firstName || ""} ${citizenData.lastName || ""}`.trim();
+
+        // Update the name field
+        formik.setFieldValue("name", fullName);
+
+        // Auto-set gender if available
+        if (citizenData.gender) {
+          const genderMap = {
+            Male: "1",
+            Female: "2",
+          };
+          const genderId = genderMap[citizenData.gender];
+          if (genderId) {
+            formik.setFieldValue("genderId", genderId);
+          }
+        }
+
+        toast.success("Citizen details fetched successfully");
+      } else {
+        toast.warning("No citizen found with this ID");
+        formik.setFieldValue("name", "");
+        formik.setFieldValue("genderId", "");
+      }
+    } catch (error) {
+      console.error("Error fetching citizen details:", error);
+      toast.error("Failed to fetch citizen details");
+      formik.setFieldValue("name", "");
+      formik.setFieldValue("genderId", "");
+    } finally {
+      setFetchingCitizen(false);
+    }
+  };
+
+  // Create debounced version of fetchCitizenDetails
+  const debouncedFetchCitizen = useCallback(
+    debounce((citizenId) => {
+      if (citizenId && citizenId.length === 11) {
+        fetchCitizenDetails(citizenId);
+      }
+    }, 500),
+    [],
+  );
 
   const formik = useFormik({
     initialValues: {
+      hasCid: "yes",
+      cidNo: "",
       referenceNo: "",
       name: "",
-      dateOfBirth: "",
-      gender: "",
+      dob: "",
+      genderId: "",
       email: "",
       mobileNo: "",
-      academicQualification: "",
-      employmentStatus: "",
-      maritalStatus: "",
+      traineeTypeId: "",
+      employmentStatusId: "",
+      academicQualificationId: "",
       remarks: "",
       permanentDzongkhag: "",
       permanentGewog: "",
       permanentVillage: "",
-      presentDzongkhag: "",
-      presentGewog: "",
-      parentOccupation: "",
-      parentMaritalStatus: "",
-      parentContactNo: "",
+      presentDzongkhagId: "",
+      presentGewogId: "",
+      parentOccupationId: "",
+      parentMaritalStatusId: "",
       files: [],
+      applicationNo: applicationNo || "",
     },
     validationSchema,
-    validateOnChange: true, // validate while typing
+    validateOnChange: true,
     validateOnBlur: true,
-    onSubmit: async (values, { resetForm }) => {
+    onSubmit: async (values) => {
       setLoading(true);
       try {
+        // Convert files to base64
         const documents = await Promise.all(
           values.files.map((file) => fileToBase64(file)),
         );
-        const payload = { ...values, documents };
-        console.log("Payload:", payload);
 
-        // simulate API call
-        setTimeout(() => {
-          toast.success("Application submitted successfully!");
-          resetForm();
-          setLoading(false);
-        }, 1000);
+        // Prepare payload for API
+        const payload = {
+          applicationNo: values.applicationNo,
+          cidNo: values.cidNo,
+          referenceNo: values.referenceNo,
+          name: values.name,
+          dob: values.dob,
+          genderId: values.genderId ? parseInt(values.genderId) : null,
+          email: values.email,
+          mobileNo: values.mobileNo,
+          traineeTypeId: values.traineeTypeId
+            ? parseInt(values.traineeTypeId)
+            : null,
+          employmentStatusId: values.employmentStatusId
+            ? parseInt(values.employmentStatusId)
+            : null,
+          academicQualificationId: values.academicQualificationId
+            ? parseInt(values.academicQualificationId)
+            : null,
+          remarks: values.remarks,
+          presentDzongkhagId: values.presentDzongkhagId
+            ? parseInt(values.presentDzongkhagId)
+            : null,
+          presentGewogId: values.presentGewogId
+            ? parseInt(values.presentGewogId)
+            : null,
+          parentOccupationId: values.parentOccupationId
+            ? parseInt(values.parentOccupationId)
+            : null,
+          parentMaritalStatusId: values.parentMaritalStatusId
+            ? parseInt(values.parentMaritalStatusId)
+            : null,
+          statusId: 89,
+          serviceId: 40,
+          documents: documents,
+        };
+        console.log("Submitting application:", payload);
+        // Call API to submit course application
+        const response = await CourseEnrollmentService.submitTrainee(payload);
+        if (response.status === 200 || response.status === 201) {
+          toast.success("Applied submitted successfully!");
+          navigate(-1);
+        }
       } catch (error) {
-        toast.error("Submission failed");
+        console.error("Error submitting application:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to submit application",
+        );
+      } finally {
         setLoading(false);
       }
     },
   });
 
+  // Fetch gewogs when presentDzongkhagId changes
+  useEffect(() => {
+    if (formik.values.presentDzongkhagId) {
+      fetchGewogDetails(formik.values.presentDzongkhagId);
+    } else {
+      // Clear gewogs if no dzongkhag selected
+      setGewogs([]);
+      formik.setFieldValue("presentGewogId", "");
+    }
+  }, [formik.values.presentDzongkhagId]);
+
+  if (fetchingCourse) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ m: { xs: 2, md: 4 } }}>
-      <Paper sx={{ p: { xs: 2, md: 4 }, borderRadius: 3 }} elevation={3}>
-        <Box sx={{ textAlign: "center", mb: 4 }}>
-          <Typography variant="h5" fontWeight={600} display="inline">
-            Apply for Course
-          </Typography>
-        </Box>
+    <Box sx={{ m: { xs: 1, md: 1 } }}>
+      <Paper sx={{ p: { xs: 2, md: 4 } }} elevation={2}>
+        <Typography
+          variant="h5"
+          fontWeight={600}
+          sx={{ textAlign: "center", mb: 4 }}
+        >
+          Apply for Course
+        </Typography>
+
+        {/* Course Information Card */}
+        {courseDetails && (
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Course Information
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Grid container spacing={2}>
+                <Grid item size={{ xs: 12, md: 3 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Application No:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {courseDetails.application_no}
+                  </Typography>
+                </Grid>
+                <Grid item size={{ xs: 12, md: 3 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Course Name:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {courseDetails.course_name}
+                  </Typography>
+                </Grid>
+                <Grid item size={{ xs: 12, md: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Course Fee:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    Nu. {courseDetails.course_fee}
+                  </Typography>
+                </Grid>
+                <Grid item size={{ xs: 12, md: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Total Seats:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {courseDetails.total_no_trainees}
+                  </Typography>
+                </Grid>
+                <Grid item size={{ xs: 12, md: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Course Period:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {courseDetails.course_start_date &&
+                    courseDetails.course_end_date
+                      ? `${new Date(courseDetails.course_start_date).toLocaleDateString()} - ${new Date(courseDetails.course_end_date).toLocaleDateString()}`
+                      : "N/A"}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        )}
 
         <form onSubmit={formik.handleSubmit}>
-          {/* ===== Applicant Details ===== */}
+          {/* ---------- Applicant Details ---------- */}
+
           <Paper sx={{ p: 3, mb: 4 }} variant="outlined">
-            <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-              Applicant Details
-            </Typography>
+            <Typography fontWeight={600}>Applicant Details</Typography>
             <Divider sx={{ mb: 3 }} />
-            <Grid container spacing={3}>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Reference No"
-                  name="referenceNo"
-                  size="small"
-                  value={formik.values.referenceNo}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={
-                    formik.touched.referenceNo &&
-                    Boolean(formik.errors.referenceNo)
-                  }
-                  helperText={
-                    formik.touched.referenceNo && formik.errors.referenceNo
-                  }
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Name"
-                  name="name"
-                  size="small"
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.name && Boolean(formik.errors.name)}
-                  helperText={formik.touched.name && formik.errors.name}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-                <TextField
-                  type="date"
-                  fullWidth
-                  label="Date of Birth"
-                  name="dateOfBirth"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  value={formik.values.dateOfBirth}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={
-                    formik.touched.dateOfBirth &&
-                    Boolean(formik.errors.dateOfBirth)
-                  }
-                  helperText={
-                    formik.touched.dateOfBirth && formik.errors.dateOfBirth
-                  }
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Gender"
-                  name="gender"
-                  size="small"
-                  value={formik.values.gender}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.gender && Boolean(formik.errors.gender)}
-                  helperText={formik.touched.gender && formik.errors.gender}
+
+            <Grid container spacing={2}>
+              <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
+                <FormLabel>Has Citizen ID Number?</FormLabel>
+                <RadioGroup
+                  row
+                  name="hasCid"
+                  value={formik.values.hasCid}
+                  onChange={(e) => {
+                    formik.handleChange(e);
+                    // Reset fields when switching
+                    formik.setFieldValue("cidNo", "");
+                    formik.setFieldValue("name", "");
+                    formik.setFieldValue("dob", "");
+                    formik.setFieldValue("genderId", "");
+                  }}
                 >
-                  <MenuItem value="">Select</MenuItem>
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
-                </TextField>
+                  <FormControlLabel
+                    value="yes"
+                    control={<Radio />}
+                    label="Yes"
+                  />
+                  <FormControlLabel value="no" control={<Radio />} label="No" />
+                </RadioGroup>
               </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+
+              {formik.values.hasCid === "yes" && (
+                <>
+                  <Grid item size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Citizen ID No"
+                      name="cidNo"
+                      size="small"
+                      value={formik.values.cidNo}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "");
+                        if (value.length <= 11) {
+                          formik.setFieldValue("cidNo", value);
+                          // Debounced fetch as user types
+                          if (value.length === 11) {
+                            debouncedFetchCitizen(value);
+                          } else if (value.length < 11) {
+                            // Clear name and gender if CID is incomplete
+                            formik.setFieldValue("name", "");
+                            formik.setFieldValue("genderId", "");
+                          }
+                        }
+                      }}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.cidNo && Boolean(formik.errors.cidNo)
+                      }
+                      helperText={formik.touched.cidNo && formik.errors.cidNo}
+                      InputProps={{
+                        endAdornment: fetchingCitizen && (
+                          <CircularProgress size={20} />
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Name"
+                      name="name"
+                      size="small"
+                      value={formik.values.name}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={formik.touched.name && Boolean(formik.errors.name)}
+                      helperText={formik.touched.name && formik.errors.name}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                    />
+                  </Grid>
+                </>
+              )}
+
+              {formik.values.hasCid === "no" && (
+                <>
+                  <Grid item size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Reference No"
+                      name="referenceNo"
+                      size="small"
+                      value={formik.values.referenceNo}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.referenceNo &&
+                        Boolean(formik.errors.referenceNo)
+                      }
+                      helperText={
+                        formik.touched.referenceNo && formik.errors.referenceNo
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Name"
+                      name="name"
+                      size="small"
+                      value={formik.values.name}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={formik.touched.name && Boolean(formik.errors.name)}
+                      helperText={formik.touched.name && formik.errors.name}
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      type="date"
+                      label="Date of Birth"
+                      name="dob"
+                      size="small"
+                      fullWidth
+                      InputLabelProps={{ shrink: true }}
+                      value={formik.values.dob}
+                      onChange={formik.handleChange}
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Gender"
+                      name="genderId"
+                      size="small"
+                      value={formik.values.genderId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.genderId &&
+                        Boolean(formik.errors.genderId)
+                      }
+                      helperText={
+                        formik.touched.genderId && formik.errors.genderId
+                      }
+                    >
+                      <MenuItem value="">Select</MenuItem>
+                      {genders.map((gender) => (
+                        <MenuItem key={gender.id} value={gender.id.toString()}>
+                          {gender.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                </>
+              )}
+
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
-                  fullWidth
                   label="Email"
                   name="email"
                   size="small"
+                  fullWidth
                   value={formik.values.email}
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
@@ -250,14 +659,20 @@ const ApplyCourse = () => {
                   helperText={formik.touched.email && formik.errors.email}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
-                  fullWidth
-                  label="Mobile No"
+                  label="Mobile No (+975)"
                   name="mobileNo"
                   size="small"
+                  fullWidth
                   value={formik.values.mobileNo}
-                  onChange={formik.handleChange}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "");
+                    if (value.length <= 8) {
+                      formik.setFieldValue("mobileNo", value);
+                    }
+                  }}
                   onBlur={formik.handleBlur}
                   error={
                     formik.touched.mobileNo && Boolean(formik.errors.mobileNo)
@@ -265,367 +680,283 @@ const ApplyCourse = () => {
                   helperText={formik.touched.mobileNo && formik.errors.mobileNo}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
                   select
-                  fullWidth
-                  label="Academic Qualification"
-                  name="academicQualification"
+                  label="Trainee Type"
+                  name="traineeTypeId"
                   size="small"
-                  value={formik.values.academicQualification}
+                  fullWidth
+                  value={formik.values.traineeTypeId}
                   onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
                   error={
-                    formik.touched.academicQualification &&
-                    Boolean(formik.errors.academicQualification)
+                    formik.touched.traineeTypeId &&
+                    Boolean(formik.errors.traineeTypeId)
                   }
                   helperText={
-                    formik.touched.academicQualification &&
-                    formik.errors.academicQualification
+                    formik.touched.traineeTypeId && formik.errors.traineeTypeId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {academicQualifications.map((q) => (
-                    <MenuItem key={q.id} value={q.name}>
-                      {q.name}
+                  {traineeTypes.map((type) => (
+                    <MenuItem key={type.id} value={type.id.toString()}>
+                      {type.name}
                     </MenuItem>
                   ))}
                 </TextField>
               </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
                   select
-                  fullWidth
                   label="Employment Status"
-                  name="employmentStatus"
+                  name="employmentStatusId"
                   size="small"
-                  value={formik.values.employmentStatus}
+                  fullWidth
+                  value={formik.values.employmentStatusId}
                   onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
                   error={
-                    formik.touched.employmentStatus &&
-                    Boolean(formik.errors.employmentStatus)
+                    formik.touched.employmentStatusId &&
+                    Boolean(formik.errors.employmentStatusId)
                   }
                   helperText={
-                    formik.touched.employmentStatus &&
-                    formik.errors.employmentStatus
+                    formik.touched.employmentStatusId &&
+                    formik.errors.employmentStatusId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {employmentStatuses.map((s) => (
-                    <MenuItem key={s.id} value={s.name}>
-                      {s.name}
+                  {employmentStatuses.map((status) => (
+                    <MenuItem key={status.id} value={status.id.toString()}>
+                      {status.name}
                     </MenuItem>
                   ))}
                 </TextField>
               </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
                   select
-                  fullWidth
-                  label="Marital Status"
-                  name="maritalStatus"
+                  label="Academic Qualification"
+                  name="academicQualificationId"
                   size="small"
-                  value={formik.values.maritalStatus}
+                  fullWidth
+                  value={formik.values.academicQualificationId}
                   onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
                   error={
-                    formik.touched.maritalStatus &&
-                    Boolean(formik.errors.maritalStatus)
+                    formik.touched.academicQualificationId &&
+                    Boolean(formik.errors.academicQualificationId)
                   }
                   helperText={
-                    formik.touched.maritalStatus && formik.errors.maritalStatus
+                    formik.touched.academicQualificationId &&
+                    formik.errors.academicQualificationId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {maritalStatuses.map((m) => (
-                    <MenuItem key={m.id} value={m.name}>
-                      {m.name}
+                  {academicQualifications.map((qualification) => (
+                    <MenuItem
+                      key={qualification.id}
+                      value={qualification.id.toString()}
+                    >
+                      {qualification.name}
                     </MenuItem>
                   ))}
                 </TextField>
               </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+
+              <Grid item size={{ xs: 12, sm: 8 }}>
                 <TextField
-                  fullWidth
                   label="Remarks"
                   name="remarks"
-                  size="small"
                   multiline
                   rows={2}
+                  size="small"
+                  fullWidth
                   value={formik.values.remarks}
                   onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
                 />
               </Grid>
             </Grid>
           </Paper>
 
-          {/* ===== Permanent Address ===== */}
+          {/* ---------- Present Address ---------- */}
+
           <Paper sx={{ p: 3, mb: 4 }} variant="outlined">
-            <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-              Permanent Address
-            </Typography>
+            <Typography fontWeight={600}>Present Address</Typography>
             <Divider sx={{ mb: 3 }} />
-            <Grid container spacing={3}>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+
+            <Grid container spacing={2}>
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
                   select
-                  fullWidth
                   label="Dzongkhag"
-                  name="permanentDzongkhag"
+                  name="presentDzongkhagId"
                   size="small"
-                  value={formik.values.permanentDzongkhag}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
+                  fullWidth
+                  value={formik.values.presentDzongkhagId}
+                  onChange={(e) => {
+                    formik.handleChange(e);
+                    // Reset gewog when dzongkhag changes
+                    formik.setFieldValue("presentGewogId", "");
+                  }}
                   error={
-                    formik.touched.permanentDzongkhag &&
-                    Boolean(formik.errors.permanentDzongkhag)
+                    formik.touched.presentDzongkhagId &&
+                    Boolean(formik.errors.presentDzongkhagId)
                   }
                   helperText={
-                    formik.touched.permanentDzongkhag &&
-                    formik.errors.permanentDzongkhag
+                    formik.touched.presentDzongkhagId &&
+                    formik.errors.presentDzongkhagId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {dzongkhags.map((d) => (
-                    <MenuItem key={d.id} value={d.name}>
-                      {d.name}
+                  {dzongkhags.map((dzongkhag) => (
+                    <MenuItem
+                      key={dzongkhag.id}
+                      value={dzongkhag.id.toString()}
+                    >
+                      {dzongkhag.dzonkhagName}
                     </MenuItem>
                   ))}
                 </TextField>
               </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Gewog"
-                  name="permanentGewog"
-                  size="small"
-                  value={formik.values.permanentGewog}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={
-                    formik.touched.permanentGewog &&
-                    Boolean(formik.errors.permanentGewog)
-                  }
-                  helperText={
-                    formik.touched.permanentGewog &&
-                    formik.errors.permanentGewog
-                  }
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Village"
-                  name="permanentVillage"
-                  size="small"
-                  value={formik.values.permanentVillage}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={
-                    formik.touched.permanentVillage &&
-                    Boolean(formik.errors.permanentVillage)
-                  }
-                  helperText={
-                    formik.touched.permanentVillage &&
-                    formik.errors.permanentVillage
-                  }
-                />
-              </Grid>
-            </Grid>
-          </Paper>
 
-          {/* ===== Present Address ===== */}
-          <Paper sx={{ p: 3, mb: 4 }} variant="outlined">
-            <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-              Present Address
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            <Grid container spacing={3}>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
                   select
-                  fullWidth
-                  label="Dzongkhag"
-                  name="presentDzongkhag"
+                  label="Gewog"
+                  name="presentGewogId"
                   size="small"
-                  value={formik.values.presentDzongkhag}
+                  fullWidth
+                  value={formik.values.presentGewogId}
                   onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
                   error={
-                    formik.touched.presentDzongkhag &&
-                    Boolean(formik.errors.presentDzongkhag)
+                    formik.touched.presentGewogId &&
+                    Boolean(formik.errors.presentGewogId)
                   }
                   helperText={
-                    formik.touched.presentDzongkhag &&
-                    formik.errors.presentDzongkhag
+                    formik.touched.presentGewogId &&
+                    formik.errors.presentGewogId
                   }
+                  disabled={!formik.values.presentDzongkhagId || fetchingGewogs}
+                  InputProps={{
+                    endAdornment: fetchingGewogs && (
+                      <CircularProgress size={20} />
+                    ),
+                  }}
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {dzongkhags.map((d) => (
-                    <MenuItem key={d.id} value={d.name}>
-                      {d.name}
+                  {gewogs.map((gewog) => (
+                    <MenuItem key={gewog.id} value={gewog.id.toString()}>
+                      {gewog.gewogName}
                     </MenuItem>
                   ))}
                 </TextField>
               </Grid>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Gewog"
-                  name="presentGewog"
-                  size="small"
-                  value={formik.values.presentGewog}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={
-                    formik.touched.presentGewog &&
-                    Boolean(formik.errors.presentGewog)
-                  }
-                  helperText={
-                    formik.touched.presentGewog && formik.errors.presentGewog
-                  }
-                />
-              </Grid>
             </Grid>
           </Paper>
 
-          {/* ===== Parental Details ===== */}
+          {/* ---------- Parental Details ---------- */}
+
           <Paper sx={{ p: 3, mb: 4 }} variant="outlined">
-            <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-              Parental Details
-            </Typography>
+            <Typography fontWeight={600}>Parental Details</Typography>
             <Divider sx={{ mb: 3 }} />
-            <Grid container spacing={3}>
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+
+            <Grid container spacing={2}>
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
                   select
-                  fullWidth
                   label="Parental Occupation"
-                  name="parentOccupation"
+                  name="parentOccupationId"
                   size="small"
-                  value={formik.values.parentOccupation}
+                  fullWidth
+                  value={formik.values.parentOccupationId}
                   onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
                   error={
-                    formik.touched.parentOccupation &&
-                    Boolean(formik.errors.parentOccupation)
+                    formik.touched.parentOccupationId &&
+                    Boolean(formik.errors.parentOccupationId)
                   }
                   helperText={
-                    formik.touched.parentOccupation &&
-                    formik.errors.parentOccupation
+                    formik.touched.parentOccupationId &&
+                    formik.errors.parentOccupationId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {parentOccupations.map((p) => (
-                    <MenuItem key={p.id} value={p.name}>
-                      {p.name}
+                  {parentOccupations.map((occupation) => (
+                    <MenuItem
+                      key={occupation.id}
+                      value={occupation.id.toString()}
+                    >
+                      {occupation.name}
                     </MenuItem>
                   ))}
                 </TextField>
               </Grid>
 
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
+              <Grid item size={{ xs: 12, sm: 4 }}>
                 <TextField
                   select
-                  fullWidth
                   label="Marital Status of Parents"
-                  name="parentMaritalStatus"
+                  name="parentMaritalStatusId"
                   size="small"
-                  value={formik.values.parentMaritalStatus}
+                  fullWidth
+                  value={formik.values.parentMaritalStatusId}
                   onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
                   error={
-                    formik.touched.parentMaritalStatus &&
-                    Boolean(formik.errors.parentMaritalStatus)
+                    formik.touched.parentMaritalStatusId &&
+                    Boolean(formik.errors.parentMaritalStatusId)
                   }
                   helperText={
-                    formik.touched.parentMaritalStatus &&
-                    formik.errors.parentMaritalStatus
+                    formik.touched.parentMaritalStatusId &&
+                    formik.errors.parentMaritalStatusId
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
-                  {maritalStatuses.map((m) => (
-                    <MenuItem key={m.id} value={m.name}>
-                      {m.name}
+                  {maritalStatuses.map((status) => (
+                    <MenuItem key={status.id} value={status.id.toString()}>
+                      {status.name}
                     </MenuItem>
                   ))}
                 </TextField>
-              </Grid>
-
-              <Grid item size={{ xs: 12, sm: 4, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Parental/Guardian Contact No"
-                  name="parentContactNo"
-                  size="small"
-                  value={formik.values.parentContactNo}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={
-                    formik.touched.parentContactNo &&
-                    Boolean(formik.errors.parentContactNo)
-                  }
-                  helperText={
-                    formik.touched.parentContactNo &&
-                    formik.errors.parentContactNo
-                  }
-                />
               </Grid>
             </Grid>
           </Paper>
 
-          {/* ===== Supporting Documents ===== */}
-          <Paper sx={{ p: 3, mb: 4 }}>
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Supporting Documents
+          {/* ---------- Supporting Documents ---------- */}
+
+          <Paper sx={{ p: 3, mb: 4 }} variant="outlined">
+            <Typography fontWeight={600}>Supporting Documents</Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Document size should not be more than 1 MB per attachment
             </Typography>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              Attach the file: <br />
-              [Document size should not be more than 1 MB for each attachment]{" "}
-              <br />
-              (Note: For Skills Development Plan, please attach your highest
-              academic qualification certificate.)
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
+
             <FileUpload
               files={formik.values.files}
               onFilesChange={(files) => formik.setFieldValue("files", files)}
+              error={formik.touched.files && Boolean(formik.errors.files)}
+              helperText={formik.touched.files && formik.errors.files}
             />
-            {formik.touched.files && formik.errors.files && (
-              <Typography color="error" variant="caption">
-                {formik.errors.files}
-              </Typography>
-            )}
           </Paper>
 
-          {/* ===== Submit & Reset Buttons ===== */}
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 2,
-              mt: 3,
-            }}
-          >
+          {/* ---------- Buttons ---------- */}
+
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
             <Button
               type="submit"
               variant="contained"
               size="small"
               disabled={loading}
               startIcon={
-                loading ? <CircularProgress size={20} /> : <ArrowUpwardIcon />
+                loading ? <CircularProgress size={18} /> : <ArrowUpwardIcon />
               }
             >
-              {loading ? "Submitting..." : "Submit"}
+              Submit
             </Button>
 
             <Button
               type="button"
+              color="error"
               variant="contained"
               size="small"
-              color="error"
               startIcon={<LockResetIcon />}
               onClick={() => formik.resetForm()}
             >

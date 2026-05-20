@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { useTheme } from "@mui/material/styles";
 import {
   Box,
   Typography,
-  Container,
   Paper,
   Table,
   TableBody,
@@ -45,7 +43,6 @@ import {
 } from "@mui/icons-material";
 import UserRoleManagementService from "../../../api/services/UserRoleManagementService";
 import CommonService from "../../../api/services/CommonService";
-
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
@@ -105,7 +102,6 @@ const UserIndex = () => {
   const [locations, setLocations] = useState([]);
   const [currentRoles, setCurrentRoles] = useState([]);
   const [loading, setLoading] = useState(false);
-  const theme = useTheme();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchTerm, setSearchTerm] = useState("");
@@ -481,8 +477,8 @@ const UserIndex = () => {
   };
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ my: 4 }}>
+    <Paper sx={{ p: 3, mt: 1 }}>
+      <Box>
         <Stack
           direction="row"
           justifyContent="space-between"
@@ -508,7 +504,7 @@ const UserIndex = () => {
                   ),
                 },
               }}
-              sx={{ width: 250 }}
+              sx={{ width: 300 }}
             />
             <Button
               variant="contained"
@@ -534,21 +530,11 @@ const UserIndex = () => {
             <TableContainer component={Paper}>
               <Table
                 sx={{
-                  borderCollapse: "separate",
-                  borderSpacing: 0,
-                  "& th, & td": {
-                    borderRight: `1px solid ${theme.palette.divider}`,
-                    borderBottom: `1px solid ${theme.palette.divider}`,
-                    "&:last-child": { borderRight: "none" },
+                  border: "1px solid #e0e0e0",
+                  borderCollapse: "collapse",
+                  "& .MuiTableCell-root": {
+                    border: "1px solid #e0e0e0",
                   },
-                  "& th": {
-                    backgroundColor:
-                      theme.palette.mode === "dark" ? "#333" : "#f5f5f5",
-                    color: theme.palette.mode === "dark" ? "#fff" : "#000",
-                    fontWeight: "bold",
-                    borderTop: `1px solid ${theme.palette.divider}`,
-                  },
-                  "& tr:last-child td": { borderBottom: "none" },
                 }}
               >
                 <TableHead>
@@ -556,6 +542,7 @@ const UserIndex = () => {
                     sx={{
                       "& .MuiTableCell-root": {
                         textAlign: "center",
+                        fontWeight: 600,
                       },
                     }}
                   >
@@ -727,7 +714,7 @@ const UserIndex = () => {
         )}
 
         {/* Add/Edit User Dialog */}
-        <Dialog open={open} onClose={handleDialogClose} fullWidth maxWidth="sm">
+        <Dialog open={open} onClose={handleDialogClose} fullWidth maxWidth="md">
           <DialogTitle>
             {editMode ? "Edit User" : "Add New User"}
             <IconButton
@@ -1063,7 +1050,8 @@ const UserIndex = () => {
           <DialogActions>
             <Button
               onClick={() => setDeleteDialogOpen(false)}
-              color="primary"
+              color="secondary"
+              size="small"
               variant="contained"
               disabled={loading}
             >
@@ -1073,6 +1061,7 @@ const UserIndex = () => {
               onClick={handleDeleteUser}
               color="error"
               variant="contained"
+              size="small"
               disabled={loading}
               startIcon={loading ? <CircularProgress size={20} /> : null}
             >
@@ -1081,7 +1070,7 @@ const UserIndex = () => {
           </DialogActions>
         </Dialog>
       </Box>
-    </Container>
+    </Paper>
   );
 };
 

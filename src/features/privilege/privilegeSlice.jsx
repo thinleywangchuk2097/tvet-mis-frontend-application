@@ -30,7 +30,7 @@ const privilegeSlice = createSlice({
   reducers: {
     setPrivileges: (state, action) => {
       const privileges = Array.isArray(action.payload) ? action.payload : [];
-      console.log("Setting privileges in Redux state:", privileges);
+     // console.log("Setting privileges in Redux state:", privileges);
       state.privileges = privileges;
       savePrivilegesToStorage(privileges); // Persist in localStorage
     },

@@ -35,15 +35,15 @@ const Sidebar = () => {
 
   // Dynamic icon rendering
   const renderIcon = (iconName) => {
-    if (!iconName) return null;
+    if (!iconName) return 0;
     const formattedName = iconName.replace(/Icon$/, "");
     const IconComponent = MuiIcons[formattedName];
-    if (!IconComponent) return null;
+    if (!IconComponent) return 0;
     return <IconComponent fontSize="small" />;
   };
 
   const mainMenus = privileges
-    .filter((priv) => priv.parent_id === null)
+    .filter((priv) => priv.parent_id === 0)
     .sort(
       (a, b) => (Number(a.display_order) || 0) - (Number(b.display_order) || 0),
     );

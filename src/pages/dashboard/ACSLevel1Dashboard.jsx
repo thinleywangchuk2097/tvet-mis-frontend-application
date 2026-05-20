@@ -45,43 +45,62 @@ const lineData = [
 ];
 
 const pieData = [
-  { name: "Closed", value: 45 },
-  { name: "Open", value: 30 },
-  { name: "Under Review", value: 25 },
+  { name: "Verified", value: 45 },
+  { name: "Submited", value: 30 },
+  { name: "Pending", value: 25 },
 ];
 
-const tvetIndicators = [
+const tvetData = [
   {
     id: 1,
+    applicationNo: "1000023",
     name: "Registered Training Provider",
-    ttiGovt: 14,
+    service: "Institute Proposal",
     pvtOthers: 130,
     total: 144,
   },
   {
     id: 2,
+    applicationNo: "1000024",
     name: "Accredited Courses",
-    ttiGovt: 173,
-    pvtOthers: 69,
-    total: 242,
+    service: "Institute Proposal",
+    total: 24,
   },
-  { id: 3, name: "Other Courses", ttiGovt: 164, pvtOthers: 556, total: 720 },
+  {
+    id: 3,
+    applicationNo: "1000025",
+    name: "Other Courses",
+    service: "Institute Proposal",
+    total: 70,
+  },
   {
     id: 4,
+    applicationNo: "1000026",
     name: "Enrolment in Accredited Courses",
-    ttiGovt: 8094,
-    pvtOthers: 16990,
-    total: 25084,
+    service: "Institute Proposal",
+    total: 25,
   },
   {
     id: 5,
+    applicationNo: "1000027",
     name: "Enrolment in other Courses",
-    ttiGovt: 5732,
-    pvtOthers: 45951,
-    total: 51683,
+    service: "Institute Proposal",
+    total: 51,
   },
-  { id: 6, name: "ToT Certified", ttiGovt: 124, pvtOthers: 50, total: 174 },
-  { id: 7, name: "RPL Certified (MoLHR)", ttiGovt: 0, pvtOthers: 0, total: 0 },
+  {
+    id: 6,
+    applicationNo: "1000028",
+    name: "ToT Certified",
+    service: "Institute Proposal",
+    total: 174,
+  },
+  {
+    id: 7,
+    applicationNo: "1000029",
+    name: "RPL Certified (MoLHR)",
+    service: "Institute Proposal",
+    total: 12,
+  },
 ];
 
 const COLORS = ["#2e7d32", "#ed6c02", "#d32f2f"];
@@ -106,7 +125,7 @@ const ACSLevel1Dashboard = () => {
   const [infoPage, setInfoPage] = useState(0);
   const [infoRowsPerPage, setInfoRowsPerPage] = useState(5);
   return (
-    <Paper sx={{ p: 3, borderRadius: 1 }}>
+    <Paper sx={{ p: 2, mt: 1 }}>
       <Typography variant="h6" fontWeight={700} mb={3}>
         ACS Level 1 Dashboard
       </Typography>
@@ -185,13 +204,13 @@ const ACSLevel1Dashboard = () => {
                             <TableRow>
                               <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
+                                Application No
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
                                 Name
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
-                                TTI/Govt
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                Pvt/Others
+                                Service
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
                                 Total
@@ -200,7 +219,7 @@ const ACSLevel1Dashboard = () => {
                           </TableHead>
 
                           <TableBody>
-                            {tvetIndicators
+                            {tvetData
                               .filter((row) =>
                                 row.name
                                   .toLowerCase()
@@ -213,9 +232,9 @@ const ACSLevel1Dashboard = () => {
                               .map((row, index) => (
                                 <TableRow key={index}>
                                   <TableCell>{row.id}</TableCell>
+                                  <TableCell>{row.applicationNo}</TableCell>
                                   <TableCell>{row.name}</TableCell>
-                                  <TableCell>{row.ttiGovt ?? 0}</TableCell>
-                                  <TableCell>{row.pvtOthers ?? 0}</TableCell>
+                                  <TableCell>{row.service}</TableCell>
                                   <TableCell>{row.total ?? 0}</TableCell>
                                 </TableRow>
                               ))}
@@ -226,7 +245,7 @@ const ACSLevel1Dashboard = () => {
                       <TablePagination
                         component="div"
                         count={
-                          tvetIndicators.filter((row) =>
+                          tvetData.filter((row) =>
                             row.name
                               .toLowerCase()
                               .includes(values.search.toLowerCase()),
@@ -256,7 +275,7 @@ const ACSLevel1Dashboard = () => {
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
-                Monthly Case Trend
+                Total Application Case Trend
               </Typography>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={lineData}>
@@ -282,7 +301,7 @@ const ACSLevel1Dashboard = () => {
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
-                Case Status Distribution
+                Application Status Distribution
               </Typography>
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
@@ -313,7 +332,7 @@ const ACSLevel1Dashboard = () => {
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
             <CardContent>
               <Typography fontWeight={600} mb={2}>
-                Monthly Case Comparison
+                Current Year Monthly Application Received
               </Typography>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={lineData}>

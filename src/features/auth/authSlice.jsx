@@ -25,6 +25,7 @@ const initialState = {
   refreshToken: Cookies.get('refresh_token') || null,
   userId,
   roles,
+  id: Cookies.get('id') || null,
   locationId: Cookies.get('locationId') || null,
   current_roleId: Cookies.get('current_roleId') || null,
 };
@@ -34,7 +35,7 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     loginSuccess: (state, action) => {
-      const { access_token, refresh_token, current_role, locationId} = action.payload;
+      const { access_token, refresh_token, current_role, locationId, id } = action.payload;
       const { userId, roles } = getTokenData(access_token);
       state.accessToken = access_token;
       state.refreshToken = refresh_token;
@@ -42,11 +43,17 @@ const authSlice = createSlice({
       state.roles = roles;
       state.locationId = locationId;
       state.current_roleId = current_role;
+      state.id = id;
 
       Cookies.set('access_token', access_token);
       Cookies.set('current_roleId', current_role);
       Cookies.set('locationId', locationId);
       Cookies.set('refresh_token', refresh_token);
+      Cookies.set('id', id);
+
+
+
+
     },
 
     logout: (state) => {
@@ -55,6 +62,8 @@ const authSlice = createSlice({
       state.userId = '';
       state.roles = [];
       state.locationId = null;
+      state.current_roleId = null;
+      state.id = null;
 
       Cookies.remove('access_token');
       Cookies.remove('refresh_token');
@@ -63,6 +72,7 @@ const authSlice = createSlice({
       Cookies.remove('current_roleId');
       Cookies.remove('current_role_name');
       Cookies.remove('locationId');
+      Cookies.remove('id');
 
     },
   },

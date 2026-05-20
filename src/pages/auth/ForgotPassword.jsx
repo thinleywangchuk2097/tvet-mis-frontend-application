@@ -9,7 +9,6 @@ import {
   Typography,
   Container,
   Paper,
-  Link,
   CircularProgress,
   Alert,
 } from "@mui/material";
@@ -176,22 +175,32 @@ const ForgotPasswordPage = () => {
                 >
                   {loading ? <CircularProgress size={24} /> : "Send Reset Link"}
                 </Button>
-                <Link
-                  component={RouterLink}
-                  to="/login"
-                  underline="hover"
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "0.85rem",
-                    lineHeight: 1.2,
-                    py: 0.25,
-                  }}
-                >
-                  <ArrowBackIcon sx={{ mr: 0.5, fontSize: 16 }} />
-                  Back to Login
-                </Link>
+                <Box display="flex" justifyContent="flex-end">
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    sx={{
+                      cursor: "pointer",
+                      color: "primary.main", // normal color
+                      transition: "color 0.2s ease, text-decoration 0.2s ease",
+                      "&:hover": {
+                        color: "primary.dark", // darker on hover
+                        textDecoration: "underline", // underline on hover
+                      },
+                    }}
+                    onClick={() => navigate("/auth/login")}
+                  >
+                    <ArrowBackIcon
+                      fontSize="small"
+                      sx={{
+                        mr: 0.5,
+                        color: "inherit",
+                        transition: "color 0.2s ease",
+                      }}
+                    />
+                    <Typography variant="body2">Back to Login</Typography>
+                  </Box>
+                </Box>
               </Box>
             </>
           )}

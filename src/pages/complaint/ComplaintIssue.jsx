@@ -13,7 +13,7 @@ import {
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { Send, Clear } from "@mui/icons-material";
-import FileUplaod from "../../components/file/FileUplaod";
+import FileUpload from "../../components/file/FileUpload";
 import ComplaintService from "../../api/services/ComplaintService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -105,7 +105,7 @@ const ComplaintIssue = () => {
           currentRoleId: current_roleId,
           locationId,
           serviceId: 1,
-          statusId: 59,
+          statusId: 101,
         };
 
         const response = await ComplaintService.submitComplaint(
@@ -388,7 +388,7 @@ const ComplaintIssue = () => {
               borderRadius: 2,
             }}
           >
-            <FileUplaod
+            <FileUpload
               files={formik.values.files}
               onFilesChange={(files) => formik.setFieldValue("files", files)}
               disabled={loading}

@@ -1,0 +1,828 @@
+import React, { useState, useEffect } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  TextField,
+  Button,
+  TablePagination,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  MenuItem,
+  Grid,
+  Typography,
+  Chip,
+  Box,
+  IconButton,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import { Formik, Form } from "formik";
+import * as Yup from "yup";
+import RemoveRedEyeIcon from "@mui/icons-material/RemoveRedEye";
+import { useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
+import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
+import CommonService from "../../../api/services/CommonService";
+import FileUpload from "../../../components/file/FileUpload";
+import CourseEnrollmentService from "../../../api/services/CourseEnrollmentService";
+import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
+
+// Helper function to convert file to base64
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () =>
+      resolve({
+        name: file.name,
+        content: reader.result.split(",")[1],
+        contentType: file.type || "application/octet-stream",
+      });
+    reader.onerror = reject;
+  });
+
+const RPLAssessment = () => {
+  const navigate = useNavigate();
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [rplApplications, setRplApplications] = useState([]);
+  const [instituteDetails, setInstituteDetails] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [certificationLevels, setCertificationLevels] = useState([]);
+  const [fundingSources, setFundingSources] = useState([]);
+  const [dzongkhags, setDzongkhags] = useState([]);
+  const [approvedCourses, setApprovedCourses] = useState([]);
+  const [statusList, setStatusList] = useState([]);
+  const access_token = useSelector((state) => state.auth.accessToken);
+  const actionId = useSelector((state) => state.auth.id);
+  const registration_no = useSelector((state) => state.auth.userId);
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchInstituteDetails();
+    fetchRPLApplications();
+    fetchStatusList();
+    fetchDzongkhags();
+    fetchDropdownData();
+    fetchApprovedCourses();
+  }, []);
+
+  const fetchInstituteDetails = async () => {
+    try {
+      const response =
+        await InstituteRegistrationService.getInstituteDetails(registration_no);
+      setInstituteDetails(response.data);
+      console.log("Institute Details:", response.data);
+    } catch (error) {
+      console.error("Error fetching institute data:", error);
+    }
+  };
+
+  const fetchRPLApplications = async () => {
+    try {
+      const response =
+        await CourseEnrollmentService.getCourseDetailsAnnouncementByUserId(
+          registration_no,
+          39, // Service ID for RPL assessment
+          access_token,
+        );
+      setRplApplications(response.data);
+    } catch (error) {
+      console.error("Error fetching RPL applications:", error);
+    }
+  };
+
+  const fetchStatusList = async () => {
+    try {
+      const statusResponse = await CommonService.getByParentId(4);
+      setStatusList(statusResponse.data);
+      console.log("Status List:", statusResponse.data);
+    } catch (error) {
+      console.error("Error fetching status list:", error);
+    }
+  };
+
+  const fetchDzongkhags = async () => {
+    try {
+      const dzongkhagLists = await CommonService.getAllDzongkhags();
+      setDzongkhags(dzongkhagLists.data);
+      console.log("Dzongkhags:", dzongkhagLists.data);
+    } catch (error) {
+      console.error("Error fetching dzongkhags:", error);
+    }
+  };
+
+  const fetchApprovedCourses = async () => {
+    try {
+      const approvedCourses = await CommonService.getAllOccupations();
+      // Filter only active courses if needed
+      const activeCourses = approvedCourses.data.filter(
+        (course) => course.isActive === "Y",
+      );
+      setApprovedCourses(activeCourses);
+      console.log("Approved Courses:", activeCourses);
+    } catch (error) {
+      console.error("Error fetching approved courses:", error);
+    }
+  };
+
+  const fetchDropdownData = async () => {
+    try {
+      // Fetch certification levels
+      const levelsResponse = await CommonService.getByParentId(10);
+      setCertificationLevels(levelsResponse.data);
+
+      // Fetch funding sources
+      const fundingResponse = await CommonService.getByParentId(16);
+      setFundingSources(fundingResponse.data);
+    } catch (error) {
+      console.error("Error fetching dropdown data:", error);
+    }
+  };
+
+  const institute = instituteDetails[0] || {};
+
+  const handleChangePage = (event, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(+event.target.value);
+    setPage(0);
+  };
+  // Handle view details navigation
+  const handleViewDetails = (applicationNo) => {
+    navigate(`/announcement/course-trainee-selection/${applicationNo}`);
+  };
+
+  const filteredApplications = rplApplications.filter(
+    (app) =>
+      (app.course_name?.toLowerCase() || "").includes(search.toLowerCase()) ||
+      (app.application_no?.toLowerCase() || "").includes(search.toLowerCase()),
+  );
+
+  const initialValues = {
+    instituteId: institute.institute_id || "",
+    courseId: "",
+    courseFee: "",
+    totalNoTrainees: "",
+    applicationStartDate: "",
+    applicationEndDate: "",
+    courseStartDate: "",
+    courseEndDate: "",
+    certificationLevelId: "",
+    fundingSourceId: "",
+    trainingLocationId: "",
+    courseDescription: "",
+    files: [],
+  };
+
+  const validationSchema = Yup.object().shape({
+    courseId: Yup.string().required("Course Name is required"),
+    courseFee: Yup.number()
+      .typeError("Must be a number")
+      .required("Course Fee is required"),
+    totalNoTrainees: Yup.number()
+      .typeError("Must be a number")
+      .required("Total number of trainees required"),
+    applicationStartDate: Yup.date()
+      .typeError("Invalid date")
+      .required("Application Start Date required"),
+    applicationEndDate: Yup.date()
+      .typeError("Invalid date")
+      .required("Application End Date required")
+      .min(
+        Yup.ref("applicationStartDate"),
+        "Application end date cannot be before application start date",
+      ),
+    courseStartDate: Yup.date()
+      .typeError("Invalid date")
+      .required("Course Start Date required")
+      .test(
+        "is-after-application-end",
+        "Course start date must be after application end date",
+        function (value) {
+          const { applicationEndDate } = this.parent;
+          if (!value || !applicationEndDate) return true;
+          return new Date(value) > new Date(applicationEndDate);
+        },
+      ),
+    courseEndDate: Yup.date()
+      .typeError("Invalid date")
+      .required("Course End Date required")
+      .min(
+        Yup.ref("courseStartDate"),
+        "Course end date cannot be before course start date",
+      ),
+    certificationLevelId: Yup.string().required(
+      "Certification Level is required",
+    ),
+    fundingSourceId: Yup.string().required("Funding Source is required"),
+    trainingLocationId: Yup.string().required("Training Location is required"),
+    courseDescription: Yup.string().required("Course Description is required"),
+    files: Yup.array()
+      .min(1, "Please upload required documents")
+      .max(5, "Maximum 5 files allowed"),
+  });
+
+  const handleSubmit = async (values, { resetForm, setSubmitting }) => {
+    setLoading(true);
+    try {
+      const documents = await Promise.all(
+        values.files.map((file) => fileToBase64(file)),
+      );
+
+      const payload = {
+        instituteId: values.instituteId,
+        courseId: values.courseId,
+        courseFee: values.courseFee,
+        totalNoTrainees: values.totalNoTrainees,
+        applicationStartDate: values.applicationStartDate,
+        applicationEndDate: values.applicationEndDate,
+        courseStartDate: values.courseStartDate,
+        courseEndDate: values.courseEndDate,
+        certificationLevelId: values.certificationLevelId,
+        fundingSourceId: values.fundingSourceId,
+        trainingLocationId: values.trainingLocationId,
+        courseDescription: values.courseDescription,
+        createdBy: actionId,
+        serviceId: 39, // Service ID for RPL assessment
+        statusId: 55, // Initial status (Pending)
+        remarks: "RPL Assessment Application",
+        documents: documents,
+        assessmentType: "RPL",
+      };
+
+      console.log("Submitting RPL payload:", payload);
+
+      const response = await CourseEnrollmentService.submitCourseAnnouncement(
+        payload,
+        access_token,
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        toast.success("RPL Assessment submitted successfully!");
+        await fetchRPLApplications();
+        resetForm();
+        setOpenDialog(false);
+      }
+    } catch (error) {
+      console.error("Error submitting RPL assessment:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to submit RPL assessment",
+      );
+    } finally {
+      setLoading(false);
+      setSubmitting(false);
+    }
+  };
+
+  // Helper function to get status name
+  const getStatusName = (statusId) => {
+    if (!statusId) return "Pending";
+    const status = statusList.find(
+      (s) => parseInt(s.id) === parseInt(statusId),
+    );
+    return status ? status.name : "Pending";
+  };
+
+  // Helper function to get status color
+  const getStatusColor = (statusId) => {
+    const statusName = getStatusName(statusId);
+    switch (statusName.toLowerCase()) {
+      case "approved":
+        return "#4caf50";
+      case "rejected":
+        return "#f44336";
+      case "pending":
+      default:
+        return "#ff9800";
+    }
+  };
+
+  // Helper function to get dzongkhag name by ID
+  const getDzongkhagName = (locationId) => {
+    if (!locationId) return "N/A";
+    const dzongkhag = dzongkhags.find(
+      (dzong) => dzong.id === parseInt(locationId),
+    );
+    return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
+  };
+
+  // Helper function to get course name by ID - UPDATED for occupationName
+  const getCourseName = (courseId) => {
+    if (!courseId) return "N/A";
+    const course = approvedCourses.find((c) => c.id === parseInt(courseId));
+    return course ? course.occupationName : courseId;
+  };
+
+  // Helper function to get certification level name by ID
+  const getCertificationLevelName = (levelId) => {
+    if (!levelId) return "N/A";
+    const level = certificationLevels.find((l) => l.id === parseInt(levelId));
+    return level ? level.name : levelId;
+  };
+
+  // Helper function to get funding source name by ID
+  const getFundingSourceName = (sourceId) => {
+    if (!sourceId) return "N/A";
+    const source = fundingSources.find((s) => s.id === parseInt(sourceId));
+    return source ? source.name : sourceId;
+  };
+
+  const tableStyle = {
+    border: "1px solid",
+    borderColor: "divider",
+    "& th, & td": {
+      border: "1px solid",
+      borderColor: "divider",
+    },
+  };
+
+  return (
+    <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
+      <Typography variant="h5" gutterBottom>
+        RPL Assessment
+      </Typography>
+
+      {/* Search + Add Assessment */}
+      <Grid
+        container
+        spacing={1}
+        alignItems="center"
+        sx={{ justifyContent: "flex-end", mb: 2 }}
+      >
+        <Grid item size={{ xs: 12, md: 4 }}>
+          <TextField
+            label="Search by Course or Application No"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                height: "36px",
+                "& input": { padding: "8px 12px" },
+                "& fieldset": { borderRadius: "4px" },
+              },
+            }}
+          />
+        </Grid>
+        <Grid item size={{ xs: 12, md: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenDialog(true)}
+            sx={{ height: "36px" }}
+          >
+            Apply for RPL
+          </Button>
+        </Grid>
+      </Grid>
+
+      {/* Table */}
+      <TableContainer component={Paper} elevation={1}>
+        <Table size="small" sx={tableStyle}>
+          <TableHead>
+            <TableRow>
+              <TableCell>#</TableCell>
+              <TableCell>Application No</TableCell>
+              <TableCell>Course</TableCell>
+              <TableCell>Certification Level</TableCell>
+              <TableCell>Course Fee</TableCell>
+              <TableCell>Total Trainees</TableCell>
+              <TableCell>Application Period</TableCell>
+              <TableCell>Course Period</TableCell>
+              <TableCell>Training Location</TableCell>
+              <TableCell>Funding Source</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell align="center">Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredApplications.length > 0 ? (
+              filteredApplications
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((app, index) => (
+                  <TableRow key={app.id || index}>
+                    <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
+                    <TableCell>{app.application_no || "N/A"}</TableCell>
+                    <TableCell>{getCourseName(app.course_id)}</TableCell>
+                    <TableCell>
+                      {getCertificationLevelName(app.certification_level_id)}
+                    </TableCell>
+                    <TableCell>Nu. {app.course_fee}</TableCell>
+                    <TableCell>{app.total_no_trainees || "N/A"}</TableCell>
+                    <TableCell>
+                      {app.application_start_date && app.application_end_date
+                        ? `${new Date(app.application_start_date).toLocaleDateString()} - ${new Date(app.application_end_date).toLocaleDateString()}`
+                        : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {app.course_start_date && app.course_end_date
+                        ? `${new Date(app.course_start_date).toLocaleDateString()} - ${new Date(app.course_end_date).toLocaleDateString()}`
+                        : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {getDzongkhagName(app.training_location_id)}
+                    </TableCell>
+                    <TableCell>
+                      {getFundingSourceName(app.funding_source_id)}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={getStatusName(app.status_id)}
+                        size="small"
+                        sx={{
+                          backgroundColor: getStatusColor(app.status_id),
+                          color: "white",
+                          fontWeight: "medium",
+                          minWidth: "80px",
+                          "& .MuiChip-label": {
+                            px: 1.5,
+                            py: 0.5,
+                          },
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        color="primary"
+                        size="small"
+                        onClick={() => handleViewDetails(app.application_no)}
+                        title="View Details"
+                      >
+                        <RemoveRedEyeIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={12} align="center">
+                  No RPL assessment applications found
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={filteredApplications.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
+      </TableContainer>
+
+      {/* Apply for RPL Dialog */}
+      <Dialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>Apply for RPL Assessment</DialogTitle>
+        <Formik
+          initialValues={initialValues}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+          enableReinitialize={true}
+          validateOnBlur={true}
+          validateOnChange={true}
+          validateOnMount={false}
+        >
+          {(formik) => (
+            <Form>
+              <DialogContent dividers>
+                <Grid container spacing={2}>
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Course Name"
+                      name="courseId"
+                      size="small"
+                      value={formik.values.courseId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.courseId &&
+                        Boolean(formik.errors.courseId)
+                      }
+                      helperText={
+                        formik.touched.courseId && formik.errors.courseId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {approvedCourses.map((course) => (
+                        <MenuItem key={course.id} value={course.id}>
+                          {course.occupationName}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Course Fee"
+                      name="courseFee"
+                      size="small"
+                      type="number"
+                      value={formik.values.courseFee}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.courseFee &&
+                        Boolean(formik.errors.courseFee)
+                      }
+                      helperText={
+                        formik.touched.courseFee && formik.errors.courseFee
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Certification Level"
+                      name="certificationLevelId"
+                      size="small"
+                      value={formik.values.certificationLevelId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.certificationLevelId &&
+                        Boolean(formik.errors.certificationLevelId)
+                      }
+                      helperText={
+                        formik.touched.certificationLevelId &&
+                        formik.errors.certificationLevelId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {certificationLevels.map((level) => (
+                        <MenuItem key={level.id} value={level.id}>
+                          {level.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Total No of Candidates"
+                      name="totalNoTrainees"
+                      size="small"
+                      type="number"
+                      value={formik.values.totalNoTrainees}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.totalNoTrainees &&
+                        Boolean(formik.errors.totalNoTrainees)
+                      }
+                      helperText={
+                        formik.touched.totalNoTrainees &&
+                        formik.errors.totalNoTrainees
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      type="date"
+                      fullWidth
+                      label="Application Start Date"
+                      name="applicationStartDate"
+                      size="small"
+                      value={formik.values.applicationStartDate}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      InputLabelProps={{ shrink: true }}
+                      error={
+                        formik.touched.applicationStartDate &&
+                        Boolean(formik.errors.applicationStartDate)
+                      }
+                      helperText={
+                        formik.touched.applicationStartDate &&
+                        formik.errors.applicationStartDate
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      type="date"
+                      fullWidth
+                      label="Application End Date"
+                      name="applicationEndDate"
+                      size="small"
+                      value={formik.values.applicationEndDate}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      InputLabelProps={{ shrink: true }}
+                      error={
+                        formik.touched.applicationEndDate &&
+                        Boolean(formik.errors.applicationEndDate)
+                      }
+                      helperText={
+                        formik.touched.applicationEndDate &&
+                        formik.errors.applicationEndDate
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      type="date"
+                      fullWidth
+                      label="Assessment Start Date"
+                      name="courseStartDate"
+                      size="small"
+                      value={formik.values.courseStartDate}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      InputLabelProps={{ shrink: true }}
+                      error={
+                        formik.touched.courseStartDate &&
+                        Boolean(formik.errors.courseStartDate)
+                      }
+                      helperText={
+                        formik.touched.courseStartDate &&
+                        formik.errors.courseStartDate
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      type="date"
+                      fullWidth
+                      label="Assessment End Date"
+                      name="courseEndDate"
+                      size="small"
+                      value={formik.values.courseEndDate}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      InputLabelProps={{ shrink: true }}
+                      error={
+                        formik.touched.courseEndDate &&
+                        Boolean(formik.errors.courseEndDate)
+                      }
+                      helperText={
+                        formik.touched.courseEndDate &&
+                        formik.errors.courseEndDate
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Funding Source"
+                      name="fundingSourceId"
+                      size="small"
+                      value={formik.values.fundingSourceId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.fundingSourceId &&
+                        Boolean(formik.errors.fundingSourceId)
+                      }
+                      helperText={
+                        formik.touched.fundingSourceId &&
+                        formik.errors.fundingSourceId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {fundingSources.map((source) => (
+                        <MenuItem key={source.id} value={source.id}>
+                          {source.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Assessment Location (Dzongkhag)"
+                      name="trainingLocationId"
+                      size="small"
+                      value={formik.values.trainingLocationId}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.trainingLocationId &&
+                        Boolean(formik.errors.trainingLocationId)
+                      }
+                      helperText={
+                        formik.touched.trainingLocationId &&
+                        formik.errors.trainingLocationId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {dzongkhags.map((dzongkhag) => (
+                        <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
+                          {dzongkhag.dzonkhagName}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12 }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      label="Course/Assessment Description"
+                      name="courseDescription"
+                      size="small"
+                      value={formik.values.courseDescription}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.courseDescription &&
+                        Boolean(formik.errors.courseDescription)
+                      }
+                      helperText={
+                        formik.touched.courseDescription &&
+                        formik.errors.courseDescription
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Required Documents for RPL Assessment:
+                    </Typography>
+                    <FileUpload
+                      files={formik.values.files}
+                      onFilesChange={(files) => {
+                        formik.setFieldValue("files", files);
+                        setTimeout(() => {
+                          formik.validateField("files");
+                        }, 100);
+                      }}
+                      error={
+                        formik.touched.files && Boolean(formik.errors.files)
+                      }
+                      helperText={formik.touched.files && formik.errors.files}
+                    />
+                    {!formik.touched.files &&
+                      formik.values.files.length === 0 && (
+                        <Typography variant="caption" color="textSecondary">
+                          Please upload required documents (PDF, DOC, etc.)
+                        </Typography>
+                      )}
+                  </Grid>
+                </Grid>
+              </DialogContent>
+              <DialogActions>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="error"
+                  onClick={() => setOpenDialog(false)}
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="small"
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={loading}
+                >
+                  {loading ? "Submitting..." : "Submit"}
+                </Button>
+              </DialogActions>
+            </Form>
+          )}
+        </Formik>
+      </Dialog>
+    </Paper>
+  );
+};
+
+export default RPLAssessment;

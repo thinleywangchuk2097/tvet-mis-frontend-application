@@ -5,7 +5,6 @@ import {
   Box,
   Avatar,
   useTheme,
-  useMediaQuery,
   Chip,
   Table,
   TableBody,
@@ -40,29 +39,28 @@ import {
 
 const InstituteDashboard = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // -------------------- Chart Data --------------------
   const lineData = [
-    { month: "Jan", students: 120 },
-    { month: "Feb", students: 210 },
-    { month: "Mar", students: 180 },
-    { month: "Apr", students: 250 },
-    { month: "May", students: 300 },
-    { month: "Jun", students: 280 },
-    { month: "Jul", students: 350 },
-    { month: "Aug", students: 400 },
-    { month: "Sep", students: 380 },
-    { month: "Oct", students: 420 },
-    { month: "Nv", students: 450 },
-    { month: "Dec", students: 500 },
+    { month: "Jan", trainees: 120 },
+    { month: "Feb", trainees: 210 },
+    { month: "Mar", trainees: 180 },
+    { month: "Apr", trainees: 250 },
+    { month: "May", trainees: 300 },
+    { month: "Jun", trainees: 280 },
+    { month: "Jul", trainees: 350 },
+    { month: "Aug", trainees: 400 },
+    { month: "Sep", trainees: 380 },
+    { month: "Oct", trainees: 420 },
+    { month: "Nv", trainees: 450 },
+    { month: "Dec", trainees: 500 },
   ];
 
   const pieData = [
-    { name: "Science", value: 400 },
-    { name: "Commerce", value: 300 },
-    { name: "Arts", value: 300 },
-    { name: "Other", value: 200 },
+    { name: "Male", value: 430 },
+    { name: "Female", value: 300 },
+    { name: "Other", value: 10 },
+    { name: "Total", value: 740 },
   ];
 
   const barData = [
@@ -80,7 +78,7 @@ const InstituteDashboard = () => {
     { month: "Dec", courses: 9 },
   ];
 
-  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AA336A"];
 
   // -------------------- Pagination --------------------
   const [infoPage, setInfoPage] = useState(0);
@@ -97,7 +95,7 @@ const InstituteDashboard = () => {
     { label: "Institute Registration Date", value: "26 June 2024" },
     { label: "Valid till", value: "26 June 2026" },
     { label: "Ongoing Course", value: "CBT: 0, Non CBT: 0" },
-    { label: "Graduate Students", value: "0" },
+    { label: "Graduate trainee", value: "0" },
     { label: "QMS Certification", value: "Valid till" },
   ];
 
@@ -159,7 +157,7 @@ const InstituteDashboard = () => {
 
   const metrics = [
     {
-      title: "Total Students",
+      title: "Total trainees",
       value: "1,240",
       color: "primary",
       icon: <PeopleIcon />,
@@ -176,13 +174,18 @@ const InstituteDashboard = () => {
       color: "success",
       icon: <CheckCircleIcon />,
     },
-    { title: "Grade", value: "A+", color: "warning", icon: <TrendingUpIcon /> },
+    {
+      title: "Annual Budget",
+      value: "50,000",
+      color: "warning",
+      icon: <TrendingUpIcon />,
+    },
   ];
 
   return (
-    <Paper sx={{ p: isMobile ? 2 : 3, borderRadius: 2 }}>
+    <Paper sx={{ p: 2, mt: 1 }}>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-        Institute Dashboard
+         Dashboard
       </Typography>
 
       {/* -------------------- Metric Cards -------------------- */}
@@ -221,7 +224,7 @@ const InstituteDashboard = () => {
 
       {/* -------------------- Charts -------------------- */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4 }}>
           <Paper
             sx={{
               p: 2,
@@ -239,14 +242,14 @@ const InstituteDashboard = () => {
                 <Tooltip />
                 <Line
                   type="monotone"
-                  dataKey="students"
+                  dataKey="trainees"
                   stroke={theme.palette.primary.main}
                 />
               </LineChart>
             </ResponsiveContainer>
           </Paper>
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4 }}>
           <Paper
             sx={{
               p: 2,
@@ -255,7 +258,9 @@ const InstituteDashboard = () => {
               borderColor: "divider",
             }}
           >
-            <Typography fontWeight={600}>Students Distribution</Typography>
+            <Typography fontWeight={600}>
+              Gender Distribution of Trainees
+            </Typography>
             <ResponsiveContainer width="100%" height="90%">
               <PieChart>
                 <Pie data={pieData} dataKey="value" outerRadius={80} label>
@@ -268,7 +273,7 @@ const InstituteDashboard = () => {
             </ResponsiveContainer>
           </Paper>
         </Grid>
-        <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
+        <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
           <Paper
             sx={{
               p: 2,
