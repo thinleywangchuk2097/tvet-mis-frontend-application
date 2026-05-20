@@ -32,7 +32,7 @@ import { Formik, Form } from "formik";
 import * as Yup from "yup";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import FileUpload from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import CommonService from "../../../api/services/CommonService";
 import CurriculumEndorsementIndexService from "../../../api/services/CurriculumEndorsementIndexService";
 import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";

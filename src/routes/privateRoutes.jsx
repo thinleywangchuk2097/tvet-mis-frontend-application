@@ -10,8 +10,7 @@ import SwitchRole from "../pages/auth/SwitchRole";
 import MyTaskList from "../pages/tasklist/MyTaskList";
 import GroupTaskList from "../pages/tasklist/GroupTaskList";
 import TaskListIndex from "../pages/tasklist/TaskListIndex";
-//reports
-import ReportIndex from "../pages/report/ReportIndex";
+
 //course announcement paths
 import AccreditatedCourse from "../pages/institute/course-announcement/AccreditatedCourse";
 import NonAccreditedCourse from "../pages/institute/course-announcement/NonAccreditedCourse";
@@ -66,6 +65,13 @@ import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
 
 //Certificate
 import Assessment from "../pages/certificate/Assessment";
+//birms
+import BirmsPrivatePaymentIndex from "../pages/birms/private/BirmsPrivatePaymentIndex";
+
+//reports
+import InstituteReportIndex from "../pages/report/InstituteReportIndex";
+import CourseReportIndex from "../pages/report/CourseReportIndex";  
+import TraineeReportIndex from "../pages/report/TraineeReportIndex";
 
 export const privateRoutes = [
   {
@@ -217,8 +223,17 @@ export const privateRoutes = [
   {
     path: "report",
     children: [
-      { path: "report-index", element: <ReportIndex /> },
+      { path: "institute-report-index", element: <InstituteReportIndex /> },
+      { path: "course-report-index", element: <CourseReportIndex /> },
+      { path: "trainee-report-index", element: <TraineeReportIndex /> },  
       { path: "track-application-status", element: <TrackApplicationStatus /> },
+    ],
+  },
+   {
+    path: "auth-birms",
+    children: [
+      { path: "payment-index", element: <BirmsPrivatePaymentIndex /> },
+    
     ],
   },
   {

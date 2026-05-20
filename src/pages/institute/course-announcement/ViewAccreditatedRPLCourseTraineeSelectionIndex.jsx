@@ -591,8 +591,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       padding: "8px",
     },
     "& th": {
-      fontWeight: 600,
-      backgroundColor: "#f5f5f5",
+      fontWeight: 600
     },
   };
 

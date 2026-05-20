@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import FileUplaod from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import { toast } from "react-toastify";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
@@ -1174,7 +1174,7 @@ const InstituteProposal = () => {
               Supporting Documents
             </Typography>
             <Divider sx={{ mb: 3 }} />
-            <FileUplaod
+            <FileUpload
               files={formik.values.files}
               onFilesChange={(files) => formik.setFieldValue("files", files)}
             />

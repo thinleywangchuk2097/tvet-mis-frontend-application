@@ -714,7 +714,7 @@ const UserIndex = () => {
         )}
 
         {/* Add/Edit User Dialog */}
-        <Dialog open={open} onClose={handleDialogClose} fullWidth maxWidth="sm">
+        <Dialog open={open} onClose={handleDialogClose} fullWidth maxWidth="md">
           <DialogTitle>
             {editMode ? "Edit User" : "Add New User"}
             <IconButton

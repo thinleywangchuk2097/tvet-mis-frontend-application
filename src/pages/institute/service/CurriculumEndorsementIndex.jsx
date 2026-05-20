@@ -25,7 +25,7 @@ import AddIcon from "@mui/icons-material/Add";
 import LaunchIcon from "@mui/icons-material/Launch";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
-import FileUpload from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import CurriculumEndorsementIndexService from "../../../api/services/CurriculumEndorsementIndexService";
 import CommonService from "../../../api/services/CommonService";
 import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
