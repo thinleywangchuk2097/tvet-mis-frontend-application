@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { Formik, FieldArray } from "formik";
 import * as Yup from "yup";
-import FileUplaod from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import { toast } from "react-toastify";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
@@ -1172,7 +1172,7 @@ const AssessorAccreditorQMSAuditor = () => {
                       minHeight: 100,
                     }}
                   >
-                    <FileUplaod
+                    <FileUpload
                       files={formik.values.documents}
                       onFilesChange={(files) =>
                         formik.setFieldValue("documents", files)

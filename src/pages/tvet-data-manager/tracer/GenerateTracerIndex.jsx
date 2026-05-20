@@ -35,6 +35,7 @@ import { toast } from "react-toastify";
 
 // Validation schema - FIXED: questionType not required when subQuestions exist
 const validationSchema = Yup.object({
+  tracerTitle: Yup.string().required("Tracer title is required"),
   tracerType: Yup.string().required("Tracer type is required"),
   questions: Yup.array().of(
     Yup.object().shape({
@@ -118,6 +119,7 @@ const GenerateTracerIndex = () => {
   // Formik setup
   const formik = useFormik({
     initialValues: {
+      tracerTitle: "",
       tracerType: "",
       questions: [
         {
@@ -755,6 +757,68 @@ const GenerateTracerIndex = () => {
       )}
 
       <form onSubmit={formik.handleSubmit}>
+        {/* Tracer Title and Type Section */}
+        <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+            Tracer Information
+          </Typography>
+          <Grid container spacing={2}>
+            {/* Tracer Title */}
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Tracer Title"
+                name="tracerTitle"
+                value={formik.values.tracerTitle}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                variant="outlined"
+                size="small"
+                error={
+                  formik.touched.tracerTitle && Boolean(formik.errors.tracerTitle)
+                }
+                helperText={
+                  formik.touched.tracerTitle && formik.errors.tracerTitle
+                }
+              />
+            </Grid>
+            
+            {/* Tracer Type */}
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <FormControl
+                fullWidth
+                size="small"
+                error={
+                  formik.touched.tracerType && Boolean(formik.errors.tracerType)
+                }
+              >
+                <InputLabel>Select Tracer Type</InputLabel>
+                <Select
+                  name="tracerType"
+                  value={formik.values.tracerType}
+                  label="Select Tracer Type"
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                >
+                  <MenuItem value="">
+                    <em>-- Select Tracer Type --</em>
+                  </MenuItem>
+                  {tracerTypes.map((type) => (
+                    <MenuItem key={type.value} value={type.value}>
+                      {type.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {formik.touched.tracerType && formik.errors.tracerType && (
+                  <Typography variant="caption" color="error">
+                    {formik.errors.tracerType}
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+          </Grid>
+        </Paper>
+
         {/* Questions List */}
         {formik.values.questions.map((question, index) => (
           <Paper
@@ -795,40 +859,6 @@ const GenerateTracerIndex = () => {
             <Divider sx={{ mb: 3 }} />
 
             <Grid container spacing={2}>
-              {/* Tracer Type Dropdown */}
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <FormControl
-                  fullWidth
-                  size="small"
-                  error={
-                    formik.touched.tracerType &&
-                    Boolean(formik.errors.tracerType)
-                  }
-                >
-                  <InputLabel>Select Tracer Type</InputLabel>
-                  <Select
-                    name="tracerType"
-                    value={formik.values.tracerType}
-                    label="Select Tracer Type"
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                  >
-                    <MenuItem value="">
-                      <em>-- Select Tracer Type --</em>
-                    </MenuItem>
-                    {tracerTypes.map((type) => (
-                      <MenuItem key={type.value} value={type.value}>
-                        {type.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  {formik.touched.tracerType && formik.errors.tracerType && (
-                    <Typography variant="caption" color="error">
-                      {formik.errors.tracerType}
-                    </Typography>
-                  )}
-                </FormControl>
-              </Grid>
               {/* Question Text */}
               <Grid item size={{ xs: 12, md: 6 }}>
                 <TextField
@@ -853,7 +883,7 @@ const GenerateTracerIndex = () => {
                 />
               </Grid>
               {/* Question Type and Required Toggle */}
-              <Grid item size={{ xs: 12, md: 2 }}>
+              <Grid item size={{ xs: 12, md: 4 }}>
                 <FormControl
                   fullWidth
                   size="small"
@@ -1132,20 +1162,33 @@ const GenerateTracerIndex = () => {
           </Button>
         </Box>
       </form>
+      
       {/* Live Preview */}
       <Box sx={{ mt: 3 }}>
         <Typography variant="h6" fontWeight={650} gutterBottom>
           Live Preview
         </Typography>
         <Paper sx={{ p: 2 }} variant="outlined">
-          {/* Display selected tracer type in preview */}
+          {/* Display tracer title in preview */}
+          {formik.values.tracerTitle && (
+            <Typography variant="h6" gutterBottom color="primary">
+              {formik.values.tracerTitle}
+            </Typography>
+          )}
+          
+          {/* Display tracer type in preview */}
           {formik.values.tracerType && (
-            <Typography variant="subtitle2" color="primary" gutterBottom>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Tracer Type:{" "}
               {tracerTypes.find((t) => t.value === formik.values.tracerType)
                 ?.label || formik.values.tracerType}
             </Typography>
           )}
+          
+          {(formik.values.tracerTitle || formik.values.tracerType) && (
+            <Divider sx={{ my: 2 }} />
+          )}
+          
           {formik.values.questions.map((question, index) => (
             <Box key={question.id} sx={{ mb: 1 }}>
               <Typography variant="body1" gutterBottom>

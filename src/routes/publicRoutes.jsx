@@ -2,12 +2,8 @@ import PublicIndex from "../pages/public/PublicIndex";
 import Login from "../pages/auth/Login";
 import ForgotPassword from "../pages/auth/ForgotPassword";
 //public registration routes paths
-import Assessor from "../pages/public/registration/Assessor";
-import AssessmentCentre from "../pages/public/registration/AssessmentCentre";
-import Accreditor from "../pages/public/registration/Accreditor";
 import InstituteProposal from "../pages/public/proposal/InstituteProposal";
 import InstituteRegistration from "../pages/public/registration/InstituteRegistration";
-import QMSAuditor from "../pages/public/registration/QMSAuditor";
 import RPLAssessment from "../pages/public/courses/RPLAssessment";
 // assessment result path
 import AssessmentResult from "../pages/public/assessment/AssessmentResult";
@@ -16,7 +12,7 @@ import ApplyCourse from "../pages/trainee/ApplyCourse";
 import ResetPassword from "../pages/auth/ResetPassword";
 import GenerateQRCode from "../pages/auth/bhutanndi/GenerateQRCode";
 import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
-import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex";
+//import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex";
 //Reports
 import AssessorReport from "../pages/public/reports/Assessor";
 import InstituteReport from "../pages/public/reports/Institute";
@@ -24,6 +20,7 @@ import AccreditorReport from "../pages/public/reports/Accreditor";
 import TrainerReport from "../pages/public/reports/Trainer";
 import QMSAuditorReport from "../pages/public/reports/QMSAuditor";
 import CoursesAccreditedReport from "../pages/public/reports/CoursesAccredited";
+import BirmsPublicPaymentIndex from "../pages/birms/pubilc/BirmsPublicPaymentIndex";
 
 //public routes ..
 export const publicRoutes = [
@@ -59,7 +56,10 @@ export const publicRoutes = [
   {
     path: "registration",
     children: [
-      { path: ":registrationType/:serviceId", element: <AssessorAccreditorQMSAuditor /> },
+      {
+        path: ":registrationType/:serviceId",
+        element: <AssessorAccreditorQMSAuditor />,
+      },
     ],
   },
   {
@@ -73,6 +73,7 @@ export const publicRoutes = [
       { path: "courses-accredited", element: <CoursesAccreditedReport /> },
     ],
   },
+
   {
     path: "result",
     children: [{ path: "assessment-result", element: <AssessmentResult /> }],
@@ -86,8 +87,6 @@ export const publicRoutes = [
   },
   {
     path: "birms",
-    children: [
-      { path: "payment-index", element: <BirmsPaymentIndex /> }
-    ]
-  }
+    children: [{ path: "payment-index", element: <BirmsPublicPaymentIndex /> }],
+  },
 ];

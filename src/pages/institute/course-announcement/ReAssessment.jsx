@@ -19,6 +19,9 @@ import {
   Typography,
   Chip,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { Formik, Form } from "formik";
@@ -30,7 +33,7 @@ import { useNavigate } from "react-router-dom";
 import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
 import CourseEnrollmentService from "../../../api/services/CourseEnrollmentService";
 import CommonService from "../../../api/services/CommonService";
-import FileUpload from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
 
 // Helper function to convert file to base64
@@ -61,6 +64,11 @@ const ReAssessment = () => {
   const [dzongkhags, setDzongkhags] = useState([]);
   const [approvedCourses, setApprovedCourses] = useState([]);
   const [statusList, setStatusList] = useState([]);
+  const [reassessmentTypes, setReassessmentTypes] = useState([]);
+  const [currentReassessmentType, setCurrentReassessmentType] = useState("");
+  const [filterReassessmentType, setFilterReassessmentType] = useState("");
+  const [rplCourses, setRplCourses] = useState([]);
+  const [accreditedCourses, setAccreditedCourses] = useState([]);
 
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -71,9 +79,9 @@ const ReAssessment = () => {
     fetchInstituteDetails();
     fetchDropdownData();
     fetchDzongkhags();
-    fetchApprovedCourses();
-    fetchEnrolledCourses();
     fetchStatusList();
+    fetchReAssessmentServiceName();
+    fetchAllCoursesData();
   }, []);
 
   const fetchInstituteDetails = async () => {
@@ -109,32 +117,72 @@ const ReAssessment = () => {
     }
   };
 
-  const fetchApprovedCourses = async () => {
+  const fetchReAssessmentServiceName = async () => {
     try {
-      const approvedCourses =
+      const response =
+        await CourseEnrollmentService.getReAssessmentServiceName(access_token);
+      console.log("Re-assessment Service Name:", response.data);
+      if (response.data && Array.isArray(response.data)) {
+        const filteredTypes = response.data.filter(
+          (type) => type.id === "41" || type.id === "42",
+        );
+        setReassessmentTypes(filteredTypes);
+      }
+    } catch (error) {
+      console.error("Error fetching re-assessment service name:", error);
+    }
+  };
+
+  const fetchAllCoursesData = async () => {
+    try {
+      const rplResponse = await CommonService.getAllOccupations();
+      const mappedRplCourses = rplResponse.data.map((occupation) => ({
+        id: occupation.id,
+        name: occupation.occupationName,
+        serviceId: "41",
+        originalData: occupation,
+      }));
+      setRplCourses(mappedRplCourses);
+      console.log("RPL Courses loaded:", mappedRplCourses);
+
+      const accreditedResponse =
         await ApplyAccreditedCourseService.getAccreditedApprovedCourseByUserId(
           registration_no,
           access_token,
         );
-      setApprovedCourses(approvedCourses.data);
-      console.log("Approved Courses:", approvedCourses.data);
+      const mappedAccreditedCourses = accreditedResponse.data.map((course) => ({
+        id: course.id,
+        name: course.course_name,
+        serviceId: "42",
+        originalData: course,
+      }));
+      setAccreditedCourses(mappedAccreditedCourses);
+      console.log("Accredited Courses loaded:", mappedAccreditedCourses);
     } catch (error) {
-      console.error("Error fetching approved courses:", error);
+      console.error("Error fetching all courses data:", error);
+      toast.error("Failed to load courses data");
     }
   };
 
-  const fetchEnrolledCourses = async () => {
+  const fetchEnrolledCourses = async (reassessmentTypeId) => {
+    if (!reassessmentTypeId) {
+      setCourses([]);
+      return;
+    }
+    
     try {
       const response =
         await CourseEnrollmentService.getCourseDetailsAnnouncementByUserId(
           registration_no,
-          41, // Service ID for Re-assessment
+          reassessmentTypeId,
           access_token,
         );
       setCourses(response.data);
-      console.log("Enrolled Courses:", response.data);
+      console.log("Enrolled Courses for type", reassessmentTypeId, ":", response.data);
     } catch (error) {
       console.error("Error fetching courses:", error);
+      setCourses([]);
+      toast.error("Failed to fetch courses");
     }
   };
 
@@ -148,6 +196,32 @@ const ReAssessment = () => {
     }
   };
 
+  const fetchApprovedCourses = async (reassessmentTypeId) => {
+    try {
+      if (!reassessmentTypeId) {
+        setApprovedCourses([]);
+        setCurrentReassessmentType("");
+        return;
+      }
+
+      setCurrentReassessmentType(reassessmentTypeId);
+
+      if (reassessmentTypeId === "42" || reassessmentTypeId === 42) {
+        setApprovedCourses(accreditedCourses);
+        console.log("Using Accredited Courses:", accreditedCourses);
+      } else if (reassessmentTypeId === "41" || reassessmentTypeId === 41) {
+        setApprovedCourses(rplCourses);
+        console.log("Using RPL Courses:", rplCourses);
+      } else {
+        setApprovedCourses([]);
+      }
+    } catch (error) {
+      console.error("Error fetching approved courses:", error);
+      setApprovedCourses([]);
+      toast.error("Failed to fetch courses");
+    }
+  };
+
   const institute = instituteDetails[0] || {};
 
   const handleChangePage = (event, newPage) => setPage(newPage);
@@ -156,18 +230,52 @@ const ReAssessment = () => {
     setPage(0);
   };
 
-  const handleViewDetails = (applicationNo) => {
-    navigate(`/announcement/reassessment-trainee-selection/${applicationNo}`);
+  const handleViewDetails = (applicationNo, courseId) => {
+    // Navigate with both applicationNo and courseId as route parameters
+    navigate(`/announcement/reassessment-trainee-selection/${applicationNo}/${courseId}`);
   };
 
-  const filteredCourses = courses.filter(
-    (course) =>
-      course.course_name?.toLowerCase().includes(search.toLowerCase()) ||
-      course.application_no?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const getReassessmentTypeName = (serviceId) => {
+    if (!serviceId) return "N/A";
+    const type = reassessmentTypes.find((t) => t.id === String(serviceId));
+    return type ? type.service_name : "N/A";
+  };
+
+  const getCourseName = (courseId, serviceId) => {
+    if (!courseId) return "N/A";
+    
+    let course = null;
+    
+    if (serviceId === "41" || serviceId === 41) {
+      course = rplCourses.find((c) => String(c.id) === String(courseId));
+    } else if (serviceId === "42" || serviceId === 42) {
+      course = accreditedCourses.find((c) => String(c.id) === String(courseId));
+    } else {
+      course = approvedCourses.find((c) => String(c.id) === String(courseId));
+      if (!course) {
+        const originalCourse = courses.find(
+          (c) => String(c.course_id) === String(courseId)
+        );
+        return originalCourse ? originalCourse.course_name : courseId;
+      }
+    }
+    
+    return course ? course.name : courseId;
+  };
+
+  const filteredCourses = courses.filter((course) => {
+    const courseName = getCourseName(course.course_id, course.service_id);
+    
+    const matchesSearch =
+      courseName?.toLowerCase().includes(search.toLowerCase()) ||
+      course.application_no?.toLowerCase().includes(search.toLowerCase());
+    
+    return matchesSearch;
+  });
 
   const initialValues = {
     instituteId: institute.institute_id || "",
+    reassessmentTypeId: "",
     courseId: "",
     courseFee: "",
     totalNoTrainees: "",
@@ -181,6 +289,7 @@ const ReAssessment = () => {
   };
 
   const validationSchema = Yup.object().shape({
+    reassessmentTypeId: Yup.string().required("Reassessment Type is required"),
     courseId: Yup.string().required("Course Name is required"),
     courseFee: Yup.number()
       .typeError("Must be a number")
@@ -218,6 +327,7 @@ const ReAssessment = () => {
 
       const payload = {
         instituteId: values.instituteId,
+        serviceId: values.reassessmentTypeId,
         courseId: values.courseId,
         courseFee: values.courseFee,
         totalNoTrainees: values.totalNoTrainees,
@@ -228,7 +338,6 @@ const ReAssessment = () => {
         trainingLocationId: values.trainingLocationId,
         courseDescription: values.courseDescription,
         createdBy: actionId,
-        serviceId: 41, // Service ID for Re-assessment
         statusId: 55,
         remarks: "",
         documents: documents,
@@ -243,7 +352,7 @@ const ReAssessment = () => {
 
       if (response.status === 200 || response.status === 201) {
         toast.success("Re-Assessment submitted successfully!");
-        await fetchEnrolledCourses();
+        await fetchEnrolledCourses(values.reassessmentTypeId);
         resetForm();
         setOpenDialog(false);
       }
@@ -289,12 +398,6 @@ const ReAssessment = () => {
     return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
   };
 
-  const getCourseName = (courseId) => {
-    if (!courseId) return "N/A";
-    const course = approvedCourses.find((c) => c.id === courseId);
-    return course ? course.course_name : courseId;
-  };
-
   const getCertificationLevelName = (levelId) => {
     if (!levelId) return "N/A";
     const level = certificationLevels.find((l) => l.id === parseInt(levelId));
@@ -324,28 +427,56 @@ const ReAssessment = () => {
 
       <Grid
         container
-        spacing={1}
+        spacing={2}
         alignItems="center"
         sx={{ justifyContent: "flex-end", mb: 2 }}
       >
-        <Grid item size={{ xs: 12, md: 4 }}>
-          <TextField
-            label="Search by Course or Application No"
-            variant="outlined"
-            size="small"
-            fullWidth
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                height: "36px",
-                "& input": { padding: "8px 12px" },
-                "& fieldset": { borderRadius: "4px" },
-              },
-            }}
-          />
+        <Grid item size={{ xs: 12, md: 3 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Select Reassessment Type</InputLabel>
+            <Select
+              value={filterReassessmentType}
+              onChange={async (e) => {
+                const value = e.target.value;
+                setFilterReassessmentType(value);
+                setSearch("");
+                setPage(0);
+                await fetchEnrolledCourses(value);
+              }}
+              label="Select Reassessment Type"
+              sx={{ height: "36px" }}
+            >
+              <MenuItem value="">-Select Reassessment Type-</MenuItem>
+              {reassessmentTypes.map((type) => (
+                <MenuItem key={type.id} value={type.id}>
+                  {type.service_name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Grid>
-        <Grid item size={{ xs: 12, md: 2 }}>
+        
+        {filterReassessmentType && (
+          <Grid item size={{ xs: 12, md: 3 }}>
+            <TextField
+              label="Search by Course or Application No"
+              variant="outlined"
+              size="small"
+              fullWidth
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  height: "36px",
+                  "& input": { padding: "8px 12px" },
+                  "& fieldset": { borderRadius: "4px" },
+                },
+              }}
+            />
+          </Grid>
+        )}
+        
+        <Grid item size={{ xs: 12, md: filterReassessmentType ? 2 : 2 }}>
           <Button
             variant="contained"
             color="primary"
@@ -365,6 +496,7 @@ const ReAssessment = () => {
             <TableRow>
               <TableCell>#</TableCell>
               <TableCell>Application No</TableCell>
+              <TableCell>Reassessment Type</TableCell>
               <TableCell>Course</TableCell>
               <TableCell>Course Fee</TableCell>
               <TableCell>Total Trainees</TableCell>
@@ -377,14 +509,25 @@ const ReAssessment = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredCourses.length > 0 ? (
+            {!filterReassessmentType ? (
+              <TableRow>
+                <TableCell colSpan={12} align="center">
+                  Please select a Reassessment Type to view the data
+                </TableCell>
+              </TableRow>
+            ) : filteredCourses.length > 0 ? (
               filteredCourses
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((course, index) => (
                   <TableRow key={course.id || index}>
                     <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
                     <TableCell>{course.application_no || "N/A"}</TableCell>
-                    <TableCell>{getCourseName(course.course_id)}</TableCell>
+                    <TableCell>
+                      {getReassessmentTypeName(course.service_id)}
+                    </TableCell>
+                    <TableCell>
+                      {getCourseName(course.course_id, course.service_id)}
+                    </TableCell>
                     <TableCell>Nu. {course.course_fee}</TableCell>
                     <TableCell>{course.total_no_trainees}</TableCell>
                     <TableCell>
@@ -421,7 +564,7 @@ const ReAssessment = () => {
                       <IconButton
                         color="primary"
                         size="small"
-                        onClick={() => handleViewDetails(course.application_no)}
+                        onClick={() => handleViewDetails(course.application_no, course.course_id)}
                         title="View Details"
                       >
                         <RemoveRedEyeIcon fontSize="small" />
@@ -431,22 +574,24 @@ const ReAssessment = () => {
                 ))
             ) : (
               <TableRow>
-                <TableCell colSpan={11} align="center">
-                  No data available in table
+                <TableCell colSpan={12} align="center">
+                  No data available for selected reassessment type
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={filteredCourses.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
+        {filterReassessmentType && filteredCourses.length > 0 && (
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={filteredCourses.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        )}
       </TableContainer>
 
       <Dialog
@@ -471,6 +616,43 @@ const ReAssessment = () => {
                 <Grid container spacing={2}>
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
+                      select
+                      fullWidth
+                      label="Reassessment Type"
+                      name="reassessmentTypeId"
+                      size="small"
+                      value={formik.values.reassessmentTypeId}
+                      onChange={async (e) => {
+                        const value = e.target.value;
+                        formik.handleChange(e);
+                        formik.setFieldValue("courseId", "");
+                        if (value) {
+                          await fetchApprovedCourses(value);
+                        } else {
+                          setApprovedCourses([]);
+                        }
+                      }}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.reassessmentTypeId &&
+                        Boolean(formik.errors.reassessmentTypeId)
+                      }
+                      helperText={
+                        formik.touched.reassessmentTypeId &&
+                        formik.errors.reassessmentTypeId
+                      }
+                    >
+                      <MenuItem value="">-select-</MenuItem>
+                      {reassessmentTypes.map((type) => (
+                        <MenuItem key={type.id} value={type.id}>
+                          {type.service_name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <TextField
                       fullWidth
                       label="Course Name"
                       name="courseId"
@@ -486,16 +668,21 @@ const ReAssessment = () => {
                       helperText={
                         formik.touched.courseId && formik.errors.courseId
                       }
+                      disabled={
+                        !formik.values.reassessmentTypeId ||
+                        approvedCourses.length === 0
+                      }
                     >
                       <MenuItem value="">-select-</MenuItem>
                       {approvedCourses.map((course) => (
                         <MenuItem key={course.id} value={course.id}>
-                          {course.course_name}
+                          {course.name}
                         </MenuItem>
                       ))}
                     </TextField>
                   </Grid>
 
+                  {/* Rest of the form fields remain the same */}
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth

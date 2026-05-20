@@ -10,8 +10,7 @@ import SwitchRole from "../pages/auth/SwitchRole";
 import MyTaskList from "../pages/tasklist/MyTaskList";
 import GroupTaskList from "../pages/tasklist/GroupTaskList";
 import TaskListIndex from "../pages/tasklist/TaskListIndex";
-//reports
-import ReportIndex from "../pages/report/ReportIndex";
+
 //course announcement paths
 import AccreditatedCourse from "../pages/institute/course-announcement/AccreditatedCourse";
 import NonAccreditedCourse from "../pages/institute/course-announcement/NonAccreditedCourse";
@@ -21,7 +20,7 @@ import AccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/cours
 import ViewAccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/course-announcement/ViewAccreditatedRPLCourseTraineeSelectionIndex";
 import NonAccreditedCourseTraineeSelection from "../pages/institute/course-announcement/NonAccreditedCourseTraineeSelection";
 import ReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ReAssessmentTraineeSelectionIndex";
-
+import ViewReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ViewReAssessmentTraineeSelectionIndex"; 
 
 //resource-management
 import StaffManagement from "../pages/institute/resource-management/StaffManagement";
@@ -66,6 +65,13 @@ import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
 
 //Certificate
 import Assessment from "../pages/certificate/Assessment";
+//birms
+import BirmsPrivatePaymentIndex from "../pages/birms/private/BirmsPrivatePaymentIndex";
+
+//reports
+import InstituteReportIndex from "../pages/report/InstituteReportIndex";
+import CourseReportIndex from "../pages/report/CourseReportIndex";  
+import TraineeReportIndex from "../pages/report/TraineeReportIndex";
 
 export const privateRoutes = [
   {
@@ -135,6 +141,10 @@ export const privateRoutes = [
         path: "view-trainee-selection/:applicationNo",
         element: <ViewAccreditatedRPLCourseTraineeSelectionIndex />,
       },
+      {
+        path: "view-reassessment-trainee-selection/:applicationNo",
+        element: <ViewReAssessmentTraineeSelectionIndex />,
+      },
     ],
   },
   {
@@ -171,7 +181,7 @@ export const privateRoutes = [
         element: <NonAccreditedCourseTraineeSelection />,
       },
       {
-        path: "reassessment-trainee-selection/:applicationNo",
+        path: "reassessment-trainee-selection/:applicationNo/:courseId",
         element: <ReAssessmentTraineeSelectionIndex />,
       }
     ],
@@ -213,8 +223,17 @@ export const privateRoutes = [
   {
     path: "report",
     children: [
-      { path: "report-index", element: <ReportIndex /> },
+      { path: "institute-report-index", element: <InstituteReportIndex /> },
+      { path: "course-report-index", element: <CourseReportIndex /> },
+      { path: "trainee-report-index", element: <TraineeReportIndex /> },  
       { path: "track-application-status", element: <TrackApplicationStatus /> },
+    ],
+  },
+   {
+    path: "auth-birms",
+    children: [
+      { path: "payment-index", element: <BirmsPrivatePaymentIndex /> },
+    
     ],
   },
   {

@@ -29,7 +29,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
-import FileUpload from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from "react-toastify";

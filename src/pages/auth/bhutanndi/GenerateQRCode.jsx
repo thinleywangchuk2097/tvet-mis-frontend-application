@@ -163,7 +163,8 @@ const GenerateQRCode = () => {
           const data = JSON.parse(sc.decode(msg.data));
           if (data) {
             console.log('Received NATS message:', data);
-            const authResponse = await BhutanNDIService.bhutanNDIAuthResponse(data);
+            const authResponse = await BhutanNDIService.bhutanNDIAuthNatsResponse(data);
+            console.log('Authentication response:', authResponse);
             if (authResponse.status === 200) {
               await handleSuccessfulLogin(authResponse);
             } else {
@@ -239,7 +240,7 @@ const GenerateQRCode = () => {
     }
 
     toast.success("Login successfully!");
-    navigate('/dashboard');
+    navigate('/');
   };
 
   const handleClose = () => navigate("/auth/login");

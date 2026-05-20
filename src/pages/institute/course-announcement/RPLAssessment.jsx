@@ -30,7 +30,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
 import CommonService from "../../../api/services/CommonService";
-import FileUpload from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import CourseEnrollmentService from "../../../api/services/CourseEnrollmentService";
 import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
 
