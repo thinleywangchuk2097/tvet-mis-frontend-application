@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import FileUplaod from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import { toast } from "react-toastify";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
@@ -472,7 +472,7 @@ const InstituteChange = () => {
               1. Agreement for Ownership change
             </Typography>
 
-            <FileUplaod
+            <FileUpload
               files={formik.values.files}
               onFilesChange={(files) => formik.setFieldValue("files", files)}
               maxFiles={5}

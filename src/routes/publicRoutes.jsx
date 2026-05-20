@@ -12,7 +12,7 @@ import ApplyCourse from "../pages/trainee/ApplyCourse";
 import ResetPassword from "../pages/auth/ResetPassword";
 import GenerateQRCode from "../pages/auth/bhutanndi/GenerateQRCode";
 import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
-import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex";
+import BirmsPublicPaymentIndex from "../pages/birms/pubilc/BirmsPublicPaymentIndex";
 
 //public routes ..
 export const publicRoutes = [
@@ -67,6 +67,6 @@ export const publicRoutes = [
   },
   {
     path: "birms",
-    children: [{ path: "payment-index", element: <BirmsPaymentIndex /> }],
+    children: [{ path: "payment-index", element: <BirmsPublicPaymentIndex /> }],
   },
 ];

@@ -29,7 +29,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
-import FileUpload from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import ApplyNonAccreditedCourseService from "../../../api/services/ApplyNonAccreditedCourseService";
 import CommonService from "../../../api/services/CommonService";
 import CurriculumEndorsementIndexService from "../../../api/services/CurriculumEndorsementIndexService";

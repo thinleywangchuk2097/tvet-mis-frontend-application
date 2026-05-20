@@ -1,11 +1,17 @@
 // src/api/axios.js
-import axios from 'axios';
+import axios from "axios";
+
+// For local development
+const VITE_API_URL = "http://localhost:8080";
+
+// For Kubernetes (when deploying node ip)
+//const VITE_API_URL = 'http://172.30.3.10:30176';
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:8080', // Change this to your backend API URL(auth-application)
-  timeout: 10000, // 10 seconds instead of 1000ms
+  baseURL: VITE_API_URL,
+  timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 

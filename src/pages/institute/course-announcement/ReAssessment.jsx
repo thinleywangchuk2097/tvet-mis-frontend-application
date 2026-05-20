@@ -33,7 +33,7 @@ import { useNavigate } from "react-router-dom";
 import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
 import CourseEnrollmentService from "../../../api/services/CourseEnrollmentService";
 import CommonService from "../../../api/services/CommonService";
-import FileUpload from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
 
 // Helper function to convert file to base64

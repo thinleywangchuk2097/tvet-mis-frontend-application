@@ -28,7 +28,7 @@ import MenuBookIcon from "@mui/icons-material/MenuBook";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
-import FileUpload from "../../../components/file/FileUplaod";
+import FileUpload from "../../../components/file/FileUpload";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useFormik } from "formik";

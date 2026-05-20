@@ -27,7 +27,7 @@ import {
   Print as PrintIcon,
 } from "@mui/icons-material";
 
-const BirmsPaymentIndex = () => {
+const BirmsPublicPaymentIndex = () => {
   const [searchAdviceNo, setSearchAdviceNo] = useState("");
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
@@ -454,4 +454,4 @@ const BirmsPaymentIndex = () => {
   );
 };
 
-export default BirmsPaymentIndex;
+export default BirmsPublicPaymentIndex;

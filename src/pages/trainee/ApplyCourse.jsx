@@ -21,7 +21,7 @@ import * as Yup from "yup";
 import { useParams, useNavigate } from "react-router-dom";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
-import FileUpload from "../../components/file/FileUplaod";
+import FileUpload from "../../components/file/FileUpload";
 import { toast } from "react-toastify";
 import CommonService from "../../api/services/CommonService";
 import CourseEnrollmentService from "../../api/services/CourseEnrollmentService";
