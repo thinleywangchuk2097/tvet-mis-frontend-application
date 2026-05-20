@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -24,6 +24,10 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
+import TotService from "../../api/services/TotService";
+import { useSelector } from "react-redux";
+import { toast } from "react-toastify";
+
 
 const CreateTotIndex = () => {
   const [search, setSearch] = useState("");
@@ -31,19 +35,22 @@ const CreateTotIndex = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [courses, setCourses] = useState([]);
+  const access_token = useSelector((state) => state.auth.accessToken);
 
   const [data, setData] = useState([
     {
       id: 1,
       applicationNo: "24000017",
-      courseName: "Instructional Methodology & Pedagogy",
+      courseName: "Mason",
       applicationDate: "February 27th 2023 to March 9th 2023",
       courseDate: "March 13th 2023 to March 25th 2023",
     },
     {
       id: 2,
       applicationNo: "24000016",
-      courseName: "Instructional Methodology & Pedagogy",
+      courseName: "Plumber",
       applicationDate: "May 6th 2022 to May 23rd 2022",
       courseDate: "June 6th 2022 to June 18th 2022",
     },
@@ -68,6 +75,19 @@ const CreateTotIndex = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingId(null);
+  };
+
+  const fetchEnrolledCourses = async () => {
+    try {
+      const response =
+        await TotService.getCourseDetailsAnnouncementByUserId(
+          access_token,
+        );
+      setCourses(response.data);
+      console.log("ToT Courses details:", response.data);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+    }
   };
 
   const filteredData = data.filter(
@@ -110,36 +130,61 @@ const CreateTotIndex = () => {
       ),
   });
 
-  const handleSubmit = (values, { resetForm }) => {
-    if (editingId) {
-      // Update existing record
-      setData((prev) =>
-        prev.map((item) =>
-          item.id === editingId
-            ? {
+  const handleSubmit = async (values, { resetForm, setSubmitting }) => {
+    setLoading(true);
+    try {
+      if (editingId) {
+        // Update existing record
+        setData((prev) =>
+          prev.map((item) =>
+            item.id === editingId
+              ? {
                 ...item,
                 courseName: values.courseName,
                 applicationDate: `${values.applicationStartDate} to ${values.applicationEndDate}`,
                 courseDate: `${values.courseStartDate} to ${values.courseEndDate}`,
               }
-            : item,
-        ),
+              : item,
+          ),
+        );
+      } else {
+        // Add new record
+        const payload = {
+          courseId: values.courseName,
+          applicationStartDate: values.applicationStartDate,
+          applicationEndDate: values.applicationEndDate,
+          courseStartDate: values.courseStartDate,
+          courseEndDate: values.courseEndDate,
+          courseDescription: values.courseDescription,
+          //createdBy: actionId,
+          serviceId: 24,
+          statusId: 55,
+        };
+        //console.log("Submitting payload:", newEntry);
+        //setData((prev) => [...prev, newEntry]);
+        const response = await TotService.submitCourseAnnouncement(
+          payload,
+          access_token,
+        );
+        if (response.status === 200 || response.status === 201) {
+          toast.success("ToT course created successfully!");
+          await fetchEnrolledCourses();
+          resetForm();
+          setOpenDialog(false);
+        }
+      }
+
+    } catch (error) {
+      console.error("Error submitting course:", error);
+      toast.error(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to submit course",
       );
-    } else {
-      // Add new record
-      const newEntry = {
-        id: data.length + 1,
-        applicationNo: (Math.floor(Math.random() * 10000000) + 10000000)
-          .toString()
-          .slice(0, 8),
-        courseName: values.courseName,
-        applicationDate: `${values.applicationStartDate} to ${values.applicationEndDate}`,
-        courseDate: `${values.courseStartDate} to ${values.courseEndDate}`,
-      };
-      setData((prev) => [...prev, newEntry]);
+    } finally {
+      setLoading(false);
+      setSubmitting(false);
     }
-    resetForm();
-    handleCloseDialog();
   };
 
   const handleDelete = (id) => {
@@ -192,7 +237,7 @@ const CreateTotIndex = () => {
             onClick={() => handleOpenDialog()}
             sx={{ height: "36px" }}
           >
-            Add TOT
+            Announce TOT
           </Button>
         </Grid>
       </Grid>
@@ -268,7 +313,7 @@ const CreateTotIndex = () => {
         fullWidth
       >
         <DialogTitle>
-          {editingId ? "Edit Course Details" : "Add Course Details"}
+          {editingId ? "Edit Course Details" : "Announce ToT Course"}
         </DialogTitle>
         <Formik
           initialValues={initialValues}
@@ -298,14 +343,14 @@ const CreateTotIndex = () => {
                       }
                     >
                       <MenuItem value="">-Select-</MenuItem>
-                      <MenuItem value="Instructional Methodology & Pedagogy">
-                        Instructional Methodology & Pedagogy
+                      <MenuItem value="1">
+                        Mason
                       </MenuItem>
-                      <MenuItem value="Curriculum Development">
-                        Curriculum Development
+                      <MenuItem value="2">
+                        Plumber
                       </MenuItem>
-                      <MenuItem value="Assessment Design">
-                        Assessment Design
+                      <MenuItem value="3">
+                        Construction Carpenter
                       </MenuItem>
                     </TextField>
                   </Grid>
@@ -397,6 +442,27 @@ const CreateTotIndex = () => {
                       }
                     />
                   </Grid>
+                  <Grid item size={{ xs: 12 }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      label="Course Description"
+                      name="courseDescription"
+                      size="small"
+                      value={formik.values.courseDescription}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.courseDescription &&
+                        Boolean(formik.errors.courseDescription)
+                      }
+                      helperText={
+                        formik.touched.courseDescription &&
+                        formik.errors.courseDescription
+                      }
+                    />
+                  </Grid>
                 </Grid>
               </DialogContent>
               <DialogActions>
@@ -405,6 +471,7 @@ const CreateTotIndex = () => {
                   variant="contained"
                   color="error"
                   onClick={handleCloseDialog}
+                  disabled={loading}
                 >
                   Cancel
                 </Button>
@@ -413,8 +480,9 @@ const CreateTotIndex = () => {
                   type="submit"
                   variant="contained"
                   color="primary"
+                  disabled={loading}
                 >
-                  {editingId ? "Update" : "Create"}
+                  {loading ? "Submitting..." : "Submit"}
                 </Button>
               </DialogActions>
             </Form>

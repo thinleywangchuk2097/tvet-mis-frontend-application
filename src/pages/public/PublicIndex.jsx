@@ -1,48 +1,43 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
-  Box,
-  Button,
-  useTheme,
-  alpha,
-  TextField,
-  InputAdornment,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Grid,
-  Typography,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TablePagination,
-  Chip,
+  Box, Button, alpha, TextField, InputAdornment,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Paper, Grid, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
+  TablePagination, Chip, Card, CardContent, Stack, IconButton, Container,
 } from "@mui/material";
-
 import { Search } from "@mui/icons-material";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
+  PieChart, Pie, Cell, Tooltip as RTooltip,
+  XAxis, YAxis, CartesianGrid, ResponsiveContainer,
+  BarChart, Bar,
 } from "recharts";
+
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
-import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
+import VerifiedIcon from "@mui/icons-material/Verified";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import BarChartIcon from "@mui/icons-material/BarChart";
+import CampaignIcon from "@mui/icons-material/Campaign";
+import TrackChangesIcon from "@mui/icons-material/TrackChanges";
+import HistoryIcon from "@mui/icons-material/History";
+import PieChartIcon from "@mui/icons-material/PieChart";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import SchoolIcon from "@mui/icons-material/School";
+import BusinessIcon from "@mui/icons-material/Business";
+import EngineeringIcon from "@mui/icons-material/Engineering";
+import ArticleIcon from "@mui/icons-material/Article";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import PhoneInTalkIcon from "@mui/icons-material/PhoneInTalk";
+import GroupsIcon from "@mui/icons-material/Groups";
+import PublicIcon from "@mui/icons-material/Public";
+
+// ── Imported course announcements component
 import CourseTraineeAnnouncementsIndex from "./CourseTraineeAnnouncementsIndex";
 
-// Slider images
+// ── Slider images
 import slide1 from "../../assets/slider/slide1.jpg";
 import slide2 from "../../assets/slider/slide2.jpg";
 import slide3 from "../../assets/slider/slide3.jpg";
@@ -50,777 +45,1015 @@ import slide4 from "../../assets/slider/slide4.png";
 import slide5 from "../../assets/slider/slide5.png";
 import slide6 from "../../assets/slider/slide6.png";
 import slide7 from "../../assets/slider/slide7.png";
-
 const sliderImages = [slide1, slide2, slide3, slide4, slide5, slide6, slide7];
 
+// ── Brand palette
+const P = "#1565c0";
+const PD = "#0a2d6e";
+const PL = "#e8f1fb";
+const W = "#ffffff";
+const TEAL = "#0097a7";
+
+// ── Static data
 const applicationDetails = [
-  {
-    application_no: 301,
-    name: "Tashi Dorji",
-    location: "Thimphu",
-    service: "Electricity",
-    status: "Approved",
-  },
-  {
-    application_no: 302,
-    name: "Sonam Choden",
-    location: "Paro",
-    service: "Water Supply",
-    status: "Pending",
-  },
-  {
-    application_no: 303,
-    name: "Pema Wangchuk",
-    location: "Punakha",
-    service: "Road Construction",
-    status: "Rejected",
-  },
-  {
-    application_no: 304,
-    name: "Kesang Dema",
-    location: "Gelegphu",
-    service: "Health",
-    status: "Approved",
-  },
+  { application_no: 301, name: "Tashi Dorji", location: "Thimphu", service: "Electricity", status: "Approved" },
+  { application_no: 302, name: "Sonam Choden", location: "Paro", service: "Water Supply", status: "Pending" },
+  { application_no: 303, name: "Pema Wangchuk", location: "Punakha", service: "Road Construction", status: "Rejected" },
+  { application_no: 304, name: "Kesang Dema", location: "Gelephu", service: "Health", status: "Approved" },
 ];
 
-// Pie chart
+// ── Key TVET Indicators (Public / Private / Total)
+const tvetIndicators = [
+  { id: 1, name: "Registered Training Providers", pub: 14, pvt: 130, color: P },
+  { id: 2, name: "Accredited Training Providers", pub: 12, pvt: 74, color: "#0288d1" },
+  { id: 3, name: "Accredited Assessment Centres", pub: 18, pvt: 16, color: TEAL },
+  { id: 4, name: "Registered SES Centres", pub: 20, pvt: 8, color: "#00897b" },
+  { id: 5, name: "Registered Trainers", pub: 215, pvt: 197, color: "#2e7d32" },
+  { id: 6, name: "Registered Accreditors", pub: 38, pvt: 18, color: "#558b2f" },
+  { id: 7, name: "Registered QMS Auditors", pub: 22, pvt: 16, color: "#9e9d24" },
+  { id: 8, name: "Registered Assessors", pub: 95, pvt: 92, color: "#f9a825" },
+  { id: 9, name: "Registered Programs", pub: 250, pvt: 470, color: "#ef6c00" },
+  { id: 10, name: "Accredited Programs", pub: 173, pvt: 69, color: "#e65100" },
+  { id: 11, name: "Enrollment in Accredited (BQF) Programs", pub: 8094, pvt: 16990, color: "#d84315" },
+  { id: 12, name: "Enrollment in Non-BQF Programs", pub: 5732, pvt: 45951, color: "#bf360c" },
+  { id: 13, name: "BQF Certificate Awarded", pub: 3245, pvt: 5211, color: "#6a1b9a" },
+  { id: 14, name: "Certificate 2", pub: 1856, pvt: 2465, color: "#7b1fa2" },
+  { id: 15, name: "Certificate 3", pub: 1325, pvt: 1662, color: "#8e24aa" },
+  { id: 16, name: "Diploma", pub: 1024, pvt: 830, color: "#4527a0" },
+  { id: 17, name: "Advance Diploma", pub: 412, pvt: 212, color: "#283593" },
+].map(r => ({ ...r, total: r.pub + r.pvt }));
+
+// ── Institute by Provider Type
+const providerTypeData = [
+  { name: "Public", value: 48, color: "#1565c0" },
+  { name: "Private", value: 86, color: "#2e7d32" },
+  { name: "NGOs", value: 10, color: "#e65100" },
+];
+const providerTotal = providerTypeData.reduce((s, d) => s + d.value, 0);
+
+// ── Ongoing Programs
+const ongoingPrograms = [
+  { course: "Physics 101", certification: "Level 1", status: "ONGOING", startDate: "15-Jan-2026", endDate: "15-Jun-2026" },
+  { course: "Mathematics 201", certification: "Level 2", status: "ONGOING", startDate: "10-Dec-2025", endDate: "10-May-2026" },
+  { course: "Electrical Wiring", certification: "Level 2", status: "COMPLETED", startDate: "05-Sep-2025", endDate: "05-Feb-2026" },
+  { course: "Plumbing Level 2", certification: "Level 2", status: "ONGOING", startDate: "01-Feb-2026", endDate: "01-Jul-2026" },
+  { course: "Building Painter", certification: "Level 1", status: "COMPLETED", startDate: "10-Aug-2025", endDate: "10-Jan-2026" },
+  { course: "Carpentry Basics", certification: "Level 1", status: "ONGOING", startDate: "20-Jan-2026", endDate: "20-Jun-2026" },
+  { course: "Welding Advanced", certification: "Level 3", status: "COMPLETED", startDate: "01-Jul-2025", endDate: "01-Dec-2025" },
+];
+
+// ── Institute by Sector (pie)
 const pieData = [
-  { name: "Construction", value: 1 },
-  { name: "Power", value: 2 },
-  { name: "Automobile", value: 3 },
-  { name: "Manufacturing", value: 5 },
-  { name: "Tourism & Hospitality", value: 1 },
-  { name: "Transportation", value: 2 },
-  { name: "Zorig Chusum", value: 3 },
+  { name: "Construction", value: 12 },
+  { name: "Power", value: 18 },
+  { name: "Automobile", value: 14 },
+  { name: "Manufacturing", value: 25 },
+  { name: "Tourism & Hospitality", value: 21 },
+  { name: "Transportation", value: 9 },
+  { name: "Zorig Chusum", value: 15 },
+];
+const PIE_COLORS = [P, "#0288d1", TEAL, "#2e7d32", "#558b2f", "#e65100", "#6a1b9a"];
+
+// ── Institute by Dzongkhag (all 20 dzongkhags)
+const dzongkhagData = [
+  { name: "Thimphu", value: 38 }, { name: "Paro", value: 12 },
+  { name: "Punakha", value: 8 }, { name: "Wangdue", value: 7 },
+  { name: "Bumthang", value: 5 }, { name: "Trongsa", value: 4 },
+  { name: "Zhemgang", value: 3 }, { name: "Tsirang", value: 4 },
+  { name: "Dagana", value: 3 }, { name: "Sarpang", value: 6 },
+  { name: "Pemagatshel", value: 3 }, { name: "Samdrup J.", value: 6 },
+  { name: "Trashigang", value: 7 }, { name: "Mongar", value: 5 },
+  { name: "Lhuentse", value: 3 }, { name: "Trashiyangtse", value: 3 },
+  { name: "Haa", value: 4 }, { name: "Chhukha", value: 9 },
+  { name: "Gasa", value: 1 }, { name: "Samtse", value: 8 },
 ];
 
-const COLORS = [
-  "#4caf50",
-  "#ff9800",
-  "#f44336",
-  "#2196f3",
-  "#9c27b0",
-  "#ff5722",
-  "#3f51b5",
-  "#009688",
+const notifications = [
+  "New Course Applications open — Apply before 10th March 2026.",
+  "Institute registrations for 2026 are due soon. Complete your profile.",
+  "Check your application status using the search bar above.",
+  "New courses added in Thimphu and Paro locations.",
+  "ToT Certification Workshop in Thimphu — June 5 to 7, 2026.",
 ];
 
-// Line & bar chart
-const graphData = [
-  { month: "Thimphu", value: 3 },
-  { month: "Bumthang", value: 1 },
-  { month: "Wangdue", value: 1 },
-  { month: "Tgang", value: 1 },
-  { month: "Punakha", value: 3 },
+// ── Services for public — four user paths
+const services = [
+  {
+    title: "For Trainees", desc: "Browse and apply for accredited TVET courses.", cta: "Apply for a Course",
+    color: P, icon: <SchoolIcon sx={{ fontSize: 30 }} />, href: "#course-announcements"
+  },
+  {
+    title: "For Training Providers", desc: "Register your institute and propose programs.", cta: "Register Institute",
+    color: TEAL, icon: <BusinessIcon sx={{ fontSize: 30 }} />, href: "/register/institute/7"
+  },
+  {
+    title: "For Professionals", desc: "Apply as Trainer, Assessor or Accreditor.", cta: "Become Certified",
+    color: "#2e7d32", icon: <EngineeringIcon sx={{ fontSize: 30 }} />, href: "/registration/assessor/32"
+  },
+  {
+    title: "Standards & Curriculum", desc: "Browse National Competency Standards.", cta: "View Resources",
+    color: "#e65100", icon: <ArticleIcon sx={{ fontSize: 30 }} />, href: "https://www.blmis.gov.bt/tvet/ncs"
+  },
 ];
 
-const graphLineData = [
-  { month: "jan", value: 12 },
-  { month: "feb", value: 17 },
-  { month: "mar", value: 20 },
-  { month: "apr", value: 50 },
-  { month: "may", value: 40 },
-  { month: "jun", value: 100 },
-  { month: "jul", value: 150 },
-  { month: "aug", value: 50 },
-  { month: "sep", value: 67 },
-  { month: "oct", value: 100 },
-  { month: "nov", value: 175 },
-  { month: "dec", value: 200 },
+// ── Headline stats
+const stats = [
+  { value: "144", label: "Training Institutes", icon: <BusinessIcon sx={{ fontSize: 22 }} />, color: P },
+  { value: "720", label: "Programs Offered", icon: <SchoolIcon sx={{ fontSize: 22 }} />, color: TEAL },
+  { value: "76,767", label: "Trainees Enrolled", icon: <GroupsIcon sx={{ fontSize: 22 }} />, color: "#2e7d32" },
+  { value: "20", label: "Dzongkhags Reached", icon: <PublicIcon sx={{ fontSize: 22 }} />, color: "#e65100" },
 ];
 
+const getStatusColor = s =>
+  ({ approved: "#2e7d32", pending: "#e65100", rejected: "#c62828" }[s?.toLowerCase()] || "#555");
+
+// ── Status pill colours (Ongoing=GREEN, Completed=RED)
+const getProgStatusStyle = status => {
+  if (status === "ONGOING") return { bg: alpha("#2e7d32", 0.12), color: "#2e7d32" };
+  if (status === "COMPLETED") return { bg: alpha("#c62828", 0.12), color: "#c62828" };
+  return { bg: alpha("#9e9e9e", 0.12), color: "#555" };
+};
+
+// ── Shared table styles
+const TS = {
+  "& th": { bgcolor: PL, fontWeight: 700, fontSize: "0.77rem", color: PD, whiteSpace: "nowrap" },
+  "& td": { fontSize: "0.8rem" },
+  "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
+  "& tbody tr:hover td": { bgcolor: "#f5f9ff" },
+};
+
+// ── Modern section heading
+const SectionTitle = ({ eyebrow, title, subtitle, align = "left" }) => (
+  <Box sx={{ textAlign: align, mb: 3 }}>
+    <Typography sx={{
+      color: P, fontSize: "0.66rem", letterSpacing: 1.4,
+      fontWeight: 800, textTransform: "uppercase", mb: 0.8,
+    }}>
+      {eyebrow}
+    </Typography>
+    <Typography sx={{
+      fontWeight: 800, fontSize: { xs: "1.2rem", md: "1.55rem" },
+      color: "#0a1929", lineHeight: 1.2, mb: 0.8,
+    }}>
+      {title}
+    </Typography>
+    {subtitle && (
+      <Typography sx={{
+        color: "text.secondary", fontSize: "0.85rem", lineHeight: 1.6,
+        maxWidth: 640,
+        mx: align === "center" ? "auto" : undefined,
+      }}>
+        {subtitle}
+      </Typography>
+    )}
+    <Box sx={{
+      mt: 1.4, height: 3, width: 52,
+      background: `linear-gradient(90deg, ${P}, ${TEAL})`,
+      borderRadius: 2,
+      mx: align === "center" ? "auto" : undefined,
+    }} />
+  </Box>
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
 const PublicIndex = () => {
-  const theme = useTheme();
-  const [activeSlide, setActiveSlide] = useState(0);
+  const [slide, setSlide] = useState(0);
+  const timerRef = useRef(null);
 
-  // -------------------- Pagination --------------------
+  // Track Application state
+  const [trackQ, setTrackQ] = useState("");
+  const [trackErr, setTrackErr] = useState(false);
+  const [trackOpen, setTrackOpen] = useState(false);
+  const [trackRes, setTrackRes] = useState(null);
+
+  // Pagination — TVET Indicators
   const [infoPage, setInfoPage] = useState(0);
   const [infoRowsPerPage, setInfoRowsPerPage] = useState(5);
-  const [coursePage, setCoursePage] = useState(0);
-  const [courseRowsPerPage, setCourseRowsPerPage] = useState(5);
 
-  // -------------------- Table Data --------------------
+  // Pagination — Ongoing Programs
+  const [progPage, setProgPage] = useState(0);
+  const [progRowsPerPage, setProgRowsPerPage] = useState(5);
 
-  const tvetIndicators = [
-    {
-      id: 1,
-      name: "Registered Training Provider",
-      ttiGovt: 14,
-      pvtOthers: 130,
-      total: 144,
-    },
-    {
-      id: 2,
-      name: "Accredited Courses",
-      ttiGovt: 173,
-      pvtOthers: 69,
-      total: 242,
-    },
-    { id: 3, name: "Other Courses", ttiGovt: 164, pvtOthers: 556, total: 720 },
-    {
-      id: 4,
-      name: "Enrolment in Accredited Courses",
-      ttiGovt: 8094,
-      pvtOthers: 16990,
-      total: 25084,
-    },
-    {
-      id: 5,
-      name: "Enrolment in other Courses",
-      ttiGovt: 5732,
-      pvtOthers: 45951,
-      total: 51683,
-    },
-    { id: 6, name: "ToT Certified", ttiGovt: 124, pvtOthers: 50, total: 174 },
-    {
-      id: 7,
-      name: "RPL Certified (MoLHR)",
-      ttiGovt: 0,
-      pvtOthers: 0,
-      total: 0,
-    },
-  ];
-
-  const recentOngoingCourses = [
-    {
-      course: "Physics 101",
-      certification: "Level 1",
-      status: "ONGOING",
-      applicationDate: "10-Jan-2026",
-      courseDate: "15-Jan-2026",
-    },
-    {
-      course: "Mathematics 201",
-      certification: "Level 2",
-      status: "ONGOING",
-      applicationDate: "05-Dec-2025",
-      courseDate: "10-Dec-2025",
-    },
-    {
-      course: "Mathematics 201",
-      certification: "Level 2",
-      status: "COMPLETED",
-      applicationDate: "05-Dec-2025",
-      courseDate: "10-Dec-2025",
-    },
-    {
-      course: "Mathematics 201",
-      certification: "Level 2",
-      status: "ONGOING",
-      applicationDate: "05-Dec-2025",
-      courseDate: "10-Dec-2025",
-    },
-    {
-      course: "Mathematics 201",
-      certification: "Level 2",
-      status: "COMPLETED",
-      applicationDate: "05-Dec-2025",
-      courseDate: "10-Dec-2025",
-    },
-  ];
-
-  const tableStyle = {
-    border: "1px solid",
-    borderColor: "divider",
-    "& th, & td": {
-      border: "1px solid",
-      borderColor: "divider",
-    },
-  };
-
-  const notifications = [
-    {
-      id: 1,
-      message:
-        "New Course Applications are now open! Apply before 10th March 2026.",
-      icon: <NotificationsActiveIcon fontSize="small" />,
-    },
-    {
-      id: 2,
-      message: "Institute registrations for 2026 are due soon.",
-      icon: <NotificationsActiveIcon fontSize="small" />,
-    },
-    {
-      id: 3,
-      message: "Check your application status using the search bar above.",
-      icon: <NotificationsActiveIcon fontSize="small" />,
-    },
-    {
-      id: 4,
-      message: "New courses added in Thimphu and Paro locations.",
-      icon: <NotificationsActiveIcon fontSize="small" />,
-    },
-  ];
-
-  // Modal search
-  const [modalSearchQuery, setModalSearchQuery] = useState("");
-  const [searchError, setSearchError] = useState(false);
-  const [openModal, setOpenModal] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState(null);
-
-  // Slider auto change
+  // Slider auto-advance
   useEffect(() => {
-    const interval = setInterval(
-      () => setActiveSlide((prev) => (prev + 1) % sliderImages.length),
-      4000,
+    timerRef.current = setInterval(
+      () => setSlide(p => (p + 1) % sliderImages.length), 4000
     );
-    return () => clearInterval(interval);
+    return () => clearInterval(timerRef.current);
   }, []);
 
-  // Search handler with validation
-  const handleSearchClick = () => {
-    if (!modalSearchQuery.trim()) {
-      setSearchError(true);
-      return;
-    }
-
-    setSearchError(false);
-
-    const app = applicationDetails.find(
-      (a) => a.application_no.toString() === modalSearchQuery,
+  const goSlide = d => {
+    clearInterval(timerRef.current);
+    setSlide(p => (p + d + sliderImages.length) % sliderImages.length);
+    timerRef.current = setInterval(
+      () => setSlide(p => (p + 1) % sliderImages.length), 4000
     );
-    setSelectedApplication(app || null);
-    setOpenModal(true);
   };
 
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case "approved":
-        return "#4caf50";
-      case "pending":
-        return "#ff9800";
-      case "rejected":
-        return "#f44336";
-      default:
-        return "#000";
-    }
+  const handleTrack = () => {
+    if (!trackQ.trim()) { setTrackErr(true); return; }
+    setTrackErr(false);
+    setTrackRes(
+      applicationDetails.find(a => a.application_no.toString() === trackQ.trim()) || null
+    );
+    setTrackOpen(true);
   };
 
   return (
-    <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
-      {/* Slider */}
-      <Box
-        sx={{
-          position: "relative",
-          width: "100vw",
-          left: "50%",
-          marginLeft: "-50vw",
-          height: { xs: 300, md: 200 },
-          overflow: "hidden",
-          borderRadius: 2,
-          boxShadow: 3,
-        }}
-      >
-        {sliderImages.map((img, index) => (
-          <Box
-            key={index}
-            sx={{
-              position: "absolute",
-              inset: 0,
-              backgroundImage: `url(${img})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              width: "100%",
-              height: "100%",
-              opacity: index === activeSlide ? 1 : 0,
-              transition: "opacity 1.2s ease-in-out",
-            }}
-          />
-        ))}
-        <Box
-          sx={{
-            position: "absolute",
-            inset: 0,
-            bgcolor: "rgba(0,0,0,0.25)",
-            zIndex: 1,
-          }}
-        />
-        {/* Search */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: { xs: 16, md: 24 },
-            right: { xs: 16, md: 40 },
-            display: "flex",
-            width: { xs: "90%", sm: 360, md: 420 },
-            zIndex: 2,
-          }}
-        >
-          <TextField
-            fullWidth
-            placeholder="Track Your Application"
-            variant="outlined"
-            size="small"
-            value={modalSearchQuery}
-            onChange={(e) => {
-              setModalSearchQuery(e.target.value);
-              if (searchError && e.target.value.trim()) setSearchError(false);
-            }}
-            error={searchError}
-            helperText={searchError ? "Please enter application no." : ""}
-            slotProps={{
-              input: {
-                sx: {
-                  borderRadius: "6px 0 0 6px",
-                  backgroundColor: alpha(theme.palette.background.paper, 0.85),
-                  height: { xs: 36, md: 42 },
-                  fontSize: { xs: "0.85rem", md: "0.95rem" },
-                },
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search sx={{ color: theme.palette.primary.main }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-          <Button
-            variant="contained"
-            sx={{
-              borderRadius: "0 6px 6px 0",
-              backgroundColor: theme.palette.primary.main,
-              px: 3,
-              height: { xs: 36, md: 42 },
-            }}
-            onClick={handleSearchClick}
-          >
-            Search
-          </Button>
-        </Box>
-        {/* Moving Notification */}
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: 16,
-            width: "100%",
-            overflow: "hidden",
-            zIndex: 2,
-          }}
-        >
-          <Box
-            component="style"
-            children={`
-      @keyframes slideLeftRight {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-      }
-    `}
-          />
+    <Box sx={{ bgcolor: "#f7f9fc", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
 
-          <Box
-            sx={{
-              display: "flex",
-              gap: 6,
-              whiteSpace: "nowrap",
-              animation: "slideLeftRight 20s linear infinite",
-            }}
-          >
-            {notifications.map((notif) => (
-              <Box
-                key={notif.id}
-                sx={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 1,
-                  px: 2,
-                  py: 0.5,
-                  bgcolor: alpha(theme.palette.primary.main, 0.85),
-                  borderRadius: 1,
-                  color: "#fff",
-                  fontSize: { xs: "0.6rem", md: "0.75rem" },
-                }}
-              >
-                {notif.icon}
-                {notif.message}
+      {/* ── 1. Cinematic Hero ───────────────────────────────────────── */}
+      <Box sx={{ position: "relative", width: "100%", height: { xs: 360, md: 440 }, overflow: "hidden" }}>
+        {sliderImages.map((img, i) => (
+          <Box key={i} sx={{
+            position: "absolute", inset: 0,
+            backgroundImage: `url(${img})`, backgroundSize: "cover", backgroundPosition: "center",
+            opacity: i === slide ? 1 : 0, transition: "opacity 1.2s ease-in-out",
+          }} />
+        ))}
+        <Box sx={{
+          position: "absolute", inset: 0, zIndex: 1,
+          background: `linear-gradient(135deg, ${alpha(PD, 0.82)} 0%, ${alpha(P, 0.45)} 50%, ${alpha("#000", 0.35)} 100%)`,
+        }} />
+
+        <Container maxWidth="xl" sx={{
+          position: "relative", zIndex: 2, height: "100%",
+          display: "flex", alignItems: "center",
+        }}>
+          <Grid container alignItems="center" spacing={3}>
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Typography sx={{
+                color: "#90caf9", fontSize: "0.72rem",
+                letterSpacing: 1.4, fontWeight: 700, textTransform: "uppercase", mb: 1.2,
+              }}>
+                Royal Government of Bhutan
+              </Typography>
+              <Typography sx={{
+                color: W, fontWeight: 800,
+                fontSize: { xs: "1.6rem", md: "2.3rem" },
+                lineHeight: 1.15, mb: 1.8,
+                textShadow: "0 2px 12px rgba(0,0,0,0.35)",
+              }}>
+                Building Bhutan's<br />Skilled Workforce
+              </Typography>
+              <Typography sx={{
+                color: alpha(W, 0.9), fontSize: { xs: "0.85rem", md: "0.95rem" },
+                lineHeight: 1.65, maxWidth: 560, mb: 3,
+              }}>
+                The official TVET Management Information System — empowering trainees,
+                training providers and professionals with accredited skills and certifications
+                across all 20 Dzongkhags.
+              </Typography>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <Button variant="contained" size="large"
+                  href="#course-announcements"
+                  endIcon={<ArrowForwardIcon sx={{ fontSize: 18 }} />}
+                  sx={{
+                    bgcolor: W, color: P,
+                    textTransform: "none", fontWeight: 700, fontSize: "0.9rem",
+                    px: 3, py: 1.1, borderRadius: 2,
+                    boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+                    "&:hover": {
+                      bgcolor: alpha(W, 0.94),
+                      transform: "translateY(-2px)",
+                      boxShadow: "0 10px 28px rgba(0,0,0,0.4)"
+                    },
+                    transition: "all 0.25s",
+                  }}>
+                  Browse Courses
+                </Button>
+              </Stack>
+            </Grid>
+
+            {/* Track Application embedded in hero */}
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Box sx={{
+                bgcolor: alpha(PD, 0.92), backdropFilter: "blur(8px)",
+                borderRadius: 2.5,
+                border: `1px solid ${alpha(W, 0.12)}`,
+                boxShadow: "0 12px 36px rgba(0,0,0,0.4)",
+                p: 2.2, ml: { md: "auto" }, maxWidth: { md: 420 },
+              }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.4 }}>
+                  <Box sx={{
+                    width: 32, height: 32, borderRadius: "50%",
+                    bgcolor: alpha("#90caf9", 0.15),
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <TrackChangesIcon sx={{ color: "#90caf9", fontSize: 18 }} />
+                  </Box>
+                  <Box>
+                    <Typography fontWeight={800} sx={{ color: W, fontSize: "0.88rem", lineHeight: 1.1 }}>
+                      Track Your Application
+                    </Typography>
+                    <Typography sx={{ color: alpha(W, 0.65), fontSize: "0.7rem" }}>
+                      Check the status of your submission
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Box sx={{ display: "flex" }}>
+                  <TextField fullWidth size="small" placeholder="Enter Application No."
+                    value={trackQ}
+                    onChange={e => { setTrackQ(e.target.value); if (trackErr) setTrackErr(false); }}
+                    error={trackErr}
+                    onKeyDown={e => e.key === "Enter" && handleTrack()}
+                    slotProps={{
+                      input: {
+                        sx: { bgcolor: W, borderRadius: "6px 0 0 6px", height: 38, fontSize: "0.82rem" },
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Search sx={{ color: "#90a4ae", fontSize: 16 }} />
+                          </InputAdornment>
+                        ),
+                      }
+                    }}
+                    sx={{ "& .MuiOutlinedInput-notchedOutline": { border: "none" } }}
+                  />
+                  <Button variant="contained" onClick={handleTrack}
+                    sx={{
+                      borderRadius: "0 6px 6px 0", bgcolor: P, height: 38,
+                      px: 2.8, fontSize: "0.78rem",
+                      textTransform: "none", fontWeight: 700, whiteSpace: "nowrap",
+                      "&:hover": { bgcolor: "#0d47a1" }
+                    }}>
+                    Search
+                  </Button>
+                </Box>
               </Box>
-            ))}
-          </Box>
+            </Grid>
+          </Grid>
+        </Container>
+
+        {/* Slider controls */}
+        <IconButton onClick={() => goSlide(-1)}
+          sx={{
+            position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", zIndex: 3,
+            bgcolor: alpha(W, 0.2), color: W,
+            "&:hover": { bgcolor: alpha(W, 0.35) }
+          }}>
+          <KeyboardArrowLeftIcon />
+        </IconButton>
+        <IconButton onClick={() => goSlide(1)}
+          sx={{
+            position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", zIndex: 3,
+            bgcolor: alpha(W, 0.2), color: W,
+            "&:hover": { bgcolor: alpha(W, 0.35) }
+          }}>
+          <KeyboardArrowRightIcon />
+        </IconButton>
+        <Stack direction="row" spacing={0.8}
+          sx={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", zIndex: 3 }}>
+          {sliderImages.map((_, i) => (
+            <Box key={i} onClick={() => setSlide(i)}
+              sx={{
+                width: i === slide ? 22 : 8, height: 8, borderRadius: 4, bgcolor: W,
+                opacity: i === slide ? 1 : 0.5, cursor: "pointer", transition: "all 0.3s"
+              }} />
+          ))}
+        </Stack>
+      </Box>
+
+      {/* ── 2. News Ticker ─────────────────────────────────────────── */}
+      <Box sx={{ bgcolor: P, py: 0.6, overflow: "hidden", display: "flex", alignItems: "center" }}>
+        <Box sx={{
+          bgcolor: PD, px: 2, py: 0.4, flexShrink: 0,
+          display: "flex", alignItems: "center", gap: 0.7,
+        }}>
+          <CampaignIcon sx={{ color: "#90caf9", fontSize: 14 }} />
+          <Typography sx={{
+            color: "#90caf9", fontSize: "0.65rem", fontWeight: 800,
+            letterSpacing: 1, whiteSpace: "nowrap"
+          }}>
+            NOTICE
+          </Typography>
+        </Box>
+        <Box sx={{ overflow: "hidden", flex: 1, ml: 2 }}>
+          <Box component="style">{`@keyframes tk{from{transform:translateX(100%)}to{transform:translateX(-200%)}}`}</Box>
+          <Typography sx={{
+            display: "inline-block", animation: "tk 35s linear infinite",
+            color: "#e3f2fd", fontSize: "0.75rem", fontWeight: 500, whiteSpace: "nowrap"
+          }}>
+            {notifications.join("   ·   ")}
+          </Typography>
         </Box>
       </Box>
 
-      <Paper
-        sx={{ p: 4, mb: 6, mt: 1, border: "1px solid", borderColor: "divider" }}
-      >
-        {/* Charts Section */}
-        <Grid container spacing={2} mb={4}>
-          {/* Line Chart */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Paper sx={{ p: 2, borderRadius: 2, boxShadow: 2 }}>
-              <Typography variant="h7" fontWeight={600} mb={1}>
-                Monthly Applications
+      {/* ── Page body ─────────────────────────────────────────────── */}
+      <Box sx={{ flex: 1 }}>
+
+        {/* ── 4. Stats band ───────────────────────────────────────── */}
+        <Box sx={{
+          background: `linear-gradient(135deg, ${PD} 0%, ${P} 60%, #1976d2 100%)`,
+          py: { xs: 5, md: 6 }, position: "relative", overflow: "hidden",
+        }}>
+          <Box sx={{
+            position: "absolute", top: -50, right: -50,
+            width: 220, height: 220, borderRadius: "50%", bgcolor: alpha(W, 0.05),
+          }} />
+          <Box sx={{
+            position: "absolute", bottom: -40, left: "20%",
+            width: 140, height: 140, borderRadius: "50%", bgcolor: alpha(W, 0.04),
+          }} />
+
+          <Container maxWidth="xl" sx={{ position: "relative", zIndex: 1 }}>
+            <Box sx={{ textAlign: "center", mb: 4 }}>
+              <Typography sx={{
+                color: "#90caf9", fontSize: "0.66rem", letterSpacing: 1.4,
+                fontWeight: 800, textTransform: "uppercase", mb: 1,
+              }}>
+                TVET by the Numbers
               </Typography>
-              <ResponsiveContainer width="100%" height={236}>
-                <LineChart data={graphLineData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#1976d2"
-                    strokeWidth={3}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </Paper>
-          </Grid>
-
-          {/* Pie Chart */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Paper
-              sx={{
-                p: 2,
-                borderRadius: 2,
-                boxShadow: 2,
-              }}
-            >
-              <Typography fontWeight={600} mb={2}>
-                Institute By Sector
+              <Typography sx={{
+                color: W, fontWeight: 800,
+                fontSize: { xs: "1.3rem", md: "1.7rem" }, lineHeight: 1.2,
+              }}>
+                A national platform for skills development
               </Typography>
+            </Box>
 
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <Box sx={{ width: "60%", height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={70}
-                        label={({ percent }) =>
-                          `${(percent * 100).toFixed(0)}%`
-                        }
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell
-                            key={index}
-                            fill={COLORS[index % COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: 8,
-                          border: "none",
-                          boxShadow: "0px 4px 20px rgba(0,0,0,0.1)",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </Box>
-
-                <Box
-                  sx={{
-                    width: "40%",
-                    pl: 2,
-                    maxHeight: 180,
-                    overflowY: "auto",
-                  }}
-                >
-                  {pieData.map((item, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        mb: 1,
-                        fontSize: 13,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: "50%",
-                          bgcolor: COLORS[index % COLORS.length],
-                          mr: 1,
-                        }}
-                      />
-                      {item.name}
+            <Grid container spacing={2.5}>
+              {stats.map((s, i) => (
+                <Grid key={i} size={{ xs: 6, md: 3 }}>
+                  <Box sx={{
+                    bgcolor: alpha(W, 0.08), backdropFilter: "blur(4px)",
+                    border: `1px solid ${alpha(W, 0.12)}`, borderRadius: 2.5,
+                    p: { xs: 2, md: 2.6 }, textAlign: "center",
+                    transition: "all 0.3s",
+                    "&:hover": {
+                      bgcolor: alpha(W, 0.14), transform: "translateY(-4px)",
+                      borderColor: alpha(W, 0.25),
+                    },
+                  }}>
+                    <Box sx={{
+                      width: 44, height: 44, borderRadius: "50%",
+                      bgcolor: alpha(W, 0.18), color: W,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      mx: "auto", mb: 1.5,
+                    }}>
+                      {s.icon}
                     </Box>
-                  ))}
-                </Box>
-              </Box>
-            </Paper>
-          </Grid>
+                    <Typography sx={{
+                      color: W, fontWeight: 800,
+                      fontSize: { xs: "1.5rem", md: "1.9rem" }, lineHeight: 1,
+                    }}>
+                      {s.value}
+                    </Typography>
+                    <Typography sx={{
+                      color: "#90caf9", fontSize: "0.7rem",
+                      fontWeight: 600, letterSpacing: 0.4,
+                      textTransform: "uppercase", mt: 1,
+                    }}>
+                      {s.label}
+                    </Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Container>
+        </Box>
 
-          {/* Bar Chart */}
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Paper sx={{ p: { xs: 2, md: 2 }, borderRadius: 2, boxShadow: 2 }}>
-              <Typography variant="h7" fontWeight={600} mb={1}>
-                Institute By Dzongkhang Location
-              </Typography>
-              <ResponsiveContainer width="100%" height={236}>
-                <BarChart data={graphData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar
-                    dataKey="value"
-                    fill={theme.palette.primary.main}
-                    radius={[6, 6, 0, 0]}
-                    barSize={40}
+        {/* ── 5. National Statistics ─────────────────────────────────── */}
+        <Container maxWidth="xl" sx={{ py: { xs: 5, md: 6 } }}>
+          <SectionTitle
+            align="center"
+            eyebrow="National Statistics"
+            title="Key TVET Indicators"
+            subtitle="Detailed cumulative figures across all sectors — Public, Private and combined totals."
+          />
+          <Grid container spacing={2.5}>
+            {/* Key TVET Indicators — Indicator | Public | Private | Total */}
+            <Grid size={{ xs: 12, md: 8 }}>
+              <Card elevation={0} sx={{
+                border: "1px solid #e3eaf4", borderRadius: 3,
+                bgcolor: W, height: "100%",
+              }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 2 }}>
+                    <Box sx={{
+                      width: 36, height: 36, borderRadius: 1.5,
+                      bgcolor: alpha(P, 0.12), color: P,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <BarChartIcon sx={{ fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                      <Typography fontWeight={800} sx={{ fontSize: "0.95rem", color: "#0a1929" }}>
+                        TVET Indicators Breakdown
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        Public vs Private vs Total
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <TableContainer>
+                    <Table size="small" sx={TS}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell width={36}>#</TableCell>
+                          <TableCell>Indicator</TableCell>
+                          <TableCell align="center">Public</TableCell>
+                          <TableCell align="center">Private</TableCell>
+                          <TableCell align="center">Total</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {tvetIndicators
+                          .slice(infoPage * infoRowsPerPage,
+                            infoPage * infoRowsPerPage + infoRowsPerPage)
+                          .map(row => (
+                            <TableRow key={row.id}>
+                              <TableCell>
+                                <Box sx={{
+                                  width: 22, height: 22, borderRadius: 1, bgcolor: row.color,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                }}>
+                                  <Typography sx={{ color: W, fontSize: "0.66rem", fontWeight: 800 }}>
+                                    {row.id}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600, color: "#0a1929" }}>
+                                {row.name}
+                              </TableCell>
+                              <TableCell align="center" sx={{ color: "#1565c0", fontWeight: 600 }}>
+                                {row.pub.toLocaleString()}
+                              </TableCell>
+                              <TableCell align="center" sx={{ color: "#2e7d32", fontWeight: 600 }}>
+                                {row.pvt.toLocaleString()}
+                              </TableCell>
+                              <TableCell align="center">
+                                <Box sx={{
+                                  display: "inline-block", px: 1.4, py: 0.3,
+                                  borderRadius: 1, bgcolor: alpha(row.color, 0.12),
+                                  border: `1px solid ${alpha(row.color, 0.35)}`, minWidth: 60,
+                                }}>
+                                  <Typography fontWeight={800}
+                                    sx={{ color: row.color, fontSize: "0.78rem" }}>
+                                    {row.total.toLocaleString()}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <TablePagination component="div" count={tvetIndicators.length}
+                    page={infoPage} onPageChange={(_, p) => setInfoPage(p)}
+                    rowsPerPage={infoRowsPerPage}
+                    onRowsPerPageChange={e => {
+                      setInfoRowsPerPage(parseInt(e.target.value, 10));
+                      setInfoPage(0);
+                    }}
+                    rowsPerPageOptions={[5, 10, 25]}
+                    sx={{
+                      "& .MuiTablePagination-toolbar": { minHeight: 40 },
+                      "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                        { fontSize: "0.75rem" }
+                    }}
                   />
-                </BarChart>
-              </ResponsiveContainer>
-            </Paper>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Institute by Provider Type */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card elevation={0} sx={{
+                border: "1px solid #e3eaf4", borderRadius: 3,
+                bgcolor: W, height: "100%",
+              }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 2 }}>
+                    <Box sx={{
+                      width: 36, height: 36, borderRadius: 1.5,
+                      bgcolor: alpha(P, 0.12), color: P,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <AccountBalanceIcon sx={{ fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                      <Typography fontWeight={800} sx={{ fontSize: "0.95rem", color: "#0a1929" }}>
+                        Institute by Provider Type
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        Public · Private · NGOs
+                      </Typography>
+                    </Box>
+                  </Stack>
+
+                  {/* Total summary card */}
+                  <Box sx={{
+                    background: `linear-gradient(135deg, ${P} 0%, #0d47a1 100%)`,
+                    borderRadius: 1.5, px: 1.6, py: 1.1, mb: 1.8,
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    boxShadow: `0 3px 10px ${alpha(P, 0.22)}`,
+                  }}>
+                    <Box>
+                      <Typography sx={{
+                        color: alpha(W, 0.78), fontSize: "0.6rem",
+                        letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase",
+                      }}>
+                        Total Institutes
+                      </Typography>
+                      <Typography sx={{
+                        color: W, fontWeight: 800,
+                        fontSize: "1.3rem", lineHeight: 1.1,
+                      }}>
+                        {providerTotal.toLocaleString()}
+                      </Typography>
+                    </Box>
+                    <AccountBalanceIcon sx={{ color: alpha(W, 0.8), fontSize: 30 }} />
+                  </Box>
+
+                  {/* Provider rows with progress bars */}
+                  <Stack spacing={1.4}>
+                    {providerTypeData.map((item, i) => {
+                      const maxV = Math.max(...providerTypeData.map(d => d.value));
+                      const widthPct = (item.value / maxV) * 100;
+                      const sharePct = ((item.value / providerTotal) * 100).toFixed(1);
+                      return (
+                        <Box key={i}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center"
+                            sx={{ mb: 0.5 }}>
+                            <Stack direction="row" alignItems="center" spacing={0.8}>
+                              <Box sx={{
+                                width: 8, height: 8, borderRadius: "50%", bgcolor: item.color,
+                                boxShadow: `0 0 0 2px ${alpha(item.color, 0.18)}`,
+                              }} />
+                              <Typography fontWeight={700}
+                                sx={{ fontSize: "0.78rem", color: "#0a1929" }}>
+                                {item.name}
+                              </Typography>
+                            </Stack>
+                            <Stack direction="row" alignItems="baseline" spacing={0.5}>
+                              <Typography fontWeight={800}
+                                sx={{ color: item.color, fontSize: "0.9rem" }}>
+                                {item.value}
+                              </Typography>
+                              <Typography sx={{ color: "text.secondary", fontSize: "0.65rem" }}>
+                                ({sharePct}%)
+                              </Typography>
+                            </Stack>
+                          </Stack>
+                          <Box sx={{ height: 6, bgcolor: "#f0f4fa", borderRadius: 3, overflow: "hidden" }}>
+                            <Box sx={{
+                              width: `${widthPct}%`, height: "100%",
+                              background: `linear-gradient(90deg, ${item.color} 0%, ${alpha(item.color, 0.65)} 100%)`,
+                              borderRadius: 3,
+                              transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+                              boxShadow: `0 1px 2px ${alpha(item.color, 0.4)}`,
+                            }} />
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-        </Grid>
+        </Container>
 
-        {/* -------------------- Tables Section -------------------- */}
-        <Grid container spacing={2}>
-          {/* Course Announcements - Imported Component */}
-          <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
-            <CourseTraineeAnnouncementsIndex />
+        {/* ── 6. Distribution overview ──────────────────────────────── */}
+        <Box sx={{ bgcolor: "#eef3fa", py: { xs: 5, md: 6 } }}>
+          <Container maxWidth="xl">
+            <SectionTitle
+              align="center"
+              eyebrow="Distribution Overview"
+              title="Where TVET is happening across Bhutan"
+              subtitle="Institute distribution by industry sector and geographic location."
+            />
+            <Grid container spacing={2.5}>
+              {/* Institute By Sector */}
+              <Grid size={{ xs: 12, md: 5 }}>
+                <Card elevation={0} sx={{
+                  border: "1px solid #e3eaf4", borderRadius: 3,
+                  bgcolor: W, height: "100%",
+                }}>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 2 }}>
+                      <Box sx={{
+                        width: 36, height: 36, borderRadius: 1.5,
+                        bgcolor: alpha(P, 0.12), color: P,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <PieChartIcon sx={{ fontSize: 20 }} />
+                      </Box>
+                      <Box>
+                        <Typography fontWeight={800} sx={{ fontSize: "0.95rem", color: "#0a1929" }}>
+                          Institute By Sector
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          Distribution by industry sector
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Box sx={{ width: "55%", height: 240 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={pieData} dataKey="value" nameKey="name"
+                              cx="50%" cy="50%" outerRadius={80} innerRadius={30}
+                              label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                              labelLine={{ stroke: "#ccc", strokeWidth: 1 }}>
+                              {pieData.map((_, i) => (
+                                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <RTooltip contentStyle={{ borderRadius: 8, border: "1px solid #d4e2f4", fontSize: "0.8rem" }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </Box>
+                      <Box sx={{ width: "45%", pl: 1.5, maxHeight: 240, overflowY: "auto" }}>
+                        {pieData.map((item, i) => (
+                          <Box key={i} sx={{ display: "flex", alignItems: "center", mb: 1, gap: 0.8 }}>
+                            <Box sx={{
+                              width: 10, height: 10, borderRadius: "50%",
+                              bgcolor: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0
+                            }} />
+                            <Typography variant="caption"
+                              sx={{ color: "#444", flex: 1, fontSize: "0.72rem" }}>
+                              {item.name}
+                            </Typography>
+                            <Typography sx={{
+                              fontSize: "0.72rem", fontWeight: 700,
+                              color: PIE_COLORS[i % PIE_COLORS.length]
+                            }}>
+                              {item.value}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Institute By Dzongkhag */}
+              <Grid size={{ xs: 12, md: 7 }}>
+                <Card elevation={0} sx={{
+                  border: "1px solid #e3eaf4", borderRadius: 3,
+                  bgcolor: W, height: "100%",
+                }}>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 2 }}>
+                      <Box sx={{
+                        width: 36, height: 36, borderRadius: 1.5,
+                        bgcolor: alpha(P, 0.12), color: P,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <LocationOnIcon sx={{ fontSize: 20 }} />
+                      </Box>
+                      <Box>
+                        <Typography fontWeight={800} sx={{ fontSize: "0.95rem", color: "#0a1929" }}>
+                          Institute By Dzongkhag
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          Distribution across all 20 Dzongkhags of Bhutan
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <ResponsiveContainer width="100%" height={270}>
+                      <BarChart data={dzongkhagData} margin={{ top: 8, right: 16, left: -18, bottom: 58 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#edf2f9" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#555" }}
+                          angle={-40} textAnchor="end" interval={0} height={70} />
+                        <YAxis tick={{ fontSize: 11, fill: "#666" }} />
+                        <RTooltip contentStyle={{ borderRadius: 8, border: "1px solid #d4e2f4", fontSize: "0.8rem" }} />
+                        <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={18}>
+                          {dzongkhagData.map((_, i) => (
+                            <Cell key={i} fill={i % 2 === 0 ? P : "#1976d2"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Container>
+        </Box>
+
+        {/* ── 7. Course Announcements ───────────────────────────────── */}
+        <Container maxWidth="xl" sx={{ py: { xs: 5, md: 6 } }} id="course-announcements">
+          <SectionTitle
+            eyebrow="Latest Opportunities"
+            title="Course Announcements"
+            subtitle="Open programs accepting applications now — find the right course and apply online."
+          />
+          <Card elevation={0} sx={{
+            border: "1px solid #e3eaf4", borderRadius: 3, bgcolor: W, p: 2.5,
+          }}>
+            <Box sx={{
+              "& .MuiTable-root": { borderCollapse: "separate" },
+              "& .MuiTableCell-root": {
+                fontSize: "0.8rem", py: 0.85, px: 1.2,
+                border: "1px solid #dbe5f0",
+              },
+              "& .MuiTableCell-head": {
+                bgcolor: PL, fontWeight: 700, fontSize: "0.77rem",
+                color: PD, whiteSpace: "nowrap",
+              },
+              "& .MuiTableBody-root tr:hover .MuiTableCell-root": { bgcolor: "#f5f9ff" },
+              "& .MuiChip-root": { fontSize: "0.65rem", height: 20, fontWeight: 700 },
+              "& .MuiButton-root": { fontSize: "0.7rem", py: 0.4 },
+              "& .MuiInputBase-input": { fontSize: "0.82rem" },
+              "& .MuiTablePagination-root": { fontSize: "0.75rem" },
+              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
+                fontSize: "0.75rem",
+              },
+            }}>
+              <CourseTraineeAnnouncementsIndex />
+            </Box>
+          </Card>
+        </Container>
+
+        {/* ── 8. Ongoing Programs ───────────────────────────────────── */}
+        <Box sx={{ bgcolor: "#eef3fa", py: { xs: 5, md: 6 } }}>
+          <Container maxWidth="xl">
+            <SectionTitle
+              eyebrow="Active Programs"
+              title="Ongoing Programs"
+              subtitle="Latest program activity across accredited institutes."
+            />
+            <Card elevation={0} sx={{ border: "1px solid #e3eaf4", borderRadius: 3, bgcolor: W }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <TableContainer sx={{ borderRadius: 1.5, border: "1px solid #dbe5f0" }}>
+                  <Table size="small" sx={TS}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Program</TableCell>
+                        <TableCell>Certification</TableCell>
+                        <TableCell align="center">Status</TableCell>
+                        <TableCell>Course Start Date</TableCell>
+                        <TableCell>Course End Date</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {ongoingPrograms
+                        .slice(progPage * progRowsPerPage,
+                          progPage * progRowsPerPage + progRowsPerPage)
+                        .map((c, i) => {
+                          const st = getProgStatusStyle(c.status);
+                          return (
+                            <TableRow key={i}>
+                              <TableCell sx={{ fontWeight: 600, color: "#0a1929" }}>{c.course}</TableCell>
+                              <TableCell>{c.certification}</TableCell>
+                              <TableCell align="center">
+                                <Chip label={c.status} size="small"
+                                  sx={{
+                                    bgcolor: st.bg, color: st.color,
+                                    fontWeight: 700, fontSize: "0.65rem", height: 20,
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ fontSize: "0.76rem" }}>{c.startDate}</TableCell>
+                              <TableCell sx={{ fontSize: "0.76rem" }}>{c.endDate}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <TablePagination component="div" count={ongoingPrograms.length}
+                  page={progPage} onPageChange={(_, p) => setProgPage(p)}
+                  rowsPerPage={progRowsPerPage}
+                  onRowsPerPageChange={e => {
+                    setProgRowsPerPage(parseInt(e.target.value, 10));
+                    setProgPage(0);
+                  }}
+                  rowsPerPageOptions={[5, 10]}
+                  sx={{
+                    "& .MuiTablePagination-toolbar": { minHeight: 40 },
+                    "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                      { fontSize: "0.75rem" }
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </Container>
+        </Box>
+
+        {/* ── 9. Quick Access ───────────────────────────────────────── */}
+        <Container maxWidth="xl" sx={{ py: { xs: 5, md: 6 } }}>
+          <SectionTitle
+            align="center"
+            eyebrow="Resources"
+            title="Quick Access"
+            subtitle="Frequently used resources for trainees, training providers and TVET professionals."
+          />
+          <Grid container spacing={2}>
+            {[
+              {
+                label: "National Competency Standards", desc: "Browse all NCS documents by sector and qualification level",
+                href: "https://www.blmis.gov.bt/tvet/ncs", color: P,
+                icon: <VerifiedIcon sx={{ fontSize: 28 }} />
+              },
+              {
+                label: "Approved Curriculum", desc: "Access and download approved curricula for accredited TVET courses",
+                href: "https://www.blmis.gov.bt/tvet/curriculum", color: TEAL,
+                icon: <MenuBookIcon sx={{ fontSize: 28 }} />
+              },
+            ].map((link, i) => (
+              <Grid key={i} size={{ xs: 12, sm: 6 }}>
+                <Box component="a" href={link.href} target="_blank" rel="noreferrer"
+                  sx={{ textDecoration: "none" }}>
+                  <Box sx={{
+                    display: "flex", alignItems: "center", gap: 2, p: 2.2,
+                    border: `1.5px solid ${alpha(link.color, 0.28)}`,
+                    borderRadius: 2.5, bgcolor: alpha(link.color, 0.04),
+                    transition: "all 0.2s",
+                    "&:hover": {
+                      bgcolor: alpha(link.color, 0.09),
+                      borderColor: link.color,
+                      transform: "translateY(-2px)",
+                      boxShadow: `0 4px 14px ${alpha(link.color, 0.14)}`,
+                    },
+                  }}>
+                    <Box sx={{
+                      width: 48, height: 48, borderRadius: "50%",
+                      bgcolor: alpha(link.color, 0.13), color: link.color,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {link.icon}
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography fontWeight={700} sx={{ color: link.color, mb: 0.3 }}>
+                        {link.label}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {link.desc}
+                      </Typography>
+                    </Box>
+                    <OpenInNewIcon sx={{
+                      color: alpha(link.color, 0.45), fontSize: 18, flexShrink: 0
+                    }} />
+                  </Box>
+                </Box>
+              </Grid>
+            ))}
           </Grid>
+        </Container>
+      </Box>
 
-          {/* TVET Indicators */}
-          <Grid item size={{ xs: 12, sm: 12, md: 6 }}>
-            <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-              <Typography fontWeight={600} sx={{ mb: 2 }}>
-                TVET Indicators
-              </Typography>
-
-              <TableContainer>
-                <Table size="small" sx={tableStyle}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>TTI/Govt</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Pvt/Others</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Total</TableCell>
-                    </TableRow>
-                  </TableHead>
-
-                  <TableBody>
-                    {tvetIndicators
-                      .slice(
-                        infoPage * infoRowsPerPage,
-                        infoPage * infoRowsPerPage + infoRowsPerPage,
-                      )
-                      .map((row, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{row.id}</TableCell>
-                          <TableCell>{row.name}</TableCell>
-                          <TableCell>{row.ttiGovt ?? 0}</TableCell>
-                          <TableCell>{row.pvtOthers ?? 0}</TableCell>
-                          <TableCell>{row.total ?? 0}</TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <TablePagination
-                component="div"
-                count={tvetIndicators.length}
-                page={infoPage}
-                onPageChange={(e, newPage) => setInfoPage(newPage)}
-                rowsPerPage={infoRowsPerPage}
-                onRowsPerPageChange={(e) => {
-                  setInfoRowsPerPage(parseInt(e.target.value, 10));
-                  setInfoPage(0);
-                }}
-                rowsPerPageOptions={[5, 10]}
-              />
-            </Paper>
-          </Grid>
-
-          {/* Courses */}
-          <Grid item size={{ xs: 12, sm: 12, md: 6 }}>
-            <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-              <Typography fontWeight={600} sx={{ mb: 2 }}>
-                Recent Ongoing Course Details
-              </Typography>
-
-              <TableContainer>
-                <Table size="small" sx={tableStyle}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Course</TableCell>
-                      <TableCell>Certification</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Application Date</TableCell>
-                      <TableCell>Course Date</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {recentOngoingCourses
-                      .slice(
-                        coursePage * courseRowsPerPage,
-                        coursePage * courseRowsPerPage + courseRowsPerPage,
-                      )
-                      .map((course, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{course.course}</TableCell>
-                          <TableCell>{course.certification}</TableCell>
-                          <TableCell>
-                            <Chip
-                              label={course.status}
-                              size="small"
-                              color={
-                                course.status === "ONGOING"
-                                  ? "warning"
-                                  : course.status === "COMPLETED"
-                                    ? "success"
-                                    : "error"
-                              }
-                            />
-                          </TableCell>
-                          <TableCell>{course.applicationDate}</TableCell>
-                          <TableCell>{course.courseDate}</TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <TablePagination
-                component="div"
-                count={recentOngoingCourses.length}
-                page={coursePage}
-                onPageChange={(e, newPage) => setCoursePage(newPage)}
-                rowsPerPage={courseRowsPerPage}
-                onRowsPerPageChange={(e) => {
-                  setCourseRowsPerPage(parseInt(e.target.value, 10));
-                  setCoursePage(0);
-                }}
-                rowsPerPageOptions={[5, 10]}
-              />
-            </Paper>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* Modal */}
-      <Dialog
-        open={openModal}
-        onClose={() => setOpenModal(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle sx={{ fontWeight: 500 }}>Application Details</DialogTitle>
-        <DialogContent dividers>
-          <Box>
-            <TableContainer component={Paper}>
-              <Table sx={{ borderCollapse: "collapse", width: "100%" }}>
-                <TableHead>
-                  <TableRow>
-                    {[
-                      "Application No",
-                      "Name",
-                      "Location",
-                      "Service",
-                      "Status",
-                    ].map((header) => (
-                      <TableCell
-                        key={header}
-                        sx={{
-                          fontWeight: 550,
-                          textAlign: "center",
-                          border: "1px solid #000",
-                          py: 1,
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        {header}
+      {/* ── Track Application Modal ─────────────────────────────────── */}
+      <Dialog open={trackOpen} onClose={() => setTrackOpen(false)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { borderRadius: 2.5 } }}>
+        <DialogTitle sx={{
+          fontWeight: 700, fontSize: "0.92rem", bgcolor: PL,
+          borderBottom: "1px solid #d4e2f4", py: 1.5, px: 3, color: PD
+        }}>
+          Application Status
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <TableContainer component={Paper} elevation={0}
+            sx={{ border: "1px solid #d4e2f4", borderRadius: 2 }}>
+            <Table sx={TS}>
+              <TableHead>
+                <TableRow>
+                  {["Application No", "Name", "Location", "Service", "Status"].map(h => (
+                    <TableCell key={h} align="center">{h}</TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {trackRes ? (
+                  <TableRow hover>
+                    {["application_no", "name", "location", "service", "status"].map(key => (
+                      <TableCell key={key} align="center">
+                        {key === "status" ? (
+                          <Chip label={trackRes[key]} size="small"
+                            sx={{
+                              bgcolor: alpha(getStatusColor(trackRes[key]), 0.12),
+                              color: getStatusColor(trackRes[key]),
+                              fontWeight: 700, fontSize: "0.72rem"
+                            }}
+                          />
+                        ) : trackRes[key]}
                       </TableCell>
                     ))}
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {selectedApplication ? (
-                    <TableRow hover>
-                      {[
-                        "application_no",
-                        "name",
-                        "location",
-                        "service",
-                        "status",
-                      ].map((key) => (
-                        <TableCell
-                          key={key}
-                          sx={{
-                            textAlign: "center",
-                            py: 1.25,
-                            fontSize: "0.85rem",
-                            border: "1px solid #000",
-                          }}
-                        >
-                          {key === "status" ? (
-                            <Box
-                              component="span"
-                              sx={{
-                                px: 1.5,
-                                py: 0.5,
-                                borderRadius: 1,
-                                fontWeight: 600,
-                                fontSize: "0.75rem",
-                                color: "#fff",
-                                backgroundColor: getStatusColor(
-                                  selectedApplication[key],
-                                ),
-                                textTransform: "capitalize",
-                              }}
-                            >
-                              {selectedApplication[key]}
-                            </Box>
-                          ) : (
-                            selectedApplication[key]
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        sx={{
-                          textAlign: "center",
-                          py: 3,
-                          color: "error.main",
-                          fontWeight: 500,
-                          border: "1px solid #000",
-                        }}
-                      >
-                        No data found
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center"
+                      sx={{ py: 4, color: "error.main", fontWeight: 600 }}>
+                      No application found for the entered number.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </DialogContent>
-        <DialogActions sx={{ px: 3 }}>
-          <Button
-            onClick={() => setOpenModal(false)}
-            variant="contained"
-            color="error"
-            startIcon={<CloseFullscreenIcon />}
-            size="small"
-            sx={{
-              borderWidth: 1,
-              px: 2,
-              py: 0.5,
-              fontSize: "0.75rem",
-              "&:hover": {
-                backgroundColor: "error.main",
-                color: "#fff",
-              },
-            }}
-          >
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setTrackOpen(false)} variant="contained" color="error"
+            size="small" startIcon={<CloseFullscreenIcon />}
+            sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, fontSize: "0.8rem" }}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
+
     </Box>
   );
 };
