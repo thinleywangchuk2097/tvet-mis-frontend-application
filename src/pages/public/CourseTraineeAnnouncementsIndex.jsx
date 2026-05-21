@@ -46,7 +46,6 @@ const CourseTraineeAnnouncementsIndex = () => {
     try {
       const response = await CommonService.getAllCourseAnnouncement();
       setCourseAnnouncementDetails(response.data);
-      console.log("Course Announcement Details:", response.data);
     } catch (error) {
       console.error("Error fetching course announcements:", error);
     }
@@ -70,7 +69,6 @@ const CourseTraineeAnnouncementsIndex = () => {
     try {
       const dzongkhagLists = await CommonService.getAllDzongkhags();
       setDzongkhags(dzongkhagLists.data);
-      console.log("Dzongkhags:", dzongkhagLists.data);
     } catch (error) {
       console.error("Error fetching dzongkhags:", error);
     }

@@ -1,587 +1,616 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  Box,
-  IconButton,
-  Menu,
-  MenuItem,
-  Divider,
-  Fade,
-  Collapse,
-  useTheme,
-  useMediaQuery,
+  Box, Button, Typography, IconButton, Stack, Divider, Drawer,
+  Menu, MenuItem, Fade, useMediaQuery, useTheme,
 } from "@mui/material";
-import {
-  Login as LoginIcon,
-  Home as HomeIcon,
-  Menu as MenuIcon,
-  ExpandMore,
-  ExpandLess,
-} from "@mui/icons-material";
-import { useFormik } from "formik";
+import { alpha } from "@mui/material/styles";
+
+import HomeIcon from "@mui/icons-material/Home";
+import MenuIcon from "@mui/icons-material/Menu";
+import CloseIcon from "@mui/icons-material/Close";
+import LoginIcon from "@mui/icons-material/Login";
+import HowToRegIcon from "@mui/icons-material/HowToReg";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import { ExpandMore, ExpandLess } from "@mui/icons-material";
+
+import PhoneIcon from "@mui/icons-material/Phone";
+import EmailIcon from "@mui/icons-material/Email";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import FacebookIcon from "@mui/icons-material/Facebook";
+import XIcon from "@mui/icons-material/X";
+import LinkedInIcon from "@mui/icons-material/LinkedIn";
+
+import ArticleIcon from "@mui/icons-material/Article";
+import BusinessIcon from "@mui/icons-material/Business";
+import ApartmentIcon from "@mui/icons-material/Apartment";
+import VerifiedIcon from "@mui/icons-material/Verified";
+import GroupsIcon from "@mui/icons-material/Groups";
+import GavelIcon from "@mui/icons-material/Gavel";
+import EngineeringIcon from "@mui/icons-material/Engineering";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import SchoolIcon from "@mui/icons-material/School";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import PaymentIcon from "@mui/icons-material/Payment";
+import RuleFolderIcon from "@mui/icons-material/RuleFolder";
+import FeedbackIcon from "@mui/icons-material/Feedback";
+
 import { useNavigate, useLocation } from "react-router-dom";
 
+// ── Government logo
+import govtLogo from "../../assets/logo/govt-logo-lg.png";
+
+// ── Brand palette
+const P = "#1565c0";
+const PD = "#0a2d6e";
+const PDD = "#061a45";
+const PL = "#e8f1fb";
+const TEAL = "#26c6da";
+const W = "#ffffff";
+
+// ── Nav menu ────────────────────────────────────────────────────────────────
+const NAV_MENU = [
+  { label: "Home", icon: <HomeIcon sx={{ fontSize: 16 }} />, path: "/" },
+  {
+    label: "Proposal", icon: <ArticleIcon sx={{ fontSize: 16 }} />,
+    sub: [
+      { label: "Institute Proposal", icon: <BusinessIcon sx={{ fontSize: 16 }} />, path: "/proposal/institute/6" },
+      { label: "SES Centre Proposal", icon: <ApartmentIcon sx={{ fontSize: 16 }} />, path: "/proposal/ses-centre/34" },
+      { label: "Assessment Centre Proposal", icon: <AssessmentIcon sx={{ fontSize: 16 }} />, path: "/proposal/assessment-center/35" },
+    ],
+  },
+  {
+    label: "Registration", icon: <HowToRegIcon sx={{ fontSize: 16 }} />,
+    sub: [
+      { label: "Institute Registration", icon: <BusinessIcon sx={{ fontSize: 16 }} />, path: "/register/institute/7" },
+      { label: "SES Centre Registration", icon: <ApartmentIcon sx={{ fontSize: 16 }} />, path: "/register/ses-centre/36" },
+      { label: "Assessment Centre Accreditation", icon: <VerifiedIcon sx={{ fontSize: 16 }} />, path: "/register/assessment-centre/4" },
+      { label: "Assessor Registration", icon: <GroupsIcon sx={{ fontSize: 16 }} />, path: "/registration/assessor/32" },
+      { label: "Accreditor Registration", icon: <VerifiedIcon sx={{ fontSize: 16 }} />, path: "/registration/accreditor/5" },
+      { label: "Quality Auditor Registration", icon: <GavelIcon sx={{ fontSize: 16 }} />, path: "/registration/qms-auditor/3" },
+    ],
+  },
+  {
+    label: "Renewal", icon: <RefreshIcon sx={{ fontSize: 16 }} />,
+    sub: [
+      { label: "Assessor", icon: <GroupsIcon sx={{ fontSize: 16 }} />, path: "/renewal/assessor" },
+      { label: "Accreditor", icon: <VerifiedIcon sx={{ fontSize: 16 }} />, path: "/renewal/accreditor" },
+      { label: "Quality Auditor Registration", icon: <GavelIcon sx={{ fontSize: 16 }} />, path: "/renewal/qms-auditor" },
+    ],
+  },
+  {
+    label: "Reports", icon: <RuleFolderIcon sx={{ fontSize: 16 }} />,
+    sub: [
+      { label: "Assessor", icon: <GroupsIcon sx={{ fontSize: 16 }} />, path: "/reports/assessor" },
+      { label: "Institute/Center", icon: <BusinessIcon sx={{ fontSize: 16 }} />, path: "/reports/institute" },
+      { label: "Accreditor", icon: <VerifiedIcon sx={{ fontSize: 16 }} />, path: "/reports/accreditor" },
+      //{ label: "Assessment Centre Accreditation", icon: <ApartmentIcon sx={{ fontSize: 16 }} />, path: "/reports/assessment-centre" },
+      { label: "Trainer", icon: <EngineeringIcon sx={{ fontSize: 16 }} />, path: "/reports/trainer" },
+      { label: "QMS Auditor", icon: <GavelIcon sx={{ fontSize: 16 }} />, path: "/reports/qms-auditor" },
+      { label: "Courses Accredited", icon: <SchoolIcon sx={{ fontSize: 16 }} />, path: "/reports/courses-accredited" },
+    ],
+  },
+  { label: "Assessment Result", icon: <AssessmentIcon sx={{ fontSize: 16 }} />, path: "/result/assessment-result" },
+  { label: "Payment", icon: <PaymentIcon sx={{ fontSize: 16 }} />, path: "/birms/payment-index" },
+  { label: "Feedback/Complain", icon: <FeedbackIcon sx={{ fontSize: 16 }} />, path: "/feedback/form" },
+];
+
+// Paths that require a full page reload after navigation
+const refreshPaths = [
+  "/register/institute/7",
+  "/register/ses-centre/36",
+  "/register/assessment-centre/4",
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HoverMenu — MUI Menu with hover triggers (professional, portal-rendered,
+// correct z-index, escape-key + click-away built in).
+// ═══════════════════════════════════════════════════════════════════════════
+const HoverMenu = ({ item, onItemClick, navBtnSx, activeBtnSx }) => {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const timerRef = useRef(null);
+  const isOpen = Boolean(anchorEl);
+
+  const handleEnter = e => {
+    clearTimeout(timerRef.current);
+    if (!anchorEl) setAnchorEl(e.currentTarget);
+  };
+  const scheduleClose = () => {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setAnchorEl(null), 200);
+  };
+  const cancelClose = () => clearTimeout(timerRef.current);
+
+  return (
+    <Box
+      onMouseEnter={handleEnter}
+      onMouseLeave={scheduleClose}
+    >
+      <Button
+        startIcon={item.icon}
+        endIcon={
+          <KeyboardArrowDownIcon sx={{
+            fontSize: "15px !important",
+            transition: "transform 0.2s",
+            transform: isOpen ? "rotate(180deg)" : "none",
+          }} />
+        }
+        sx={{ ...navBtnSx, ...(isOpen ? activeBtnSx : {}) }}
+      >
+        {item.label}
+      </Button>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={isOpen}
+        onClose={() => setAnchorEl(null)}
+        slots={{ transition: Fade }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        // ── Critical for hover menus: backdrop must NOT block the cursor
+        //    from re-entering the button, but the paper itself must capture
+        //    mouse events so the user can hover into the items.
+        sx={{ pointerEvents: "none" }}
+        slotProps={{
+          paper: {
+            elevation: 0,
+            onMouseEnter: cancelClose,
+            onMouseLeave: scheduleClose,
+            sx: {
+              pointerEvents: "auto",
+              mt: 0,
+              minWidth: 270,
+              borderRadius: "0 0 10px 10px",
+              borderTop: `3px solid ${TEAL}`,
+              boxShadow: "0 10px 36px rgba(0,0,0,0.22)",
+              overflow: "hidden",
+            },
+          },
+          list: { sx: { p: 0 } },
+        }}
+        disableAutoFocus
+        disableAutoFocusItem
+        disableRestoreFocus
+        disableScrollLock
+      >
+        {item.sub.flatMap((s, si) => [
+          <MenuItem
+            key={s.path}
+            onClick={() => { setAnchorEl(null); onItemClick(s.path); }}
+            sx={{
+              py: 1.1, px: 2.2, minHeight: "auto", fontSize: "0.82rem",
+              fontWeight: 600, color: "#1a2740",
+              transition: "all 0.15s",
+              borderLeft: "3px solid transparent",
+              gap: 1.3,
+              "&:hover": {
+                bgcolor: PL, color: P,
+                borderLeftColor: P,
+                pl: 2.6,
+              },
+            }}
+          >
+            <Box sx={{ color: P, display: "flex" }}>{s.icon}</Box>
+            {s.label}
+          </MenuItem>,
+          si < item.sub.length - 1 && (
+            <Divider key={`${s.path}-d`} sx={{ mx: 2, my: 0, borderColor: "#eef2f9" }} />
+          ),
+        ])}
+      </Menu>
+    </Box>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
+  const isMd = useMediaQuery(theme.breakpoints.down("md"));
 
-  // --- FIXED: Use md breakpoint for responsiveness ---
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"), { noSsr: true });
+  // Mobile drawer state
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileExpand, setMobileExpand] = useState({});
 
-  // Mobile menu
-  const [anchorEl, setAnchorEl] = React.useState(null);
-  const open = Boolean(anchorEl);
-
-  // Mobile collapse menus
-  const [mobileProposalOpen, setMobileProposalOpen] = React.useState(false);
-  const [mobileRegisterOpen, setMobileRegisterOpen] = React.useState(false);
-  const [mobileRenewalOpen, setMobileRenewalOpen] = React.useState(false);
-  const [mobileReportsOpen, setMobileReportsOpen] = React.useState(false);
-
-  // Desktop dropdowns
-  const [registerAnchorEl, setRegisterAnchorEl] = React.useState(null);
-  const [renewalAnchorEl, setRenewalAnchorEl] = React.useState(null);
-  const [reportsAnchorEl, setReportsAnchorEl] = React.useState(null);
-  const [proposalAnchorEl, setProposalAnchorEl] = React.useState(null);
-
-  const proposalOpen = Boolean(proposalAnchorEl);
-  const registerOpen = Boolean(registerAnchorEl);
-  const renewalOpen = Boolean(renewalAnchorEl);
-  const reportsOpen = Boolean(reportsAnchorEl);
-
-  // Define the paths that should trigger a page refresh
-  const refreshPaths = [
-    "/register/institute/7",
-    "/register/ses-centre/36",
-    "/register/assessment-centre/4",
-  ];
-
-  // Function to handle navigation with conditional refresh
-  const handleNavigateWithRefresh = (path, closeFn) => {
-    // Check if the current path is one of the refresh paths
-    const isRefreshPath = refreshPaths.includes(path);
-    const currentIsRefreshPath = refreshPaths.includes(location.pathname);
-
-    // Close menu if closeFn is provided
+  // Navigate with optional full page reload
+  const handleNav = (path, closeFn) => {
     if (closeFn) closeFn();
-
-    // Navigate to the new path
+    if (!path) return;
     navigate(path);
-
-    // Only refresh if we're moving FROM a refresh path TO another refresh path
-    // OR if we're moving TO a refresh path from a non-refresh path
-    if (isRefreshPath) {
-      // Use setTimeout to ensure navigation happens before refresh
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
+    if (refreshPaths.includes(path)) {
+      setTimeout(() => window.location.reload(), 100);
     }
   };
 
-  const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setMobileProposalOpen(false);
-    setMobileRegisterOpen(false);
-    setMobileRenewalOpen(false);
-    setMobileReportsOpen(false);
+  const toggleMobileExpand = label =>
+    setMobileExpand(p => ({ ...p, [label]: !p[label] }));
+
+  const closeMobile = () => {
+    setMobileOpen(false);
+    setMobileExpand({});
   };
 
-  const handleProposalOpen = (event) =>
-    setProposalAnchorEl(event.currentTarget);
-  const handleProposalClose = () => setProposalAnchorEl(null);
-
-  const handleRegisterOpen = (event) =>
-    setRegisterAnchorEl(event.currentTarget);
-
-  const handleRegisterClose = () => setRegisterAnchorEl(null);
-  const handleRenewalOpen = (event) => setRenewalAnchorEl(event.currentTarget);
-  const handleRenewalClose = () => setRenewalAnchorEl(null);
-  const handleReportsOpen = (event) => setReportsAnchorEl(event.currentTarget);
-  const handleReportsClose = () => setReportsAnchorEl(null);
-
-  const formik = useFormik({
-    initialValues: { user_id: "", password: "" },
-    onSubmit: () => navigate("/auth/login"),
-  });
-
-  const navItems = [
-    { label: "Assessment Result", path: "/result/assessment-result" },
-    { label: "Feedback & Complaint", path: "/feedback" },
-    { label: "Birms Payment", path: "/birms/payment-index" },
-  ];
-
-  const proposalItems = [
-    { label: "Institute Proposal", path: "/proposal/institute/6" },
-    { label: "SES Centre Proposal", path: "/proposal/ses-centre/34" },
-    {
-      label: "Assessment Centre Proposal",
-      path: "/proposal/assessment-center/35",
+  // Shared nav-button style
+  const navBtnSx = {
+    color: alpha(W, 0.85),
+    fontSize: "0.8rem", fontWeight: 600,
+    textTransform: "none",
+    px: 1.6, py: 1.3, borderRadius: 0, minWidth: "unset",
+    bgcolor: "transparent",
+    borderBottom: "3px solid transparent",
+    transition: "all 0.2s",
+    letterSpacing: 0.2,
+    "&:hover": {
+      color: W,
+      bgcolor: alpha(W, 0.08),
+      borderBottom: `3px solid ${TEAL}`,
     },
-  ];
-
-  const registerItems = [
-    { label: "Institute Registration", path: "/register/institute/7" },
-    { label: "SES Centre Registration", path: "/register/ses-centre/36" },
-    {
-      label: "Assessment Centre Accreditation",
-      path: "/register/assessment-centre/4",
-    },
-    { label: "Assessor Registration", path: "/registration/assessor/32" },
-    { label: "Accreditor Registration", path: "/registration/accreditor/5" },
-    {
-      label: "Quality Auditor Registration",
-      path: "/registration/qms-auditor/3",
-    },
-  ];
-
-  const renewalItems = [
-    { label: "Assessor", path: "/renewal/assessor" },
-    { label: "Accreditor", path: "/renewal/accreditor" },
-    { label: "Quality Auditor Registration", path: "/renewal/qms-auditor" },
-  ];
-
-  const reports = [
-    { label: "Assessor", path: "/reports/assessor" },
-    { label: "Institute", path: "/reports/institute" },
-    { label: "Accreditor", path: "/reports/accreditor" },
-    {
-      label: "Assessment Centre Accreditation",
-      path: "/reports/assessment-centre",
-    },
-    { label: "Trainer", path: "/reports/trainer" },
-    { label: "QMS Auditor", path: "/reports/qms-auditor" },
-    { label: "Courses Accredited", path: "/reports/courses-accredited" },
-  ];
-
-  const renderMenuItems = (items, closeFn) =>
-    items.flatMap((item, index) => [
-      <MenuItem
-        key={item.path}
-        onClick={() => {
-          // Check if this item is in refreshPaths
-          if (refreshPaths.includes(item.path)) {
-            handleNavigateWithRefresh(item.path, closeFn);
-          } else {
-            navigate(item.path);
-            if (closeFn) closeFn();
-          }
-        }}
-        sx={{
-          py: 0.4,
-          px: 1.75,
-          minHeight: "auto",
-          fontSize: "0.88rem",
-        }}
-      >
-        {item.label}
-      </MenuItem>,
-      index < items.length - 1 && (
-        <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
-      ),
-    ]);
+  };
+  const activeBtnSx = {
+    color: W,
+    bgcolor: alpha(W, 0.1),
+    borderBottom: `3px solid ${TEAL}`,
+  };
 
   return (
-    <AppBar
-      position="static"
-      sx={{ backgroundColor: "#283593", height: { xs: 60, sm: 70, md: 70 } }}
-    >
-      <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-        {/* Left side */}
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          {isMobile ? (
-            <IconButton color="inherit" onClick={handleMenuOpen} sx={{ mr: 1 }}>
-              <MenuIcon fontSize="small" />
+    <Box sx={{ position: "sticky", top: 0, zIndex: 1200 }}>
+
+      {/* ── Top info bar ─────────────────────────────────────────────── */}
+      <Box sx={{
+        background: `linear-gradient(90deg, ${PDD} 0%, ${PD} 100%)`,
+        py: 0.6, px: { xs: 1.5, md: 4 },
+      }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" spacing={{ xs: 1, md: 2 }}
+            divider={<Box sx={{ width: "1px", height: 12, bgcolor: alpha(W, 0.18) }} />}>
+            <Stack direction="row" alignItems="center" spacing={0.7}>
+              <PhoneIcon sx={{ color: TEAL, fontSize: 13 }} />
+              <Typography sx={{ color: alpha(W, 0.78), fontSize: "0.7rem", fontWeight: 500 }}>
+                +975-2-337175
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.7}
+              sx={{ display: { xs: "none", sm: "flex" } }}>
+              <EmailIcon sx={{ color: TEAL, fontSize: 13 }} />
+              <Typography sx={{ color: alpha(W, 0.78), fontSize: "0.7rem", fontWeight: 500 }}>
+                tvet@bqpca.gov.bt
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.7}
+              sx={{ display: { xs: "none", md: "flex" } }}>
+              <LocationOnIcon sx={{ color: TEAL, fontSize: 13 }} />
+              <Typography sx={{ color: alpha(W, 0.78), fontSize: "0.7rem", fontWeight: 500 }}>
+                Chang Gidaphu, Thimphu, Bhutan
+              </Typography>
+            </Stack>
+          </Stack>
+
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Typography sx={{
+              color: alpha(W, 0.55), fontSize: "0.68rem",
+              fontWeight: 600, letterSpacing: 0.4,
+              display: { xs: "none", md: "block" },
+            }}>
+              FOLLOW US
+            </Typography>
+            <Stack direction="row" spacing={0.4}>
+              {[
+                { Icon: FacebookIcon, href: "https://www.facebook.com/BQPCA", label: "Facebook" },
+                { Icon: XIcon, href: "#", label: "X" },
+                { Icon: LinkedInIcon, href: "#", label: "LinkedIn" },
+              ].map(({ Icon, href, label }, i) => (
+                <IconButton key={i} size="small" href={href} target="_blank" rel="noreferrer"
+                  aria-label={label}
+                  sx={{
+                    color: alpha(W, 0.6), p: 0.4,
+                    borderRadius: 1,
+                    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                    "&:hover": {
+                      color: W,
+                      bgcolor: alpha(TEAL, 0.2),
+                      transform: "translateY(-1px)",
+                    },
+                  }}>
+                  <Icon sx={{ fontSize: 14 }} />
+                </IconButton>
+              ))}
+            </Stack>
+          </Stack>
+        </Stack>
+      </Box>
+
+      {/* ── Brand / Logo bar ─────────────────────────────────────────── */}
+      <Box sx={{
+        background: `linear-gradient(135deg, ${P} 0%, #0d47a1 100%)`,
+        boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
+        py: 1, px: { xs: 1.5, md: 4 },
+      }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+
+          {/* Left: logo + title */}
+          <Stack direction="row" alignItems="center" spacing={{ xs: 1, md: 1.6 }}>
+            <Box component="img" src={govtLogo} alt="Royal Government of Bhutan"
+              onClick={() => navigate("/")}
+              sx={{
+                width: { xs: 40, md: 52 },
+                height: { xs: 40, md: 52 },
+                objectFit: "contain", cursor: "pointer", flexShrink: 0,
+                transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.15))",
+                "&:hover": {
+                  transform: "scale(1.06) rotate(-2deg)",
+                  filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.25))",
+                },
+              }} />
+
+            <Box sx={{ minWidth: 0 }}>
+              <Typography fontWeight={800}
+                sx={{
+                  color: W,
+                  fontSize: { xs: "0.8rem", md: "1.05rem" },
+                  lineHeight: 1.2, letterSpacing: "-0.2px",
+                  whiteSpace: { md: "nowrap" }
+                }}>
+                TVET Management Information System
+              </Typography>
+              <Typography sx={{
+                color: alpha(W, 0.78),
+                fontSize: { xs: "0.6rem", md: "0.68rem" },
+                lineHeight: 1.3,
+                display: { xs: "none", sm: "block" },
+              }}>
+                Ministry of Education and Skills Development · Royal Government of Bhutan
+              </Typography>
+            </Box>
+          </Stack>
+
+          {/* Right: login on desktop · hamburger on mobile */}
+          {isMd ? (
+            <IconButton onClick={() => setMobileOpen(true)}
+              sx={{
+                color: W, border: `1px solid ${alpha(W, 0.4)}`,
+                borderRadius: 1.5, p: 0.7,
+                transition: "all 0.2s",
+                "&:hover": { bgcolor: alpha(W, 0.12), borderColor: W }
+              }}>
+              <MenuIcon />
             </IconButton>
           ) : (
-            <IconButton
-              onClick={() => {
-                // Home button - no refresh needed
-                navigate("/");
-              }}
-              sx={{ color: "#fff", mr: 2 }}
-            >
-              <HomeIcon
-                sx={{
-                  fontSize: { xs: 24, sm: 30 },
+            <Button
+              onClick={() => navigate("/auth/login")}
+              startIcon={
+                <Box sx={{
+                  width: 22, height: 22, borderRadius: "50%",
+                  bgcolor: alpha(P, 0.12),
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}
-              />
-            </IconButton>
-          )}
-
-          <Typography
-            sx={{
-              fontWeight: "bold",
-              fontSize: { xs: "0.85rem", sm: "1rem" },
-            }}
-          >
-            TVET Management Information System (TVET-MIS)
-          </Typography>
-        </Box>
-
-        {/* Desktop Nav */}
-        {!isMobile && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {/* proposal */}
-            <Box>
-              <Button
-                onClick={handleProposalOpen}
-                endIcon={<ExpandMore sx={{ color: "#fff" }} />}
-                sx={{
-                  color: "#fff",
-                  textTransform: "none",
-                  position: "relative",
-                  "&:hover::after": {
-                    content: '""',
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "1px",
-                    bgcolor: "#fff",
-                  },
-                }}
-              >
-                Proposal
-              </Button>
-              <Menu
-                anchorEl={proposalAnchorEl}
-                open={proposalOpen}
-                onClose={handleProposalClose}
-                slots={{ transition: Fade }}
-                slotProps={{
-                  paper: {
-                    sx: {
-                      mt: 1,
-                      minWidth: 220,
-                      p: 0,
-                      borderRadius: 1.5,
-                      overflow: "visible",
-                      "&::before": {
-                        content: '""',
-                        position: "absolute",
-                        top: 0,
-                        left: 24,
-                        width: 10,
-                        height: 10,
-                        bgcolor: "#fff",
-                        transform: "translateY(-50%) rotate(45deg)",
-                      },
-                    },
-                  },
-                }}
-              >
-                {renderMenuItems(proposalItems, handleProposalClose)}
-              </Menu>
-            </Box>
-            {/* Registration */}
-            <Box>
-              <Button
-                onClick={handleRegisterOpen}
-                endIcon={<ExpandMore sx={{ color: "#fff" }} />}
-                sx={{
-                  color: "#fff",
-                  textTransform: "none",
-                  position: "relative",
-                  "&:hover::after": {
-                    content: '""',
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "1px",
-                    bgcolor: "#fff",
-                  },
-                }}
-              >
-                Registration
-              </Button>
-              <Menu
-                anchorEl={registerAnchorEl}
-                open={registerOpen}
-                onClose={handleRegisterClose}
-                slots={{ transition: Fade }}
-                slotProps={{
-                  paper: {
-                    sx: {
-                      mt: 1,
-                      minWidth: 220,
-                      p: 0,
-                      borderRadius: 1.5,
-                      overflow: "visible",
-                      "&::before": {
-                        content: '""',
-                        position: "absolute",
-                        top: 0,
-                        left: 24,
-                        width: 10,
-                        height: 10,
-                        bgcolor: "#fff",
-                        transform: "translateY(-50%) rotate(45deg)",
-                      },
-                    },
-                  },
-                }}
-              >
-                {renderMenuItems(registerItems, handleRegisterClose)}
-              </Menu>
-            </Box>
-
-            <Box>
-              <Button
-                onClick={handleRenewalOpen}
-                endIcon={<ExpandMore sx={{ color: "#fff" }} />}
-                sx={{
-                  color: "#fff",
-                  textTransform: "none",
-                  position: "relative",
-                  "&:hover::after": {
-                    content: '""',
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "1px",
-                    bgcolor: "#fff",
-                  },
-                }}
-              >
-                Renewal
-              </Button>
-              <Menu
-                anchorEl={renewalAnchorEl}
-                open={renewalOpen}
-                onClose={handleRenewalClose}
-                slots={{ transition: Fade }}
-                slotProps={{
-                  paper: {
-                    sx: {
-                      mt: 1,
-                      minWidth: 220,
-                      p: 0,
-                      borderRadius: 1.5,
-                      overflow: "visible",
-                      "&::before": {
-                        content: '""',
-                        position: "absolute",
-                        top: 0,
-                        left: 24,
-                        width: 10,
-                        height: 10,
-                        bgcolor: "#fff",
-                        transform: "translateY(-50%) rotate(45deg)",
-                      },
-                    },
-                  },
-                }}
-              >
-                {renderMenuItems(renewalItems, handleRenewalClose)}
-              </Menu>
-            </Box>
-
-            <Box>
-              <Button
-                onClick={handleReportsOpen}
-                endIcon={<ExpandMore sx={{ color: "#fff" }} />}
-                sx={{
-                  color: "#fff",
-                  textTransform: "none",
-                  position: "relative",
-                  "&:hover::after": {
-                    content: '""',
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "1px",
-                    bgcolor: "#fff",
-                  },
-                }}
-              >
-                Reports
-              </Button>
-              <Menu
-                anchorEl={reportsAnchorEl}
-                open={reportsOpen}
-                onClose={handleReportsClose}
-                slots={{ transition: Fade }}
-                slotProps={{
-                  paper: {
-                    sx: {
-                      mt: 1,
-                      minWidth: 220,
-                      p: 0,
-                      borderRadius: 1.5,
-                      overflow: "visible",
-                      "&::before": {
-                        content: '""',
-                        position: "absolute",
-                        top: 0,
-                        left: 24,
-                        width: 10,
-                        height: 10,
-                        bgcolor: "#fff",
-                        transform: "translateY(-50%) rotate(45deg)",
-                      },
-                    },
-                  },
-                }}
-              >
-                {renderMenuItems(reports, handleReportsClose)}
-              </Menu>
-            </Box>
-            {navItems.map((item) => (
-              <Button
-                key={item.path}
-                onClick={() => {
-                  // Regular navigation - no refresh
-                  navigate(item.path);
-                }}
-                sx={{
-                  color: "#fff",
-                  textTransform: "none",
-                  position: "relative",
-                  "&:hover::after": {
-                    content: '""',
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "1px",
-                    bgcolor: "#fff",
-                  },
-                }}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </Box>
-        )}
-
-        {/* Login */}
-        <form onSubmit={formik.handleSubmit} style={{ margin: 0 }}>
-          <Button
-            type="submit"
-            variant="contained"
-            startIcon={<LoginIcon />}
-            sx={{
-              padding: { xs: "2px 8px", sm: "2px 12px" },
-              fontWeight: "bold",
-              textTransform: "none",
-              backgroundColor: "#1e88e6",
-              "&:hover": {
-                backgroundColor: "#1565c0",
-                boxShadow: "0 6px 12px rgba(0,0,0,0.2)",
-              },
-            }}
-          >
-            {isMobile ? "" : "Login"}
-          </Button>
-        </form>
-
-        {/* Mobile Menu */}
-        {isMobile && (
-          <Menu
-            anchorEl={anchorEl}
-            open={open}
-            onClose={handleMenuClose}
-            slotProps={{
-              paper: {
-                sx: { minWidth: 240, p: 0, borderRadius: 1.5 },
-              },
-            }}
-          >
-            {/* Navigation */}
-            {navItems.flatMap((item, index) => [
-              <MenuItem
-                key={item.path}
-                onClick={() => {
-                  navigate(item.path);
-                  handleMenuClose();
-                }}
-                sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
-              >
-                {item.label}
-              </MenuItem>,
-              index < navItems.length - 1 && (
-                <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
-              ),
-            ])}
-
-            <Divider sx={{ my: 0.25 }} />
-
-            {/* Collapsible sections */}
-            {[
-              {
-                label: "Proposal",
-                open: mobileProposalOpen,
-                setOpen: setMobileProposalOpen,
-                items: proposalItems,
-              },
-              {
-                label: "Registration",
-                open: mobileRegisterOpen,
-                setOpen: setMobileRegisterOpen,
-                items: registerItems,
-              },
-              {
-                label: "Renewal",
-                open: mobileRenewalOpen,
-                setOpen: setMobileRenewalOpen,
-                items: renewalItems,
-              },
-              {
-                label: "Reports",
-                open: mobileReportsOpen,
-                setOpen: setMobileReportsOpen,
-                items: reports,
-              },
-            ].map(({ label, open, setOpen, items }) => (
-              <Box key={label}>
-                <MenuItem
-                  onClick={() => setOpen(!open)}
-                  sx={{ py: 0.4, px: 1.75, minHeight: "auto" }}
+                  className="login-icon-wrap"
                 >
-                  {label} {open ? <ExpandLess /> : <ExpandMore />}
-                </MenuItem>
-                <Collapse in={open} timeout="auto" unmountOnExit>
-                  {items.flatMap((item, index) => [
-                    <MenuItem
-                      key={item.path}
-                      onClick={() => {
-                        // Check if this item is in refreshPaths
-                        if (refreshPaths.includes(item.path)) {
-                          handleNavigateWithRefresh(item.path, handleMenuClose);
-                        } else {
-                          navigate(item.path);
-                          handleMenuClose();
-                        }
-                      }}
-                      sx={{
-                        py: 0.35,
-                        px: 3,
-                        minHeight: "auto",
-                        fontSize: "0.85rem",
-                      }}
-                    >
-                      {item.label}
-                    </MenuItem>,
-                    index < items.length - 1 && (
-                      <Divider key={`${item.path}-divider`} sx={{ my: 0.25 }} />
-                    ),
-                  ])}
-                </Collapse>
-                <Divider sx={{ my: 0.25 }} />
+                  <LoginIcon sx={{ fontSize: 14, color: P }} />
+                </Box>
+              }
+              sx={{
+                background: `linear-gradient(135deg, ${W} 0%, #eaf3ff 100%)`,
+                color: PD,
+                fontSize: "0.82rem",
+                textTransform: "none",
+                fontWeight: 700,
+                letterSpacing: 0.4,
+                pl: 1, pr: 2.2, py: 0.6,
+                borderRadius: 2,
+                border: `1px solid ${alpha(W, 0.92)}`,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.85)",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                position: "relative",
+                overflow: "hidden",
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0, left: "-100%", height: "100%", width: "100%",
+                  background: `linear-gradient(90deg, transparent, ${alpha(TEAL, 0.25)}, transparent)`,
+                  transition: "left 0.6s ease",
+                },
+                "&:hover": {
+                  background: `linear-gradient(135deg, #eaf3ff 0%, ${W} 100%)`,
+                  color: P,
+                  transform: "translateY(-2px)",
+                  boxShadow: `0 8px 22px rgba(0,0,0,0.22), 0 0 0 3px ${alpha(TEAL, 0.4)}, inset 0 1px 0 rgba(255,255,255,0.95)`,
+                  "&::before": { left: "100%" },
+                  "& .login-icon-wrap": {
+                    bgcolor: TEAL,
+                    transform: "rotate(-8deg) scale(1.05)",
+                    "& svg": { color: W },
+                  },
+                },
+                "&:active": {
+                  transform: "translateY(0)",
+                  boxShadow: `0 2px 6px rgba(0,0,0,0.18), 0 0 0 3px ${alpha(TEAL, 0.4)}`,
+                },
+              }}
+            >
+              Login
+            </Button>
+          )}
+        </Stack>
+      </Box>
+
+      {/* ── Desktop nav bar (MUI Menu hover dropdowns) ────────────────── */}
+      {!isMd && (
+        <Box sx={{
+          bgcolor: PD,
+          borderBottom: `2px solid ${TEAL}`,
+          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+          px: { md: 2, lg: 4 },
+        }}>
+          <Stack direction="row" alignItems="stretch">
+            {NAV_MENU.map(item => {
+              const isActive = !item.sub && item.path && location.pathname === item.path;
+
+              if (item.sub) {
+                return (
+                  <HoverMenu
+                    key={item.label}
+                    item={item}
+                    onItemClick={path => handleNav(path)}
+                    navBtnSx={navBtnSx}
+                    activeBtnSx={activeBtnSx}
+                  />
+                );
+              }
+
+              return (
+                <Button key={item.label}
+                  onClick={() => handleNav(item.path)}
+                  startIcon={item.icon}
+                  sx={{ ...navBtnSx, ...(isActive ? activeBtnSx : {}) }}>
+                  {item.label}
+                </Button>
+              );
+            })}
+          </Stack>
+        </Box>
+      )}
+
+      {/* ── Mobile drawer ────────────────────────────────────────────── */}
+      <Drawer anchor="left" open={mobileOpen} onClose={closeMobile}
+        PaperProps={{ sx: { width: 290, bgcolor: PD } }}>
+        <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+
+          {/* Drawer header */}
+          <Box sx={{
+            background: `linear-gradient(135deg, ${P} 0%, #0d47a1 100%)`,
+            p: 2, display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <Stack direction="row" spacing={1.2} alignItems="center">
+              <Box component="img" src={govtLogo} alt="Logo"
+                sx={{ width: 36, height: 36, objectFit: "contain" }} />
+              <Box>
+                <Typography fontWeight={800} sx={{ color: W, fontSize: "0.86rem", lineHeight: 1.1 }}>
+                  TVET MIS
+                </Typography>
+                <Typography sx={{ color: alpha(W, 0.7), fontSize: "0.62rem" }}>
+                  MoESD · RGoB
+                </Typography>
               </Box>
-            ))}
-          </Menu>
-        )}
-      </Toolbar>
-    </AppBar>
+            </Stack>
+            <IconButton size="small" onClick={closeMobile}
+              sx={{
+                color: W, border: `1px solid ${alpha(W, 0.3)}`,
+                "&:hover": { bgcolor: alpha(W, 0.1) }
+              }}>
+              <CloseIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Box>
+
+          {/* Nav items */}
+          <Box sx={{ flex: 1, overflowY: "auto" }}>
+            {NAV_MENU.map(item => {
+              const expanded = !!mobileExpand[item.label];
+              return (
+                <Box key={item.label}>
+                  <Box
+                    onClick={() => item.sub
+                      ? toggleMobileExpand(item.label)
+                      : handleNav(item.path, closeMobile)}
+                    sx={{
+                      display: "flex", alignItems: "center",
+                      justifyContent: "space-between",
+                      px: 2, py: 1.3, cursor: "pointer",
+                      bgcolor: expanded ? alpha(W, 0.06) : "transparent",
+                      transition: "all 0.15s",
+                      "&:hover": { bgcolor: alpha(W, 0.08) },
+                    }}>
+                    <Stack direction="row" spacing={1.2} alignItems="center">
+                      <Box sx={{
+                        color: expanded ? TEAL : alpha(W, 0.7),
+                        display: "flex", transition: "color 0.2s"
+                      }}>
+                        {item.icon}
+                      </Box>
+                      <Typography sx={{ color: W, fontSize: "0.83rem", fontWeight: 600 }}>
+                        {item.label}
+                      </Typography>
+                    </Stack>
+                    {item.sub && (expanded
+                      ? <ExpandLess sx={{ color: alpha(W, 0.55), fontSize: 17 }} />
+                      : <ExpandMore sx={{ color: alpha(W, 0.55), fontSize: 17 }} />)}
+                  </Box>
+
+                  {/* Sub-items */}
+                  {item.sub && expanded && (
+                    <Box sx={{ bgcolor: alpha("#000", 0.18) }}>
+                      {item.sub.map((s, si) => (
+                        <Box key={si}
+                          onClick={() => handleNav(s.path, closeMobile)}
+                          sx={{
+                            display: "flex", alignItems: "center", gap: 1.1,
+                            px: 4, py: 1, cursor: "pointer",
+                            borderLeft: `2px solid ${alpha(TEAL, 0.3)}`,
+                            ml: 2,
+                            transition: "all 0.15s",
+                            "&:hover": {
+                              bgcolor: alpha(W, 0.06),
+                              borderLeftColor: TEAL, pl: 4.5
+                            },
+                          }}>
+                          <Box sx={{ color: alpha(W, 0.6), display: "flex" }}>{s.icon}</Box>
+                          <Typography sx={{ color: alpha(W, 0.82), fontSize: "0.78rem" }}>
+                            {s.label}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+
+                  <Divider sx={{ borderColor: alpha(W, 0.08) }} />
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Drawer footer — login (matches desktop styling) */}
+          <Box sx={{ p: 2, bgcolor: PDD, borderTop: `1px solid ${alpha(W, 0.08)}` }}>
+            <Button fullWidth
+              startIcon={
+                <Box sx={{
+                  width: 24, height: 24, borderRadius: "50%",
+                  bgcolor: alpha(P, 0.12),
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.3s",
+                }}
+                  className="m-login-wrap"
+                >
+                  <LoginIcon sx={{ fontSize: 15, color: P }} />
+                </Box>
+              }
+              onClick={() => { navigate("/auth/login"); closeMobile(); }}
+              sx={{
+                background: `linear-gradient(135deg, ${W} 0%, #eaf3ff 100%)`,
+                color: PD,
+                textTransform: "none", fontWeight: 700, fontSize: "0.85rem",
+                letterSpacing: 0.4,
+                borderRadius: 2, py: 1,
+                border: `1px solid ${alpha(W, 0.92)}`,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.8)",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                "&:hover": {
+                  background: `linear-gradient(135deg, #eaf3ff 0%, ${W} 100%)`,
+                  color: P,
+                  transform: "translateY(-1px)",
+                  boxShadow: `0 6px 18px rgba(0,0,0,0.32), 0 0 0 2px ${alpha(TEAL, 0.4)}`,
+                  "& .m-login-wrap": {
+                    bgcolor: TEAL,
+                    "& svg": { color: W },
+                  },
+                },
+              }}>
+              Login to TVET MIS
+            </Button>
+          </Box>
+        </Box>
+      </Drawer>
+    </Box>
   );
 };
 

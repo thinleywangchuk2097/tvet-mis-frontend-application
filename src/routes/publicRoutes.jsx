@@ -12,7 +12,17 @@ import ApplyCourse from "../pages/trainee/ApplyCourse";
 import ResetPassword from "../pages/auth/ResetPassword";
 import GenerateQRCode from "../pages/auth/bhutanndi/GenerateQRCode";
 import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
+//import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex";
+//Reports
+import AssessorReport from "../pages/public/reports/Assessor";
+import InstituteReport from "../pages/public/reports/Institute";
+import AccreditorReport from "../pages/public/reports/Accreditor";
+import TrainerReport from "../pages/public/reports/Trainer";
+import QMSAuditorReport from "../pages/public/reports/QMSAuditor";
+import CoursesAccreditedReport from "../pages/public/reports/CoursesAccredited";
 import BirmsPublicPaymentIndex from "../pages/birms/pubilc/BirmsPublicPaymentIndex";
+//Feedback or Complain
+import FeedbackForm from "../pages/public/FeedbackForm";
 
 //public routes ..
 export const publicRoutes = [
@@ -38,10 +48,11 @@ export const publicRoutes = [
   {
     path: "register",
     children: [
-      {
-        path: ":registrationType/:serviceId",
-        element: <InstituteRegistration />,
-      },
+      { path: ":registrationType/:serviceId", element: <InstituteRegistration /> },
+      // { path: "assessment-centre", element: <AssessmentCentre /> },
+      // { path: "assessor", element: <Assessor /> },
+      //{ path: "accreditor", element: <Accreditor /> },
+      // { path: "qms-auditor", element: <QMSAuditor /> },//it is Quality Auditor Registration AssessorAccreditorQMSAuditor
     ],
   },
   {
@@ -51,6 +62,17 @@ export const publicRoutes = [
         path: ":registrationType/:serviceId",
         element: <AssessorAccreditorQMSAuditor />,
       },
+    ],
+  },
+  {
+    path: "reports",
+    children: [
+      { path: "assessor", element: <AssessorReport /> },
+      { path: "institute", element: <InstituteReport /> },
+      { path: "accreditor", element: <AccreditorReport /> },
+      { path: "trainer", element: <TrainerReport /> },
+      { path: "qms-auditor", element: <QMSAuditorReport /> },
+      { path: "courses-accredited", element: <CoursesAccreditedReport /> },
     ],
   },
 
@@ -68,5 +90,9 @@ export const publicRoutes = [
   {
     path: "birms",
     children: [{ path: "payment-index", element: <BirmsPublicPaymentIndex /> }],
+  },
+  {
+    path: "feedback",
+    children: [{ path: "form", element: <FeedbackForm /> }],
   },
 ];
