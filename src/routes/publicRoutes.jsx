@@ -93,6 +93,6 @@ export const publicRoutes = [
   },
   {
     path: "feedback",
-    children: [{ path: "form", element: <Feedback /> }],
+    children: [{ path: "form", element: <FeedbackForm /> }],
   },
 ];
