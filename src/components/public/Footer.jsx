@@ -428,22 +428,17 @@ const Footer = () => {
 
             <ContactItem
               icon={<LocationOnIcon sx={{ fontSize: 15 }} />}
-              text="Kawajangsa, Thimphu, Bhutan · P.O. Box: 1143"
+              text="Chang Gidaphu, Thimphu, Bhutan · P.O. Box: 1143"
               color={PL}
             />
             <ContactItem
               icon={<PhoneIcon sx={{ fontSize: 15 }} />}
-              text="+975-2-334155 / 334156"
+              text="+975-2-337175"
               color={TEAL}
             />
             <ContactItem
-              icon={<FaxIcon sx={{ fontSize: 15 }} />}
-              text="+975-2-323085"
-              color="#9c27b0"
-            />
-            <ContactItem
               icon={<EmailIcon sx={{ fontSize: 15 }} />}
-              text="tvet@moesc.gov.bt"
+              text="tvet@bqpca.gov.bt"
               color="#ff7043"
             />
 

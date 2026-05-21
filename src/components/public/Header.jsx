@@ -266,21 +266,21 @@ const Header = () => {
             <Stack direction="row" alignItems="center" spacing={0.7}>
               <PhoneIcon sx={{ color: TEAL, fontSize: 13 }} />
               <Typography sx={{ color: alpha(W, 0.78), fontSize: "0.7rem", fontWeight: 500 }}>
-                +975-2-334155
+                +975-2-337175
               </Typography>
             </Stack>
             <Stack direction="row" alignItems="center" spacing={0.7}
               sx={{ display: { xs: "none", sm: "flex" } }}>
               <EmailIcon sx={{ color: TEAL, fontSize: 13 }} />
               <Typography sx={{ color: alpha(W, 0.78), fontSize: "0.7rem", fontWeight: 500 }}>
-                tvet@moesc.gov.bt
+                tvet@bqpca.gov.bt
               </Typography>
             </Stack>
             <Stack direction="row" alignItems="center" spacing={0.7}
               sx={{ display: { xs: "none", md: "flex" } }}>
               <LocationOnIcon sx={{ color: TEAL, fontSize: 13 }} />
               <Typography sx={{ color: alpha(W, 0.78), fontSize: "0.7rem", fontWeight: 500 }}>
-                Kawajangsa, Thimphu, Bhutan
+                Chang Gidaphu, Thimphu, Bhutan
               </Typography>
             </Stack>
           </Stack>
