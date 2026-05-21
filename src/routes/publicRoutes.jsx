@@ -21,6 +21,8 @@ import TrainerReport from "../pages/public/reports/Trainer";
 import QMSAuditorReport from "../pages/public/reports/QMSAuditor";
 import CoursesAccreditedReport from "../pages/public/reports/CoursesAccredited";
 import BirmsPublicPaymentIndex from "../pages/birms/pubilc/BirmsPublicPaymentIndex";
+//Feedback or Complain
+import FeedbackForm from "../pages/public/FeedbackForm";
 
 //public routes ..
 export const publicRoutes = [
@@ -88,5 +90,9 @@ export const publicRoutes = [
   {
     path: "birms",
     children: [{ path: "payment-index", element: <BirmsPublicPaymentIndex /> }],
+  },
+  {
+    path: "feedback",
+    children: [{ path: "form", element: <Feedback /> }],
   },
 ];

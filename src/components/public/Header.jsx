@@ -91,7 +91,7 @@ const NAV_MENU = [
   },
   { label: "Assessment Result", icon: <AssessmentIcon sx={{ fontSize: 16 }} />, path: "/result/assessment-result" },
   { label: "Payment", icon: <PaymentIcon sx={{ fontSize: 16 }} />, path: "/birms/payment-index" },
-  { label: "Feedback", icon: <FeedbackIcon sx={{ fontSize: 16 }} />, path: "/feedback" },
+  { label: "Feedback/Complain", icon: <FeedbackIcon sx={{ fontSize: 16 }} />, path: "/feedback/form" },
 ];
 
 // Paths that require a full page reload after navigation
