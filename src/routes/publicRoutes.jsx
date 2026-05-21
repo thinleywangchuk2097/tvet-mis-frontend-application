@@ -48,9 +48,9 @@ export const publicRoutes = [
     children: [
       { path: ":registrationType/:serviceId", element: <InstituteRegistration /> },
       // { path: "assessment-centre", element: <AssessmentCentre /> },
-      { path: "assessor", element: <Assessor /> },
-      { path: "accreditor", element: <Accreditor /> },
-      { path: "qms-auditor", element: <QMSAuditor /> },//it is Quality Auditor Registration AssessorAccreditorQMSAuditor
+      // { path: "assessor", element: <Assessor /> },
+      //{ path: "accreditor", element: <Accreditor /> },
+      // { path: "qms-auditor", element: <QMSAuditor /> },//it is Quality Auditor Registration AssessorAccreditorQMSAuditor
     ],
   },
   {

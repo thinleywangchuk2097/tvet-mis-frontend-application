@@ -87,19 +87,19 @@ const tvetIndicators = [
 const providerTypeData = [
   { name: "Public", value: 48, color: "#1565c0" },
   { name: "Private", value: 86, color: "#2e7d32" },
-  { name: "NGOs", value: 10, color: "#e65100" },
+  // { name: "NGOs", value: 10, color: "#e65100" },
 ];
 const providerTotal = providerTypeData.reduce((s, d) => s + d.value, 0);
 
 // ── Ongoing Programs
 const ongoingPrograms = [
-  { course: "Physics 101", certification: "Level 1", status: "ONGOING", startDate: "15-Jan-2026", endDate: "15-Jun-2026" },
-  { course: "Mathematics 201", certification: "Level 2", status: "ONGOING", startDate: "10-Dec-2025", endDate: "10-May-2026" },
-  { course: "Electrical Wiring", certification: "Level 2", status: "COMPLETED", startDate: "05-Sep-2025", endDate: "05-Feb-2026" },
-  { course: "Plumbing Level 2", certification: "Level 2", status: "ONGOING", startDate: "01-Feb-2026", endDate: "01-Jul-2026" },
-  { course: "Building Painter", certification: "Level 1", status: "COMPLETED", startDate: "10-Aug-2025", endDate: "10-Jan-2026" },
-  { course: "Carpentry Basics", certification: "Level 1", status: "ONGOING", startDate: "20-Jan-2026", endDate: "20-Jun-2026" },
-  { course: "Welding Advanced", certification: "Level 3", status: "COMPLETED", startDate: "01-Jul-2025", endDate: "01-Dec-2025" },
+  { centre: "Technical Training Institute Samthang", course: "Physics 101", certification: "Level 1", status: "ONGOING", startDate: "15-Jan-2026", endDate: "15-Jun-2026" },
+  { centre: "Karma Driving Training Institute", course: "Mathematics 201", certification: "Level 2", status: "ONGOING", startDate: "10-Dec-2025", endDate: "10-May-2026" },
+  { centre: "Technical Training Institute Rangjung", course: "Electrical Wiring", certification: "Level 2", status: "COMPLETED", startDate: "05-Sep-2025", endDate: "05-Feb-2026" },
+  { centre: "College of Zorig Chusum", course: "Plumbing Level 2", certification: "Level 2", status: "ONGOING", startDate: "01-Feb-2026", endDate: "01-Jul-2026" },
+  { centre: "GAB Training Institute", course: "Building Painter", certification: "Level 1", status: "COMPLETED", startDate: "10-Aug-2025", endDate: "10-Jan-2026" },
+  { centre: "Gawa Driving Training Institute", course: "Carpentry Basics", certification: "Level 1", status: "ONGOING", startDate: "20-Jan-2026", endDate: "20-Jun-2026" },
+  { centre: "Beauty & Wellness Training Institute", course: "Welding Advanced", certification: "Level 3", status: "COMPLETED", startDate: "01-Jul-2025", endDate: "01-Dec-2025" },
 ];
 
 // ── Institute by Sector (pie)
@@ -134,26 +134,6 @@ const notifications = [
   "Check your application status using the search bar above.",
   "New courses added in Thimphu and Paro locations.",
   "ToT Certification Workshop in Thimphu — June 5 to 7, 2026.",
-];
-
-// ── Services for public — four user paths
-const services = [
-  {
-    title: "For Trainees", desc: "Browse and apply for accredited TVET courses.", cta: "Apply for a Course",
-    color: P, icon: <SchoolIcon sx={{ fontSize: 30 }} />, href: "#course-announcements"
-  },
-  {
-    title: "For Training Providers", desc: "Register your institute and propose programs.", cta: "Register Institute",
-    color: TEAL, icon: <BusinessIcon sx={{ fontSize: 30 }} />, href: "/register/institute/7"
-  },
-  {
-    title: "For Professionals", desc: "Apply as Trainer, Assessor or Accreditor.", cta: "Become Certified",
-    color: "#2e7d32", icon: <EngineeringIcon sx={{ fontSize: 30 }} />, href: "/registration/assessor/32"
-  },
-  {
-    title: "Standards & Curriculum", desc: "Browse National Competency Standards.", cta: "View Resources",
-    color: "#e65100", icon: <ArticleIcon sx={{ fontSize: 30 }} />, href: "https://www.blmis.gov.bt/tvet/ncs"
-  },
 ];
 
 // ── Headline stats
@@ -259,11 +239,70 @@ const PublicIndex = () => {
     setTrackOpen(true);
   };
 
+  // ── Track Application card (reused — mobile inline & desktop floating)
+  const trackCard = (
+    <Box sx={{
+      bgcolor: alpha(PD, 0.92), backdropFilter: "blur(8px)",
+      borderRadius: 2.5,
+      border: `1px solid ${alpha(W, 0.12)}`,
+      boxShadow: "0 12px 36px rgba(0,0,0,0.4)",
+      p: 2.2,
+      width: { xs: "100%", md: 400 },
+    }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.4 }}>
+        <Box sx={{
+          width: 32, height: 32, borderRadius: "50%",
+          bgcolor: alpha("#90caf9", 0.15),
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <TrackChangesIcon sx={{ color: "#90caf9", fontSize: 18 }} />
+        </Box>
+        <Box>
+          <Typography fontWeight={800} sx={{ color: W, fontSize: "0.88rem", lineHeight: 1.1 }}>
+            Track Your Application
+          </Typography>
+          <Typography sx={{ color: alpha(W, 0.65), fontSize: "0.7rem" }}>
+            Check the status of your submission
+          </Typography>
+        </Box>
+      </Stack>
+      <Box sx={{ display: "flex" }}>
+        <TextField fullWidth size="small" placeholder="Enter Application No."
+          value={trackQ}
+          onChange={e => { setTrackQ(e.target.value); if (trackErr) setTrackErr(false); }}
+          error={trackErr}
+          onKeyDown={e => e.key === "Enter" && handleTrack()}
+          slotProps={{
+            input: {
+              sx: { bgcolor: W, borderRadius: "6px 0 0 6px", height: 38, fontSize: "0.82rem" },
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ color: "#90a4ae", fontSize: 16 }} />
+                </InputAdornment>
+              ),
+            }
+          }}
+          sx={{ "& .MuiOutlinedInput-notchedOutline": { border: "none" } }}
+        />
+        <Button variant="contained" onClick={handleTrack}
+          sx={{
+            borderRadius: "0 6px 6px 0", bgcolor: P, height: 38,
+            px: 2.8, fontSize: "0.78rem",
+            textTransform: "none", fontWeight: 700, whiteSpace: "nowrap",
+            "&:hover": { bgcolor: "#0d47a1" }
+          }}>
+          Search
+        </Button>
+      </Box>
+    </Box>
+  );
+
   return (
     <Box sx={{ bgcolor: "#f7f9fc", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
 
       {/* ── 1. Cinematic Hero ───────────────────────────────────────── */}
-      <Box sx={{ position: "relative", width: "100%", height: { xs: 360, md: 440 }, overflow: "hidden" }}>
+      <Box sx={{ position: "relative", width: "100%", height: { xs: "auto", md: 440 }, overflow: "hidden" }}>
+        {/* Slider images */}
         {sliderImages.map((img, i) => (
           <Box key={i} sx={{
             position: "absolute", inset: 0,
@@ -271,17 +310,24 @@ const PublicIndex = () => {
             opacity: i === slide ? 1 : 0, transition: "opacity 1.2s ease-in-out",
           }} />
         ))}
+        {/* Image fallback height on mobile */}
+        <Box sx={{ height: { xs: 360, md: "100%" } }} />
+
         <Box sx={{
           position: "absolute", inset: 0, zIndex: 1,
           background: `linear-gradient(135deg, ${alpha(PD, 0.82)} 0%, ${alpha(P, 0.45)} 50%, ${alpha("#000", 0.35)} 100%)`,
         }} />
 
         <Container maxWidth="xl" sx={{
-          position: "relative", zIndex: 2, height: "100%",
+          position: { xs: "static", md: "absolute" },
+          inset: { md: 0 },
+          zIndex: 2, height: { md: "100%" },
           display: "flex", alignItems: "center",
+          pt: { xs: 4, md: 0 }, pb: { xs: 4, md: 0 },
         }}>
-          <Grid container alignItems="center" spacing={3}>
-            <Grid size={{ xs: 12, md: 7 }}>
+          <Box sx={{ width: "100%", position: "relative" }}>
+            {/* Hero text — full width, with right padding to clear Track card on desktop */}
+            <Box sx={{ maxWidth: { xs: "100%", md: "62%" }, pr: { md: 4 } }}>
               <Typography sx={{
                 color: "#90caf9", fontSize: "0.72rem",
                 letterSpacing: 1.4, fontWeight: 700, textTransform: "uppercase", mb: 1.2,
@@ -323,86 +369,48 @@ const PublicIndex = () => {
                   Browse Courses
                 </Button>
               </Stack>
-            </Grid>
+            </Box>
 
-            {/* Track Application embedded in hero */}
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Box sx={{
-                bgcolor: alpha(PD, 0.92), backdropFilter: "blur(8px)",
-                borderRadius: 2.5,
-                border: `1px solid ${alpha(W, 0.12)}`,
-                boxShadow: "0 12px 36px rgba(0,0,0,0.4)",
-                p: 2.2, ml: { md: "auto" }, maxWidth: { md: 420 },
-              }}>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.4 }}>
-                  <Box sx={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    bgcolor: alpha("#90caf9", 0.15),
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <TrackChangesIcon sx={{ color: "#90caf9", fontSize: 18 }} />
-                  </Box>
-                  <Box>
-                    <Typography fontWeight={800} sx={{ color: W, fontSize: "0.88rem", lineHeight: 1.1 }}>
-                      Track Your Application
-                    </Typography>
-                    <Typography sx={{ color: alpha(W, 0.65), fontSize: "0.7rem" }}>
-                      Check the status of your submission
-                    </Typography>
-                  </Box>
-                </Stack>
-                <Box sx={{ display: "flex" }}>
-                  <TextField fullWidth size="small" placeholder="Enter Application No."
-                    value={trackQ}
-                    onChange={e => { setTrackQ(e.target.value); if (trackErr) setTrackErr(false); }}
-                    error={trackErr}
-                    onKeyDown={e => e.key === "Enter" && handleTrack()}
-                    slotProps={{
-                      input: {
-                        sx: { bgcolor: W, borderRadius: "6px 0 0 6px", height: 38, fontSize: "0.82rem" },
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Search sx={{ color: "#90a4ae", fontSize: 16 }} />
-                          </InputAdornment>
-                        ),
-                      }
-                    }}
-                    sx={{ "& .MuiOutlinedInput-notchedOutline": { border: "none" } }}
-                  />
-                  <Button variant="contained" onClick={handleTrack}
-                    sx={{
-                      borderRadius: "0 6px 6px 0", bgcolor: P, height: 38,
-                      px: 2.8, fontSize: "0.78rem",
-                      textTransform: "none", fontWeight: 700, whiteSpace: "nowrap",
-                      "&:hover": { bgcolor: "#0d47a1" }
-                    }}>
-                    Search
-                  </Button>
-                </Box>
-              </Box>
-            </Grid>
-          </Grid>
+            {/* Track Application — RIGHT ALIGNED (absolute on desktop) */}
+            <Box sx={{
+              position: { xs: "relative", md: "absolute" },
+              top: { md: "50%" }, right: { md: 0 },
+              transform: { md: "translateY(-50%)" },
+              mt: { xs: 3, md: 0 },
+              display: "flex", justifyContent: "flex-end",
+              width: { xs: "100%", md: "auto" },
+              zIndex: 2,
+            }}>
+              {trackCard}
+            </Box>
+          </Box>
         </Container>
 
         {/* Slider controls */}
         <IconButton onClick={() => goSlide(-1)}
           sx={{
-            position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", zIndex: 3,
+            position: "absolute", left: 10, top: { xs: 180, md: "50%" }, transform: "translateY(-50%)", zIndex: 3,
             bgcolor: alpha(W, 0.2), color: W,
+            display: { xs: "none", md: "inline-flex" },
             "&:hover": { bgcolor: alpha(W, 0.35) }
           }}>
           <KeyboardArrowLeftIcon />
         </IconButton>
         <IconButton onClick={() => goSlide(1)}
           sx={{
-            position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", zIndex: 3,
+            position: "absolute", right: 10, top: { xs: 180, md: "50%" }, transform: "translateY(-50%)", zIndex: 3,
             bgcolor: alpha(W, 0.2), color: W,
+            display: { xs: "none", md: "inline-flex" },
             "&:hover": { bgcolor: alpha(W, 0.35) }
           }}>
           <KeyboardArrowRightIcon />
         </IconButton>
         <Stack direction="row" spacing={0.8}
-          sx={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", zIndex: 3 }}>
+          sx={{
+            position: "absolute", bottom: 14, left: "50%",
+            transform: "translateX(-50%)", zIndex: 3,
+            display: { xs: "none", md: "flex" },
+          }}>
           {sliderImages.map((_, i) => (
             <Box key={i} onClick={() => setSlide(i)}
               sx={{
@@ -441,67 +449,69 @@ const PublicIndex = () => {
       {/* ── Page body ─────────────────────────────────────────────── */}
       <Box sx={{ flex: 1 }}>
 
-        {/* ── 4. Stats band ───────────────────────────────────────── */}
+        {/* ── 3. TVET by the Numbers (corrected bg) ───────────────── */}
         <Box sx={{
-          background: `linear-gradient(135deg, ${PD} 0%, ${P} 60%, #1976d2 100%)`,
-          py: { xs: 5, md: 6 }, position: "relative", overflow: "hidden",
+          // Subtle radial-gradient backdrop on a soft tinted base — feels modern,
+          // not heavy, and reads cleanly as a public landing section.
+          position: "relative",
+          py: { xs: 5, md: 6 },
+          background: `
+            radial-gradient(circle at 15% 30%, ${alpha(P, 0.10)} 0%, transparent 45%),
+            radial-gradient(circle at 85% 70%, ${alpha(TEAL, 0.10)} 0%, transparent 45%),
+            linear-gradient(180deg, #f7faff 0%, #eef4fb 100%)
+          `,
+          overflow: "hidden",
+          borderTop: `1px solid ${alpha(P, 0.08)}`,
+          borderBottom: `1px solid ${alpha(P, 0.08)}`,
         }}>
-          <Box sx={{
-            position: "absolute", top: -50, right: -50,
-            width: 220, height: 220, borderRadius: "50%", bgcolor: alpha(W, 0.05),
-          }} />
-          <Box sx={{
-            position: "absolute", bottom: -40, left: "20%",
-            width: 140, height: 140, borderRadius: "50%", bgcolor: alpha(W, 0.04),
-          }} />
-
           <Container maxWidth="xl" sx={{ position: "relative", zIndex: 1 }}>
-            <Box sx={{ textAlign: "center", mb: 4 }}>
-              <Typography sx={{
-                color: "#90caf9", fontSize: "0.66rem", letterSpacing: 1.4,
-                fontWeight: 800, textTransform: "uppercase", mb: 1,
-              }}>
-                TVET by the Numbers
-              </Typography>
-              <Typography sx={{
-                color: W, fontWeight: 800,
-                fontSize: { xs: "1.3rem", md: "1.7rem" }, lineHeight: 1.2,
-              }}>
-                A national platform for skills development
-              </Typography>
-            </Box>
-
+            <SectionTitle
+              align="center"
+              eyebrow="by Numbers"
+              title="TVET at a Glance"
+              subtitle=""
+            />
             <Grid container spacing={2.5}>
               {stats.map((s, i) => (
                 <Grid key={i} size={{ xs: 6, md: 3 }}>
                   <Box sx={{
-                    bgcolor: alpha(W, 0.08), backdropFilter: "blur(4px)",
-                    border: `1px solid ${alpha(W, 0.12)}`, borderRadius: 2.5,
-                    p: { xs: 2, md: 2.6 }, textAlign: "center",
-                    transition: "all 0.3s",
+                    bgcolor: W,
+                    border: `1px solid ${alpha(s.color, 0.18)}`,
+                    borderRadius: 2.5,
+                    p: { xs: 2, md: 2.6 },
+                    textAlign: "center",
+                    position: "relative",
+                    overflow: "hidden",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    "&::before": {
+                      content: '""',
+                      position: "absolute", top: 0, left: 0, right: 0, height: 4,
+                      background: `linear-gradient(90deg, ${s.color}, ${alpha(s.color, 0.5)})`,
+                    },
                     "&:hover": {
-                      bgcolor: alpha(W, 0.14), transform: "translateY(-4px)",
-                      borderColor: alpha(W, 0.25),
+                      transform: "translateY(-4px)",
+                      borderColor: s.color,
+                      boxShadow: `0 12px 28px ${alpha(s.color, 0.18)}`,
                     },
                   }}>
                     <Box sx={{
-                      width: 44, height: 44, borderRadius: "50%",
-                      bgcolor: alpha(W, 0.18), color: W,
+                      width: 48, height: 48, borderRadius: "50%",
+                      bgcolor: alpha(s.color, 0.12), color: s.color,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       mx: "auto", mb: 1.5,
                     }}>
                       {s.icon}
                     </Box>
                     <Typography sx={{
-                      color: W, fontWeight: 800,
+                      color: "#0a1929", fontWeight: 800,
                       fontSize: { xs: "1.5rem", md: "1.9rem" }, lineHeight: 1,
                     }}>
                       {s.value}
                     </Typography>
                     <Typography sx={{
-                      color: "#90caf9", fontSize: "0.7rem",
-                      fontWeight: 600, letterSpacing: 0.4,
-                      textTransform: "uppercase", mt: 1,
+                      color: s.color, fontSize: "0.7rem",
+                      fontWeight: 700, letterSpacing: 0.5,
+                      textTransform: "uppercase", mt: 1.2,
                     }}>
                       {s.label}
                     </Typography>
@@ -512,7 +522,7 @@ const PublicIndex = () => {
           </Container>
         </Box>
 
-        {/* ── 5. National Statistics ─────────────────────────────────── */}
+        {/* ── 4. National Statistics ─────────────────────────────────── */}
         <Container maxWidth="xl" sx={{ py: { xs: 5, md: 6 } }}>
           <SectionTitle
             align="center"
@@ -521,7 +531,7 @@ const PublicIndex = () => {
             subtitle="Detailed cumulative figures across all sectors — Public, Private and combined totals."
           />
           <Grid container spacing={2.5}>
-            {/* Key TVET Indicators — Indicator | Public | Private | Total */}
+            {/* Key TVET Indicators */}
             <Grid size={{ xs: 12, md: 8 }}>
               <Card elevation={0} sx={{
                 border: "1px solid #e3eaf4", borderRadius: 3,
@@ -636,12 +646,11 @@ const PublicIndex = () => {
                         Institute by Provider Type
                       </Typography>
                       <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                        Public · Private · NGOs
+                        Public · Private
                       </Typography>
                     </Box>
                   </Stack>
 
-                  {/* Total summary card */}
                   <Box sx={{
                     background: `linear-gradient(135deg, ${P} 0%, #0d47a1 100%)`,
                     borderRadius: 1.5, px: 1.6, py: 1.1, mb: 1.8,
@@ -665,8 +674,7 @@ const PublicIndex = () => {
                     <AccountBalanceIcon sx={{ color: alpha(W, 0.8), fontSize: 30 }} />
                   </Box>
 
-                  {/* Provider rows with progress bars */}
-                  <Stack spacing={1.4}>
+                  <Stack spacing={3.4}>
                     {providerTypeData.map((item, i) => {
                       const maxV = Math.max(...providerTypeData.map(d => d.value));
                       const widthPct = (item.value / maxV) * 100;
@@ -678,7 +686,7 @@ const PublicIndex = () => {
                             <Stack direction="row" alignItems="center" spacing={0.8}>
                               <Box sx={{
                                 width: 8, height: 8, borderRadius: "50%", bgcolor: item.color,
-                                boxShadow: `0 0 0 2px ${alpha(item.color, 0.18)}`,
+                                boxShadow: `0 0 0 4px ${alpha(item.color, 0.18)}`,
                               }} />
                               <Typography fontWeight={700}
                                 sx={{ fontSize: "0.78rem", color: "#0a1929" }}>
@@ -714,7 +722,7 @@ const PublicIndex = () => {
           </Grid>
         </Container>
 
-        {/* ── 6. Distribution overview ──────────────────────────────── */}
+        {/* ── 5. Distribution overview ──────────────────────────────── */}
         <Box sx={{ bgcolor: "#eef3fa", py: { xs: 5, md: 6 } }}>
           <Container maxWidth="xl">
             <SectionTitle
@@ -834,107 +842,127 @@ const PublicIndex = () => {
           </Container>
         </Box>
 
-        {/* ── 7. Course Announcements ───────────────────────────────── */}
-        <Container maxWidth="xl" sx={{ py: { xs: 5, md: 6 } }} id="course-announcements">
+        {/* ── 6. Ongoing Programs (moved BEFORE Course Announcements) ─── */}
+        <Container maxWidth="xl" sx={{ py: { xs: 5, md: 6 } }}>
           <SectionTitle
-            eyebrow="Latest Opportunities"
-            title="Course Announcements"
-            subtitle="Open programs accepting applications now — find the right course and apply online."
+            eyebrow="Active Programs"
+            title="Ongoing Programs"
+            subtitle="Latest program activity across Training Centre."
           />
-          <Card elevation={0} sx={{
-            border: "1px solid #e3eaf4", borderRadius: 3, bgcolor: W, p: 2.5,
-          }}>
-            <Box sx={{
-              "& .MuiTable-root": { borderCollapse: "separate" },
-              "& .MuiTableCell-root": {
-                fontSize: "0.8rem", py: 0.85, px: 1.2,
-                border: "1px solid #dbe5f0",
-              },
-              "& .MuiTableCell-head": {
-                bgcolor: PL, fontWeight: 700, fontSize: "0.77rem",
-                color: PD, whiteSpace: "nowrap",
-              },
-              "& .MuiTableBody-root tr:hover .MuiTableCell-root": { bgcolor: "#f5f9ff" },
-              "& .MuiChip-root": { fontSize: "0.65rem", height: 20, fontWeight: 700 },
-              "& .MuiButton-root": { fontSize: "0.7rem", py: 0.4 },
-              "& .MuiInputBase-input": { fontSize: "0.82rem" },
-              "& .MuiTablePagination-root": { fontSize: "0.75rem" },
-              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
-                fontSize: "0.75rem",
-              },
-            }}>
-              <CourseTraineeAnnouncementsIndex />
-            </Box>
+          <Card elevation={0} sx={{ border: "1px solid #e3eaf4", borderRadius: 3, bgcolor: W }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 2 }}>
+                <Box sx={{
+                  width: 36, height: 36, borderRadius: 1.5,
+                  bgcolor: alpha(P, 0.12), color: P,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <HistoryIcon sx={{ fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography fontWeight={800} sx={{ fontSize: "0.95rem", color: "#0a1929" }}>
+                    Program Activity
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Ongoing and recently completed
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <TableContainer sx={{ borderRadius: 1.5, border: "1px solid #dbe5f0" }}>
+                <Table size="small" sx={TS}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Training Centre</TableCell>
+                      <TableCell>Program</TableCell>
+                      <TableCell>Certification</TableCell>
+                      <TableCell align="center">Status</TableCell>
+                      <TableCell>Course Start Date</TableCell>
+                      <TableCell>Course End Date</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {ongoingPrograms
+                      .slice(progPage * progRowsPerPage,
+                        progPage * progRowsPerPage + progRowsPerPage)
+                      .map((c, i) => {
+                        const st = getProgStatusStyle(c.status);
+                        return (
+                          <TableRow key={i}>
+                            <TableCell sx={{}}>{c.centre}</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: "#0a1929" }}>{c.course}</TableCell>
+                            <TableCell>{c.certification}</TableCell>
+                            <TableCell align="center">
+                              <Chip label={c.status} size="small"
+                                sx={{
+                                  bgcolor: st.bg, color: st.color,
+                                  fontWeight: 700, fontSize: "0.65rem", height: 20,
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ fontSize: "0.76rem" }}>{c.startDate}</TableCell>
+                            <TableCell sx={{ fontSize: "0.76rem" }}>{c.endDate}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <TablePagination component="div" count={ongoingPrograms.length}
+                page={progPage} onPageChange={(_, p) => setProgPage(p)}
+                rowsPerPage={progRowsPerPage}
+                onRowsPerPageChange={e => {
+                  setProgRowsPerPage(parseInt(e.target.value, 10));
+                  setProgPage(0);
+                }}
+                rowsPerPageOptions={[5, 10]}
+                sx={{
+                  "& .MuiTablePagination-toolbar": { minHeight: 40 },
+                  "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                    { fontSize: "0.75rem" }
+                }}
+              />
+            </CardContent>
           </Card>
         </Container>
 
-        {/* ── 8. Ongoing Programs ───────────────────────────────────── */}
-        <Box sx={{ bgcolor: "#eef3fa", py: { xs: 5, md: 6 } }}>
+        {/* ── 7. Course Announcements (moved AFTER Ongoing Programs) ──── */}
+        <Box id="course-announcements" sx={{ bgcolor: "#eef3fa", py: { xs: 5, md: 6 } }}>
           <Container maxWidth="xl">
             <SectionTitle
-              eyebrow="Active Programs"
-              title="Ongoing Programs"
-              subtitle="Latest program activity across accredited institutes."
+              eyebrow="Latest Opportunities"
+              title="Course Announcements"
+              subtitle="Open programs accepting applications now — find the right course and apply online."
             />
-            <Card elevation={0} sx={{ border: "1px solid #e3eaf4", borderRadius: 3, bgcolor: W }}>
-              <CardContent sx={{ p: 2.5 }}>
-                <TableContainer sx={{ borderRadius: 1.5, border: "1px solid #dbe5f0" }}>
-                  <Table size="small" sx={TS}>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Program</TableCell>
-                        <TableCell>Certification</TableCell>
-                        <TableCell align="center">Status</TableCell>
-                        <TableCell>Course Start Date</TableCell>
-                        <TableCell>Course End Date</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {ongoingPrograms
-                        .slice(progPage * progRowsPerPage,
-                          progPage * progRowsPerPage + progRowsPerPage)
-                        .map((c, i) => {
-                          const st = getProgStatusStyle(c.status);
-                          return (
-                            <TableRow key={i}>
-                              <TableCell sx={{ fontWeight: 600, color: "#0a1929" }}>{c.course}</TableCell>
-                              <TableCell>{c.certification}</TableCell>
-                              <TableCell align="center">
-                                <Chip label={c.status} size="small"
-                                  sx={{
-                                    bgcolor: st.bg, color: st.color,
-                                    fontWeight: 700, fontSize: "0.65rem", height: 20,
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell sx={{ fontSize: "0.76rem" }}>{c.startDate}</TableCell>
-                              <TableCell sx={{ fontSize: "0.76rem" }}>{c.endDate}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                <TablePagination component="div" count={ongoingPrograms.length}
-                  page={progPage} onPageChange={(_, p) => setProgPage(p)}
-                  rowsPerPage={progRowsPerPage}
-                  onRowsPerPageChange={e => {
-                    setProgRowsPerPage(parseInt(e.target.value, 10));
-                    setProgPage(0);
-                  }}
-                  rowsPerPageOptions={[5, 10]}
-                  sx={{
-                    "& .MuiTablePagination-toolbar": { minHeight: 40 },
-                    "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
-                      { fontSize: "0.75rem" }
-                  }}
-                />
-              </CardContent>
+            <Card elevation={0} sx={{
+              border: "1px solid #e3eaf4", borderRadius: 3, bgcolor: W, p: 2.5,
+            }}>
+              <Box sx={{
+                "& .MuiTable-root": { borderCollapse: "separate" },
+                "& .MuiTableCell-root": {
+                  fontSize: "0.8rem", py: 0.85, px: 1.2,
+                  border: "1px solid #dbe5f0",
+                },
+                "& .MuiTableCell-head": {
+                  bgcolor: PL, fontWeight: 700, fontSize: "0.77rem",
+                  color: PD, whiteSpace: "nowrap",
+                },
+                "& .MuiTableBody-root tr:hover .MuiTableCell-root": { bgcolor: "#f5f9ff" },
+                "& .MuiChip-root": { fontSize: "0.65rem", height: 20, fontWeight: 700 },
+                "& .MuiButton-root": { fontSize: "0.7rem", py: 0.4 },
+                "& .MuiInputBase-input": { fontSize: "0.82rem" },
+                "& .MuiTablePagination-root": { fontSize: "0.75rem" },
+                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
+                  fontSize: "0.75rem",
+                },
+              }}>
+                <CourseTraineeAnnouncementsIndex />
+              </Box>
             </Card>
           </Container>
         </Box>
 
-        {/* ── 9. Quick Access ───────────────────────────────────────── */}
+        {/* ── 8. Quick Access ───────────────────────────────────────── */}
         <Container maxWidth="xl" sx={{ py: { xs: 5, md: 6 } }}>
           <SectionTitle
             align="center"
