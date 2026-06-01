@@ -27,7 +27,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useTheme } from "@mui/material/styles";
-import CommonService from "../../api/services/CommonService";
+import CommonService from "../../api/services/internal/common/CommonService";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 const MAX_FILES = 10;

@@ -62,7 +62,7 @@ import PublicIcon from "@mui/icons-material/Public";
 // ── Imported course announcements component
 import CourseTraineeAnnouncementsIndex from "./CourseTraineeAnnouncementsIndex";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
-import CommonService from "../../api/services/CommonService";
+import CommonService from "../../api/services/internal/common/CommonService";
 
 // ── Slider images
 import slide1 from "../../assets/slider/slide1.jpg";

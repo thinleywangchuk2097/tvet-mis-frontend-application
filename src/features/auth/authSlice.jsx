@@ -1,5 +1,4 @@
 import { createSlice } from '@reduxjs/toolkit';
-import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
 
 const getTokenData = (token) => {
@@ -17,17 +16,23 @@ const getTokenData = (token) => {
   }
 };
 
-const accessToken = Cookies.get('access_token') || '';
+// Helper functions to manage localStorage
+const getFromLocalStorage = (key, defaultValue = '') => {
+  const value = localStorage.getItem(key);
+  return value !== null ? value : defaultValue;
+};
+
+const accessToken = getFromLocalStorage('access_token');
 const { userId, roles } = getTokenData(accessToken);
 
 const initialState = {
   accessToken,
-  refreshToken: Cookies.get('refresh_token') || null,
+  refreshToken: getFromLocalStorage('refresh_token', null),
   userId,
   roles,
-  id: Cookies.get('id') || null,
-  locationId: Cookies.get('locationId') || null,
-  current_roleId: Cookies.get('current_roleId') || null,
+  id: getFromLocalStorage('id', null),
+  locationId: getFromLocalStorage('locationId', null),
+  current_roleId: getFromLocalStorage('current_roleId', null),
 };
 
 const authSlice = createSlice({
@@ -37,6 +42,7 @@ const authSlice = createSlice({
     loginSuccess: (state, action) => {
       const { access_token, refresh_token, current_role, locationId, id } = action.payload;
       const { userId, roles } = getTokenData(access_token);
+      
       state.accessToken = access_token;
       state.refreshToken = refresh_token;
       state.userId = userId;
@@ -45,15 +51,12 @@ const authSlice = createSlice({
       state.current_roleId = current_role;
       state.id = id;
 
-      Cookies.set('access_token', access_token);
-      Cookies.set('current_roleId', current_role);
-      Cookies.set('locationId', locationId);
-      Cookies.set('refresh_token', refresh_token);
-      Cookies.set('id', id);
-
-
-
-
+      // Store in localStorage
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      localStorage.setItem('current_roleId', current_role);
+      localStorage.setItem('locationId', locationId);
+      localStorage.setItem('id', id);
     },
 
     logout: (state) => {
@@ -65,15 +68,15 @@ const authSlice = createSlice({
       state.current_roleId = null;
       state.id = null;
 
-      Cookies.remove('access_token');
-      Cookies.remove('refresh_token');
-      localStorage.removeItem("privileges"); 
-      Cookies.remove('username');
-      Cookies.remove('current_roleId');
-      Cookies.remove('current_role_name');
-      Cookies.remove('locationId');
-      Cookies.remove('id');
-
+      // Remove from localStorage
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('privileges'); 
+      localStorage.removeItem('username');
+      localStorage.removeItem('current_roleId');
+      localStorage.removeItem('current_role_name');
+      localStorage.removeItem('locationId');
+      localStorage.removeItem('id');
     },
   },
 });

@@ -1,10 +1,15 @@
 import { createSlice } from "@reduxjs/toolkit";
-import Cookies from "js-cookie";
 
-// Initialize state from cookies if they exist
+// Helper function to get from localStorage
+const getFromLocalStorage = (key, defaultValue = null) => {
+  const value = localStorage.getItem(key);
+  return value !== null ? value : defaultValue;
+};
+
+// Initialize state from localStorage if they exist
 const initialState = {
-  userName: Cookies.get("username") || null,
-  current_role_name: Cookies.get("current_role_name") || null,
+  userName: getFromLocalStorage("username"),
+  current_role_name: getFromLocalStorage("current_role_name"),
 };
 
 const userProfileSlice = createSlice({
@@ -15,8 +20,10 @@ const userProfileSlice = createSlice({
       const { username, current_role_name } = action.payload;
       state.userName = username;
       state.current_role_name = current_role_name;
-      Cookies.set('username', username);
-      Cookies.set('current_role_name', current_role_name);
+      
+      // Store in localStorage
+      localStorage.setItem('username', username);
+      localStorage.setItem('current_role_name', current_role_name);
     },
     // No need for clearUserProfile since authSlice handles logout cleanup
   },

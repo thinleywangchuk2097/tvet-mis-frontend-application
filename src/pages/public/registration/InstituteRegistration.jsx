@@ -33,10 +33,10 @@ import FileUpload from "../../../components/file/FileUpload";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from "react-toastify";
-import CommonService from "../../../api/services/CommonService";
-import InstituteProposalService from "../../../api/services/InstituteProposalService";
-import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
-import DatahubService from "../../../api/services/external/DatahubService";
+import CommonService from "../../../api/services/internal/common/CommonService";
+import InstituteProposalService from "../../../api/services/internal/registration/InstituteProposalService";
+import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
+import DatahubService from "../../../api/services/external/datahub/DatahubService";
 
 import { useParams } from "react-router-dom";
 

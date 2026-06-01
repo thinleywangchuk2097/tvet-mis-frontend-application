@@ -31,7 +31,7 @@ import {
   generateAssessmentCertificatePdf,
   generateAllAssessmentCertificatesPdf
 } from "@/utils/assessmentCertificatePdf";
-import CertificationService from "../../api/services/CertificationService";
+import CertificationService from "../../api/services/internal/certification/CertificationService";
 
 const Assessment = () => {
   const [filters, setFilters] = useState({

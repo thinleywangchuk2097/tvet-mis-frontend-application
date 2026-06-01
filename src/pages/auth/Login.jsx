@@ -1,6 +1,6 @@
 import apiClient from "../../api/axios";
-import PrivilegeService from "../../api/services/PrivilegeService";
-import UserProfileService from "../../api/services/UserProfileService";
+import PrivilegeService from "../../api/services/internal/privilege/PrivilegeService";
+import UserProfileService from "../../api/services/internal/userprofile/UserProfileService";
 import { setUserProfile } from "../../features/auth/userProfileSlice";
 import { loginSuccess } from "../../features/auth/authSlice";
 import { setPrivileges } from "../../features/privilege/privilegeSlice";

@@ -21,8 +21,8 @@ import FileDownload from "../../../components/file/FileDownload";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
-import CommonService from "../../../api/services/CommonService";
-import AssessorAccreditorQMSAuditorService from "../../../api/services/AssessorAccreditorQMSAuditorService";
+import CommonService from "../../../api/services/internal/common/CommonService";
+import AssessorAccreditorQMSAuditorService from "../../../api/services/internal/registration/AssessorAccreditorQMSAuditorService";
 
 const ViewAssessorAccreditorQMSAuditor = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
