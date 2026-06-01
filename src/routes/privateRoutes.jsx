@@ -3,9 +3,9 @@ import RoleIndex from "../pages/admin/role/RoleIndex";
 import UserIndex from "../pages/admin/user/UserIndex";
 import DropdownIndex from "../pages/dropdown-management/DropdownIndex";
 //user profile
-import UserProfile from "../pages/auth/UserProfile";
-import PasswordChange from "../pages/auth/PasswordChange";
-import SwitchRole from "../pages/auth/SwitchRole";
+import UserProfile from "../pages/auth/profile/UserProfile";
+import PasswordChange from "../pages/auth/password/PasswordChange";
+import SwitchRole from "../pages/auth/switch/SwitchRole";
 //tasklist
 import MyTaskList from "../pages/tasklist/MyTaskList";
 import GroupTaskList from "../pages/tasklist/GroupTaskList";
@@ -44,19 +44,17 @@ import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
 import TrackTrainee from "../pages/institute/TrackTrainee";
 import ApplyTot from "../pages/institute/ApplyTot";
 // tvet data manager
-import GenerateTracerIndex from "../pages/tvet-data-manager/tracer/GenerateTracerIndex";
-import SendTracerIndex from "../pages/tvet-data-manager/tracer/SendTracerIndex";
-import ResponseTracerIndex from "../pages/tvet-data-manager/tracer/ResponseTracerIndex";
-//complaint
-import ComplaintView from "../pages/complaint/ComplaintView";
-import ComplaintIssue from "../pages/complaint/ComplaintIssue";
+import GenerateTracerIndex from "../pages/dwps/tracer/GenerateTracerIndex";
+import SendTracerIndex from "../pages/dwps/tracer/SendTracerIndex";
+import ResponseTracerIndex from "../pages/dwps/tracer/ResponseTracerIndex";
+//registration and proposal view
 import ViewInstituteProposal from "../pages/public/proposal/ViewInstituteProposal";
 import ViewInstituteRegistration from "../pages/public/registration/ViewInstituteRegistration";
 import ViewAssessorAccreditorQMSAuditor from "../pages/public/registration/ViewAssessorAccreditorQMSAuditor";
 
 //tot
-import CreateTotIndex from "../pages/dwps1/CreateTotIndex";
-import AddTraineeIndex from "../pages/dwps1/AddTraineeIndex";
+import CreateTotIndex from "../pages/dwps/tot/CreateTotIndex";
+import AddTraineeIndex from "../pages/dwps/tot/AddTraineeIndex";
 
 //service
 import ViewCurriculumEndorsementIndex from "../pages/institute/service/ViewCurriculumEndorsementIndex";
@@ -105,10 +103,6 @@ export const privateRoutes = [
     children: [
       { path: "task-details-index", element: <TaskListIndex /> },
       { path: "group-task-index", element: <GroupTaskList /> },
-      {
-        path: "view-complaint-details/:application_no",
-        element: <ComplaintView />,
-      },
       {
         path: "view-proposal/:applicationNo",
         element: <ViewInstituteProposal />,
@@ -194,7 +188,7 @@ export const privateRoutes = [
       { path: "annual-expenditure", element: <AnnualExpenditure /> },
       { path: "monitoring-report", element: <MonitoringReport /> },
       { path: "notification", element: <Notification /> },
-      { path: "complaint-service", element: <ComplaintIssue /> },
+     
     ],
   },
   {

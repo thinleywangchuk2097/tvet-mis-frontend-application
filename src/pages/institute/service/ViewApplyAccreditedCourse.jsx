@@ -36,8 +36,8 @@ import FileDownload from "../../../components/file/FileDownload";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
-import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
-import CommonService from "../../../api/services/CommonService";
+import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
+import CommonService from "../../../api/services/internal/common/CommonService";
 
 const TABLE_STYLE = {
   border: "1px solid",

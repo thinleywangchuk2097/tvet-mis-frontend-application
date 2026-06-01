@@ -41,8 +41,8 @@ import {
   VisibilityOff,
   Search as SearchIcon,
 } from "@mui/icons-material";
-import UserRoleManagementService from "../../../api/services/UserRoleManagementService";
-import CommonService from "../../../api/services/CommonService";
+import UserRoleManagementService from "../../../api/services/internal/userrole/UserRoleManagementService";
+import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 

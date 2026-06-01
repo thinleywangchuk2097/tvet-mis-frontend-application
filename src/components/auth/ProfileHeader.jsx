@@ -31,7 +31,7 @@ import { styled } from "@mui/material/styles";
 import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../../features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
-import UserProfileService from "../../api/services/UserProfileService";
+import UserProfileService from "../../api/services/internal/userprofile/UserProfileService";
 
 /* ---------------- Utilities ---------------- */
 

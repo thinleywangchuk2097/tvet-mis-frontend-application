@@ -28,11 +28,11 @@ import RemoveRedEyeIcon from "@mui/icons-material/RemoveRedEye";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
-import CommonService from "../../../api/services/CommonService";
+import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
+import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
-import CourseEnrollmentService from "../../../api/services/CourseEnrollmentService";
-import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
+import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
+import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) =>

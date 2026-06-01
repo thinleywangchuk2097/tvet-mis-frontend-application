@@ -33,10 +33,10 @@ import * as Yup from "yup";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import FileUpload from "../../../components/file/FileUpload";
-import CommonService from "../../../api/services/CommonService";
-import CurriculumEndorsementIndexService from "../../../api/services/CurriculumEndorsementIndexService";
-import InstituteRegistrationService from "../../../api/services/InstituteRegistrationService";
-import ApplyAccreditedCourseService from "../../../api/services/ApplyAccreditedCourseService";
+import CommonService from "../../../api/services/internal/common/CommonService";
+import CurriculumEndorsementIndexService from "../../../api/services/internal/course/CurriculumEndorsementIndexService";
+import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
+import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) =>

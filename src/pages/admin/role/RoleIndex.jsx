@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import PrivilegeService from "../../../api/services/PrivilegeService";
-import UserRoleManagementService from "../../../api/services/UserRoleManagementService";
+import PrivilegeService from "../../../api/services/internal/privilege/PrivilegeService";
+import UserRoleManagementService from "../../../api/services/internal/userrole/UserRoleManagementService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import {
