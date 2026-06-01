@@ -31,8 +31,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { toast } from "react-toastify";
-import CourseEnrollmentService from "../../../api/services/CourseEnrollmentService";
-import CommonService from "../../../api/services/CommonService";
+import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
+import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
 
 const AccreditatedRPLCourseTraineeSelectionIndex = () => {

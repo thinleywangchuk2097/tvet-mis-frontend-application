@@ -19,10 +19,10 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
-import InstituteProposalService from "../../../api/services/InstituteProposalService";
-import CommonService from "../../../api/services/CommonService";
+import InstituteProposalService from "../../../api/services/internal/registration/InstituteProposalService";
+import CommonService from "../../../api/services/internal/common/CommonService";
 import { useParams, useNavigate } from "react-router-dom";
-import DatahubService from "../../../api/services/external/DatahubService";
+import DatahubService from "../../../api/services/external/datahub/DatahubService";
 
 // ===== Validation Schema =====
 const validationSchema = Yup.object({

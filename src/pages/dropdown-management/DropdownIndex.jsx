@@ -32,7 +32,7 @@ import {
 } from "@mui/icons-material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import DropdownManagementService from "../../api/services/DropdownManagementService";
+import DropdownManagementService from "../../api/services/internal/dropdown/DropdownManagementService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 

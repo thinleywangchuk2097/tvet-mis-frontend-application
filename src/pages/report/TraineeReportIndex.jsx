@@ -25,7 +25,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import { exportToExcel } from "@/utils/exportExcel";
 import { useSelector } from "react-redux";
 import ReportService from "../../api/services/internal/report/ReportService";
-import CommonService from "../../api/services/CommonService";
+import CommonService from "../../api/services/internal/common/CommonService";
 
 const TraineeReportIndex = () => {
   const [filters, setFilters] = useState({

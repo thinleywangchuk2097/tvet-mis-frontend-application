@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
-import CommonService from "../../api/services/CommonService";
+import CommonService from "../../api/services/internal/common/CommonService";
 
 const CourseTraineeAnnouncementsIndex = () => {
   const navigate = useNavigate();
@@ -46,7 +46,6 @@ const CourseTraineeAnnouncementsIndex = () => {
     try {
       const response = await CommonService.getAllCourseAnnouncement();
       setCourseAnnouncementDetails(response.data);
-      console.log("Course Announcement Details:", response.data);
     } catch (error) {
       console.error("Error fetching course announcements:", error);
     }
@@ -70,7 +69,6 @@ const CourseTraineeAnnouncementsIndex = () => {
     try {
       const dzongkhagLists = await CommonService.getAllDzongkhags();
       setDzongkhags(dzongkhagLists.data);
-      console.log("Dzongkhags:", dzongkhagLists.data);
     } catch (error) {
       console.error("Error fetching dzongkhags:", error);
     }

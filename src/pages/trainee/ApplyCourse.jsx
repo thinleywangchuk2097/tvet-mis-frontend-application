@@ -23,9 +23,9 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import FileUpload from "../../components/file/FileUpload";
 import { toast } from "react-toastify";
-import CommonService from "../../api/services/CommonService";
-import CourseEnrollmentService from "../../api/services/CourseEnrollmentService";
-import DatahubService from "../../api/services/external/DatahubService";
+import CommonService from "../../api/services/internal/common/CommonService";
+import CourseEnrollmentService from "../../api/services/internal/course/CourseEnrollmentService";
+import DatahubService from "../../api/services/external/datahub/DatahubService";
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) =>

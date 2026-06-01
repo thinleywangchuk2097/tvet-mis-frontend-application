@@ -25,7 +25,7 @@ import { useNavigate } from "react-router-dom";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import SearchIcon from "@mui/icons-material/Search";
 import { useSelector } from "react-redux";
-import TaskListService from "../../api/services/TaskListService";
+import TaskListService from "../../api/services/internal/tasklist/TaskListService";
 
 // Map API response to your component structure
 const mapApiDataToTask = (apiData, index) => ({

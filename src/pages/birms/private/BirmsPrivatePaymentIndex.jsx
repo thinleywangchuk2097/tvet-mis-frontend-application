@@ -40,7 +40,7 @@ import { Formik, Form } from "formik";
 import * as Yup from "yup";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import CommonService from "../../../api/services/CommonService";
+import CommonService from "../../../api/services/internal/common/CommonService";
 
 const BirmsPrivatePaymentIndex = () => {
   const [search, setSearch] = useState("");

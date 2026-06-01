@@ -25,8 +25,8 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
-import CommonService from "../../../api/services/CommonService";
-import AssessorAccreditorQMSAuditorService from "../../../api/services/AssessorAccreditorQMSAuditorService";
+import CommonService from "../../../api/services/internal/common/CommonService";
+import AssessorAccreditorQMSAuditorService from "../../../api/services/internal/registration/AssessorAccreditorQMSAuditorService";
 import { useNavigate } from "react-router-dom";
 
 // Helper function to convert file to Base64

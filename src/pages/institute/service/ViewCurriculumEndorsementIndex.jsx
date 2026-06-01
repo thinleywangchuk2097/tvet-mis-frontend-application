@@ -21,8 +21,8 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import CurriculumEndorsementIndexService from "../../../api/services/CurriculumEndorsementIndexService";
-import CommonService from "../../../api/services/CommonService";
+import CurriculumEndorsementIndexService from "../../../api/services/internal/course/CurriculumEndorsementIndexService";
+import CommonService from "../../../api/services/internal/common/CommonService";
 import FileDownload from "../../../components/file/FileDownload";
 
 const ViewCurriculumEndorsementIndex = () => {
