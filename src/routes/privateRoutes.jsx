@@ -1,7 +1,7 @@
 import DashboardIndex from "../pages/dashboard/DashboardIndex";
 import RoleIndex from "../pages/admin/role/RoleIndex";
 import UserIndex from "../pages/admin/user/UserIndex";
-import DropdownIndex from "../pages/dropdown-management/DropdownIndex";
+import DropdownIndex from "../pages/admin/dropdown/DropdownIndex";
 //user profile
 import UserProfile from "../pages/auth/profile/UserProfile";
 import PasswordChange from "../pages/auth/password/PasswordChange";
@@ -20,7 +20,7 @@ import AccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/cours
 import ViewAccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/course-announcement/ViewAccreditatedRPLCourseTraineeSelectionIndex";
 import NonAccreditedCourseTraineeSelection from "../pages/institute/course-announcement/NonAccreditedCourseTraineeSelection";
 import ReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ReAssessmentTraineeSelectionIndex";
-import ViewReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ViewReAssessmentTraineeSelectionIndex"; 
+import ViewReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ViewReAssessmentTraineeSelectionIndex";
 
 //resource-management
 import StaffManagement from "../pages/institute/resource-management/StaffManagement";
@@ -66,10 +66,17 @@ import Assessment from "../pages/certificate/Assessment";
 //birms
 import BirmsPrivatePaymentIndex from "../pages/birms/private/BirmsPrivatePaymentIndex";
 
+//master 
+import SectorOccupationIndex from "../pages/master/SectorOccupationIndex";
+import ServiceMasterIndex from "../pages/master/ServiceMasterIndex";
 //reports
 import InstituteReportIndex from "../pages/report/InstituteReportIndex";
-import CourseReportIndex from "../pages/report/CourseReportIndex";  
+import CourseReportIndex from "../pages/report/CourseReportIndex";
 import TraineeReportIndex from "../pages/report/TraineeReportIndex";
+
+//BQPCA routes
+import MonitoringAssessmentIndex from "../pages/bqpca/monitoring/MonitoringAssessmentIndex";
+import InstituteMonitoringIndex from "../pages/bqpca/monitoring/InstituteMonitoringIndex";
 
 export const privateRoutes = [
   {
@@ -87,6 +94,13 @@ export const privateRoutes = [
   {
     path: "dropdown-management",
     children: [{ path: "create-dropdown", element: <DropdownIndex /> }],
+  },
+    {
+    path: "master",
+    children: [
+      { path: "sector-occupation-index", element: <SectorOccupationIndex /> },
+      { path: "service-master-index", element: <ServiceMasterIndex /> }
+    ],
   },
 
   {
@@ -177,7 +191,7 @@ export const privateRoutes = [
       {
         path: "reassessment-trainee-selection/:applicationNo/:courseId",
         element: <ReAssessmentTraineeSelectionIndex />,
-      }
+      },
     ],
   },
   {
@@ -188,7 +202,6 @@ export const privateRoutes = [
       { path: "annual-expenditure", element: <AnnualExpenditure /> },
       { path: "monitoring-report", element: <MonitoringReport /> },
       { path: "notification", element: <Notification /> },
-     
     ],
   },
   {
@@ -199,13 +212,19 @@ export const privateRoutes = [
       { path: "response-tracer", element: <ResponseTracerIndex /> },
     ],
   },
-  /*   {
-    path: "tracer",
+  {
+    path: "monitor-bqpca",
     children: [
-      { path: "sent-employer-survey", element: <SendEmployerTracerSurveyIndex /> },
-    
+      {
+        path: "monitoring-assessment-index",
+        element: <MonitoringAssessmentIndex />,
+      },
+      {
+        path: "institute-monitoring-index",
+        element: <InstituteMonitoringIndex />,
+      },
     ],
-  }, */
+  },
   {
     path: "tot",
     children: [
@@ -219,22 +238,19 @@ export const privateRoutes = [
     children: [
       { path: "institute-report-index", element: <InstituteReportIndex /> },
       { path: "course-report-index", element: <CourseReportIndex /> },
-      { path: "trainee-report-index", element: <TraineeReportIndex /> },  
+      { path: "trainee-report-index", element: <TraineeReportIndex /> },
       { path: "track-application-status", element: <TrackApplicationStatus /> },
     ],
   },
-   {
+  {
     path: "auth-birms",
     children: [
       { path: "payment-index", element: <BirmsPrivatePaymentIndex /> },
-    
     ],
   },
   {
     path: "certificate",
-    children: [
-      { path: "assessment", element: <Assessment /> },
-    ],
+    children: [{ path: "assessment", element: <Assessment /> }],
   },
   //without children
   { path: "/apply-qms-certification", element: <ApplyQmsCertification /> },
