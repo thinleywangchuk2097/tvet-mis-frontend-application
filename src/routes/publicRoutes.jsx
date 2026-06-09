@@ -24,6 +24,7 @@ import BirmsPublicPaymentIndex from "../pages/birms/pubilc/BirmsPublicPaymentInd
 //Feedback or Complain
 import FeedbackForm from "../pages/public/FeedbackForm";
 import ViewTracerSend from "../pages/dwps/tracer/ViewTracerSend";
+import PublicationIndex from "../pages/public/publication/PublicationIndex";
 
 //public routes ..
 export const publicRoutes = [
@@ -83,6 +84,10 @@ export const publicRoutes = [
   {
     path: "result",
     children: [{ path: "assessment-result", element: <AssessmentResult /> }],
+  },
+   {
+    path: "publication",
+    children: [{ path: "publication-index", element: <PublicationIndex /> }],
   },
   {
     path: "course",

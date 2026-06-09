@@ -29,8 +29,10 @@ const CourseTraineeAnnouncementsIndex = () => {
   const [searchText, setSearchText] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [courseDateFilter, setCourseDateFilter] = useState("");
-  const [courseAnnouncementDetails, setCourseAnnouncementDetails] = useState([]);
-  
+  const [courseAnnouncementDetails, setCourseAnnouncementDetails] = useState(
+    [],
+  );
+
   // Dropdown states
   const [certificationLevels, setCertificationLevels] = useState([]);
   const [fundingSources, setFundingSources] = useState([]);
@@ -77,14 +79,18 @@ const CourseTraineeAnnouncementsIndex = () => {
   // Helper function to get certification level name by ID
   const getCertificationLevelName = (levelId) => {
     if (!levelId) return "N/A";
-    const level = certificationLevels.find((l) => parseInt(l.id) === parseInt(levelId));
+    const level = certificationLevels.find(
+      (l) => parseInt(l.id) === parseInt(levelId),
+    );
     return level ? level.name : levelId;
   };
 
   // Helper function to get funding source name by ID
   const getFundingSourceName = (sourceId) => {
     if (!sourceId) return "N/A";
-    const source = fundingSources.find((s) => parseInt(s.id) === parseInt(sourceId));
+    const source = fundingSources.find(
+      (s) => parseInt(s.id) === parseInt(sourceId),
+    );
     return source ? source.name : sourceId;
   };
 
@@ -92,22 +98,24 @@ const CourseTraineeAnnouncementsIndex = () => {
   const getDzongkhagName = (locationId) => {
     if (!locationId) return "N/A";
     const dzongkhag = dzongkhags.find(
-      (dzong) => parseInt(dzong.id) === parseInt(locationId)
+      (dzong) => parseInt(dzong.id) === parseInt(locationId),
     );
     return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
   };
 
   // Get unique course dates for filter
   const courseDates = useMemo(() => {
-    const dates = courseAnnouncementDetails.map((app) => app.course_start_date?.split(' ')[0]);
-    return [...new Set(dates)].filter(date => date);
+    const dates = courseAnnouncementDetails.map(
+      (app) => app.course_start_date?.split(" ")[0],
+    );
+    return [...new Set(dates)].filter((date) => date);
   }, [courseAnnouncementDetails]);
 
   // Filtering logic
   const filteredApplications = useMemo(() => {
     return courseAnnouncementDetails.filter((app) => {
-      const courseStartDate = app.course_start_date?.split(' ')[0] || "";
-      
+      const courseStartDate = app.course_start_date?.split(" ")[0] || "";
+
       const matchesSearch =
         app.application_no?.toLowerCase().includes(searchText.toLowerCase()) ||
         app.course_name?.toLowerCase().includes(searchText.toLowerCase());
@@ -250,14 +258,16 @@ const CourseTraineeAnnouncementsIndex = () => {
           <TableHead>
             <TableRow>
               <TableCell>Application No</TableCell>
+              <TableCell>Institute Name</TableCell>
               <TableCell>Course Name</TableCell>
-              <TableCell>Location</TableCell>
+              <TableCell>Training Location</TableCell>
               <TableCell>Certification Level</TableCell>
               <TableCell>Funding Source</TableCell>
               <TableCell>Course Fee</TableCell>
               <TableCell>Application Period</TableCell>
               <TableCell>Course Period</TableCell>
-              <TableCell>Total Trainees</TableCell>
+              <TableCell>Entry Requirement</TableCell>
+              <TableCell>Capacity</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>Action</TableCell>
             </TableRow>
@@ -273,10 +283,17 @@ const CourseTraineeAnnouncementsIndex = () => {
                 .map((app) => (
                   <TableRow key={app.application_no} hover>
                     <TableCell>{app.application_no}</TableCell>
+                    <TableCell>{app.institute_name || "N/A"}</TableCell>
                     <TableCell>{app.course_name || "N/A"}</TableCell>
-                    <TableCell>{getDzongkhagName(app.training_location_id)}</TableCell>
-                    <TableCell>{getCertificationLevelName(app.certification_level_id)}</TableCell>
-                    <TableCell>{getFundingSourceName(app.funding_source_id)}</TableCell>
+                    <TableCell>
+                      {getDzongkhagName(app.training_location_id)}
+                    </TableCell>
+                    <TableCell>
+                      {getCertificationLevelName(app.certification_level_id)}
+                    </TableCell>
+                    <TableCell>
+                      {getFundingSourceName(app.funding_source_id)}
+                    </TableCell>
                     <TableCell>Nu. {app.course_fee}</TableCell>
                     <TableCell>
                       {app.application_start_date && app.application_end_date
@@ -287,6 +304,13 @@ const CourseTraineeAnnouncementsIndex = () => {
                       {app.course_start_date && app.course_end_date
                         ? `${new Date(app.course_start_date).toLocaleDateString()} - ${new Date(app.course_end_date).toLocaleDateString()}`
                         : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      <ArrowUpwardIcon
+                        fontSize="small"
+                        sx={{ verticalAlign: "middle", mr: 0.5 }}
+                      />{" "}
+                      {app.entry_requirement || "N/A"}
                     </TableCell>
                     <TableCell>{app.total_no_trainees}</TableCell>
                     <TableCell>
