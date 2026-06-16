@@ -659,7 +659,7 @@ const InstituteRegistration = () => {
         const response =
           await InstituteRegistrationService.registerInstitute(submitData);
         if (response.status === 201 || response.status === 200) {
-          toast.success("Institute Registration submitted successfully!");
+          toast.success(serviceName + " submitted successfully!");
           resetForm();
           setQualitySelections({});
           setTabValue(0);
