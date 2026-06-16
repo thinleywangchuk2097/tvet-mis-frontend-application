@@ -18,6 +18,13 @@ class BhutanNDIService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+   returnNDINatsResponse(data) {
+    return apiClient
+      .post(`/api/v1/public/auth/ndi/return-nats-response`, data, {})
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new BhutanNDIService();

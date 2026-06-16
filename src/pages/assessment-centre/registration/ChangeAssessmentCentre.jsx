@@ -16,8 +16,6 @@ import {
   Step,
   StepLabel,
   Chip,
-  alpha,
-  useTheme,
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
@@ -32,6 +30,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import DescriptionIcon from "@mui/icons-material/Description";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 
 // Validation schema for the change request
 const validationSchema = Yup.object({
@@ -40,7 +39,7 @@ const validationSchema = Yup.object({
   exactLocation: Yup.string(),
 
   // Name fields
-  proposedInstituteName: Yup.string(),
+  proposedAssessmentCentreName: Yup.string(),
 
   // Ownership fields
   ownershipTypeId: Yup.string(),
@@ -73,16 +72,16 @@ const validationSchema = Yup.object({
     is: (val) => val === "5" || val === "8",
     then: (schema) => schema.required("Address is required"),
   }),
-  promoterCitizenId: Yup.string().when("ownershipTypeId", {
+  proprietorCitizenId: Yup.string().when("ownershipTypeId", {
     is: "4",
     then: (schema) =>
       schema
-        .required("Promoter Citizen ID is required")
+        .required("Proprietor Citizen ID is required")
         .matches(/^\d{11}$/, "Citizen ID must be exactly 11 digits"),
   }),
-  promoterName: Yup.string().when("ownershipTypeId", {
+  proprietorName: Yup.string().when("ownershipTypeId", {
     is: "4",
-    then: (schema) => schema.required("Promoter Name is required"),
+    then: (schema) => schema.required("Proprietor Name is required"),
   }),
 
   reasonForChange: Yup.string()
@@ -90,8 +89,7 @@ const validationSchema = Yup.object({
     .min(10, "Please provide a detailed reason (minimum 10 characters)"),
 });
 
-const InstituteChange = () => {
-  const theme = useTheme();
+const ChangeAssessmentCentre = () => {
   const [loading, setLoading] = useState(false);
   const [dzongkhags, setDzongkhags] = useState([]);
   const [ownershipTypes, setOwnershipTypes] = useState([]);
@@ -142,13 +140,13 @@ const InstituteChange = () => {
   const fetchCurrentCentreData = async () => {
     setLoadingCentreData(true);
     try {
-      // Fetch current centre data from your API
-      // const response = await SesCentreService.getCentreById(centreId);
+      // Fetch current assessment centre data from your API
+      // const response = await AssessmentCentreService.getCentreById(centreId);
       // setCurrentCentreData(response.data);
 
       // Mock data for demonstration
       setCurrentCentreData({
-        instituteName: "Current Institute Name",
+        assessmentCentreName: "Current Assessment Centre Name",
         dzongkhagId: "1",
         exactLocation: "Current Location",
         ownershipTypeId: "1",
@@ -156,8 +154,8 @@ const InstituteChange = () => {
         registrationNo: "REG123456",
         otherName: "",
         otherAddress: "",
-        promoterCitizenId: "",
-        promoterName: "",
+        proprietorCitizenId: "",
+        proprietorName: "",
       });
     } catch (error) {
       console.error("Error fetching centre data:", error);
@@ -173,7 +171,7 @@ const InstituteChange = () => {
       dzongkhagId: "",
       exactLocation: "",
       // Name fields
-      proposedInstituteName: "",
+      proposedAssessmentCentreName: "",
       // Ownership fields
       ownershipTypeId: "",
       otherOwnershipTypeId: "",
@@ -181,8 +179,8 @@ const InstituteChange = () => {
       companyName: "",
       otherName: "",
       otherAddress: "",
-      promoterCitizenId: "",
-      promoterName: "",
+      proprietorCitizenId: "",
+      proprietorName: "",
       // Supporting documents
       files: [],
       // Common field
@@ -217,10 +215,12 @@ const InstituteChange = () => {
 
         // Check name change
         if (
-          values.proposedInstituteName &&
-          values.proposedInstituteName !== currentCentreData?.instituteName
+          values.proposedAssessmentCentreName &&
+          values.proposedAssessmentCentreName !==
+            currentCentreData?.assessmentCentreName
         ) {
-          requestedChanges.proposedInstituteName = values.proposedInstituteName;
+          requestedChanges.proposedAssessmentCentreName =
+            values.proposedAssessmentCentreName;
         }
 
         // Check ownership changes
@@ -236,8 +236,9 @@ const InstituteChange = () => {
           requestedChanges.companyName = values.companyName || null;
           requestedChanges.otherName = values.otherName || null;
           requestedChanges.otherAddress = values.otherAddress || null;
-          requestedChanges.promoterCitizenId = values.promoterCitizenId || null;
-          requestedChanges.promoterName = values.promoterName || null;
+          requestedChanges.proprietorCitizenId =
+            values.proprietorCitizenId || null;
+          requestedChanges.proprietorName = values.proprietorName || null;
         }
 
         const payload = {
@@ -248,7 +249,7 @@ const InstituteChange = () => {
         };
 
         // Submit change request to API
-        // await SesCentreService.submitChangeRequest(payload);
+        // await AssessmentCentreService.submitChangeRequest(payload);
 
         console.log("Submitting change request:", payload);
         toast.success("Change request submitted successfully!");
@@ -277,7 +278,7 @@ const InstituteChange = () => {
     return (
       formik.values.dzongkhagId ||
       formik.values.exactLocation ||
-      formik.values.proposedInstituteName ||
+      formik.values.proposedAssessmentCentreName ||
       formik.values.ownershipTypeId ||
       formik.values.files.length > 0
     );
@@ -289,7 +290,7 @@ const InstituteChange = () => {
     const changes = [];
     if (formik.values.dzongkhagId || formik.values.exactLocation)
       changes.push("Location");
-    if (formik.values.proposedInstituteName) changes.push("Name");
+    if (formik.values.proposedAssessmentCentreName) changes.push("Name");
     if (formik.values.ownershipTypeId) changes.push("Ownership");
     return changes;
   };
@@ -317,11 +318,11 @@ const InstituteChange = () => {
             fontWeight="bold"
             sx={{ textDecoration: "underline", fontSize: "1.3rem" }}
           >
-            Request for Institute Change
+            Request for Assessment Centre Change
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            Submit a request to change your centre's location, name, or
-            ownership details
+            Submit a request to change your assessment centre's location, name,
+            or ownership details
           </Typography>
         </Box>
 
@@ -338,19 +339,19 @@ const InstituteChange = () => {
         <Card sx={{ mb: 4, bgcolor: "#f5f5f5" }}>
           <CardContent>
             <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <BusinessIcon color="primary" fontSize="small" />
+              <AssessmentIcon color="primary" fontSize="small" />
               <Typography variant="subtitle1" fontWeight={600}>
-                Current Institute Information
+                Current Assessment Centre Information
               </Typography>
             </Box>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={2}>
               <Grid item size={{ xs: 12, md: 4 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Institute Name:
+                  Assessment Centre Name:
                 </Typography>
                 <Typography variant="body1" fontWeight="medium">
-                  {currentCentreData?.instituteName}
+                  {currentCentreData?.assessmentCentreName}
                 </Typography>
               </Grid>
               <Grid item size={{ xs: 12, md: 4 }}>
@@ -446,20 +447,20 @@ const InstituteChange = () => {
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
-                      label="New Institute Name"
-                      name="proposedInstituteName"
+                      label="New Assessment Centre Name"
+                      name="proposedAssessmentCentreName"
                       size="small"
-                      value={formik.values.proposedInstituteName}
+                      value={formik.values.proposedAssessmentCentreName}
                       onChange={formik.handleChange}
                       error={
-                        formik.touched.proposedInstituteName &&
-                        Boolean(formik.errors.proposedInstituteName)
+                        formik.touched.proposedAssessmentCentreName &&
+                        Boolean(formik.errors.proposedAssessmentCentreName)
                       }
                       helperText={
-                        formik.touched.proposedInstituteName &&
-                        formik.errors.proposedInstituteName
+                        formik.touched.proposedAssessmentCentreName &&
+                        formik.errors.proposedAssessmentCentreName
                       }
-                      placeholder="Enter new institute name"
+                      placeholder="Enter new assessment centre name"
                     />
                   </Grid>
                 </Grid>
@@ -638,36 +639,36 @@ const InstituteChange = () => {
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           fullWidth
-                          label="Promoter Citizen ID *"
-                          name="promoterCitizenId"
+                          label="Proprietor Citizen ID *"
+                          name="proprietorCitizenId"
                           size="small"
-                          value={formik.values.promoterCitizenId}
+                          value={formik.values.proprietorCitizenId}
                           onChange={formik.handleChange}
                           error={
-                            formik.touched.promoterCitizenId &&
-                            Boolean(formik.errors.promoterCitizenId)
+                            formik.touched.proprietorCitizenId &&
+                            Boolean(formik.errors.proprietorCitizenId)
                           }
                           helperText={
-                            formik.touched.promoterCitizenId &&
-                            formik.errors.promoterCitizenId
+                            formik.touched.proprietorCitizenId &&
+                            formik.errors.proprietorCitizenId
                           }
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           fullWidth
-                          label="Promoter Name *"
-                          name="promoterName"
+                          label="Proprietor Name *"
+                          name="proprietorName"
                           size="small"
-                          value={formik.values.promoterName}
+                          value={formik.values.proprietorName}
                           onChange={formik.handleChange}
                           error={
-                            formik.touched.promoterName &&
-                            Boolean(formik.errors.promoterName)
+                            formik.touched.proprietorName &&
+                            Boolean(formik.errors.proprietorName)
                           }
                           helperText={
-                            formik.touched.promoterName &&
-                            formik.errors.promoterName
+                            formik.touched.proprietorName &&
+                            formik.errors.proprietorName
                           }
                         />
                       </Grid>
@@ -760,13 +761,13 @@ const InstituteChange = () => {
                     </Box>
                   </Grid>
 
-                  {formik.values.proposedInstituteName && (
+                  {formik.values.proposedAssessmentCentreName && (
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <Typography variant="body2" color="textSecondary">
-                        New Institute Name:
+                        New Assessment Centre Name:
                       </Typography>
                       <Typography variant="body1">
-                        {formik.values.proposedInstituteName}
+                        {formik.values.proposedAssessmentCentreName}
                       </Typography>
                     </Grid>
                   )}
@@ -796,7 +797,7 @@ const InstituteChange = () => {
                       <Typography variant="body1">
                         {formik.values.companyName ||
                           formik.values.otherName ||
-                          formik.values.promoterName}
+                          formik.values.proprietorName}
                       </Typography>
                     </Grid>
                   )}
@@ -895,4 +896,4 @@ const InstituteChange = () => {
   );
 };
 
-export default InstituteChange;
+export default ChangeAssessmentCentre;

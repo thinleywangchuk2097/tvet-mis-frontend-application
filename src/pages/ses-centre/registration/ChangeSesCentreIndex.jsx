@@ -90,7 +90,7 @@ const validationSchema = Yup.object({
     .min(10, "Please provide a detailed reason (minimum 10 characters)"),
 });
 
-const InstituteChange = () => {
+const ChangeSesCentreIndex = () => {
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [dzongkhags, setDzongkhags] = useState([]);
@@ -317,7 +317,7 @@ const InstituteChange = () => {
             fontWeight="bold"
             sx={{ textDecoration: "underline", fontSize: "1.3rem" }}
           >
-            Request for Institute Change
+            Request for Centre Change
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
             Submit a request to change your centre's location, name, or
@@ -340,7 +340,7 @@ const InstituteChange = () => {
             <Box display="flex" alignItems="center" gap={1} mb={2}>
               <BusinessIcon color="primary" fontSize="small" />
               <Typography variant="subtitle1" fontWeight={600}>
-                Current Institute Information
+                Current Centre Information
               </Typography>
             </Box>
             <Divider sx={{ mb: 2 }} />
@@ -895,4 +895,4 @@ const InstituteChange = () => {
   );
 };
 
-export default InstituteChange;
+export default ChangeSesCentreIndex;

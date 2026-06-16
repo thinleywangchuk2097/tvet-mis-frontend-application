@@ -30,12 +30,10 @@ import MonitoringReport from "../pages/institute/resource-management/MonitoringR
 import Notification from "../pages/institute/resource-management/Notification";
 //service
 import CreateCourse from "../pages/institute/service/CreateCourse";
-import AddTrainer from "../pages/institute/service/AddTrainer";
 import CurriculumEndorsementIndex from "../pages/institute/service/CurriculumEndorsementIndex";
 import ApplyNonAccreditedCourse from "../pages/institute/service/ApplyNonAccreditedCourse";
 import ApplyAccreditedCourse from "../pages/institute/service/ApplyAccreditedCourse";
 import InstituteChange from "../pages/institute/service/InstituteChange";
-import RenewRegistration from "../pages/institute/service/RenewRegistration";
 import ViewApplyNonAccreditedCourse from "../pages/institute/service/ViewApplyNonAccreditedCourse";
 import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";
 
@@ -51,7 +49,7 @@ import ResponseTracerIndex from "../pages/dwps/tracer/ResponseTracerIndex";
 import ViewInstituteProposal from "../pages/public/proposal/ViewInstituteProposal";
 import ViewInstituteRegistration from "../pages/public/registration/ViewInstituteRegistration";
 import ViewAssessorAccreditorQMSAuditor from "../pages/public/registration/ViewAssessorAccreditorQMSAuditor";
-
+import InstituteRenewalIndex from "../pages/renewal/InstituteRenewalIndex";
 //tot
 import CreateTotIndex from "../pages/dwps/tot/CreateTotIndex";
 import AddTraineeIndex from "../pages/dwps/tot/AddTraineeIndex";
@@ -77,6 +75,22 @@ import TraineeReportIndex from "../pages/report/TraineeReportIndex";
 //BQPCA routes
 import MonitoringAssessmentIndex from "../pages/bqpca/monitoring/MonitoringAssessmentIndex";
 import InstituteMonitoringIndex from "../pages/bqpca/monitoring/InstituteMonitoringIndex";
+import ViewInstituteMonitoringIndex from "../pages/bqpca/monitoring/ViewInstituteMonitoringIndex"
+//ses centre
+import ChangeSesCentreIndex from "../pages/ses-centre/registration/ChangeSesCentreIndex";
+import SubjectIndex from "../pages/ses-centre/registration/SubjectIndex";
+import TutorIndex from "../pages/ses-centre/registration/TutorIndex";
+import TuitionAnnouncementIndex from "../pages/ses-centre/announcement/TuitionAnnouncementIndex";
+import AddStudentIndex from "../pages/ses-centre/announcement/AddStudentIndex";
+import StudentDetailsReport from "../pages/ses-centre/report/StudentDetailsReport";
+import TutorsDetailsReport from "../pages/ses-centre/report/TutorsDetailsReport";
+//assessment-centre
+import ChangeAssessmentCentre from "../pages/assessment-centre/registration/ChangeAssessmentCentre";
+import ProgramRegistration from "../pages/assessment-centre/registration/ProgramRegistration";
+import AssessmentCentreOffence from "../pages/assessment-centre/offence/AssessmentCentreOffence";
+import AssessmentCentreResult from "../pages/assessment-centre/assessment-result/AssessmentCentreResult";
+//registration
+import AddTrainerIndex from "../pages/trainer/AddTrainerIndex";
 
 export const privateRoutes = [
   {
@@ -153,8 +167,45 @@ export const privateRoutes = [
         path: "view-reassessment-trainee-selection/:applicationNo",
         element: <ViewReAssessmentTraineeSelectionIndex />,
       },
+       {
+        path: "view-institute-monitoring-index/:applicationNo",
+        element: <ViewInstituteMonitoringIndex />,
+      },
     ],
   },
+   {
+    path: "renewal",
+    children: [
+      {
+        path: ":renewalType/:serviceId",
+        element: <InstituteRenewalIndex />,
+      },
+    
+    ],
+  },
+  {
+    path: "ses-centre",
+    children: [
+      { path: "change-ses-centre", element: <ChangeSesCentreIndex /> },
+      { path: "subject-index", element: <SubjectIndex /> },
+      { path: "tutor-index", element: <TutorIndex /> },
+      { path: "tuition-announcement", element: <TuitionAnnouncementIndex /> },
+      { path: "add-student", element: <AddStudentIndex /> },
+      { path: "student-details-report", element: <StudentDetailsReport /> },
+      { path: "tutors-details-report", element: <TutorsDetailsReport /> },
+    ],
+  },
+   {
+    path: "assessment-centre",
+    children: [
+      { path: "change-assessment-centre", element: <ChangeAssessmentCentre /> },
+      { path: "program-registration", element: <ProgramRegistration /> },
+      { path: "offence", element: <AssessmentCentreOffence /> },
+      { path: "result", element: <AssessmentCentreResult /> },
+    ],
+  },
+  
+
   {
     path: "service",
     children: [
@@ -168,9 +219,8 @@ export const privateRoutes = [
       },
       { path: "apply-accredited-course", element: <ApplyAccreditedCourse /> },
       { path: "create-course", element: <CreateCourse /> },
-      { path: "add-trainer", element: <AddTrainer /> },
+      { path: "add-trainer", element: <AddTrainerIndex /> },
       { path: "institute-change", element: <InstituteChange /> },
-      { path: "renew-registration", element: <RenewRegistration /> },
     ],
   },
   {

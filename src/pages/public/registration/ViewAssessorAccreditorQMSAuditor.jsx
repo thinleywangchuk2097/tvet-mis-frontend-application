@@ -235,6 +235,8 @@ const ViewAssessorAccreditorQMSAuditor = () => {
         fullName: applicationData.full_name,
         mobileNo: applicationData.mobile_no,
         email: applicationData.email,
+        genderId: applicationData.gender_id,
+        dateOfBirth: applicationData.date_of_birth,
         dzongkhagId: applicationData.dzongkhag_id,
         serviceId: parseInt(serviceId),
         assignedRoleId: parseInt(currentRoleId),
@@ -324,14 +326,35 @@ const ViewAssessorAccreditorQMSAuditor = () => {
     }
   };
 
+  // Get the identifier value and label (shows only one - whichever has value)
+  const getIdentifierField = () => {
+    if (applicationData?.reference_no) {
+      return {
+        label: "Reference No",
+        value: applicationData.reference_no
+      };
+    }
+    if (applicationData?.citizen_id) {
+      return {
+        label: "Citizen ID",
+        value: applicationData.citizen_id
+      };
+    }
+    return {
+      label: "Reference No / Citizen ID",
+      value: "N/A"
+    };
+  };
+
   // Render action buttons based on role ID
   const renderActionButtons = () => {
     const roleId = parseInt(currentRoleId);
-    const isProcessed = applicationData?.task_status_id === "18";
+    console.log("Current Role ID:", roleId);
+    //const isProcessed = applicationData?.task_status_id === "18";
 
-    if (isProcessed) {
+   /*  if (isProcessed) {
       return null;
-    }
+    } */
 
     // For Role ID 7: Show Verify (56) and Reject (58) buttons
     if (roleId === 7) {
@@ -440,6 +463,8 @@ const ViewAssessorAccreditorQMSAuditor = () => {
     );
   }
 
+  const identifierField = getIdentifierField();
+
   return (
     <Box sx={{ m: { xs: 2, md: 2 } }}>
       <Paper
@@ -486,9 +511,9 @@ const ViewAssessorAccreditorQMSAuditor = () => {
             <Grid item size={{ xs: 12, md: 4 }}>
               <TextField
                 fullWidth
-                label="Reference No"
+                label={identifierField.label}
                 size="small"
-                value={applicationData.reference_no || "N/A"}
+                value={identifierField.value}
                 slotProps={{ input: { readOnly: true } }}
               />
             </Grid>
