@@ -601,7 +601,7 @@ const PublicIndex = () => {
               whiteSpace: "nowrap",
             }}
           >
-            LATEST COURSES
+            Announcement
           </Typography>
         </Box>
         <Box sx={{ overflow: "hidden", flex: 1, ml: 2 }}>
@@ -650,7 +650,7 @@ const PublicIndex = () => {
         </Box>
 
         {/* ── 4. National Statistics ─────────────────────────────────── */}
-        <Box sx={{ px: 2, pt: 2 }}>
+        <Box sx={{ bgcolor: "#eef3fa", py: { xs: 2, md: 2 } }}>
           <SectionTitle
             align="center"
             eyebrow=""
@@ -661,8 +661,8 @@ const PublicIndex = () => {
         </Box>
 
         {/* ── 5. Distribution overview ──────────────────────────────── */}
-        <Box sx={{ bgcolor: "#eef3fa", py: { xs: 5, md: 6 } }}>
-          <Box sx={{ px: 2 }}>
+        <Box sx={{ bgcolor: "#eef3fa", py: { xs: 2, md: 2 } }}>
+          <Box sx={{ px: 1 }}>
             <SectionTitle
               align="center"
               eyebrow="Distribution Overview"
@@ -688,7 +688,7 @@ const PublicIndex = () => {
               bgcolor: "#ffffff",
             }}
           >
-            <CardContent sx={{ p: 2.5 }}>
+            <CardContent >
               <OngoingProgramsIndex />
             </CardContent>
           </Card>

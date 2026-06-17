@@ -17,12 +17,75 @@ import {
   MenuItem,
   Button,
   Paper,
+  keyframes,
 } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchIcon from "@mui/icons-material/Search";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
 import CommonService from "../../api/services/internal/common/CommonService";
+
+// ── Animations
+const gradientShift = keyframes`
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+`;
+
+const pulse = keyframes`
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+`;
+
+const slideIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
+
+const marquee = keyframes`
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+`;
+
+const shimmer = keyframes`
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+`;
+
+const blink = keyframes`
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+`;
 
 // ── Shared table styles
 const TS = {
@@ -139,6 +202,19 @@ const OngoingProgramsIndex = () => {
     return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
   };
 
+  // Create moving course announcements from actual course data
+  const movingAnnouncements = useMemo(() => {
+    if (!ongoingCourses.length) return [];
+
+    return ongoingCourses.map((course) => ({
+      id: course.id || course.application_no,
+      courseName: course.course_name || "Course",
+      instituteName: course.institute_name || "Institute",
+      startDate: course.course_start_date,
+      endDate: course.course_end_date,
+    }));
+  }, [ongoingCourses]);
+
   // Filtering logic
   const filteredCourses = useMemo(() => {
     return ongoingCourses.filter((course) => {
@@ -197,6 +273,117 @@ const OngoingProgramsIndex = () => {
 
   return (
     <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+      {/* Moving Course Announcements Banner */}
+      {movingAnnouncements.length > 0 && (
+        <Box
+          sx={{
+            mb: 3,
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            borderRadius: 2,
+            py: 1.5,
+            position: "relative",
+            cursor: "pointer",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background:
+                "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+              animation: `${shimmer} 2s infinite`,
+            },
+          }}
+        >
+          <Box
+            sx={{
+              display: "inline-block",
+              animation: `${marquee} ${Math.max(20, movingAnnouncements.length * 2)}s linear infinite`,
+              whiteSpace: "nowrap",
+              "&:hover": {
+                animationPlayState: "paused",
+              },
+            }}
+          >
+            {/* Duplicate the array to create seamless loop */}
+            {[...movingAnnouncements, ...movingAnnouncements].map(
+              (announcement, idx) => (
+                <Box
+                  key={`${announcement.id}-${idx}`}
+                  component="span"
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    mx: 3,
+                    color: "white",
+                    fontWeight: "bold",
+                    fontSize: "0.95rem",
+                    textShadow: "1px 1px 2px rgba(0,0,0,0.2)",
+                    gap: 1,
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-block",
+                      px: 1.5,
+                      py: 0.3,
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      borderRadius: 2,
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    🎓 {announcement.courseName}
+                  </Box>
+                  <Box component="span" sx={{ opacity: 0.8 }}>
+                    @
+                  </Box>
+                  <Box component="span" sx={{ fontSize: "0.85rem" }}>
+                    {announcement.instituteName}
+                  </Box>
+                  <Box component="span" sx={{ mx: 0.5 }}>
+                    📅
+                  </Box>
+                  <Box component="span" sx={{ fontSize: "0.85rem" }}>
+                    {formatDate(announcement.startDate)} -{" "}
+                    {formatDate(announcement.endDate)}
+                  </Box>
+                  <Box
+                    component="span"
+                    sx={{
+                      ml: 1,
+                      px: 1.5,
+                      py: 0.3,
+                      bgcolor: "#4caf50",
+                      borderRadius: 3,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      fontSize: "0.75rem",
+                      fontWeight: "bold",
+                      transition: "all 0.3s ease",
+                      animation: `${blink} 1.5s ease-in-out infinite`,
+                      "&:hover": {
+                        transform: "scale(1.05)",
+                        bgcolor: "#45a049",
+                      },
+                    }}
+                  >
+                    <Box component="span" sx={{ fontSize: "0.7rem" }}>
+                      ●
+                    </Box>
+                    ACTIVE
+                  </Box>
+                </Box>
+              ),
+            )}
+          </Box>
+        </Box>
+      )}
+
       <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 2 }}>
         <Box
           sx={{
@@ -208,6 +395,7 @@ const OngoingProgramsIndex = () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            animation: `${pulse} 2s ease-in-out infinite`,
           }}
         >
           <HistoryIcon sx={{ fontSize: 20 }} />
@@ -215,12 +403,18 @@ const OngoingProgramsIndex = () => {
         <Box>
           <Typography
             fontWeight={800}
-            sx={{ fontSize: "0.95rem", color: "#0a1929" }}
+            sx={{
+              fontSize: "0.95rem",
+              background:
+                "linear-gradient(135deg, #0a1929 0%, #1565c0 50%, #0a1929 100%)",
+              backgroundSize: "200% auto",
+              color: "transparent",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              animation: `${gradientShift} 3s ease infinite`,
+            }}
           >
             Program Activity
-          </Typography>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            Ongoing courses with training locations
           </Typography>
         </Box>
       </Stack>
@@ -377,7 +571,7 @@ const OngoingProgramsIndex = () => {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   align="center"
                   sx={{ color: "error.main", fontWeight: 600 }}
                 >

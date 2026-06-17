@@ -11,6 +11,7 @@ import AssessmentResult from "../pages/public/assessment/AssessmentResult";
 import ApplyCourse from "../pages/trainee/ApplyCourse";
 import ResetPassword from "../pages/auth/password/ResetPassword";
 import GenerateQRCode from "../pages/auth/ndi/GenerateQRCode";
+import CommonQRCode from "../pages/auth/ndi/CommonQRCode";
 import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
 //import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex";
 //Reports
@@ -41,6 +42,7 @@ export const publicRoutes = [
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "reset-password", element: <ResetPassword /> },
       { path: "login-ndi-qrcode", element: <GenerateQRCode /> },
+      { path: "common-ndi-qrcode", element: <CommonQRCode /> }
     ],
   },
   {
@@ -56,10 +58,7 @@ export const publicRoutes = [
         path: ":registrationType/:serviceId",
         element: <InstituteRegistration />,
       },
-      // { path: "assessment-centre", element: <AssessmentCentre /> },
-      // { path: "assessor", element: <Assessor /> },
-      //{ path: "accreditor", element: <Accreditor /> },
-      // { path: "qms-auditor", element: <QMSAuditor /> },//it is Quality Auditor Registration AssessorAccreditorQMSAuditor
+    
     ],
   },
   {

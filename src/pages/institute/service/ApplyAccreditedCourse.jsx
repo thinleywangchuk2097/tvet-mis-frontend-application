@@ -568,7 +568,6 @@ const ApplyAccreditedCourse = () => {
 
   const handleReset = () => {
     setQualitySelections({});
-    toast.info("Form has been reset");
   };
 
   return (

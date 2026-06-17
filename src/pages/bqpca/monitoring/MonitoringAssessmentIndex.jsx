@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Paper,
   Typography,
@@ -36,15 +36,19 @@ const TABLE_STYLE = {
   "& th, & td": {
     border: "1px solid",
     borderColor: "divider",
-    height: 25,
-    padding: "0px 6px",
-    fontSize: "0.80rem",
-    lineHeight: 1.2,
+    height: 20,
+    padding: "2px 4px",
+    fontSize: "0.70rem",
+    lineHeight: 1.1,
     verticalAlign: "middle",
   },
   "& th": {
     fontWeight: 600,
     backgroundColor: "#fafafa",
+    padding: "4px 4px",
+  },
+  "& .MuiRadio-root": {
+    padding: "0px",
   },
 };
 
@@ -69,7 +73,7 @@ const MonitoringAssessmentIndex = () => {
   const [qualityData, setQualityData] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
-    dzongkhag: "",
+    dzongkhagId: "",
     exactLocation: "",
     monitoringDate: new Date().toISOString().split("T")[0],
   });
@@ -78,6 +82,25 @@ const MonitoringAssessmentIndex = () => {
   const [qualityResponses, setQualityResponses] = useState({});
   const [qualityRemarks, setQualityRemarks] = useState({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Check if all radio buttons are checked
+  const isAllRadiosChecked = useMemo(() => {
+    if (qualityData.length === 0) return false;
+
+    let totalQuestions = 0;
+    let answeredQuestions = 0;
+
+    qualityData.forEach((category) => {
+      category.rows.forEach((row) => {
+        totalQuestions++;
+        if (qualityResponses[category.id]?.[row.id]) {
+          answeredQuestions++;
+        }
+      });
+    });
+
+    return totalQuestions > 0 && answeredQuestions === totalQuestions;
+  }, [qualityData, qualityResponses]);
 
   // Generate validation schema dynamically based on quality data
   const getValidationSchema = useCallback(() => {
@@ -134,9 +157,10 @@ const MonitoringAssessmentIndex = () => {
   // Fetch monitoring checklist when parentEntityId changes
   useEffect(() => {
     if (parentEntityId) {
-      fetchMonitoringChecklist(parentEntityId);
+      setQualityData([]);
+      setQualityResponses({});
+      setQualityRemarks({});
     } else {
-      // Clear checklist when no entity type is selected
       setQualityData([]);
       setQualityResponses({});
       setQualityRemarks({});
@@ -228,7 +252,6 @@ const MonitoringAssessmentIndex = () => {
       const checklistData = response.data;
       console.log("Monitoring Checklist:", checklistData);
 
-      // Process quality data
       if (checklistData && checklistData.length > 0) {
         const mainCategories = checklistData.filter(
           (item) => item.parentId === 0 || !item.parentId,
@@ -252,7 +275,6 @@ const MonitoringAssessmentIndex = () => {
         setQualityData([]);
       }
 
-      // Reset responses when checklist changes
       setQualityResponses({});
       setQualityRemarks({});
     } catch (error) {
@@ -262,29 +284,25 @@ const MonitoringAssessmentIndex = () => {
     }
   };
 
-  // Handle parent dropdown change - using id from API
   const handleParentEntityChange = (e) => {
     const value = e.target.value;
     setParentEntityId(value);
 
-    // Reset all child dropdowns
     setSelectedInstitute("");
     setSelectedSESCentre("");
     setSelectedAssessmentCentre("");
     setShowForm(false);
     setFormData({
-      dzongkhag: "",
+      dzongkhagId: "",
       exactLocation: "",
       monitoringDate: new Date().toISOString().split("T")[0],
     });
 
-    // Reset checklist when parent entity changes
     setQualityData([]);
     setQualityResponses({});
     setQualityRemarks({});
   };
 
-  // Handle child dropdown change for Institutes
   const handleInstituteChange = (e) => {
     const value = e.target.value;
     setSelectedInstitute(value);
@@ -293,22 +311,22 @@ const MonitoringAssessmentIndex = () => {
         (inst) => inst.institute_id === value,
       );
       if (selectedInst) {
-        const dzongkhag = dzongkhagList.find(
-          (d) => d.id === parseInt(selectedInst.dzongkhag_id),
-        );
         setFormData((prev) => ({
           ...prev,
-          dzongkhag: dzongkhag?.dzonkhagName || "",
+          dzongkhagId: selectedInst.dzongkhag_id || "",
           exactLocation: selectedInst.exact_location || "",
         }));
       }
       setShowForm(true);
+      fetchMonitoringChecklist(parentEntityId);
     } else {
       setShowForm(false);
+      setQualityData([]);
+      setQualityResponses({});
+      setQualityRemarks({});
     }
   };
 
-  // Handle child dropdown change for SES Centres
   const handleSESCentreChange = (e) => {
     const value = e.target.value;
     setSelectedSESCentre(value);
@@ -317,22 +335,22 @@ const MonitoringAssessmentIndex = () => {
         (ses) => ses.institute_id === value,
       );
       if (selectedSES) {
-        const dzongkhag = dzongkhagList.find(
-          (d) => d.id === parseInt(selectedSES.dzongkhag_id),
-        );
         setFormData((prev) => ({
           ...prev,
-          dzongkhag: dzongkhag?.dzonkhagName || "",
+          dzongkhagId: selectedSES.dzongkhag_id || "",
           exactLocation: selectedSES.exact_location || "",
         }));
       }
       setShowForm(true);
+      fetchMonitoringChecklist(parentEntityId);
     } else {
       setShowForm(false);
+      setQualityData([]);
+      setQualityResponses({});
+      setQualityRemarks({});
     }
   };
 
-  // Handle child dropdown change for Assessment Centres
   const handleAssessmentCentreChange = (e) => {
     const value = e.target.value;
     setSelectedAssessmentCentre(value);
@@ -341,18 +359,19 @@ const MonitoringAssessmentIndex = () => {
         (assessment) => assessment.institute_id === value,
       );
       if (selectedAssessment) {
-        const dzongkhag = dzongkhagList.find(
-          (d) => d.id === parseInt(selectedAssessment.dzongkhag_id),
-        );
         setFormData((prev) => ({
           ...prev,
-          dzongkhag: dzongkhag?.dzonkhagName || "",
+          dzongkhagId: selectedAssessment.dzongkhag_id || "",
           exactLocation: selectedAssessment.exact_location || "",
         }));
       }
       setShowForm(true);
+      fetchMonitoringChecklist(parentEntityId);
     } else {
       setShowForm(false);
+      setQualityData([]);
+      setQualityResponses({});
+      setQualityRemarks({});
     }
   };
 
@@ -361,7 +380,6 @@ const MonitoringAssessmentIndex = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Quality checklist handlers with validation
   const handleQualityResponseChange = (categoryId, subQuestionId, value) => {
     setQualityResponses((prev) => {
       const newResponses = { ...prev };
@@ -382,7 +400,6 @@ const MonitoringAssessmentIndex = () => {
       return newResponses;
     });
 
-    // Clear validation error for this field if it exists
     const fieldName = `response_${categoryId}_${subQuestionId}`;
     if (formik.errors[fieldName]) {
       formik.setFieldError(fieldName, undefined);
@@ -399,19 +416,19 @@ const MonitoringAssessmentIndex = () => {
     }));
   };
 
-  // Prepare quality standards for backend
+  // Prepare quality standards for backend - using "Y" and "N" directly
   const prepareQualityStandardsForBackend = () => {
     const qualityStandardsData = [];
 
     Object.keys(qualityResponses).forEach((categoryId) => {
       Object.keys(qualityResponses[categoryId]).forEach((subQuestionId) => {
-        const responseId = qualityResponses[categoryId][subQuestionId];
+        const responseValue = qualityResponses[categoryId][subQuestionId];
         const remark = qualityRemarks[categoryId]?.[subQuestionId] || "";
 
-        if (responseId && responseId !== "") {
+        if (responseValue && responseValue !== "") {
           qualityStandardsData.push({
             standardId: parseInt(subQuestionId),
-            responseId: responseId === "Y" ? 1 : 0,
+            responseId: responseValue, // This will be "Y" or "N"
             remarks: remark,
           });
         }
@@ -421,7 +438,6 @@ const MonitoringAssessmentIndex = () => {
     return qualityStandardsData;
   };
 
-  // Get selected entity details
   const getSelectedEntityDetails = () => {
     if (parentEntityId === "7" && selectedInstitute) {
       return instituteLists.find(
@@ -439,7 +455,6 @@ const MonitoringAssessmentIndex = () => {
     return null;
   };
 
-  // Validate all required fields before submission
   const validateSubmission = () => {
     const errors = [];
 
@@ -455,11 +470,10 @@ const MonitoringAssessmentIndex = () => {
       errors.push("Please select monitoring date");
     }
 
-    if (!formData.dzongkhag) {
+    if (!formData.dzongkhagId) {
       errors.push("Please select dzongkhag");
     }
 
-    // Check if all quality standards are answered
     const totalQuestions = qualityData.reduce(
       (total, category) => total + category.rows.length,
       0,
@@ -480,9 +494,7 @@ const MonitoringAssessmentIndex = () => {
     return errors;
   };
 
-  // Handle submit monitoring assessment
   const handleSubmit = async () => {
-    // Validate all fields
     const validationErrors = validateSubmission();
 
     if (validationErrors.length > 0) {
@@ -496,34 +508,41 @@ const MonitoringAssessmentIndex = () => {
       const selectedEntity = getSelectedEntityDetails();
 
       const payload = {
-        entityId: selectedEntity?.institute_id,
-        entityName: selectedEntity?.proposed_institute_name,
+        instituteId: selectedEntity?.institute_id,
+        instituteName: selectedEntity?.proposed_institute_name,
         registrationNo: selectedEntity?.registration_no,
         monitoringDate: formData.monitoringDate,
-        dzongkhag: formData.dzongkhag,
+        dzongkhagId: parseInt(formData.dzongkhagId),
         exactLocation: formData.exactLocation,
         qualityStandards: qualityStandardsData,
-        inspectedBy: actionId,
+        createdBy: actionId,
         serviceId: parentEntityId,
+        // serviceId: 47,
+        statusId: 55,
       };
 
       console.log("Monitoring Assessment Payload:", payload);
+      console.log("Quality Standards with Y/N:", qualityStandardsData);
 
       // TODO: Call your API to save monitoring assessment
-      // await MonitoringAssessmentService.saveMonitoringAssessment(payload, access_token);
+      const response =
+        await MonitoringAssessmentService.submitMonitoringAssessment(
+          payload,
+          access_token,
+        );
+      if (response.status === 200 || response.status === 201) {
+        toast.success(
+          `Monitoring assessment submitted successfully for ${selectedEntity?.proposed_institute_name}`,
+        );
+      }
 
-      toast.success(
-        `Monitoring assessment submitted successfully for ${selectedEntity?.proposed_institute_name}`,
-      );
-
-      // Reset form after successful submission
       setParentEntityId("");
       setSelectedInstitute("");
       setSelectedSESCentre("");
       setSelectedAssessmentCentre("");
       setShowForm(false);
       setFormData({
-        dzongkhag: "",
+        dzongkhagId: "",
         exactLocation: "",
         monitoringDate: new Date().toISOString().split("T")[0],
       });
@@ -539,34 +558,52 @@ const MonitoringAssessmentIndex = () => {
     }
   };
 
-  // Check if any question has an error
   const hasFieldError = (categoryId, rowId) => {
     const fieldName = `response_${categoryId}_${rowId}`;
     return formik.touched[fieldName] && formik.errors[fieldName];
   };
 
-  // Render checklist in table format
   const renderChecklist = useCallback(
     (standard) => {
       return (
         <Grid item xs={12} key={standard.id}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
+          <Paper sx={{ p: 1.5, border: "1px solid", borderColor: "divider" }}>
+            <Typography sx={{ fontSize: "0.75rem", fontWeight: 600 }} mb={0.5}>
               {standard.title}
             </Typography>
             <TableContainer>
               <Table size="small" sx={TABLE_STYLE}>
                 <TableHead>
                   <TableRow>
-                    <TableCell width="40">Sl. No</TableCell>
-                    <TableCell>Quality Indicator</TableCell>
-                    <TableCell align="center" width="80">
+                    <TableCell
+                      width="30"
+                      sx={{ fontSize: "0.70rem", p: "4px 4px" }}
+                    >
+                      Sl. No
+                    </TableCell>
+                    <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
+                      Quality Indicator
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      width="60"
+                      sx={{ fontSize: "0.70rem", p: "4px 4px" }}
+                    >
                       YES
                     </TableCell>
-                    <TableCell align="center" width="80">
+                    <TableCell
+                      align="center"
+                      width="60"
+                      sx={{ fontSize: "0.70rem", p: "4px 4px" }}
+                    >
                       NO
                     </TableCell>
-                    <TableCell width="250">Remarks</TableCell>
+                    <TableCell
+                      width="200"
+                      sx={{ fontSize: "0.70rem", p: "4px 4px" }}
+                    >
+                      Remarks
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -581,22 +618,29 @@ const MonitoringAssessmentIndex = () => {
 
                     return (
                       <TableRow key={row.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell>
+                        <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
+                          {index + 1}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
                           {row.value}
                           {hasError && (
                             <FormHelperText
                               error
-                              sx={{ mt: 0.5, fontSize: "0.7rem" }}
+                              sx={{ mt: 0.25, fontSize: "0.65rem" }}
                             >
                               {formik.errors[fieldName]}
                             </FormHelperText>
                           )}
                         </TableCell>
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ p: "2px 4px" }}>
                           <Radio
                             size="small"
-                            sx={{ p: 0.25 }}
+                            sx={{
+                              p: 0,
+                              "& .MuiSvgIcon-root": {
+                                fontSize: "1rem",
+                              },
+                            }}
                             checked={isYes}
                             onChange={() => {
                               const newValue = isYes ? undefined : "Y";
@@ -609,10 +653,15 @@ const MonitoringAssessmentIndex = () => {
                             }}
                           />
                         </TableCell>
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ p: "2px 4px" }}>
                           <Radio
                             size="small"
-                            sx={{ p: 0.25 }}
+                            sx={{
+                              p: 0,
+                              "& .MuiSvgIcon-root": {
+                                fontSize: "1rem",
+                              },
+                            }}
                             checked={isNo}
                             onChange={() => {
                               const newValue = isNo ? undefined : "N";
@@ -625,11 +674,11 @@ const MonitoringAssessmentIndex = () => {
                             }}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ p: "4px 4px" }}>
                           <TextField
                             fullWidth
                             size="small"
-                            placeholder="Enter remarks"
+                            placeholder="Remarks"
                             value={remark}
                             onChange={(e) =>
                               handleQualityRemarkChange(
@@ -640,11 +689,17 @@ const MonitoringAssessmentIndex = () => {
                             }
                             slotProps={{
                               input: {
-                                sx: { fontSize: "0.75rem" },
+                                sx: {
+                                  fontSize: "0.70rem",
+                                  py: 0.5,
+                                  "& textarea": {
+                                    py: 0.5,
+                                  },
+                                },
                               },
                             }}
                             multiline
-                            rows={2}
+                            rows={1}
                           />
                         </TableCell>
                       </TableRow>
@@ -660,6 +715,35 @@ const MonitoringAssessmentIndex = () => {
     [qualityResponses, qualityRemarks, formik.touched, formik.errors],
   );
 
+  const showChecklist = () => {
+    if (!parentEntityId) return false;
+    if (parentEntityId === "7" && selectedInstitute) return true;
+    if (parentEntityId === "36" && selectedSESCentre) return true;
+    if (parentEntityId === "4" && selectedAssessmentCentre) return true;
+    return false;
+  };
+
+  const getProgressText = () => {
+    if (qualityData.length === 0) return "";
+
+    let totalQuestions = 0;
+    let answeredQuestions = 0;
+
+    qualityData.forEach((category) => {
+      category.rows.forEach(() => {
+        totalQuestions++;
+      });
+    });
+
+    Object.keys(qualityResponses).forEach((categoryId) => {
+      answeredQuestions += Object.keys(
+        qualityResponses[categoryId] || {},
+      ).length;
+    });
+
+    return `${answeredQuestions}/${totalQuestions} questions answered`;
+  };
+
   return (
     <form onSubmit={formik.handleSubmit}>
       <Paper sx={{ p: 2, mt: 1 }}>
@@ -667,7 +751,6 @@ const MonitoringAssessmentIndex = () => {
           Monitoring Assessment
         </Typography>
 
-        {/* Parent Dropdown - Using id from API */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item size={{ xs: 12, md: 4 }}>
             <FormControl fullWidth size="small">
@@ -687,7 +770,6 @@ const MonitoringAssessmentIndex = () => {
             </FormControl>
           </Grid>
 
-          {/* Child Dropdown - Institutes (id: 7) */}
           {parentEntityId === "7" && (
             <Grid item size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth size="small">
@@ -712,7 +794,6 @@ const MonitoringAssessmentIndex = () => {
             </Grid>
           )}
 
-          {/* Child Dropdown - SES Centres (id: 36) */}
           {parentEntityId === "36" && (
             <Grid item size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth size="small">
@@ -737,7 +818,6 @@ const MonitoringAssessmentIndex = () => {
             </Grid>
           )}
 
-          {/* Child Dropdown - Assessment Centres (id: 4) */}
           {parentEntityId === "4" && (
             <Grid item size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth size="small">
@@ -763,7 +843,6 @@ const MonitoringAssessmentIndex = () => {
           )}
         </Grid>
 
-        {/* Location Details and Monitoring Date Form */}
         {showForm && (
           <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
             <Typography variant="subtitle1" gutterBottom>
@@ -771,7 +850,6 @@ const MonitoringAssessmentIndex = () => {
             </Typography>
 
             <Grid container spacing={2}>
-              {/* Monitoring Date Field */}
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
@@ -786,22 +864,18 @@ const MonitoringAssessmentIndex = () => {
                 />
               </Grid>
 
-              {/* Dzongkhag Dropdown */}
               <Grid item size={{ xs: 12, md: 4 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Dzongkhag</InputLabel>
                   <Select
-                    name="dzongkhag"
-                    value={formData.dzongkhag}
+                    name="dzongkhagId"
+                    value={formData.dzongkhagId}
                     onChange={handleInputChange}
                     label="Dzongkhag"
                   >
                     <MenuItem value="">-- Select Dzongkhag --</MenuItem>
                     {dzongkhagList.map((dzongkhag) => (
-                      <MenuItem
-                        key={dzongkhag.id}
-                        value={dzongkhag.dzonkhagName}
-                      >
+                      <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
                         {dzongkhag.dzonkhagName}
                       </MenuItem>
                     ))}
@@ -809,7 +883,6 @@ const MonitoringAssessmentIndex = () => {
                 </FormControl>
               </Grid>
 
-              {/* Exact Location Search Field */}
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
@@ -827,26 +900,53 @@ const MonitoringAssessmentIndex = () => {
 
         <Divider sx={{ my: 2 }} />
 
-        {/* Quality Standards Checklist - Table Format */}
-        {parentEntityId && qualityData.length > 0 && (
+        {showChecklist() && qualityData.length > 0 && (
           <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Quality Standards Checklist for{" "}
-              {instituteTypeLists.find((t) => t.id === parentEntityId)
-                ?.service_name || "Selected Entity"}
-              <Typography
-                component="span"
-                color="error"
-                sx={{ ml: 1, fontSize: "0.75rem" }}
-              >
-                (All questions must be answered)
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle1">
+                Quality Standards Checklist for{" "}
+                {parentEntityId === "7" &&
+                  selectedInstitute &&
+                  instituteLists.find(
+                    (i) => i.institute_id === selectedInstitute,
+                  )?.proposed_institute_name}
+                {parentEntityId === "36" &&
+                  selectedSESCentre &&
+                  sesCentreLists.find(
+                    (s) => s.institute_id === selectedSESCentre,
+                  )?.proposed_institute_name}
+                {parentEntityId === "4" &&
+                  selectedAssessmentCentre &&
+                  assessmentCentreLists.find(
+                    (a) => a.institute_id === selectedAssessmentCentre,
+                  )?.proposed_institute_name}
               </Typography>
+              <Typography
+                variant="caption"
+                color={isAllRadiosChecked ? "success.main" : "error.main"}
+              >
+                {getProgressText()} {isAllRadiosChecked && "✓"}
+              </Typography>
+            </Box>
+            <Typography
+              component="span"
+              color="error"
+              sx={{ mb: 2, display: "block", fontSize: "0.75rem" }}
+            >
+              (All questions must be answered)
             </Typography>
             <Box>{qualityData.map(renderChecklist)}</Box>
           </Box>
         )}
 
-        {parentEntityId && qualityData.length === 0 && (
+        {showChecklist() && qualityData.length === 0 && (
           <Paper sx={{ p: 3, mb: 3, textAlign: "center" }}>
             <Typography color="text.secondary">
               No quality standards available for the selected entity type
@@ -854,8 +954,7 @@ const MonitoringAssessmentIndex = () => {
           </Paper>
         )}
 
-        {/* Submit Button */}
-        {showForm && qualityData.length > 0 && (
+        {showChecklist() && qualityData.length > 0 && (
           <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
             <Button
               type="submit"
@@ -869,7 +968,7 @@ const MonitoringAssessmentIndex = () => {
                   <CheckCircleIcon />
                 )
               }
-              disabled={submitting}
+              disabled={submitting || !isAllRadiosChecked}
               sx={{ px: 4, py: 1 }}
             >
               {submitting ? "Submitting..." : "Submit"}

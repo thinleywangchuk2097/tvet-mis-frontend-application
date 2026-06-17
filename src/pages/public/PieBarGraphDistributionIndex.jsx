@@ -7,6 +7,7 @@ import {
   Typography,
   alpha,
   Grid,
+  keyframes,
 } from "@mui/material";
 import {
   PieChart,
@@ -24,6 +25,102 @@ import PieChartIcon from "@mui/icons-material/PieChart";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
 import CommonService from "../../api/services/internal/common/CommonService";
+
+// ── Animations
+const fadeInUp = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const slideInLeft = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
+
+const slideInRight = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
+
+const pulse = keyframes`
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+`;
+
+const shimmer = keyframes`
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+`;
+
+const barRise = keyframes`
+  0% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+`;
+
+const barShake = keyframes`
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+`;
+
+const loadingPulse = keyframes`
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+`;
+
+const waveAnimation = keyframes`
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+`;
 
 // ── Brand palette
 const P = "#1565c0";
@@ -62,7 +159,7 @@ const getDzongkhagBarColor = (value, index) => {
     "#558b2f",
     "#e65100",
     "#6a1b9a",
-    "#7b1fa2",
+    "#7b1ba2",
     "#8e24aa",
     "#4527a0",
     "#283593",
@@ -85,14 +182,26 @@ const PieBarGraphDistributionIndex = () => {
   const [dzongkhagInstituteData, setDzongkhagInstituteData] = useState([]);
   const [courseBySectorData, setCourseBySectorData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [animateBars, setAnimateBars] = useState(false);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (!loading && dzongkhagInstituteData.length > 0) {
+      setTimeout(() => {
+        setAnimateBars(true);
+        setIsFirstLoad(false);
+      }, 500);
+    }
+  }, [loading, dzongkhagInstituteData]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
+      setAnimateBars(false);
       await Promise.all([
         fetchDzongkhags(),
         fetchInstituteDetails(),
@@ -170,10 +279,105 @@ const PieBarGraphDistributionIndex = () => {
     0,
   );
 
+  // Custom animated bar shape with loading animation
+  const AnimatedBar = (props) => {
+    const { fill, x, y, width, height, index } = props;
+    
+    if (isFirstLoad && !animateBars) {
+      return (
+        <rect
+          x={x}
+          y={y + height * 0.7}
+          width={width}
+          height={height * 0.3}
+          fill={fill}
+          rx={4}
+          ry={4}
+          opacity={0.6}
+          style={{
+            animation: `${waveAnimation} 1s ease-in-out infinite ${index * 0.1}s`,
+            transformOrigin: "bottom",
+          }}
+        >
+          <animate
+            attributeName="height"
+            values={`${height * 0.3};${height * 0.7};${height * 0.3}`}
+            dur="1s"
+            repeatCount="indefinite"
+            begin={`${index * 0.1}s`}
+          />
+        </rect>
+      );
+    }
+
+    if (!animateBars) {
+      return (
+        <rect
+          x={x}
+          y={y + height}
+          width={width}
+          height={0}
+          fill={fill}
+          rx={4}
+          ry={4}
+        />
+      );
+    }
+
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={fill}
+        rx={4}
+        ry={4}
+        style={{
+          animation: `${barRise} 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) ${index * 0.03}s both`,
+          transformOrigin: "bottom",
+        }}
+      />
+    );
+  };
+
+  // Compact Loading skeleton
+  const LoadingSkeleton = () => (
+    <Box sx={{ width: "100%", height: 280, position: "relative", overflow: "hidden" }}>
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 240,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-around",
+          px: 1,
+        }}
+      >
+        {[...Array(15)].map((_, i) => (
+          <Box
+            key={i}
+            sx={{
+              width: 20,
+              height: `${Math.random() * 150 + 40}px`,
+              bgcolor: alpha(P, 0.3),
+              borderRadius: "4px 4px 0 0",
+              animation: `${loadingPulse} 1.5s ease-in-out infinite ${i * 0.05}s`,
+              transformOrigin: "bottom",
+            }}
+          />
+        ))}
+      </Box>
+    </Box>
+  );
+
   if (loading) {
     return (
-      <Box sx={{ textAlign: "center", py: 8 }}>
-        <Typography sx={{ color: "#666" }}>
+      <Box sx={{ textAlign: "center", py: 4 }}>
+        <Typography sx={{ color: "#666", fontSize: "0.85rem" }}>
           Loading distribution data...
         </Typography>
       </Box>
@@ -181,30 +385,31 @@ const PieBarGraphDistributionIndex = () => {
   }
 
   return (
-    <Grid container spacing={2}>
+    <Grid container spacing={1.5}>
       {/* Program By Sector - Pie Chart */}
       <Grid size={{ xs: 12, md: 5 }}>
         <Card
           elevation={0}
           sx={{
             border: "1px solid #e3eaf4",
-            borderRadius: 3,
+            borderRadius: 2,
             bgcolor: "#ffffff",
             height: "100%",
+            animation: `${slideInLeft} 0.5s ease-out`,
+            transition: "all 0.3s ease",
+            "&:hover": {
+              transform: "translateY(-2px)",
+              boxShadow: `0 8px 20px ${alpha(P, 0.1)}`,
+            },
           }}
         >
-          <CardContent sx={{ p: 2.5 }}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1.2}
-              sx={{ mb: 2 }}
-            >
+          <CardContent sx={{ p: 1.5 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
               <Box
                 sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 1.5,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 1,
                   bgcolor: alpha(P, 0.12),
                   color: P,
                   display: "flex",
@@ -212,179 +417,130 @@ const PieBarGraphDistributionIndex = () => {
                   justifyContent: "center",
                 }}
               >
-                <PieChartIcon sx={{ fontSize: 20 }} />
+                <PieChartIcon sx={{ fontSize: 16 }} />
               </Box>
               <Box>
                 <Typography
-                  fontWeight={800}
-                  sx={{ fontSize: "0.95rem", color: "#0a1929" }}
+                  fontWeight={700}
+                  sx={{
+                    fontSize: "0.85rem",
+                    background: `linear-gradient(135deg, ${P}, ${TEAL})`,
+                    backgroundSize: "200% auto",
+                    color: "transparent",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                  }}
                 >
                   Program By Sector
                 </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Distribution by program sector
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.65rem" }}>
+                  Distribution by sector
                 </Typography>
               </Box>
             </Stack>
 
             {courseBySectorData.length === 0 ? (
-              <Box
-                sx={{
-                  textAlign: "center",
-                  py: 8,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: 300,
-                }}
-              >
-                <Typography
-                  sx={{
-                    color: "error.main",
-                    fontWeight: 600,
-                    fontSize: "0.9rem",
-                  }}
-                >
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Typography sx={{ color: "error.main", fontWeight: 600, fontSize: "0.8rem" }}>
                   No data available
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: "#666", mt: 1, display: "block" }}
-                >
-                  No program distribution data found
                 </Typography>
               </Box>
             ) : (
-              <>
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <Box sx={{ width: "55%", height: 240 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={courseBySectorData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          innerRadius={30}
-                          label={({ percent }) =>
-                            `${(percent * 100).toFixed(0)}%`
-                          }
-                          labelLine={{ stroke: "#ccc", strokeWidth: 1 }}
-                        >
-                          {courseBySectorData.map((_, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={getSectorColor(index)}
-                            />
-                          ))}
-                        </Pie>
-                        <RTooltip
-                          contentStyle={{
-                            borderRadius: 8,
-                            border: "1px solid #d4e2f4",
-                            fontSize: "0.8rem",
-                          }}
-                          formatter={(value, name) => [
-                            `${value} Program(s)`,
-                            name,
-                          ]}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </Box>
-                  <Box
-                    sx={{
-                      width: "45%",
-                      pl: 1.5,
-                      maxHeight: 240,
-                      overflowY: "auto",
-                    }}
-                  >
-                    {courseBySectorData.map((item, index) => {
-                      const percentage = (
-                        (item.value / totalPrograms) *
-                        100
-                      ).toFixed(1);
-                      return (
-                        <Box
-                          key={index}
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            mb: 1.5,
-                            gap: 0.8,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: "50%",
-                              bgcolor: getSectorColor(index),
-                              flexShrink: 0,
-                            }}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ width: "55%", height: 200 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={courseBySectorData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={65}
+                        innerRadius={25}
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        labelLine={{ stroke: "#ccc", strokeWidth: 0.5 }}
+                        animationBegin={300}
+                        animationDuration={800}
+                        animationEasing="ease-out"
+                      >
+                        {courseBySectorData.map((_, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={getSectorColor(index)}
+                            style={{ cursor: "pointer", transition: "transform 0.3s ease" }}
+                            onMouseEnter={(e) => { e.target.style.transform = "scale(1.03)"; }}
+                            onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }}
                           />
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: "#444",
-                              flex: 1,
-                              fontSize: "0.72rem",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {item.name}
-                          </Typography>
-                          <Stack
-                            direction="column"
-                            alignItems="flex-end"
-                            spacing={0}
-                          >
-                            <Typography
-                              sx={{
-                                fontSize: "0.72rem",
-                                fontWeight: 700,
-                                color: getSectorColor(index),
-                              }}
-                            >
-                              {item.value}
-                            </Typography>
-                            <Typography
-                              sx={{
-                                fontSize: "0.6rem",
-                                color: "#888",
-                              }}
-                            >
-                              ({percentage}%)
-                            </Typography>
-                          </Stack>
-                        </Box>
-                      );
-                    })}
-                    <Box
-                      sx={{
-                        mt: 2,
-                        pt: 1,
-                        borderTop: "1px solid #e0e8f0",
-                      }}
-                    >
-                      <Typography
-                        sx={{
+                        ))}
+                      </Pie>
+                      <RTooltip
+                        contentStyle={{
+                          borderRadius: 6,
+                          border: "1px solid #d4e2f4",
                           fontSize: "0.7rem",
-                          fontWeight: 700,
-                          color: P,
-                          textAlign: "right",
+                          padding: "4px 8px",
+                        }}
+                        formatter={(value, name) => [`${value} Program(s)`, name]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
+                <Box sx={{ width: "45%", maxHeight: 200, overflowY: "auto" }}>
+                  {courseBySectorData.slice(0, 8).map((item, index) => {
+                    const percentage = ((item.value / totalPrograms) * 100).toFixed(1);
+                    return (
+                      <Box
+                        key={index}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          mb: 1,
+                          gap: 0.5,
+                          animation: `${fadeInUp} 0.3s ease-out ${index * 0.03}s both`,
                         }}
                       >
-                        Total: {totalPrograms} Programs
-                      </Typography>
-                    </Box>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            bgcolor: getSectorColor(index),
+                            flexShrink: 0,
+                          }}
+                        />
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "#444",
+                            flex: 1,
+                            fontSize: "0.65rem",
+                            fontWeight: 500,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {item.name}
+                        </Typography>
+                        <Stack direction="column" alignItems="flex-end" spacing={0}>
+                          <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: getSectorColor(index) }}>
+                            {item.value}
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.55rem", color: "#888" }}>
+                            ({percentage}%)
+                          </Typography>
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                  <Box sx={{ mt: 1, pt: 0.5, borderTop: "1px solid #e0e8f0" }}>
+                    <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: P, textAlign: "right" }}>
+                      Total: {totalPrograms}
+                    </Typography>
                   </Box>
                 </Box>
-              </>
+              </Box>
             )}
           </CardContent>
         </Card>
@@ -396,131 +552,134 @@ const PieBarGraphDistributionIndex = () => {
           elevation={0}
           sx={{
             border: "1px solid #e3eaf4",
-            borderRadius: 3,
+            borderRadius: 2,
             bgcolor: "#ffffff",
             height: "100%",
+            animation: `${slideInRight} 0.5s ease-out`,
+            transition: "all 0.3s ease",
+            "&:hover": {
+              transform: "translateY(-2px)",
+              boxShadow: `0 8px 20px ${alpha(TEAL, 0.1)}`,
+            },
           }}
         >
-          <CardContent sx={{ p: 2.5 }}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1.2}
-              sx={{ mb: 2 }}
-            >
+          <CardContent sx={{ p: 1.5 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
               <Box
                 sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 1.5,
-                  bgcolor: alpha(P, 0.12),
-                  color: P,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 1,
+                  bgcolor: alpha(TEAL, 0.12),
+                  color: TEAL,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <LocationOnIcon sx={{ fontSize: 20 }} />
+                <LocationOnIcon sx={{ fontSize: 16 }} />
               </Box>
               <Box>
                 <Typography
-                  fontWeight={800}
-                  sx={{ fontSize: "0.95rem", color: "#0a1929" }}
+                  fontWeight={700}
+                  sx={{
+                    fontSize: "0.85rem",
+                    background: `linear-gradient(135deg, ${TEAL}, ${P})`,
+                    backgroundSize: "200% auto",
+                    color: "transparent",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                  }}
                 >
                   Institute By Dzongkhag
                 </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Distribution across all 20 Dzongkhags of Bhutan
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.65rem" }}>
+                  Across 20 Dzongkhags
                 </Typography>
               </Box>
             </Stack>
 
-            {dzongkhagInstituteData.length === 0 ||
-            dzongkhagInstituteData.every((item) => item.value === 0) ? (
-              <Box
-                sx={{
-                  textAlign: "center",
-                  py: 8,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: 300,
-                }}
-              >
-                <Typography
-                  sx={{
-                    color: "error.main",
-                    fontWeight: 600,
-                    fontSize: "0.9rem",
-                  }}
-                >
+            {loading ? (
+              <LoadingSkeleton />
+            ) : dzongkhagInstituteData.length === 0 ||
+              dzongkhagInstituteData.every((item) => item.value === 0) ? (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Typography sx={{ color: "error.main", fontWeight: 600, fontSize: "0.8rem" }}>
                   No data available
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: "#666", mt: 1, display: "block" }}
-                >
-                  No institute distribution data found
                 </Typography>
               </Box>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={320}>
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart
                     data={dzongkhagInstituteData}
-                    margin={{
-                      top: 8,
-                      right: 16,
-                      left: -18,
-                      bottom: 58,
-                    }}
+                    margin={{ top: 5, right: 10, left: -15, bottom: 50 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#edf2f9" />
                     <XAxis
                       dataKey="name"
-                      tick={{ fontSize: 10, fill: "#555" }}
+                      tick={{ fontSize: 9, fill: "#555" }}
                       angle={-40}
                       textAnchor="end"
                       interval={0}
-                      height={70}
+                      height={55}
                     />
                     <YAxis
-                      tick={{ fontSize: 11, fill: "#666" }}
+                      tick={{ fontSize: 9, fill: "#666" }}
                       label={{
-                        value: "Number of Institutes",
+                        value: "Institutes",
                         angle: -90,
                         position: "insideLeft",
-                        style: { fontSize: "11px", fill: "#666" },
+                        style: { fontSize: "9px", fill: "#666" },
                       }}
                     />
                     <RTooltip
                       contentStyle={{
-                        borderRadius: 8,
+                        borderRadius: 6,
                         border: "1px solid #d4e2f4",
-                        fontSize: "0.8rem",
+                        fontSize: "0.7rem",
+                        padding: "4px 8px",
                       }}
                       formatter={(value) => [`${value} Institute(s)`, "Count"]}
-                      labelFormatter={(label) => `${label}`}
                     />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={24}>
+                    <Bar
+                      dataKey="value"
+                      radius={[4, 4, 0, 0]}
+                      barSize={20}
+                      animationBegin={300}
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                      shape={(props) => <AnimatedBar {...props} />}
+                    >
                       {dzongkhagInstituteData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={getDzongkhagBarColor(entry.value, index)}
                           opacity={entry.value > 0 ? 1 : 0.5}
+                          style={{ cursor: "pointer", transition: "all 0.3s ease" }}
+                          onMouseEnter={(e) => {
+                            if (e.target) {
+                              e.target.style.opacity = "0.8";
+                              e.target.style.animation = `${barShake} 0.3s ease`;
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (e.target) {
+                              e.target.style.opacity = entry.value > 0 ? 1 : 0.5;
+                              e.target.style.animation = "none";
+                            }
+                          }}
                         />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <Box sx={{ mt: 2, textAlign: "center" }}>
-                  <Typography variant="caption" sx={{ color: "#666" }}>
+                <Box sx={{ mt: 1, textAlign: "center" }}>
+                  <Typography variant="caption" sx={{ color: "#666", fontSize: "0.7rem" }}>
                     Total Institutes:{" "}
-                    {dzongkhagInstituteData.reduce(
-                      (sum, d) => sum + d.value,
-                      0,
-                    )}
+                    <Box component="span" sx={{ fontWeight: "bold", color: TEAL }}>
+                      {dzongkhagInstituteData.reduce((sum, d) => sum + d.value, 0)}
+                    </Box>
                   </Typography>
                 </Box>
               </>

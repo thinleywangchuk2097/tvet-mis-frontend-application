@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Card,
@@ -16,11 +16,120 @@ import {
   TablePagination,
   Collapse,
   IconButton,
+  keyframes,
 } from "@mui/material";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+
+// ── Animations
+const fadeInUp = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const slideInLeft = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
+
+const slideInRight = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
+
+const pulse = keyframes`
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+`;
+
+const shimmer = keyframes`
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+`;
+
+const gradientShift = keyframes`
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+`;
+
+const tableRowAnimation = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
+
+const expandAnimation = keyframes`
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+    max-height: 500px;
+  }
+`;
+
+const barExpand = keyframes`
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+`;
+
+const countUp = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
 
 // ── Brand palette
 const P = "#1565c0";
@@ -76,16 +185,14 @@ const tvetIndicators = [
   {
     id: 13,
     name: "BQF Certificate Awarded",
-    pub: 3245,
-    pvt: 5211,
+    pub: 817,
+    pvt: 1460,
     color: "#6a1b9a",
     isExpandable: true,
     subItems: [
-      { name: "Certificate 2", pub: 1856, pvt: 2465 },
-      { name: "Certificate 3", pub: 1325, pvt: 1662 },
-      { name: "Certificate 2 (RPL)", pub: 0, pvt: 0 },
-      { name: "Certificate 3 (RPL)", pub: 0, pvt: 0 },
-      { name: "Diploma", pub: 1024, pvt: 830 },
+      { name: "Certificate 2", pub: 156, pvt: 265 },
+      { name: "Certificate 3", pub: 125, pvt: 162 },
+      { name: "Diploma", pub: 124, pvt: 830 },
       { name: "Advanced Diploma", pub: 412, pvt: 212 },
     ],
   },
@@ -114,7 +221,7 @@ const providerTypeData = [
 ];
 const providerTotal = providerTypeData.reduce((s, d) => s + d.value, 0);
 
-// ── Shared table styles
+// ── Shared table styles with animation
 const TS = {
   "& th": {
     bgcolor: PL,
@@ -125,13 +232,42 @@ const TS = {
   },
   "& td": { fontSize: "0.8rem" },
   "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
-  "& tbody tr:hover td": { bgcolor: "#f5f9ff" },
+  "& tbody tr": {
+    animation: `${fadeInUp} 0.4s ease-out`,
+    "&:hover td": { bgcolor: "#f5f9ff" },
+  },
 };
 
 const TvetIndicatorsInstituteProviderType = () => {
   const [infoPage, setInfoPage] = useState(0);
   const [infoRowsPerPage, setInfoRowsPerPage] = useState(5);
   const [expandedRows, setExpandedRows] = useState({});
+  const [animateValues, setAnimateValues] = useState(false);
+  const [animatedTotal, setAnimatedTotal] = useState(0);
+
+  useEffect(() => {
+    // Trigger animations after component mounts
+    setTimeout(() => setAnimateValues(true), 300);
+    
+    // Animate total count
+    const duration = 2000;
+    const stepTime = 20;
+    const steps = duration / stepTime;
+    const increment = providerTotal / steps;
+    let current = 0;
+    
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= providerTotal) {
+        setAnimatedTotal(providerTotal);
+        clearInterval(timer);
+      } else {
+        setAnimatedTotal(Math.floor(current));
+      }
+    }, stepTime);
+    
+    return () => clearInterval(timer);
+  }, []);
 
   // Check if data is available
   const hasTvetData = tvetIndicators && tvetIndicators.length > 0;
@@ -144,7 +280,7 @@ const TvetIndicatorsInstituteProviderType = () => {
     }));
   };
 
-  // Filter out child items for main display (they will be shown in expandable section)
+  // Filter out child items for main display
   const mainIndicators = tvetIndicators.filter((item) => !item.isChild);
 
   return (
@@ -158,6 +294,13 @@ const TvetIndicatorsInstituteProviderType = () => {
             borderRadius: 3,
             bgcolor: W,
             height: "100%",
+            animation: `${slideInLeft} 0.6s ease-out`,
+            transition: "all 0.3s ease",
+            "&:hover": {
+              transform: "translateY(-4px)",
+              boxShadow: `0 12px 28px ${alpha(P, 0.12)}`,
+              borderColor: alpha(P, 0.3),
+            },
           }}
         >
           <CardContent sx={{ p: 2.5 }}>
@@ -177,6 +320,7 @@ const TvetIndicatorsInstituteProviderType = () => {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  animation: `${pulse} 2s ease-in-out infinite`,
                 }}
               >
                 <BarChartIcon sx={{ fontSize: 20 }} />
@@ -184,7 +328,15 @@ const TvetIndicatorsInstituteProviderType = () => {
               <Box>
                 <Typography
                   fontWeight={800}
-                  sx={{ fontSize: "0.95rem", color: "#0a1929" }}
+                  sx={{
+                    fontSize: "0.95rem",
+                    background: `linear-gradient(135deg, ${P} 0%, ${TEAL} 50%, ${P} 100%)`,
+                    backgroundSize: "200% auto",
+                    color: "transparent",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    animation: `${gradientShift} 3s ease infinite`,
+                  }}
                 >
                   TVET Indicators Breakdown
                 </Typography>
@@ -242,9 +394,13 @@ const TvetIndicatorsInstituteProviderType = () => {
                           infoPage * infoRowsPerPage,
                           infoPage * infoRowsPerPage + infoRowsPerPage,
                         )
-                        .map((row) => (
+                        .map((row, index) => (
                           <React.Fragment key={row.id}>
-                            <TableRow>
+                            <TableRow
+                              sx={{
+                                animation: `${tableRowAnimation} 0.3s ease-out ${index * 0.05}s both`,
+                              }}
+                            >
                               <TableCell>
                                 <Box
                                   sx={{
@@ -255,6 +411,11 @@ const TvetIndicatorsInstituteProviderType = () => {
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
+                                    transition: "all 0.3s ease",
+                                    "&:hover": {
+                                      transform: "scale(1.2)",
+                                      boxShadow: `0 0 0 3px ${alpha(row.color, 0.3)}`,
+                                    },
                                   }}
                                 >
                                   <Typography
@@ -295,6 +456,11 @@ const TvetIndicatorsInstituteProviderType = () => {
                                     bgcolor: alpha(row.color, 0.12),
                                     border: `1px solid ${alpha(row.color, 0.35)}`,
                                     minWidth: 60,
+                                    transition: "all 0.3s ease",
+                                    "&:hover": {
+                                      transform: "scale(1.05)",
+                                      bgcolor: alpha(row.color, 0.2),
+                                    },
                                   }}
                                 >
                                   <Typography
@@ -307,6 +473,28 @@ const TvetIndicatorsInstituteProviderType = () => {
                                     {row.total.toLocaleString()}
                                   </Typography>
                                 </Box>
+                              </TableCell>
+                              <TableCell align="center">
+                                {row.isExpandable && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleExpandClick(row.id)}
+                                    sx={{
+                                      color: row.color,
+                                      transition: "all 0.3s ease",
+                                      "&:hover": {
+                                        bgcolor: alpha(row.color, 0.1),
+                                        transform: "rotate(180deg)",
+                                      },
+                                    }}
+                                  >
+                                    {expandedRows[row.id] ? (
+                                      <ExpandLessIcon />
+                                    ) : (
+                                      <ExpandMoreIcon />
+                                    )}
+                                  </IconButton>
+                                )}
                               </TableCell>
                             </TableRow>
 
@@ -322,7 +510,12 @@ const TvetIndicatorsInstituteProviderType = () => {
                                     timeout="auto"
                                     unmountOnExit
                                   >
-                                    <Box sx={{ m: 1.5 }}>
+                                    <Box 
+                                      sx={{ 
+                                        m: 1.5,
+                                        animation: `${expandAnimation} 0.4s ease-out`,
+                                      }}
+                                    >
                                       <Table size="small">
                                         <TableHead>
                                           <TableRow>
@@ -346,7 +539,13 @@ const TvetIndicatorsInstituteProviderType = () => {
                                           {row.subItems?.map((subItem, idx) => {
                                             const subTotal = (subItem.pub || 0) + (subItem.pvt || 0);
                                             return (
-                                              <TableRow key={idx} sx={{ bgcolor: alpha(P, 0.02) }}>
+                                              <TableRow 
+                                                key={idx} 
+                                                sx={{ 
+                                                  bgcolor: alpha(P, 0.02),
+                                                  animation: `${fadeInUp} 0.3s ease-out ${idx * 0.05}s both`,
+                                                }}
+                                              >
                                                 <TableCell>
                                                   <Box
                                                     sx={{
@@ -357,6 +556,10 @@ const TvetIndicatorsInstituteProviderType = () => {
                                                       display: "flex",
                                                       alignItems: "center",
                                                       justifyContent: "center",
+                                                      transition: "all 0.3s ease",
+                                                      "&:hover": {
+                                                        transform: "scale(1.2)",
+                                                      },
                                                     }}
                                                   >
                                                     <Typography
@@ -389,6 +592,10 @@ const TvetIndicatorsInstituteProviderType = () => {
                                                       bgcolor: alpha(row.color, 0.1),
                                                       border: `1px solid ${alpha(row.color, 0.25)}`,
                                                       minWidth: 50,
+                                                      transition: "all 0.3s ease",
+                                                      "&:hover": {
+                                                        transform: "scale(1.05)",
+                                                      },
                                                     }}
                                                   >
                                                     <Typography
@@ -450,6 +657,13 @@ const TvetIndicatorsInstituteProviderType = () => {
             borderRadius: 3,
             bgcolor: W,
             height: "100%",
+            animation: `${slideInRight} 0.6s ease-out`,
+            transition: "all 0.3s ease",
+            "&:hover": {
+              transform: "translateY(-4px)",
+              boxShadow: `0 12px 28px ${alpha(TEAL, 0.12)}`,
+              borderColor: alpha(TEAL, 0.3),
+            },
           }}
         >
           <CardContent sx={{ p: 2.5 }}>
@@ -464,11 +678,12 @@ const TvetIndicatorsInstituteProviderType = () => {
                   width: 36,
                   height: 36,
                   borderRadius: 1.5,
-                  bgcolor: alpha(P, 0.12),
-                  color: P,
+                  bgcolor: alpha(TEAL, 0.12),
+                  color: TEAL,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  animation: `${pulse} 2s ease-in-out infinite 0.5s`,
                 }}
               >
                 <AccountBalanceIcon sx={{ fontSize: 20 }} />
@@ -476,7 +691,15 @@ const TvetIndicatorsInstituteProviderType = () => {
               <Box>
                 <Typography
                   fontWeight={800}
-                  sx={{ fontSize: "0.95rem", color: "#0a1929" }}
+                  sx={{
+                    fontSize: "0.95rem",
+                    background: `linear-gradient(135deg, ${TEAL} 0%, ${P} 50%, ${TEAL} 100%)`,
+                    backgroundSize: "200% auto",
+                    color: "transparent",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    animation: `${gradientShift} 3s ease infinite 0.5s`,
+                  }}
                 >
                   Institute by Provider Type
                 </Typography>
@@ -527,6 +750,12 @@ const TvetIndicatorsInstituteProviderType = () => {
                     justifyContent: "space-between",
                     alignItems: "center",
                     boxShadow: `0 3px 10px ${alpha(P, 0.22)}`,
+                    animation: `${fadeInUp} 0.6s ease-out`,
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      transform: "scale(1.02)",
+                      boxShadow: `0 6px 20px ${alpha(P, 0.3)}`,
+                    },
                   }}
                 >
                   <Box>
@@ -547,13 +776,18 @@ const TvetIndicatorsInstituteProviderType = () => {
                         fontWeight: 800,
                         fontSize: "1.3rem",
                         lineHeight: 1.1,
+                        animation: `${countUp} 1s ease-out`,
                       }}
                     >
-                      {providerTotal.toLocaleString()}
+                      {animatedTotal.toLocaleString()}
                     </Typography>
                   </Box>
                   <AccountBalanceIcon
-                    sx={{ color: alpha(W, 0.8), fontSize: 30 }}
+                    sx={{ 
+                      color: alpha(W, 0.8), 
+                      fontSize: 30,
+                      animation: `${pulse} 2s ease-in-out infinite`,
+                    }}
                   />
                 </Box>
 
@@ -568,7 +802,7 @@ const TvetIndicatorsInstituteProviderType = () => {
                       100
                     ).toFixed(1);
                     return (
-                      <Box key={i}>
+                      <Box key={i} sx={{ animation: `${fadeInUp} 0.5s ease-out ${i * 0.2}s both` }}>
                         <Stack
                           direction="row"
                           justifyContent="space-between"
@@ -587,6 +821,10 @@ const TvetIndicatorsInstituteProviderType = () => {
                                 borderRadius: "50%",
                                 bgcolor: item.color,
                                 boxShadow: `0 0 0 4px ${alpha(item.color, 0.18)}`,
+                                transition: "all 0.3s ease",
+                                "&:hover": {
+                                  transform: "scale(1.5)",
+                                },
                               }}
                             />
                             <Typography
@@ -603,7 +841,14 @@ const TvetIndicatorsInstituteProviderType = () => {
                           >
                             <Typography
                               fontWeight={800}
-                              sx={{ color: item.color, fontSize: "0.9rem" }}
+                              sx={{ 
+                                color: item.color, 
+                                fontSize: "0.9rem",
+                                transition: "all 0.3s ease",
+                                "&:hover": {
+                                  transform: "scale(1.1)",
+                                },
+                              }}
                             >
                               {item.value}
                             </Typography>
@@ -627,13 +872,13 @@ const TvetIndicatorsInstituteProviderType = () => {
                         >
                           <Box
                             sx={{
-                              width: `${widthPct}%`,
+                              width: animateValues ? `${widthPct}%` : "0%",
                               height: "100%",
                               background: `linear-gradient(90deg, ${item.color} 0%, ${alpha(item.color, 0.65)} 100%)`,
                               borderRadius: 3,
-                              transition:
-                                "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+                              transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)",
                               boxShadow: `0 1px 2px ${alpha(item.color, 0.4)}`,
+                              animation: animateValues ? `${barExpand} 1s ease-out` : "none",
                             }}
                           />
                         </Box>

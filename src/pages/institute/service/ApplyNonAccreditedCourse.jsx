@@ -523,7 +523,6 @@ const ApplyNonAccreditedCourse = () => {
 
   const handleReset = () => {
     setQualitySelections({});
-    toast.info("Form has been reset");
   };
 
   const getCertificateLevelName = (levelId) => {
