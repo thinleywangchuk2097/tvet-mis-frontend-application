@@ -385,9 +385,7 @@ const TvetIndicatorsInstituteProviderType = () => {
                         <TableCell align="center">Public</TableCell>
                         <TableCell align="center">Private</TableCell>
                         <TableCell align="center">Total</TableCell>
-                        <TableCell width={50} align="center">
-                          Action
-                        </TableCell>
+
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -499,7 +497,7 @@ const TvetIndicatorsInstituteProviderType = () => {
                                 )}
                               </TableCell>
                             </TableRow>
-                            
+
                             {/* Expandable Sub-Items */}
                             {row.isExpandable && (
                               <TableRow>

@@ -92,6 +92,11 @@ import AssessmentCentreResult from "../pages/assessment-centre/assessment-result
 //registration
 import AddTrainerIndex from "../pages/trainer/AddTrainerIndex";
 
+//NCS Management
+import CreateNcsIndex from "../pages/bqpca/nac/CreateNcsIndex";
+//Curriculum Management
+import CreateCurriculumIndex from "../pages/bqpca/curriculum/CreateCurriculumIndex";
+
 export const privateRoutes = [
   {
     path: "/",
@@ -109,7 +114,7 @@ export const privateRoutes = [
     path: "dropdown-management",
     children: [{ path: "create-dropdown", element: <DropdownIndex /> }],
   },
-    {
+  {
     path: "master",
     children: [
       { path: "sector-occupation-index", element: <SectorOccupationIndex /> },
@@ -305,4 +310,16 @@ export const privateRoutes = [
   //without children
   { path: "/apply-qms-certification", element: <ApplyQmsCertification /> },
   { path: "/track-trainee", element: <TrackTrainee /> },
+  {
+    path: "ncs",
+    children: [
+      { path: "create-index", element: <CreateNcsIndex /> },
+    ],
+  },
+  {
+    path: "curriculum",
+    children: [
+      { path: "create-index", element: <CreateCurriculumIndex /> },
+    ],
+  },
 ];
