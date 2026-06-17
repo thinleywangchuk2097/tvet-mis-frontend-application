@@ -627,7 +627,7 @@ const PublicIndex = () => {
         <Box
           sx={{
             position: "relative",
-            py: { xs: 5, md: 6 },
+            py: { xs: 5, md: 4 },
             background: `
               radial-gradient(circle at 15% 30%, ${alpha(P, 0.1)} 0%, transparent 45%),
               radial-gradient(circle at 85% 70%, ${alpha(TEAL, 0.1)} 0%, transparent 45%),
@@ -650,10 +650,10 @@ const PublicIndex = () => {
         </Box>
 
         {/* ── 4. National Statistics ─────────────────────────────────── */}
-        <Box sx={{ px: 2 }}>
+        <Box sx={{ px: 2, pt: 2 }}>
           <SectionTitle
             align="center"
-            eyebrow="National Statistics"
+            eyebrow=""
             title="Key TVET Indicators"
             subtitle="Detailed cumulative figures across all sectors — Public, Private and combined totals."
           />
@@ -750,10 +750,10 @@ const PublicIndex = () => {
         </Box>
 
         {/* ── 8. Quick Access ───────────────────────────────────────── */}
-        <Box sx={{ px: 2, pb: 6 }}>
+        <Box sx={{ px: 2, pb: 6, pt: 2 }}>
           <SectionTitle
             align="center"
-            eyebrow="Resources"
+            eyebrow=""
             title="Quick Access"
             subtitle="Frequently used resources for trainees, training providers and TVET professionals."
           />
@@ -762,14 +762,14 @@ const PublicIndex = () => {
               {
                 label: "National Competency Standards",
                 desc: "Browse all NCS documents by sector and qualification level",
-                href: "https://www.blmis.gov.bt/tvet/ncs",
+                href: "/reports/ncs-publication",
                 color: P,
                 icon: <VerifiedIcon sx={{ fontSize: 28 }} />,
               },
               {
-                label: "Approved Curriculum",
+                label: "Curriculum",
                 desc: "Access and download approved curricula for accredited TVET courses",
-                href: "https://www.blmis.gov.bt/tvet/curriculum",
+                href: "/reports/curriculum-publication",
                 color: TEAL,
                 icon: <MenuBookIcon sx={{ fontSize: 28 }} />,
               },
@@ -778,7 +778,6 @@ const PublicIndex = () => {
                 <Box
                   component="a"
                   href={link.href}
-                  target="_blank"
                   rel="noreferrer"
                   sx={{ textDecoration: "none" }}
                 >

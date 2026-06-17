@@ -233,9 +233,7 @@ const TvetIndicatorsInstituteProviderType = () => {
                         <TableCell align="center">Public</TableCell>
                         <TableCell align="center">Private</TableCell>
                         <TableCell align="center">Total</TableCell>
-                        <TableCell width={50} align="center">
-                          Action
-                        </TableCell>
+
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -310,28 +308,8 @@ const TvetIndicatorsInstituteProviderType = () => {
                                   </Typography>
                                 </Box>
                               </TableCell>
-                              <TableCell align="center">
-                                {row.isExpandable && (
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleExpandClick(row.id)}
-                                    sx={{
-                                      color: row.color,
-                                      "&:hover": {
-                                        bgcolor: alpha(row.color, 0.1),
-                                      },
-                                    }}
-                                  >
-                                    {expandedRows[row.id] ? (
-                                      <ExpandLessIcon />
-                                    ) : (
-                                      <ExpandMoreIcon />
-                                    )}
-                                  </IconButton>
-                                )}
-                              </TableCell>
                             </TableRow>
-                            
+
                             {/* Expandable Sub-Items */}
                             {row.isExpandable && (
                               <TableRow>
