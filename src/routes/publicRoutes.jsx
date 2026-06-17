@@ -22,6 +22,8 @@ import TrainerReport from "../pages/public/reports/Trainer";
 import QMSAuditorReport from "../pages/public/reports/QMSAuditor";
 import CoursesAccreditedReport from "../pages/public/reports/CoursesAccredited";
 import BirmsPublicPaymentIndex from "../pages/birms/pubilc/BirmsPublicPaymentIndex";
+import NcsPublication from "../pages/report/NcsPublication";
+import CurriculumPublication from "../pages/report/CurriculumPublication";
 //Feedback or Complain
 import FeedbackForm from "../pages/public/FeedbackForm";
 import ViewTracerSend from "../pages/dwps/tracer/ViewTracerSend";
@@ -77,6 +79,8 @@ export const publicRoutes = [
       { path: "trainer", element: <TrainerReport /> },
       { path: "qms-auditor", element: <QMSAuditorReport /> },
       { path: "courses-accredited", element: <CoursesAccreditedReport /> },
+      { path: "ncs-publication", element: <NcsPublication /> },
+      { path: "curriculum-publication", element: <CurriculumPublication /> },
     ],
   },
 
@@ -84,7 +88,7 @@ export const publicRoutes = [
     path: "result",
     children: [{ path: "assessment-result", element: <AssessmentResult /> }],
   },
-   {
+  {
     path: "publication",
     children: [{ path: "publication-index", element: <PublicationIndex /> }],
   },
