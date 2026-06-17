@@ -54,12 +54,12 @@ const QRCodeDisplay = ({ value }) => (
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
-      width: 200,
-      height: 200,
+      width: 220,
+      height: 220,
       margin: "auto",
       marginBottom: 1,
       backgroundColor: "#FFFFFF",
-      padding: 8,
+      padding: 10,
       border: "3px solid #5AC994",
       borderRadius: "10px",
     }}
@@ -67,11 +67,11 @@ const QRCodeDisplay = ({ value }) => (
     <Box
       sx={{
         position: "relative",
-        width: 180,
-        height: 180,
+        width: 200,
+        height: 200,
       }}
     >
-      <QRCodeCanvas value={value} size={180} style={{ display: "block" }} />
+      <QRCodeCanvas value={value} size={200} style={{ display: "block" }} />
       <img
         src={QRNDIlogo}
         alt="Bhutan NDI Logo"
@@ -80,8 +80,8 @@ const QRCodeDisplay = ({ value }) => (
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          width: "45px",
-          height: "45px",
+          width: "50px",
+          height: "50px",
           borderRadius: "50%",
           background: "white",
         }}
@@ -163,7 +163,7 @@ const CommonQRCode = ({
                 onSuccess(userData);
               }
 
-           //   toast.success("NDI data retrieved successfully!");
+              // toast.success("NDI data retrieved successfully!");
               await nc.close();
               console.log("Redirecting to:", redirectRoute);
               navigate(redirectRoute);
@@ -206,62 +206,68 @@ const CommonQRCode = ({
   };
 
   return (
-    <Card
+    <Box
       sx={{
-        width: isMobile ? "95%" : 450,
-        maxWidth: "100%",
-        height: "auto",
-        maxHeight: "90vh",
-        margin: "auto",
+        flex: 1,
         display: "flex",
-        flexDirection: "column",
-        backgroundColor: "#F8F8F8",
-        borderRadius: 2,
-        overflow: "hidden",
-        position: "relative",
-        ...customStyles.card,
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 3,
+        ...customStyles.container,
       }}
     >
-      <IconButton
-        onClick={handleClose}
+      <Card
         sx={{
-          position: "absolute",
-          top: 3,
-          right: 10,
-          color: "#333",
-          zIndex: 1,
-        }}
-      >
-        <CloseIcon />
-      </IconButton>
-
-      <CardContent
-        sx={{
-          flex: 1,
-          overflowY: "auto",
+          width: isMobile ? "100%" : 600,
+          maxWidth: "100%",
+          maxHeight: "90vh",
+          margin: "auto",
+          textAlign: "center",
+          boxShadow: 3,
           padding: 3,
-          "&:last-child": {
-            paddingBottom: 3,
-          },
+          borderRadius: 2,
+          backgroundColor: "#F8F8F8",
+          fontFamily: "Inter",
+          color: "#A1A0A0",
+          overflowY: "auto",
+          position: "relative",
+          ...customStyles.card,
         }}
       >
-        <Box
+        <IconButton
+          onClick={handleClose}
           sx={{
+            position: "absolute",
+            top: 3,
+            right: 10,
+            color: "#333",
+            zIndex: 1,
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+
+        <CardContent
+          sx={{
+            paddingBottom: 2,
             display: "flex",
             flexDirection: "column",
             gap: 2,
+            "&:last-child": {
+              paddingBottom: 2,
+            },
           }}
         >
           {isMobile ? (
             <>
               <Typography
-                variant="h5"
+                variant="h4"
                 fontWeight="bold"
                 mb={1}
-                textAlign="center"
+                sx={{ fontSize: "18px", color: "#000000" }}
               >
-                Login with <span style={{ color: "#5AC994" }}>Bhutan NDI</span>{" "}
-                Wallet
+                Login with{" "}
+                <span style={{ color: "#5AC994" }}>Bhutan NDI</span> Wallet
               </Typography>
               <Button
                 variant="contained"
@@ -269,9 +275,10 @@ const CommonQRCode = ({
                 sx={{
                   bgcolor: "#5AC994",
                   color: "#fff",
+                  textTransform: "none",
                   "&:hover": { bgcolor: "#4CAF89" },
                   width: "100%",
-                  maxWidth: "250px",
+                  maxWidth: "290px",
                   margin: "0 auto",
                 }}
               >
@@ -294,10 +301,10 @@ const CommonQRCode = ({
             </>
           ) : (
             <Typography
-              variant="h5"
+              variant="h4"
               fontWeight="bold"
               mb={1}
-              textAlign="center"
+              sx={{ fontSize: "18px", color: "#000000" }}
             >
               {title}
             </Typography>
@@ -315,17 +322,18 @@ const CommonQRCode = ({
             component="div"
             variant="body2"
             sx={{
-              lineHeight: 1.6,
+              lineHeight: 1.8,
               color: "#666666",
-              textAlign: "center",
-              fontSize: "0.875rem",
+              textAlign: "left",
+              display: "flex",
+              justifyContent: "center",
             }}
           >
             <Box
               sx={{
                 textAlign: "left",
                 width: "100%",
-                pl: 2,
+                maxWidth: "300px",
               }}
             >
               1. Open Bhutan NDI Wallet on your Phone <br />
@@ -334,10 +342,11 @@ const CommonQRCode = ({
                 src="/UI_Scanicon.png"
                 alt="Scan icon"
                 style={{
-                  width: "20px",
+                  width: "25px",
                   height: "auto",
                   verticalAlign: "middle",
                   marginTop: "3px",
+                  paddingRight: 2,
                 }}
               />
               located on the
@@ -352,8 +361,8 @@ const CommonQRCode = ({
             variant="outlined"
             endIcon={
               <svg
-                width="18"
-                height="18"
+                width="20"
+                height="20"
                 viewBox="0 0 69 70"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
@@ -376,13 +385,14 @@ const CommonQRCode = ({
               border: "2px solid #5AC994",
               backgroundColor: "transparent",
               fontWeight: "bold",
-              width: "160px",
-              height: "35px",
-              fontSize: "11px",
+              width: "180px",
+              height: "37px",
+              fontSize: "12px",
               color: "#5AC994",
               borderRadius: "30px",
               margin: "0 auto",
               marginTop: 1,
+              textTransform: "none",
               "&:hover": {
                 border: "2px solid #4CAF89",
               },
@@ -393,13 +403,12 @@ const CommonQRCode = ({
           </Button>
 
           {showDownloadButtons && (
-            <Box sx={{ textAlign: "center", mb: 1 }}>
+            <Box sx={{ textAlign: "center", mb: 2 }}>
               <Typography
                 sx={{
                   mt: 1,
                   textAlign: "center",
                   mb: 1,
-                  fontSize: "0.875rem",
                 }}
               >
                 Don&apos;t have the Bhutan NDI Wallet?
@@ -434,8 +443,8 @@ const CommonQRCode = ({
                     src="/GooglePlay.png"
                     alt="Get it on Google Play"
                     style={{
-                      width: "90px",
-                      height: "36px",
+                      width: "105px",
+                      height: "42px",
                       cursor: "pointer",
                     }}
                   />
@@ -449,8 +458,8 @@ const CommonQRCode = ({
                     src="/Appstore.png"
                     alt="Download from App Store"
                     style={{
-                      width: "95px",
-                      height: "36px",
+                      width: "110px",
+                      height: "42px",
                       cursor: "pointer",
                     }}
                   />
@@ -467,7 +476,6 @@ const CommonQRCode = ({
                   color: "#5AC994",
                   textAlign: "center",
                   mb: 1,
-                  fontSize: "0.875rem",
                 }}
               >
                 Get Support
@@ -477,8 +485,13 @@ const CommonQRCode = ({
                 justifyContent="center"
                 alignItems="center"
                 spacing={1}
+                sx={{
+                  "& > *": {
+                    mx: 0.625,
+                  },
+                }}
               >
-                <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Stack direction="row" alignItems="center">
                   <IconButton
                     href="mailto:ndifeedback@dhi.bt"
                     sx={{ color: "#5AC994", p: 0.5 }}
@@ -487,18 +500,15 @@ const CommonQRCode = ({
                     <img
                       src={MailIcon}
                       alt="Mail Icon"
-                      style={{ width: "14px", height: "10px" }}
+                      style={{ width: "16px", height: "12px" }}
                     />
                   </IconButton>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: "black", fontSize: "0.75rem" }}
-                  >
+                  <Typography variant="body2" sx={{ color: "black" }}>
                     ndifeedback@dhi.bt
                   </Typography>
                 </Stack>
 
-                <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Stack direction="row" alignItems="center">
                   <IconButton
                     href="tel:1199"
                     sx={{ color: "#5AC994", p: 0.5 }}
@@ -507,22 +517,19 @@ const CommonQRCode = ({
                     <img
                       src={RingingPhoneOutlineIcon}
                       alt="Ringing Phone Icon"
-                      style={{ width: "16px", height: "16px" }}
+                      style={{ width: "18px", height: "18px" }}
                     />
                   </IconButton>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: "black", fontSize: "0.75rem" }}
-                  >
+                  <Typography variant="body2" sx={{ color: "black" }}>
                     1199
                   </Typography>
                 </Stack>
               </Stack>
             </Box>
           )}
-        </Box>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Box>
   );
 };
 

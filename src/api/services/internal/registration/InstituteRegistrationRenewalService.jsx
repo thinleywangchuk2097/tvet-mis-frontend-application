@@ -18,6 +18,20 @@ class InstituteRegistrationRenewalService {
       .catch((error) => error);
   }
 
+   getInstitutesRenewalStatus(registrationNo, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/monitoring/get-institutes-renewal-status/${registrationNo}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   
     
 }
