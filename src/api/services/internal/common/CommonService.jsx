@@ -1,6 +1,7 @@
 import apiClient from "../../../axios";
 
 class CommonService {
+  
   getAllDzongkhags() {
     return apiClient
       .get("/api/v1/common/get-dzongkhags")
@@ -21,6 +22,7 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
+
   getAllOccupations() {
     return apiClient
       .get("/api/v1/common/get-occupations")
@@ -33,9 +35,17 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
+
   getByParentId(parentId) {
     return apiClient
       .get(`/api/v1/common/get-child-dropdown/${parentId}`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  getCurriculumServiceType() {
+    return apiClient
+      .get(`/api/v1/common/get-curriculum-service-types`)
       .then((response) => response)
       .catch((error) => error);
   }
@@ -46,6 +56,7 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
+
   getOccupationsBySectorId(sectorId) {
     return apiClient
       .get(`/api/v1/common/get-occupations/${sectorId}`)
@@ -59,6 +70,7 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
+
   getServiceNameCourseAnnouncement() {
     return apiClient
       .get("/api/v1/common/get-service-announcement")
@@ -80,6 +92,7 @@ class CommonService {
       .then((response) => response)
       .catch((error) => error);
   }
+
   fetchDocument(fileName, upload_url) {
     return apiClient.get("/api/v1/common/download-document", {
       params: {

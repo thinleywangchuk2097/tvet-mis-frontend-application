@@ -158,7 +158,7 @@ const TaskListIndex = () => {
           mb: 2,
         }}
       >
-        <Typography variant="h5">Task List Index</Typography>
+        <Typography variant="h5">Task List </Typography>
 
         <TextField
           variant="outlined"

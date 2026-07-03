@@ -15,7 +15,8 @@ import {
 import { useSelector, useDispatch } from "react-redux";
 import { toggleTheme } from "../../features/theme/themeSlice";
 import ProfileHeader from "./ProfileHeader";
-import logo from "../../assets/bhutan-emblem.jpeg"; // import your logo
+import logo from "../../assets/bhutan-emblem.jpeg";
+import PropTypes from "prop-types";
 
 const Header = ({ onToggleSidebar }) => {
   const dispatch = useDispatch();
@@ -30,7 +31,7 @@ const Header = ({ onToggleSidebar }) => {
         color: theme.palette.text.primary,
         borderBottom: `1px solid ${theme.palette.divider}`,
         zIndex: theme.zIndex.drawer + 1,
-        py: 0.7,//height of header
+        py: 0.7, //height of header
       })}
     >
       <Toolbar sx={{ justifyContent: "space-between" }}>
@@ -71,6 +72,11 @@ const Header = ({ onToggleSidebar }) => {
       </Toolbar>
     </AppBar>
   );
+};
+
+// ✅ FIXED: Added PropTypes validation
+Header.propTypes = {
+  onToggleSidebar: PropTypes.func.isRequired,
 };
 
 export default Header;

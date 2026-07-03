@@ -105,7 +105,7 @@ const UserIndex = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchTerm, setSearchTerm] = useState("");
-  const [rolesOpen, setRolesOpen] = useState(false); // State to control roles dropdown
+  const [rolesOpen, setRolesOpen] = useState(false);
 
   // Fetch initial data
   useEffect(() => {
@@ -194,24 +194,32 @@ const UserIndex = () => {
       );
       setFilteredUsers(filtered);
     }
-    setPage(0); // Reset to first page when searching
+    setPage(0);
   }, [searchTerm, users]);
 
-  // Check if form has changes (for edit mode)
+  // ✅ FIXED: Check if form has changes (for edit mode) - Added comparator function
   const hasFormChanges = () => {
     if (!editMode || !originalUserData) return false;
 
-    // Compare current form values with original data
     const currentValues = formik.values;
 
-    // Check each field for changes
+    // Helper function to compare arrays with proper sorting
+    const areArraysEqual = (arr1, arr2) => {
+      // Create copies and sort numerically (since role IDs are numbers)
+      const sorted1 = [...(arr1 || [])].sort((a, b) => Number(a) - Number(b));
+      const sorted2 = [...(arr2 || [])].sort((a, b) => Number(a) - Number(b));
+
+      // Compare the sorted arrays
+      return JSON.stringify(sorted1) === JSON.stringify(sorted2);
+    };
+
+    // Compare all fields
     const hasChanges =
       currentValues.first_name !== originalUserData.first_name ||
       currentValues.middle_name !== originalUserData.middle_name ||
       currentValues.last_name !== originalUserData.last_name ||
       currentValues.current_role !== originalUserData.current_role ||
-      JSON.stringify([...currentValues.roles].sort()) !==
-        JSON.stringify([...originalUserData.roles].sort()) ||
+      !areArraysEqual(currentValues.roles, originalUserData.roles) ||
       currentValues.location_id !== originalUserData.location_id ||
       currentValues.mobile_no !== originalUserData.mobile_no ||
       currentValues.email_id !== originalUserData.email_id;
@@ -228,7 +236,6 @@ const UserIndex = () => {
     setPage(0);
   };
 
-  // Handle search change
   const handleSearchChange = (event) => {
     setSearchTerm(event.target.value);
   };
@@ -261,28 +268,26 @@ const UserIndex = () => {
     }
 
     formik.setFieldValue("roles", newRoles);
-    // Close the dropdown after selection
     setRolesOpen(false);
   };
 
   const handleSubmit = async (values) => {
     try {
       setLoading(true);
-      // Transform form values to match backend payload structure
       const payload = {
         userId: values.user_id,
         firstName: values.first_name,
-        middleName: values.middle_name || "", // Handle empty middle name
+        middleName: values.middle_name || "",
         lastName: values.last_name,
-        genderId: "1", // Default or get from form if available
-        password: values.password || undefined, // Only include if provided (for create or update)
-        role: values.roles.map(Number), // Convert role strings to numbers
+        genderId: "1",
+        password: values.password || undefined,
+        role: values.roles.map(Number),
         mobileNo: values.mobile_no,
         emailId: values.email_id,
-        profilePath: "", // Default or get from form if available
-        statusId: "1", // Default active status or get from form
-        locationId: String(values.location_id), // Ensure string type
-        currentRole: values.current_role, // Note capital 'C' to match backend
+        profilePath: "",
+        statusId: "1",
+        locationId: String(values.location_id),
+        currentRole: values.current_role,
       };
 
       let response;
@@ -301,13 +306,11 @@ const UserIndex = () => {
       if ([200, 201].includes(response.status)) {
         toast.success(`User ${editMode ? "updated" : "created"} successfully`);
 
-        // CLOSE THE DIALOG HERE
         setOpen(false);
         formik.resetForm();
-        setOriginalUserData(null); // Clear original data
-        setRolesOpen(false); // Close roles dropdown
+        setOriginalUserData(null);
+        setRolesOpen(false);
 
-        // Refresh the user list
         const usersResponse =
           await UserRoleManagementService.getAllUsers(access_token);
         if (usersResponse.status === 200) {
@@ -341,7 +344,6 @@ const UserIndex = () => {
 
       let errorMessage = "Operation failed";
       if (error.response) {
-        // Handle specific error cases
         if (error.response.data && typeof error.response.data === "object") {
           errorMessage =
             error.response.data.message ||
@@ -378,8 +380,8 @@ const UserIndex = () => {
   const handleAddUser = () => {
     setEditMode(false);
     setCurrentUser(null);
-    setOriginalUserData(null); // Clear original data
-    setRolesOpen(false); // Close roles dropdown
+    setOriginalUserData(null);
+    setRolesOpen(false);
     formik.resetForm();
     setOpen(true);
   };
@@ -388,7 +390,6 @@ const UserIndex = () => {
     setEditMode(true);
     setCurrentUser(user);
 
-    // Store original data for comparison
     const originalData = {
       user_id: user.user_id,
       first_name: user.first_name,
@@ -402,7 +403,6 @@ const UserIndex = () => {
     };
     setOriginalUserData(originalData);
 
-    // Set form values
     formik.setValues({
       user_id: user.user_id,
       first_name: user.first_name,
@@ -460,15 +460,13 @@ const UserIndex = () => {
     return location ? location.name : "Unknown";
   };
 
-  // Check if form is valid and has changes (for edit mode)
   const isUpdateDisabled = () => {
-    if (loading) return true; // Disabled while loading
-    if (!formik.isValid) return true; // Disabled if form has validation errors
-    if (editMode && !hasFormChanges()) return true; // Disabled if no changes in edit mode
-    return false; // Enabled otherwise
+    if (loading) return true;
+    if (!formik.isValid) return true;
+    if (editMode && !hasFormChanges()) return true;
+    return false;
   };
 
-  // Close roles dropdown when dialog closes
   const handleDialogClose = () => {
     if (!loading) {
       setOpen(false);

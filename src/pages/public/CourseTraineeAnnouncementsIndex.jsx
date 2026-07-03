@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   Button,
@@ -27,88 +27,36 @@ import SearchIcon from "@mui/icons-material/Search";
 import CampaignIcon from "@mui/icons-material/Campaign";
 import CommonService from "../../api/services/internal/common/CommonService";
 
-// ── Animations
+// ── Animations (optimized - keeping only essential ones)
 const gradientShift = keyframes`
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 `;
 
 const pulse = keyframes`
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.02);
-  }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.02); }
 `;
 
 const slideIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
 `;
 
 const fadeInUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 `;
 
 const shimmer = keyframes`
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 `;
 
 const tableRowAnimation = keyframes`
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-`;
-
-const marquee = keyframes`
-  0% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-`;
-
-const bounce = keyframes`
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
 `;
 
 // ── Shared table styles with animation
@@ -137,33 +85,322 @@ const textFieldStyle = {
   },
 };
 
-// Course icons based on course name
-const getCourseIcon = (courseName) => {
-  const icons = {
-    carpenter: "🔨",
-    mason: "🧱",
-    welding: "⚡",
-    plumbing: "🚰",
-    electrical: "⚡",
-    computer: "💻",
-    accounting: "📊",
-    business: "💼",
-    hospitality: "🏨",
-    cooking: "🍳",
-    driving: "🚗",
-    language: "📚",
-    default: "🎓",
-  };
+// ── OPTIMIZED MOVING BANNER COMPONENT ──
+const MovingAnnouncementBanner = ({ announcements, navigate }) => {
+  // ✅ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURN
+  
+  // 1. All useRef hooks
+  const containerRef = useRef(null);
+  const contentRef = useRef(null);
+  const animationRef = useRef(null);
+  const positionRef = useRef(0);
+  const isPausedRef = useRef(false);
+  const startTimeRef = useRef(null);
 
-  const lowerName = courseName?.toLowerCase() || "";
-  for (const [key, icon] of Object.entries(icons)) {
-    if (lowerName.includes(key)) {
-      return icon;
+  // 2. All useCallback hooks
+  const getCourseIcon = useCallback((courseName) => {
+    const icons = {
+      carpenter: "🔨",
+      mason: "🧱",
+      welding: "⚡",
+      plumbing: "🚰",
+      electrical: "⚡",
+      computer: "💻",
+      accounting: "📊",
+      business: "💼",
+      hospitality: "🏨",
+      cooking: "🍳",
+      driving: "🚗",
+      language: "📚",
+      default: "🎓",
+    };
+
+    const lowerName = courseName?.toLowerCase() || "";
+    for (const [key, icon] of Object.entries(icons)) {
+      if (lowerName.includes(key)) {
+        return icon;
+      }
     }
-  }
-  return icons.default;
+    return icons.default;
+  }, []);
+
+  // 3. All useMemo hooks
+  const displayItems = useMemo(() => {
+    if (announcements.length === 0) return [];
+    return [...announcements, ...announcements, ...announcements];
+  }, [announcements]);
+
+  // 4. All useEffect hooks
+  useEffect(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    
+    if (!container || !content || announcements.length === 0) return;
+
+    // Check if content needs to scroll
+    const contentWidth = content.scrollWidth / 3; // Because we triple the content
+    const containerWidth = container.clientWidth;
+
+    if (contentWidth <= containerWidth) {
+      content.style.transform = 'translateX(0)';
+      return;
+    }
+
+    // FIXED SPEED - consistent regardless of data amount
+    const SPEED = 50; // pixels per second
+
+    const animate = (timestamp) => {
+      if (isPausedRef.current) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      if (!startTimeRef.current) {
+        startTimeRef.current = timestamp;
+      }
+
+      const delta = (timestamp - startTimeRef.current) / 1000;
+      startTimeRef.current = timestamp;
+
+      positionRef.current -= SPEED * delta;
+
+      // Reset position for seamless loop
+      if (Math.abs(positionRef.current) >= contentWidth) {
+        positionRef.current = 0;
+      }
+
+      content.style.transform = `translateX(${positionRef.current}px)`;
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    const handleMouseEnter = () => {
+      isPausedRef.current = true;
+    };
+
+    const handleMouseLeave = () => {
+      isPausedRef.current = false;
+      startTimeRef.current = null;
+    };
+
+    container.addEventListener('mouseenter', handleMouseEnter);
+    container.addEventListener('mouseleave', handleMouseLeave);
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      container.removeEventListener('mouseenter', handleMouseEnter);
+      container.removeEventListener('mouseleave', handleMouseLeave);
+    };
+  }, [announcements]);
+
+  // 5. ✅ CONDITIONAL RETURN AFTER ALL HOOKS
+  if (announcements.length === 0) return null;
+
+  // 6. Render
+  return (
+    <Box
+      ref={containerRef}
+      sx={{
+        mb: 3,
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        borderRadius: 2,
+        py: 1.5,
+        position: "relative",
+        cursor: "pointer",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background:
+            "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+          backgroundSize: "200% 100%",
+          animation: `${shimmer} 3s infinite`,
+          pointerEvents: "none",
+        },
+      }}
+    >
+      {/* Speaker/Megaphone Icon */}
+      <Box
+        sx={{
+          position: "absolute",
+          left: 10,
+          top: "50%",
+          transform: "translateY(-50%)",
+          zIndex: 2,
+          bgcolor: "rgba(255,255,255,0.2)",
+          borderRadius: "50%",
+          width: 32,
+          height: 32,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          animation: `${pulse} 1.5s ease-in-out infinite`,
+        }}
+      >
+        <CampaignIcon sx={{ color: "white", fontSize: 18 }} />
+      </Box>
+
+      {/* Moving Announcements */}
+      <Box
+        ref={contentRef}
+        sx={{
+          display: "inline-block",
+          whiteSpace: "nowrap",
+          willChange: "transform",
+          ml: 6,
+        }}
+      >
+        {displayItems.map((announcement, idx) => (
+          <Box
+            key={`${announcement.id}-${idx}`}
+            component="span"
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              mx: 3,
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "0.95rem",
+              textShadow: "1px 1px 2px rgba(0,0,0,0.2)",
+              gap: 1.5,
+            }}
+          >
+            {/* Icon */}
+            <Box
+              component="span"
+              sx={{
+                display: "inline-block",
+                fontSize: "1.1rem",
+              }}
+            >
+              {getCourseIcon(announcement.courseName)}
+            </Box>
+
+            {/* Course Title */}
+            <Box
+              component="span"
+              sx={{
+                display: "inline-block",
+                px: 1.5,
+                py: 0.3,
+                bgcolor: "rgba(255,255,255,0.2)",
+                borderRadius: 2,
+                fontSize: "0.9rem",
+                fontWeight: 700,
+              }}
+            >
+              {announcement.courseName}
+            </Box>
+
+            {/* Institute */}
+            <Box
+              component="span"
+              sx={{ opacity: 0.8, fontSize: "0.85rem" }}
+            >
+              @{" "}
+              {announcement.instituteName.length > 20
+                ? announcement.instituteName.substring(0, 20) + "..."
+                : announcement.instituteName}
+            </Box>
+
+            {/* Date Range */}
+            <Box
+              component="span"
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              <Box component="span" sx={{ fontSize: "0.9rem" }}>
+                📅
+              </Box>
+              <Box component="span" sx={{ fontSize: "0.85rem" }}>
+                {announcement.startDate} - {announcement.endDate}
+              </Box>
+            </Box>
+
+            {/* Fee */}
+            {announcement.fee && (
+              <Box
+                component="span"
+                sx={{
+                  px: 1,
+                  py: 0.2,
+                  bgcolor: "rgba(255,215,0,0.2)",
+                  borderRadius: 2,
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                }}
+              >
+                Nu. {announcement.fee.toLocaleString()}
+              </Box>
+            )}
+
+            {/* Separator */}
+            <Box component="span" sx={{ opacity: 0.5 }}>
+              |
+            </Box>
+
+            {/* Apply Now CTA */}
+            <Box
+              component="span"
+              sx={{
+                px: 1.8,
+                py: 0.4,
+                bgcolor: "#ff6b6b",
+                borderRadius: 3,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                fontSize: "0.8rem",
+                fontWeight: "bold",
+                transition: "all 0.3s ease",
+                cursor: "pointer",
+                "&:hover": {
+                  transform: "scale(1.05)",
+                  bgcolor: "#ff5252",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                },
+              }}
+              onClick={() =>
+                navigate(`/course/apply-course/${announcement.id}`)
+              }
+            >
+              <Box component="span" sx={{ fontSize: "0.9rem" }}>
+                🎯
+              </Box>
+              Apply Now!
+            </Box>
+
+            {/* Separator between announcements */}
+            <Box
+              component="span"
+              sx={{
+                width: 4,
+                height: 4,
+                borderRadius: "50%",
+                bgcolor: "rgba(255,255,255,0.5)",
+                mx: 1,
+              }}
+            />
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
 };
 
+// ── MAIN COMPONENT ──
 const CourseTraineeAnnouncementsIndex = () => {
   const navigate = useNavigate();
   const [appPage, setAppPage] = useState(0);
@@ -171,9 +408,7 @@ const CourseTraineeAnnouncementsIndex = () => {
   const [searchText, setSearchText] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [courseDateFilter, setCourseDateFilter] = useState("");
-  const [courseAnnouncementDetails, setCourseAnnouncementDetails] = useState(
-    [],
-  );
+  const [courseAnnouncementDetails, setCourseAnnouncementDetails] = useState([]);
 
   // Dropdown states
   const [certificationLevels, setCertificationLevels] = useState([]);
@@ -216,11 +451,11 @@ const CourseTraineeAnnouncementsIndex = () => {
     }
   };
 
-  // Create moving announcements from actual course data
+  // Create moving announcements from actual course data (memoized)
   const movingAnnouncements = useMemo(() => {
     if (!courseAnnouncementDetails.length) return [];
 
-    return courseAnnouncementDetails.slice(0, 10).map((course) => ({
+    return courseAnnouncementDetails.slice(0, 15).map((course) => ({
       id: course.application_no,
       courseName: course.course_name || "Course",
       instituteName: course.institute_name || "Institute",
@@ -243,29 +478,39 @@ const CourseTraineeAnnouncementsIndex = () => {
     }));
   }, [courseAnnouncementDetails]);
 
-  const getCertificationLevelName = (levelId) => {
-    if (!levelId) return "N/A";
-    const level = certificationLevels.find(
-      (l) => parseInt(l.id) === parseInt(levelId),
-    );
-    return level ? level.name : levelId;
-  };
+  // Memoized helper functions with Map for O(1) lookups
+  const getCertificationLevelName = useMemo(() => {
+    const levelMap = new Map();
+    certificationLevels.forEach(level => {
+      levelMap.set(parseInt(level.id), level.name);
+    });
+    return (levelId) => {
+      if (!levelId) return "N/A";
+      return levelMap.get(parseInt(levelId)) || levelId;
+    };
+  }, [certificationLevels]);
 
-  const getFundingSourceName = (sourceId) => {
-    if (!sourceId) return "N/A";
-    const source = fundingSources.find(
-      (s) => parseInt(s.id) === parseInt(sourceId),
-    );
-    return source ? source.name : sourceId;
-  };
+  const getFundingSourceName = useMemo(() => {
+    const sourceMap = new Map();
+    fundingSources.forEach(source => {
+      sourceMap.set(parseInt(source.id), source.name);
+    });
+    return (sourceId) => {
+      if (!sourceId) return "N/A";
+      return sourceMap.get(parseInt(sourceId)) || sourceId;
+    };
+  }, [fundingSources]);
 
-  const getDzongkhagName = (locationId) => {
-    if (!locationId) return "N/A";
-    const dzongkhag = dzongkhags.find(
-      (dzong) => parseInt(dzong.id) === parseInt(locationId),
-    );
-    return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
-  };
+  const getDzongkhagName = useMemo(() => {
+    const dzongMap = new Map();
+    dzongkhags.forEach(dzong => {
+      dzongMap.set(parseInt(dzong.id), dzong.dzonkhagName);
+    });
+    return (locationId) => {
+      if (!locationId) return "N/A";
+      return dzongMap.get(parseInt(locationId)) || "N/A";
+    };
+  }, [dzongkhags]);
 
   const courseDates = useMemo(() => {
     const dates = courseAnnouncementDetails.map(
@@ -294,219 +539,20 @@ const CourseTraineeAnnouncementsIndex = () => {
     });
   }, [searchText, locationFilter, courseDateFilter, courseAnnouncementDetails]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setSearchText("");
     setLocationFilter("");
     setCourseDateFilter("");
     setAppPage(0);
-  };
+  }, []);
 
   return (
     <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-      {/* Moving Announcements Banner from API Data */}
-      {movingAnnouncements.length > 0 && (
-        <Box
-          sx={{
-            mb: 3,
-            overflow: "hidden",
-            whiteSpace: "nowrap",
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            borderRadius: 2,
-            py: 1.5,
-            position: "relative",
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background:
-                "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-              animation: `${shimmer} 2s infinite`,
-            },
-          }}
-        >
-          {/* Speaker/Megaphone Icon */}
-          <Box
-            sx={{
-              position: "absolute",
-              left: 10,
-              top: "50%",
-              transform: "translateY(-50%)",
-              zIndex: 2,
-              bgcolor: "rgba(255,255,255,0.2)",
-              borderRadius: "50%",
-              width: 32,
-              height: 32,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              animation: `${pulse} 1.5s ease-in-out infinite`,
-            }}
-          >
-            <CampaignIcon sx={{ color: "white", fontSize: 18 }} />
-          </Box>
-
-          {/* Moving Announcements */}
-          <Box
-            sx={{
-              display: "inline-block",
-              animation: `${marquee} ${Math.max(20, movingAnnouncements.length * 2)}s linear infinite`,
-              whiteSpace: "nowrap",
-              "&:hover": {
-                animationPlayState: "paused",
-              },
-              ml: 6,
-            }}
-          >
-            {/* Duplicate announcements for seamless loop */}
-            {[
-              ...movingAnnouncements,
-              ...movingAnnouncements,
-              ...movingAnnouncements,
-            ].map((announcement, idx) => (
-              <Box
-                key={`${announcement.id}-${idx}`}
-                component="span"
-                sx={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  mx: 3,
-                  color: "white",
-                  fontWeight: "bold",
-                  fontSize: "0.95rem",
-                  textShadow: "1px 1px 2px rgba(0,0,0,0.2)",
-                  gap: 1.5,
-                }}
-              >
-                {/* Icon with bounce animation based on course name */}
-                <Box
-                  component="span"
-                  sx={{
-                    display: "inline-block",
-                    animation: `${bounce} 1s ease-in-out infinite`,
-                    fontSize: "1.1rem",
-                  }}
-                >
-                  {getCourseIcon(announcement.courseName)}
-                </Box>
-
-                {/* Course Title */}
-                <Box
-                  component="span"
-                  sx={{
-                    display: "inline-block",
-                    px: 1.5,
-                    py: 0.3,
-                    bgcolor: "rgba(255,255,255,0.2)",
-                    borderRadius: 2,
-                    fontSize: "0.9rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  {announcement.courseName}
-                </Box>
-
-                {/* Institute */}
-                <Box
-                  component="span"
-                  sx={{ opacity: 0.8, fontSize: "0.85rem" }}
-                >
-                  @{" "}
-                  {announcement.instituteName.length > 20
-                    ? announcement.instituteName.substring(0, 20) + "..."
-                    : announcement.instituteName}
-                </Box>
-
-                {/* Date Range */}
-                <Box
-                  component="span"
-                  sx={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Box component="span" sx={{ fontSize: "0.9rem" }}>
-                    📅
-                  </Box>
-                  <Box component="span" sx={{ fontSize: "0.85rem" }}>
-                    {announcement.startDate} - {announcement.endDate}
-                  </Box>
-                </Box>
-
-                {/* Fee */}
-                {announcement.fee && (
-                  <Box
-                    component="span"
-                    sx={{
-                      px: 1,
-                      py: 0.2,
-                      bgcolor: "rgba(255,215,0,0.2)",
-                      borderRadius: 2,
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Nu. {announcement.fee.toLocaleString()}
-                  </Box>
-                )}
-
-                {/* Separator */}
-                <Box component="span" sx={{ opacity: 0.5 }}>
-                  |
-                </Box>
-
-                {/* Apply Now CTA */}
-                <Box
-                  component="span"
-                  sx={{
-                    px: 1.8,
-                    py: 0.4,
-                    bgcolor: "#ff6b6b",
-                    borderRadius: 3,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    fontSize: "0.8rem",
-                    fontWeight: "bold",
-                    transition: "all 0.3s ease",
-                    cursor: "pointer",
-                    "&:hover": {
-                      transform: "scale(1.05)",
-                      bgcolor: "#ff5252",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                    },
-                  }}
-                  onClick={() =>
-                    navigate(`/course/apply-course/${announcement.id}`)
-                  }
-                >
-                  <Box component="span" sx={{ fontSize: "0.9rem" }}>
-                    🎯
-                  </Box>
-                  Apply Now!
-                </Box>
-
-                {/* Separator between announcements */}
-                <Box
-                  component="span"
-                  sx={{
-                    width: 4,
-                    height: 4,
-                    borderRadius: "50%",
-                    bgcolor: "rgba(255,255,255,0.5)",
-                    mx: 1,
-                  }}
-                />
-              </Box>
-            ))}
-          </Box>
-        </Box>
-      )}
+      {/* Moving Announcements Banner - OPTIMIZED */}
+      <MovingAnnouncementBanner 
+        announcements={movingAnnouncements} 
+        navigate={navigate} 
+      />
 
       {/* Header Section with Animation */}
       <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 3 }}>

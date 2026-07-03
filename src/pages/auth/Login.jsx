@@ -27,6 +27,7 @@ import * as Yup from "yup";
 import QRNDIlogo from "../../assets/images/ndibg.svg";
 import slide5 from "../../assets/slider/slide5.png"; // background image
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
 const validationSchema = Yup.object({
   username: Yup.string().required("User ID is required"),
@@ -36,6 +37,7 @@ const validationSchema = Yup.object({
 const Login = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [authError, setAuthError] = useState("");
 
   const redirectToBhutanNDI = () => {
     navigate("/auth/login-ndi-qrcode");
@@ -56,7 +58,11 @@ const Login = () => {
       password: "",
     },
     validationSchema,
-    onSubmit: async (values, { setSubmitting, setFieldError }) => {
+    onSubmit: async (values, { setSubmitting, setFieldError, setErrors }) => {
+      // Clear previous errors
+      setAuthError("");
+      setErrors({});
+
       try {
         const response = await apiClient.post(
           "/api/v1/auth/authenticate",
@@ -68,7 +74,7 @@ const Login = () => {
           current_role,
           userId,
           locationId,
-          id
+          id,
         } = response.data;
 
         const { roles } = getTokenData(access_token);
@@ -87,7 +93,7 @@ const Login = () => {
             refresh_token,
             current_role,
             locationId,
-            id
+            id,
           }),
         );
 
@@ -129,11 +135,27 @@ const Login = () => {
         }
 
         toast.success("Login successfully!");
+        // Navigate to dashboard or home page after successful login
+        // navigate("/dashboard");
       } catch (error) {
-        setFieldError(
-          "password",
-          error.response?.data?.message || error.message || "Failed to login",
-        );
+        // Clear any previous field errors
+        setErrors({});
+
+        // Get error message from response or use default
+        const errorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          "Invalid credentials. Please check your userId and password.";
+
+        // Set error on both fields WITHOUT helper text (just to highlight red)
+        setFieldError("username", " ");
+        setFieldError("password", " ");
+
+        // Set auth error state for display at bottom
+        setAuthError(errorMessage);
+
+        // Show error toast for better visibility
+        toast.error(errorMessage);
       } finally {
         setSubmitting(false);
       }
@@ -205,6 +227,7 @@ const Login = () => {
               </Box>
               Login with Bhutan NDI
             </Button>
+
             {/* DIVIDER */}
             <Box sx={{ width: "100%", my: 2 }}>
               <Typography
@@ -241,10 +264,10 @@ const Login = () => {
                 value={formik.values.username}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={
-                  formik.touched.username && Boolean(formik.errors.username)
+                error={Boolean(formik.errors.username)}
+                helperText={
+                  formik.errors.username === " " ? "" : formik.errors.username
                 }
-                helperText={formik.touched.username && formik.errors.username}
                 slotProps={{
                   input: {
                     startAdornment: (
@@ -267,10 +290,10 @@ const Login = () => {
                 value={formik.values.password}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={
-                  formik.touched.password && Boolean(formik.errors.password)
+                error={Boolean(formik.errors.password)}
+                helperText={
+                  formik.errors.password === " " ? "" : formik.errors.password
                 }
-                helperText={formik.touched.password && formik.errors.password}
                 slotProps={{
                   input: {
                     startAdornment: (
@@ -282,11 +305,28 @@ const Login = () => {
                 }}
               />
 
+              {/* Display error message at bottom */}
+              {authError && (
+                <Typography
+                  color="error"
+                  variant="body2"
+                  sx={{
+                    mt: 1,
+                    mb: 1,
+                    textAlign: "left",
+                    fontSize: "0.75rem",
+                    fontWeight: 400,
+                  }}
+                >
+                  {authError}
+                </Typography>
+              )}
+
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
-                sx={{ mt: 2, mb: 1.5, fontWeight: "bold" }}
+                sx={{ mt: authError ? 0.5 : 2, mb: 1.5, fontWeight: "bold" }}
                 disabled={formik.isSubmitting}
                 endIcon={
                   formik.isSubmitting ? (
@@ -305,11 +345,11 @@ const Login = () => {
                   alignItems="center"
                   sx={{
                     cursor: "pointer",
-                    color: "primary.main", // normal color
+                    color: "primary.main",
                     transition: "color 0.2s ease, text-decoration 0.2s ease",
                     "&:hover": {
-                      color: "primary.dark", // darker on hover
-                      textDecoration: "underline", // underline on hover
+                      color: "primary.dark",
+                      textDecoration: "underline",
                     },
                   }}
                   onClick={() => navigate("/auth/forgot-password")}

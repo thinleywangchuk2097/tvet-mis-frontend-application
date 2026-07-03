@@ -137,7 +137,7 @@ const initialTuition = {
   tutorQualification: "",
 };
 
-const InstituteRegistration = () => {
+const InstituteSesCentreAssessmentCentre = () => {
   // State
   const [loading, setLoading] = useState(false);
   const [fetchingCitizen, setFetchingCitizen] = useState(false);
@@ -401,19 +401,22 @@ const InstituteRegistration = () => {
       const response = await DatahubService.getDetailsByCitizenshipNo(cid);
       if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
         const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
-        
-        const fullName = `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
-        
+
+        const fullName =
+          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
+
         // Auto-fill tutor name based on CID
         formik.setFieldValue(`tuitionDetails[${index}].tutorName`, fullName);
-        
+
         toast.success(`Tutor details fetched successfully for ${fullName}`);
       } else {
         toast.warning("No citizen details found for this CID");
       }
     } catch (error) {
       console.error("Error fetching citizen details:", error);
-      toast.error("Failed to fetch tutor details. Please check the CID number.");
+      toast.error(
+        "Failed to fetch tutor details. Please check the CID number.",
+      );
     } finally {
       setFetchingCitizen(false);
     }
@@ -887,16 +890,15 @@ const InstituteRegistration = () => {
           trimmedValue,
           currentServiceId,
         );
-
       if (status === 200) {
         toast.info(data.message);
         if (
           data.data?.proposalStatusId === 57 &&
-          data.data?.registrationStatusId === null
+          (data.data?.registrationStatusId === null ||
+            data.data?.registrationStatusId === 58)
         ) {
           await fetchApplicationDetails(trimmedValue);
         }
-
         setApplicationNo(trimmedValue);
       } else {
         toast.error("No application found with this number");
@@ -2316,7 +2318,7 @@ const InstituteRegistration = () => {
                               }
                             />
                           </Grid>
-                          
+
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
                               fullWidth
@@ -2332,8 +2334,14 @@ const InstituteRegistration = () => {
                               onChange={formik.handleChange}
                               onBlur={(e) => {
                                 formik.handleBlur(e);
-                                if (e.target.value && e.target.value.length === 11) {
-                                  fetchAndFillTutorDetails(e.target.value, index);
+                                if (
+                                  e.target.value &&
+                                  e.target.value.length === 11
+                                ) {
+                                  fetchAndFillTutorDetails(
+                                    e.target.value,
+                                    index,
+                                  );
                                 }
                               }}
                               error={
@@ -2356,7 +2364,7 @@ const InstituteRegistration = () => {
                               }}
                             />
                           </Grid>
-                          
+
                           <Grid item size={{ xs: 12, md: 4 }}>
                             <TextField
                               fullWidth
@@ -2536,4 +2544,4 @@ const InstituteRegistration = () => {
   );
 };
 
-export default InstituteRegistration;
+export default InstituteSesCentreAssessmentCentre;

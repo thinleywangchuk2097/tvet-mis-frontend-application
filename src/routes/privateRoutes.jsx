@@ -30,12 +30,15 @@ import MonitoringReport from "../pages/institute/resource-management/MonitoringR
 import Notification from "../pages/institute/resource-management/Notification";
 //service
 import CreateCourse from "../pages/institute/service/CreateCourse";
-import CurriculumEndorsementIndex from "../pages/institute/service/CurriculumEndorsementIndex";
 import ApplyNonAccreditedCourse from "../pages/institute/service/ApplyNonAccreditedCourse";
 import ApplyAccreditedCourse from "../pages/institute/service/ApplyAccreditedCourse";
 import InstituteChange from "../pages/institute/service/InstituteChange";
 import ViewApplyNonAccreditedCourse from "../pages/institute/service/ViewApplyNonAccreditedCourse";
 import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";
+
+//curriculum
+import CurriculumIndex from "../pages/curriculum/CurriculumIndex";
+import ViewCurriculumIndex from "../pages/curriculum/ViewCurriculumIndex";
 
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
@@ -46,25 +49,24 @@ import GenerateTracerIndex from "../pages/dwps/tracer/GenerateTracerIndex";
 import SendTracerIndex from "../pages/dwps/tracer/SendTracerIndex";
 import ResponseTracerIndex from "../pages/dwps/tracer/ResponseTracerIndex";
 //registration and proposal view
-import ViewInstituteProposal from "../pages/public/proposal/ViewInstituteProposal";
-import ViewInstituteRegistration from "../pages/public/registration/ViewInstituteRegistration";
+import ViewInstituteSesCentreAssessmentCentreProposal from "../pages/public/proposal/ViewInstituteSesCentreAssessmentCentreProposal";
+import ViewInstituteSesCentreAssessmentCentre from "../pages/public/registration/ViewInstituteSesCentreAssessmentCentre";
 import ViewAssessorAccreditorQMSAuditor from "../pages/public/registration/ViewAssessorAccreditorQMSAuditor";
 import InstituteRenewalIndex from "../pages/renewal/InstituteRenewalIndex";
 //tot
 import CreateTotIndex from "../pages/dwps/tot/CreateTotIndex";
 import AddTraineeIndex from "../pages/dwps/tot/AddTraineeIndex";
 
-//service
-import ViewCurriculumEndorsementIndex from "../pages/institute/service/ViewCurriculumEndorsementIndex";
 //track application status
 import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
 
 //Certificate
 import Assessment from "../pages/certificate/Assessment";
+import CertificateIndex from "../pages/certificate/CertificateIndex";
 //birms
-import BirmsPrivatePaymentIndex from "../pages/birms/private/BirmsPrivatePaymentIndex";
-
-//master 
+import BirmsAgencyPaymentIndex from "../pages/birms/private/BirmsAgencyPaymentIndex";
+import BirmsInstitutePaymentIndex from "../pages/birms/private/BirmsInstitutePaymentIndex";
+//master
 import SectorOccupationIndex from "../pages/master/SectorOccupationIndex";
 import ServiceMasterIndex from "../pages/master/ServiceMasterIndex";
 //reports
@@ -75,7 +77,7 @@ import TraineeReportIndex from "../pages/report/TraineeReportIndex";
 //BQPCA routes
 import MonitoringAssessmentIndex from "../pages/bqpca/monitoring/MonitoringAssessmentIndex";
 import InstituteMonitoringIndex from "../pages/bqpca/monitoring/InstituteMonitoringIndex";
-import ViewInstituteMonitoringIndex from "../pages/bqpca/monitoring/ViewInstituteMonitoringIndex"
+import ViewInstituteMonitoringIndex from "../pages/bqpca/monitoring/ViewInstituteMonitoringIndex";
 //ses centre
 import ChangeSesCentreIndex from "../pages/ses-centre/registration/ChangeSesCentreIndex";
 import SubjectIndex from "../pages/ses-centre/registration/SubjectIndex";
@@ -96,6 +98,9 @@ import AddTrainerIndex from "../pages/trainer/AddTrainerIndex";
 import CreateNcsIndex from "../pages/bqpca/nac/CreateNcsIndex";
 //Curriculum Management
 import CreateCurriculumIndex from "../pages/bqpca/curriculum/CreateCurriculumIndex";
+//On-Job Training
+import OnJobTrainingIndex from "../pages/ojt/OnJobTrainingIndex";
+import OnCampusJobPlacement from "../pages/ojt/OnCampusJobPlacement";
 
 export const privateRoutes = [
   {
@@ -118,7 +123,7 @@ export const privateRoutes = [
     path: "master",
     children: [
       { path: "sector-occupation-index", element: <SectorOccupationIndex /> },
-      { path: "service-master-index", element: <ServiceMasterIndex /> }
+      { path: "service-master-index", element: <ServiceMasterIndex /> },
     ],
   },
 
@@ -136,13 +141,14 @@ export const privateRoutes = [
     children: [
       { path: "task-details-index", element: <TaskListIndex /> },
       { path: "group-task-index", element: <GroupTaskList /> },
+      { path: "my-task-index", element: <MyTaskList /> },
       {
         path: "view-proposal/:applicationNo",
-        element: <ViewInstituteProposal />,
+        element: <ViewInstituteSesCentreAssessmentCentreProposal />,
       },
       {
         path: "view-registration/:applicationNo",
-        element: <ViewInstituteRegistration />,
+        element: <ViewInstituteSesCentreAssessmentCentre />,
       },
       {
         path: "view-assessoraccreditorqmsquditor/:applicationNo",
@@ -157,8 +163,8 @@ export const privateRoutes = [
         element: <ViewApplyNonAccreditedCourse />,
       },
       {
-        path: "view-curriculum-endorsement/:applicationNo",
-        element: <ViewCurriculumEndorsementIndex />,
+        path: "view-curriculum-index/:applicationNo",
+        element: <ViewCurriculumIndex />,
       },
       {
         path: "view-accredited-course/:applicationNo",
@@ -172,20 +178,19 @@ export const privateRoutes = [
         path: "view-reassessment-trainee-selection/:applicationNo",
         element: <ViewReAssessmentTraineeSelectionIndex />,
       },
-       {
+      {
         path: "view-institute-monitoring-index/:applicationNo",
         element: <ViewInstituteMonitoringIndex />,
       },
     ],
   },
-   {
+  {
     path: "renewal",
     children: [
       {
         path: ":renewalType/:serviceId",
         element: <InstituteRenewalIndex />,
       },
-    
     ],
   },
   {
@@ -200,7 +205,7 @@ export const privateRoutes = [
       { path: "tutors-details-report", element: <TutorsDetailsReport /> },
     ],
   },
-   {
+  {
     path: "assessment-centre",
     children: [
       { path: "change-assessment-centre", element: <ChangeAssessmentCentre /> },
@@ -209,15 +214,35 @@ export const privateRoutes = [
       { path: "result", element: <AssessmentCentreResult /> },
     ],
   },
-  
-
+  {
+    path: "curriculum",
+    children: [
+      {
+        path: "curriculum-index",
+        element: <CurriculumIndex />,
+      },
+    ],
+  },
+  {
+    path: "ojt",
+    children: [
+      {
+        path: "job-training-index",
+        element: <OnJobTrainingIndex />,
+      },
+      {
+        path: "campus-job-placement",
+        element: <OnCampusJobPlacement />,
+      },
+    ],
+  },
   {
     path: "service",
     children: [
-      {
+      /*  {
         path: "curriculum-endorse-index",
         element: <CurriculumEndorsementIndex />,
-      },
+      }, */
       {
         path: "apply-non-accredited-course",
         element: <ApplyNonAccreditedCourse />,
@@ -298,28 +323,31 @@ export const privateRoutes = [
     ],
   },
   {
-    path: "auth-birms",
+    path: "birms",
     children: [
-      { path: "payment-index", element: <BirmsPrivatePaymentIndex /> },
+      {
+        path: "institute-payment-index",
+        element: <BirmsInstitutePaymentIndex />,
+      },
+      { path: "agency-payment-index", element: <BirmsAgencyPaymentIndex /> },
     ],
   },
   {
     path: "certificate",
-    children: [{ path: "assessment", element: <Assessment /> }],
+    children: [
+      { path: "assessment", element: <Assessment /> },
+      { path: "trainee-certificate", element: <CertificateIndex /> },
+    ],
   },
   //without children
   { path: "/apply-qms-certification", element: <ApplyQmsCertification /> },
   { path: "/track-trainee", element: <TrackTrainee /> },
   {
     path: "ncs",
-    children: [
-      { path: "create-index", element: <CreateNcsIndex /> },
-    ],
+    children: [{ path: "create-index", element: <CreateNcsIndex /> }],
   },
   {
     path: "curriculum",
-    children: [
-      { path: "create-index", element: <CreateCurriculumIndex /> },
-    ],
+    children: [{ path: "create-index", element: <CreateCurriculumIndex /> }],
   },
 ];

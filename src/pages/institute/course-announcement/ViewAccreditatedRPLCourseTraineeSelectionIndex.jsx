@@ -34,10 +34,13 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import ReceiptIcon from "@mui/icons-material/Receipt";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
+import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 
 const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
@@ -50,10 +53,14 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [statusList, setStatusList] = useState([]);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [currentStatusId, setCurrentStatusId] = useState(null);
-
   // State for CA dates (only used when they don't exist in course details)
   const [caStartDate, setCaStartDate] = useState("");
   const [caEndDate, setCaEndDate] = useState("");
+  const [paymentStatusDetails, setPaymentStatusDetails] = useState([]);
+
+  // State for payment advice
+  const [paymentAdviceNo, setPaymentAdviceNo] = useState(null);
+  const [paymentRedirectUrl, setPaymentRedirectUrl] = useState(null);
 
   // State for qualifications lookup
   const [academicQualifications, setAcademicQualifications] = useState([]);
@@ -67,16 +74,33 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [traineeTheoryAssessments, setTraineeTheoryAssessments] = useState({});
   const [traineePracticalAssessments, setTraineePracticalAssessments] =
     useState({});
-  
+
   // State for storing viva and practical assessments for service_id 39
   const [traineeVivaAssessments, setTraineeVivaAssessments] = useState({});
-  const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] = useState({});
+  const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] =
+    useState({});
+
+  // State to track if all CA marks exist
+  const [allCAmarksExist, setAllCAmarksExist] = useState(false);
 
   // Dialog states
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [currentAction, setCurrentAction] = useState(null);
   const [remarks, setRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
+
+  // PA Dialog states
+  const [paDialogOpen, setPaDialogOpen] = useState(false);
+  const [paData, setPaData] = useState({
+    taxPayerNo: "",
+    payerEmail: "",
+    mobileNo: "",
+    taxPayerName: "",
+    paymentDueDate: "",
+    refNo: "",
+    totalPayableAmount: "",
+  });
+  const [paErrors, setPaErrors] = useState({});
 
   // Pagination
   const [page, setPage] = useState(0);
@@ -93,15 +117,22 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   // Check if any trainee has internal_assessment (to determine if we need theory/practical columns)
   const [hasInternalAssessmentForCourse, setHasInternalAssessmentForCourse] =
     useState(false);
-  
+
   // Check if service_id is 39 for Viva assessments
   const isServiceId39 = courseDetails?.service_id === "39";
+
+  // Check if CA dates are null (both start and end dates are null/empty)
+  const areCADatesNull = !courseDetails?.ca_start_date && !courseDetails?.ca_end_date;
+
+  // Check if approve button should be enabled (OR condition)
+  const isApproveEnabled = !!paymentAdviceNo || areCADatesNull;
 
   // Fetch data on component mount
   useEffect(() => {
     fetchAcademicQualification();
     fetchStatusList();
     fetchAcademicCompetency();
+    fetchPaymentDetail();
   }, []);
 
   // Fetch course details and selected trainees when dependencies are ready
@@ -119,6 +150,11 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     selectedStatusId,
     academicCompetency,
   ]);
+
+  // Check CA marks whenever selectedTrainees changes
+  useEffect(() => {
+    checkCAmarksExist();
+  }, [selectedTrainees]);
 
   const fetchAcademicQualification = async () => {
     try {
@@ -189,7 +225,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         : response.data;
       setCourseDetails(courseData);
       setCurrentStatusId(courseData?.status_id);
-
+      console.log("course details", response.data);
       // Only set CA dates in state if they DON'T exist in course details
       if (!courseData?.ca_start_date) {
         setCaStartDate("");
@@ -202,6 +238,34 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     } catch (error) {
       console.error("Error fetching course details:", error);
       toast.error("Failed to fetch course details");
+    }
+  };
+
+  const fetchPaymentDetail = async () => {
+    try {
+      const response =
+        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+     
+      setPaymentStatusDetails(response.data);
+      console.log("payment details", response.data);
+
+      // Extract paymentAdviceNo if it exists
+      if (response.data && response.data.paymentAdviceNo) {
+        setPaymentAdviceNo(response.data.paymentAdviceNo);
+        if (response.data.redirectUrl) {
+          setPaymentRedirectUrl(response.data.redirectUrl);
+        }
+      } else {
+        setPaymentAdviceNo(null);
+        setPaymentRedirectUrl(null);
+      }
+
+      console.log("payment details:", response);
+    } catch (error) {
+      console.error("Error fetching payment details :", error);
+      toast.error("Failed to fetch payment details");
+      setPaymentAdviceNo(null);
+      setPaymentRedirectUrl(null);
     }
   };
 
@@ -240,7 +304,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         initialTheory[trainee.id] = trainee.theory_assessment || "";
         initialPractical[trainee.id] = trainee.practical_assessment || "";
         initialViva[trainee.id] = trainee.viva_assessment || "";
-        initialVivaPractical[trainee.id] = trainee.viva_practical_assessment || "";
+        initialVivaPractical[trainee.id] =
+          trainee.viva_practical_assessment || "";
       });
 
       setTraineeTheoryAssessments(initialTheory);
@@ -248,8 +313,18 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       setTraineeVivaAssessments(initialViva);
       setTraineeVivaPracticalAssessments(initialVivaPractical);
 
+      // Check CA marks existence
+      const allHaveCA = selected.every(
+        (trainee) => 
+          trainee.internal_assessment !== null && 
+          trainee.internal_assessment !== "" &&
+          trainee.internal_assessment !== undefined
+      );
+      setAllCAmarksExist(allHaveCA);
+
       console.log("Selected trainees:", selected);
       console.log("Has internal assessment for course:", hasInternal);
+      console.log("All CA marks exist:", allHaveCA);
       console.log("Is service_id 39:", isServiceId39);
     } catch (error) {
       console.error("Error fetching selected trainees:", error);
@@ -257,6 +332,24 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to check if all selected trainees have CA marks
+  const checkCAmarksExist = () => {
+    if (selectedTrainees.length === 0) {
+      setAllCAmarksExist(false);
+      return;
+    }
+
+    // Check if all trainees have internal_assessment (CA marks)
+    const allHaveCA = selectedTrainees.every(
+      (trainee) => 
+        trainee.internal_assessment !== null && 
+        trainee.internal_assessment !== "" &&
+        trainee.internal_assessment !== undefined
+    );
+    
+    setAllCAmarksExist(allHaveCA);
   };
 
   // Handle theory assessment change
@@ -289,6 +382,154 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       ...prev,
       [traineeId]: value,
     }));
+  };
+
+  // Handle PA Dialog open
+  const handlePADialogOpen = () => {
+    // Pre-fill data from course details
+    setPaData({
+      taxPayerNo: courseDetails?.registration_no || "",
+      payerEmail: courseDetails?.institute_email || "",
+      mobileNo: courseDetails?.institue_mobile_number || "",
+      taxPayerName: courseDetails?.institute_name || "",
+      paymentDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0], // 7 days from now
+      refNo: courseDetails?.application_no || applicationNo || "",
+      totalPayableAmount: "", // Leave empty for user to enter
+    });
+    setPaErrors({});
+    setPaDialogOpen(true);
+  };
+
+  // Handle PA Dialog close
+  const handlePADialogClose = () => {
+    setPaDialogOpen(false);
+    setPaData({
+      taxPayerNo: "",
+      payerEmail: "",
+      mobileNo: "",
+      taxPayerName: "",
+      paymentDueDate: "",
+      refNo: "",
+      totalPayableAmount: "",
+    });
+  };
+
+  // Handle PA data change
+  const handlePADataChange = (field, value) => {
+    setPaData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    // Clear error for this field
+    setPaErrors((prev) => ({
+      ...prev,
+      [field]: "",
+    }));
+  };
+
+  // Validate PA form
+  const validatePAForm = () => {
+    const errors = {};
+    const requiredFields = {
+      taxPayerNo: "Tax Payer No",
+      payerEmail: "Payer Email",
+      mobileNo: "Mobile No",
+      taxPayerName: "Tax Payer Name",
+      paymentDueDate: "Payment Due Date",
+      refNo: "Reference No",
+      totalPayableAmount: "Total Payable Amount",
+    };
+
+    for (const [field, label] of Object.entries(requiredFields)) {
+      if (!paData[field] || paData[field].toString().trim() === "") {
+        errors[field] = `${label} is required`;
+      }
+    }
+
+    // Validate email format
+    if (
+      paData.payerEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paData.payerEmail)
+    ) {
+      errors.payerEmail = "Invalid email format";
+    }
+
+    // Validate mobile number (assuming 8 digits for Bhutan)
+    if (paData.mobileNo && !/^[0-9]{8}$/.test(paData.mobileNo)) {
+      errors.mobileNo = "Invalid mobile number (must be 8 digits)";
+    }
+
+    // Validate total payable amount is a positive number
+    if (
+      paData.totalPayableAmount &&
+      parseFloat(paData.totalPayableAmount) <= 0
+    ) {
+      errors.totalPayableAmount = "Amount must be greater than 0";
+    }
+
+    setPaErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Handle Generate PA
+  const handleGeneratePA = async () => {
+    if (!validatePAForm()) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      // Prepare PA data
+      const paPayload = {
+        applicationNo: applicationNo,
+        taxPayerNo: paData.taxPayerNo,
+        taxPayerEmail: paData.payerEmail,
+        taxPayerMobileNo: paData.mobileNo,
+        taxPayerName: paData.taxPayerName,
+        paymentDueDate: paData.paymentDueDate,
+        refNo: paData.refNo,
+        totalPayableAmount: parseFloat(paData.totalPayableAmount),
+        // Add any additional fields needed by your API
+        serviceCode: 100578,
+        courseName: courseDetails?.course_name,
+        serviceId: courseDetails?.service_id,
+        selectedTraineeCount: selectedTrainees.length,
+      };
+
+      console.log("PA Payload:", paPayload);
+
+      // Call your API to generate PA
+      const response =
+        await BirmsPaymentService.generatePaymentAdvice(paPayload);
+
+      // After successful generation, refresh payment details
+      await fetchPaymentDetail();
+      
+      toast.success("Payment Advice generated successfully!");
+
+      handlePADialogClose();
+
+      // Optionally navigate to PA view or download
+      // navigate(`/payment-advice/${applicationNo}`);
+    } catch (error) {
+      console.error("Error generating Payment Advice:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to generate Payment Advice",
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle View PA
+  const handleViewPA = () => {
+    if (paymentRedirectUrl) {
+      window.open(paymentRedirectUrl, '_blank');
+    } else {
+      toast.info("Payment Advice URL not available");
+    }
   };
 
   // Helper function to get qualification name from ID
@@ -483,6 +724,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           <strong>Course Name: {courseDetails?.course_name}</strong>
           <br />
           <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
+          {paymentAdviceNo && (
+            <>
+              <br />
+              <strong>Payment Advice No: {paymentAdviceNo}</strong>
+            </>
+          )}
           {!hasCADatesInCourse && caStartDate && caEndDate && (
             <>
               <br />
@@ -496,7 +743,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               <br />
               <br />
               <strong>
-                Note: {isServiceId39 ? "Viva and Practical" : "Theory and Practical"} assessments will be saved with this approval.
+                Note:{" "}
+                {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
+                assessments will be saved with this approval.
               </strong>
             </>
           )}
@@ -513,6 +762,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             <strong>Course Name: {courseDetails?.course_name}</strong>
             <br />
             <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
+            {paymentAdviceNo && (
+              <>
+                <br />
+                <strong>Payment Advice No: {paymentAdviceNo}</strong>
+              </>
+            )}
             {!hasCADatesInCourse && caStartDate && caEndDate && (
               <>
                 <br />
@@ -554,6 +809,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const handleRefresh = () => {
     fetchData();
+    fetchPaymentDetail();
     toast.info("Data refreshed");
   };
 
@@ -591,7 +847,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       padding: "8px",
     },
     "& th": {
-      fontWeight: 600
+      fontWeight: 600,
     },
   };
 
@@ -612,7 +868,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   // Render assessment column based on service type
   const renderAssessmentColumn = (trainee) => {
     const hasInternalAssessment =
-      trainee.internal_assessment !== null && trainee.internal_assessment !== "";
+      trainee.internal_assessment !== null &&
+      trainee.internal_assessment !== "";
 
     if (isServiceId39) {
       // For service_id 39: Show Viva and Practical columns
@@ -665,7 +922,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Typography>
             )}
           </TableCell>
-          
+
           {/* Practical Assessment Column for service_id 39 */}
           <TableCell>
             {hasInternalAssessment ? (
@@ -675,7 +932,10 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   size="small"
                   value={traineeVivaPracticalAssessments[trainee.id] || ""}
                   onChange={(e) =>
-                    handleVivaPracticalAssessmentChange(trainee.id, e.target.value)
+                    handleVivaPracticalAssessmentChange(
+                      trainee.id,
+                      e.target.value,
+                    )
                   }
                   fullWidth
                   InputProps={{
@@ -688,7 +948,10 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   <Select
                     value={traineeVivaPracticalAssessments[trainee.id] || ""}
                     onChange={(e) =>
-                      handleVivaPracticalAssessmentChange(trainee.id, e.target.value)
+                      handleVivaPracticalAssessmentChange(
+                        trainee.id,
+                        e.target.value,
+                      )
                     }
                     displayEmpty
                   >
@@ -766,7 +1029,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Typography>
             )}
           </TableCell>
-          
+
           {/* Practical Assessment Column for other services */}
           <TableCell>
             {hasInternalAssessment ? (
@@ -789,7 +1052,10 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   <Select
                     value={traineePracticalAssessments[trainee.id] || ""}
                     onChange={(e) =>
-                      handlePracticalAssessmentChange(trainee.id, e.target.value)
+                      handlePracticalAssessmentChange(
+                        trainee.id,
+                        e.target.value,
+                      )
                     }
                     displayEmpty
                   >
@@ -908,6 +1174,17 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   Nu. {courseDetails.course_fee}
                 </Typography>
               </Grid>
+              {/* Show Payment Advice No if it exists */}
+              {paymentAdviceNo && (
+                <Grid item size={{ xs: 12, md: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Payment Advice No:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold" color="success">
+                    {paymentAdviceNo}
+                  </Typography>
+                </Grid>
+              )}
               {/* Show CA dates from course details if they exist */}
               {courseDetails.ca_start_date && (
                 <Grid item size={{ xs: 12, md: 2 }}>
@@ -1039,7 +1316,11 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   {/* Show Theory and Practical or Viva and Practical based on service_id */}
                   {hasInternalAssessmentForCourse && (
                     <>
-                      <TableCell>{isServiceId39 ? "Viva Assessment" : "Theory Assessment"}</TableCell>
+                      <TableCell>
+                        {isServiceId39
+                          ? "Viva Assessment"
+                          : "Theory Assessment"}
+                      </TableCell>
                       <TableCell>Practical Assessment</TableCell>
                     </>
                   )}
@@ -1060,7 +1341,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                             {index + 1 + page * rowsPerPage}
                           </TableCell>
                           <TableCell>{trainee.applicant_name}</TableCell>
-                          <TableCell>{trainee.cid_no || trainee.reference_no}</TableCell>
+                          <TableCell>
+                            {trainee.cid_no || trainee.reference_no}
+                          </TableCell>
                           <TableCell>{trainee.mobile_no}</TableCell>
                           <TableCell>{trainee.email_id}</TableCell>
                           <TableCell>
@@ -1099,7 +1382,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                             </TableCell>
                           )}
                           {/* Render assessment columns based on service type */}
-                          {hasInternalAssessmentForCourse && renderAssessmentColumn(trainee)}
+                          {hasInternalAssessmentForCourse &&
+                            renderAssessmentColumn(trainee)}
                         </TableRow>
                       );
                     })
@@ -1128,27 +1412,114 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       </Card>
 
       {/* Action Buttons */}
-      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-        <Button
-          variant="contained"
-          color="success"
-          startIcon={<CheckCircleIcon />}
-          onClick={() => openDialog(57)}
-          disabled={isActionDisabled() || actionLoading}
-          sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-        >
-          Approve
-        </Button>
-        <Button
-          variant="contained"
-          color="error"
-          startIcon={<CancelIcon />}
-          onClick={() => openDialog(58)}
-          disabled={isActionDisabled() || actionLoading}
-          sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-        >
-          Reject
-        </Button>
+      <Box
+        sx={{ display: "flex", justifyContent: "space-between", gap: 2, mt: 3 }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<ReceiptIcon />}
+            onClick={handlePADialogOpen}
+            disabled={
+              isActionDisabled() || 
+              actionLoading ||
+              !!paymentAdviceNo ||
+              !allCAmarksExist
+            }
+            sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+          >
+            Generate PA
+          </Button>
+          
+          {/* Show message when CA marks are missing */}
+          {!allCAmarksExist && !paymentAdviceNo && selectedTrainees.length > 0 && (
+            <Typography
+              variant="caption"
+              color="error"
+              sx={{ alignSelf: "center" }}
+            >
+              CA Mark/Competency values are required for all selected trainees
+            </Typography>
+          )}
+          
+          {paymentAdviceNo && (
+            <Button
+              variant="outlined"
+              color="info"
+              startIcon={<VisibilityIcon />}
+              onClick={handleViewPA}
+              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+            >
+              View PA
+            </Button>
+          )}
+          
+          {paymentAdviceNo && (
+            <Typography
+              variant="caption"
+              color="success"
+              sx={{ fontWeight: "bold" }}
+            >
+              PA Generated: {paymentAdviceNo}
+            </Typography>
+          )}
+        </Box>
+        
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<CheckCircleIcon />}
+              onClick={() => openDialog(57)}
+              disabled={
+                isActionDisabled() || 
+                actionLoading ||
+                !isApproveEnabled  // OR condition: paymentAdviceNo exists OR CA dates are null
+              }
+              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+            >
+              Approve
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<CancelIcon />}
+              onClick={() => openDialog(58)}
+              disabled={isActionDisabled() || actionLoading}
+              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+            >
+              Reject
+            </Button>
+          </Box>
+          
+          {/* Show message when approval is not enabled */}
+          {!isApproveEnabled && !isActionDisabled() && selectedTrainees.length > 0 && (
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              sx={{ alignSelf: "center" }}
+            >
+              {!paymentAdviceNo && !areCADatesNull 
+                ? "Generate PA OR set CA dates to enable approval" 
+                : "Approval not available"}
+            </Typography>
+          )}
+          
+          {/* Show success message when approval is enabled */}
+          {isApproveEnabled && !isActionDisabled() && selectedTrainees.length > 0 && (
+            <Typography
+              variant="caption"
+              color="success"
+              sx={{ alignSelf: "center", fontWeight: "bold" }}
+            >
+              {paymentAdviceNo 
+                ? "✓ Approval enabled (PA generated)" 
+                : "✓ Approval enabled (CA dates are null)"}
+            </Typography>
+          )}
+        </Box>
       </Box>
 
       {/* Action Dialog */}
@@ -1180,6 +1551,155 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             }
           >
             {getConfirmButtonText()}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Payment Advice (PA) Dialog */}
+      <Dialog
+        open={paDialogOpen}
+        onClose={handlePADialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <ReceiptIcon color="primary" />
+          Generate Payment Advice
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Please provide the following details to generate the Payment Advice
+            for course:
+            <strong> {courseDetails?.course_name}</strong>
+          </DialogContentText>
+
+          <Grid container spacing={2}>
+            <Grid item size={{ xs: 12 }}>
+              <TextField
+                label="Tax Payer No"
+                fullWidth
+                value={paData.taxPayerNo}
+                onChange={(e) =>
+                  handlePADataChange("taxPayerNo", e.target.value)
+                }
+                error={!!paErrors.taxPayerNo}
+                helperText={paErrors.taxPayerNo}
+                required
+              />
+            </Grid>
+            <Grid item size={{ xs: 12 }}>
+              <TextField
+                label="Payer Email"
+                fullWidth
+                type="email"
+                value={paData.payerEmail}
+                onChange={(e) =>
+                  handlePADataChange("payerEmail", e.target.value)
+                }
+                error={!!paErrors.payerEmail}
+                helperText={paErrors.payerEmail}
+                required
+              />
+            </Grid>
+            <Grid item size={{ xs: 12 }}>
+              <TextField
+                label="Mobile No"
+                fullWidth
+                value={paData.mobileNo}
+                onChange={(e) => handlePADataChange("mobileNo", e.target.value)}
+                error={!!paErrors.mobileNo}
+                helperText={paErrors.mobileNo || "Enter 8 digits mobile number"}
+                required
+              />
+            </Grid>
+            <Grid item size={{ xs: 12 }}>
+              <TextField
+                label="Tax Payer Name"
+                fullWidth
+                value={paData.taxPayerName}
+                onChange={(e) =>
+                  handlePADataChange("taxPayerName", e.target.value)
+                }
+                error={!!paErrors.taxPayerName}
+                helperText={paErrors.taxPayerName}
+                required
+              />
+            </Grid>
+            <Grid item size={{ xs: 12 }}>
+              <TextField
+                label="Payment Due Date"
+                type="date"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                value={paData.paymentDueDate}
+                onChange={(e) =>
+                  handlePADataChange("paymentDueDate", e.target.value)
+                }
+                error={!!paErrors.paymentDueDate}
+                helperText={paErrors.paymentDueDate}
+                required
+              />
+            </Grid>
+            <Grid item size={{ xs: 12 }}>
+              <TextField
+                label="Reference No"
+                fullWidth
+                value={paData.refNo}
+                onChange={(e) => handlePADataChange("refNo", e.target.value)}
+                error={!!paErrors.refNo}
+                helperText={paErrors.refNo}
+                required
+                disabled
+              />
+            </Grid>
+            <Grid item size={{ xs: 12 }}>
+              <TextField
+                label="Total Payable Amount"
+                fullWidth
+                type="number"
+                InputProps={{
+                  startAdornment: (
+                    <Typography variant="body2" sx={{ mr: 1 }}>
+                      Nu.
+                    </Typography>
+                  ),
+                }}
+                value={paData.totalPayableAmount}
+                onChange={(e) =>
+                  handlePADataChange("totalPayableAmount", e.target.value)
+                }
+                error={!!paErrors.totalPayableAmount}
+                helperText={
+                  paErrors.totalPayableAmount ||
+                  "Enter the total amount payable"
+                }
+                required
+                placeholder="Enter amount"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            color="error"
+            variant="contained"
+            size="small"
+            onClick={handlePADialogClose}
+            disabled={actionLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleGeneratePA}
+            color="primary"
+            variant="contained"
+            size="small"
+            disabled={actionLoading}
+            startIcon={
+              actionLoading ? <CircularProgress size={20} /> : <ReceiptIcon />
+            }
+          >
+            {actionLoading ? "Generating..." : "Generate PA"}
           </Button>
         </DialogActions>
       </Dialog>

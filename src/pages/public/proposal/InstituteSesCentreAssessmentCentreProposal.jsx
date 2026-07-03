@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   Paper,
@@ -120,8 +120,9 @@ const validationSchema = Yup.object({
   ),
 });
 
-const InstituteProposal = () => {
+const InstituteSesCentreAssessmentCentreProposal = () => {
   const [loading, setLoading] = useState(false);
+  const [fetchingCitizen, setFetchingCitizen] = useState(false);
   const [sectors, setSectors] = useState([]);
   const [serviceName, setServiceName] = useState();
   const [dzongkhags, setDzongkhags] = useState([]);
@@ -134,15 +135,7 @@ const InstituteProposal = () => {
 
   const navigate = useNavigate();
   const { serviceId } = useParams();
-
-  // Debounce function
-  const debounce = (func, delay) => {
-    let timeoutId;
-    return (...args) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func(...args), delay);
-    };
-  };
+  const formikRef = useRef();
 
   useEffect(() => {
     fetchSectors();
@@ -166,45 +159,73 @@ const InstituteProposal = () => {
     }
   };
 
-  const fetchCitizenDetails = async (citizenId, index) => {
-    if (!citizenId || citizenId.length !== 11) {
+  // Function to fetch and auto-fill promoter details
+  const fetchAndFillPromoterDetails = async (cid, formik) => {
+    if (!cid || cid.length !== 11) {
+      toast.warning("Please enter a valid 11-digit CID");
       return;
     }
 
+    setFetchingCitizen(true);
     try {
-      const response =
-        await DatahubService.getDetailsByCitizenshipNo(citizenId);
-      const citizenData =
-        response.data?.citizenDetailsResponse?.citizenDetail?.[0];
-
-      if (citizenData) {
-        // Construct full name from firstName and lastName
+      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
+      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
+        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
         const fullName =
-          `${citizenData.firstName || ""} ${citizenData.lastName || ""}`.trim();
+          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
 
-        // Update the partner name field
-        formik.setFieldValue(`partners[${index}].partnerName`, fullName);
+        // Auto-fill the promoter name
+        formik.setFieldValue("promoterName", fullName);
+
+        toast.success(`Citizen details fetched successfully for ${fullName}`);
       } else {
-        toast.warning("No citizen found with this ID");
-        // Clear the partner name if no citizen found
+        toast.warning("No citizen details found for this CID");
+        formik.setFieldValue("promoterName", "");
+      }
+    } catch (error) {
+      console.error("Error fetching citizen details:", error);
+      toast.error(
+        "Failed to fetch citizen details. Please check the CID number.",
+      );
+      formik.setFieldValue("promoterName", "");
+    } finally {
+      setFetchingCitizen(false);
+    }
+  };
+
+  // Function to fetch and auto-fill partner details
+  const fetchAndFillPartnerDetails = async (cid, formik, index) => {
+    if (!cid || cid.length !== 11) {
+      toast.warning("Please enter a valid 11-digit CID");
+      return;
+    }
+
+    setFetchingCitizen(true);
+    try {
+      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
+      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
+        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
+        const fullName =
+          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
+
+        // Auto-fill the partner name
+        formik.setFieldValue(`partners[${index}].partnerName`, fullName);
+
+        toast.success(`Citizen details fetched successfully for ${fullName}`);
+      } else {
+        toast.warning("No citizen details found for this CID");
         formik.setFieldValue(`partners[${index}].partnerName`, "");
       }
     } catch (error) {
       console.error("Error fetching citizen details:", error);
-      toast.error("Failed to fetch citizen details");
+      toast.error(
+        "Failed to fetch citizen details. Please check the CID number.",
+      );
       formik.setFieldValue(`partners[${index}].partnerName`, "");
+    } finally {
+      setFetchingCitizen(false);
     }
   };
-
-  // Create debounced version of fetchCitizenDetails
-  const debouncedFetchCitizen = useCallback(
-    debounce((citizenId, index) => {
-      if (citizenId && citizenId.length === 11) {
-        fetchCitizenDetails(citizenId, index);
-      }
-    }, 500),
-    [],
-  );
 
   const fetchCoursesBySector = async (sectorId) => {
     if (!sectorId) {
@@ -273,7 +294,6 @@ const InstituteProposal = () => {
   const fetchTypeOfOwner = async () => {
     try {
       const typeOfOwnerdata = await CommonService.getByParentId(6);
-      console.log("response", typeOfOwnerdata.data);
       setTypeOfOwners(typeOfOwnerdata.data);
     } catch (error) {
       console.error("Error fetching activity levels:", error);
@@ -294,6 +314,7 @@ const InstituteProposal = () => {
     });
 
   const formik = useFormik({
+    innerRef: formikRef,
     initialValues: {
       ownershipTypeId: "",
       otherOwnershipTypeId: "",
@@ -319,6 +340,8 @@ const InstituteProposal = () => {
     },
 
     validationSchema,
+    validateOnChange: true,
+    validateOnBlur: true,
     onSubmit: async (values, { resetForm }) => {
       setLoading(true);
       try {
@@ -349,7 +372,7 @@ const InstituteProposal = () => {
           statusId: 55,
           userId: null,
           documents,
-          partners: values.partners || [], // Include partners in the payload
+          partners: values.partners || [],
         };
 
         const response =
@@ -374,20 +397,29 @@ const InstituteProposal = () => {
 
   // Helper function to check if ownership type is "Others"
   const isOthersType = () => {
-    return formik.values.ownershipTypeId === "2"; // ID for Others
+    return formik.values.ownershipTypeId === "2";
   };
 
   // Helper function to check if other ownership type is Agency or Organization
   const isAgencyOrOrganization = () => {
     const id = formik.values.otherOwnershipTypeId;
-    return id === "5" || id === "8"; // Agency (5) or Organization (8)
+    return id === "5" || id === "8";
   };
 
   // Helper function to check if other ownership type is Cooperative or Group
   const isCooperativeOrGroup = () => {
     const id = formik.values.otherOwnershipTypeId;
-    return id === "6" || id === "7"; // Cooperative (6) or Group (7)
+    return id === "6" || id === "7";
   };
+
+  const requiredLabel = (label) => (
+    <>
+      {label}
+      <Typography component="span" sx={{ color: "red" }}>
+        *
+      </Typography>
+    </>
+  );
 
   return (
     <Box sx={{ m: 1 }}>
@@ -420,11 +452,7 @@ const InstituteProposal = () => {
                 <TextField
                   select
                   fullWidth
-                  label={
-                    <span>
-                      Ownership Type <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Ownership Type")}
                   name="ownershipTypeId"
                   size="small"
                   value={formik.values.ownershipTypeId}
@@ -438,6 +466,7 @@ const InstituteProposal = () => {
                     formik.setFieldValue("otherAddress", "");
                     formik.setFieldValue("partners", []);
                   }}
+                  onBlur={formik.handleBlur}
                   error={
                     formik.touched.ownershipTypeId &&
                     Boolean(formik.errors.ownershipTypeId)
@@ -457,21 +486,17 @@ const InstituteProposal = () => {
               </Grid>
 
               {/* Company section */}
-              {formik.values.ownershipTypeId === "1" && ( // Company
+              {formik.values.ownershipTypeId === "1" && (
                 <>
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
-                      label={
-                        <span>
-                          Registration No{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
+                      label={requiredLabel("Registration No")}
                       name="registrationNo"
                       size="small"
                       value={formik.values.registrationNo}
                       onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
                       error={
                         formik.touched.registrationNo &&
                         Boolean(formik.errors.registrationNo)
@@ -485,15 +510,12 @@ const InstituteProposal = () => {
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
-                      label={
-                        <span>
-                          Company Name <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
+                      label={requiredLabel("Company Name")}
                       name="companyName"
                       size="small"
                       value={formik.values.companyName}
                       onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
                       error={
                         formik.touched.companyName &&
                         Boolean(formik.errors.companyName)
@@ -507,7 +529,7 @@ const InstituteProposal = () => {
               )}
 
               {/* Partnership Section */}
-              {formik.values.ownershipTypeId === "3" && ( // Partnership
+              {formik.values.ownershipTypeId === "3" && (
                 <>
                   {formik.values.partners.map((partner, index) => (
                     <Box
@@ -527,15 +549,11 @@ const InstituteProposal = () => {
                             select
                             fullWidth
                             size="small"
-                            label={
-                              <span>
-                                Type of Owner{" "}
-                                <span style={{ color: "red" }}>*</span>
-                              </span>
-                            }
+                            label={requiredLabel("Type of Owner")}
                             name={`partners[${index}].typeOfOwner`}
                             value={partner.typeOfOwner}
                             onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
                             error={
                               formik.touched.partners &&
                               Boolean(
@@ -559,25 +577,30 @@ const InstituteProposal = () => {
                           </TextField>
                         </Grid>
 
-                        {/* Individual Partner - using ID comparison */}
-                        {partner.typeOfOwner === "22" && ( // ID for Individual
+                        {/* Individual Partner */}
+                        {partner.typeOfOwner === "22" && (
                           <>
                             <Grid item size={{ xs: 12, md: 3 }}>
                               <TextField
                                 fullWidth
-                                label={
-                                  <span>
-                                    Partner Citizen ID No{" "}
-                                    <span style={{ color: "red" }}>*</span>
-                                  </span>
-                                }
+                                label={requiredLabel("Partner Citizen ID No")}
                                 name={`partners[${index}].citizenId`}
                                 size="small"
                                 value={partner.citizenId}
-                                onChange={(e) => {
-                                  formik.handleChange(e);
-                                  // Debounced fetch as user types
-                                  debouncedFetchCitizen(e.target.value, index);
+                                onChange={formik.handleChange}
+                                onBlur={(e) => {
+                                  formik.handleBlur(e);
+                                  // Auto-fetch citizen details when CID is entered and is 11 digits
+                                  if (
+                                    e.target.value &&
+                                    e.target.value.length === 11
+                                  ) {
+                                    fetchAndFillPartnerDetails(
+                                      e.target.value,
+                                      formik,
+                                      index,
+                                    );
+                                  }
                                 }}
                                 error={
                                   formik.touched.partners &&
@@ -589,21 +612,22 @@ const InstituteProposal = () => {
                                   formik.touched.partners &&
                                   formik.errors.partners?.[index]?.citizenId
                                 }
+                                InputProps={{
+                                  endAdornment: fetchingCitizen && (
+                                    <CircularProgress size={20} />
+                                  ),
+                                }}
                               />
                             </Grid>
                             <Grid item size={{ xs: 12, md: 3 }}>
                               <TextField
                                 fullWidth
-                                label={
-                                  <span>
-                                    Partner Name{" "}
-                                    <span style={{ color: "red" }}>*</span>
-                                  </span>
-                                }
+                                label={requiredLabel("Partner Name")}
                                 name={`partners[${index}].partnerName`}
                                 size="small"
                                 value={partner.partnerName}
                                 onChange={formik.handleChange}
+                                onBlur={formik.handleBlur}
                                 error={
                                   formik.touched.partners &&
                                   Boolean(
@@ -616,29 +640,32 @@ const InstituteProposal = () => {
                                   formik.errors.partners?.[index]?.partnerName
                                 }
                                 InputProps={{
-                                  readOnly: true, // Make the field read-only since it's auto-populated
+                                  readOnly: true,
+                                  sx: {
+                                    backgroundColor: partner.partnerName
+                                      ? (theme) => theme.palette.action.hover
+                                      : "transparent",
+                                  },
                                 }}
                               />
                             </Grid>
                           </>
                         )}
 
-                        {/* Company Partner - using ID comparison */}
-                        {partner.typeOfOwner === "23" && ( // ID for Company
+                        {/* Company Partner */}
+                        {partner.typeOfOwner === "23" && (
                           <>
                             <Grid item size={{ xs: 12, md: 3 }}>
                               <TextField
                                 fullWidth
-                                label={
-                                  <span>
-                                    Partner Company Registration No{" "}
-                                    <span style={{ color: "red" }}>*</span>
-                                  </span>
-                                }
+                                label={requiredLabel(
+                                  "Partner Company Registration No",
+                                )}
                                 name={`partners[${index}].registrationNo`}
                                 size="small"
                                 value={partner.registrationNo}
                                 onChange={formik.handleChange}
+                                onBlur={formik.handleBlur}
                                 error={
                                   formik.touched.partners &&
                                   Boolean(
@@ -656,16 +683,12 @@ const InstituteProposal = () => {
                             <Grid item size={{ xs: 12, md: 3 }}>
                               <TextField
                                 fullWidth
-                                label={
-                                  <span>
-                                    Partner Company Name{" "}
-                                    <span style={{ color: "red" }}>*</span>
-                                  </span>
-                                }
+                                label={requiredLabel("Partner Company Name")}
                                 name={`partners[${index}].companyName`}
                                 size="small"
                                 value={partner.companyName}
                                 onChange={formik.handleChange}
+                                onBlur={formik.handleBlur}
                                 error={
                                   formik.touched.partners &&
                                   Boolean(
@@ -731,11 +754,7 @@ const InstituteProposal = () => {
                     <TextField
                       select
                       fullWidth
-                      label={
-                        <span>
-                          Types of Other <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
+                      label={requiredLabel("Types of Other")}
                       name="otherOwnershipTypeId"
                       size="small"
                       value={formik.values.otherOwnershipTypeId}
@@ -746,6 +765,7 @@ const InstituteProposal = () => {
                         formik.setFieldValue("otherName", "");
                         formik.setFieldValue("otherAddress", "");
                       }}
+                      onBlur={formik.handleBlur}
                       error={
                         formik.touched.otherOwnershipTypeId &&
                         Boolean(formik.errors.otherOwnershipTypeId)
@@ -770,15 +790,12 @@ const InstituteProposal = () => {
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           fullWidth
-                          label={
-                            <span>
-                              Name <span style={{ color: "red" }}>*</span>
-                            </span>
-                          }
+                          label={requiredLabel("Name")}
                           name="otherName"
                           size="small"
                           value={formik.values.otherName}
                           onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
                           error={
                             formik.touched.otherName &&
                             Boolean(formik.errors.otherName)
@@ -792,15 +809,12 @@ const InstituteProposal = () => {
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           fullWidth
-                          label={
-                            <span>
-                              Address <span style={{ color: "red" }}>*</span>
-                            </span>
-                          }
+                          label={requiredLabel("Address")}
                           name="otherAddress"
                           size="small"
                           value={formik.values.otherAddress}
                           onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
                           error={
                             formik.touched.otherAddress &&
                             Boolean(formik.errors.otherAddress)
@@ -820,16 +834,12 @@ const InstituteProposal = () => {
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           fullWidth
-                          label={
-                            <span>
-                              Registration No{" "}
-                              <span style={{ color: "red" }}>*</span>
-                            </span>
-                          }
+                          label={requiredLabel("Registration No")}
                           name="registrationNo"
                           size="small"
                           value={formik.values.registrationNo}
                           onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
                           error={
                             formik.touched.registrationNo &&
                             Boolean(formik.errors.registrationNo)
@@ -844,16 +854,12 @@ const InstituteProposal = () => {
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           fullWidth
-                          label={
-                            <span>
-                              Company Name{" "}
-                              <span style={{ color: "red" }}>*</span>
-                            </span>
-                          }
+                          label={requiredLabel("Company Name")}
                           name="companyName"
                           size="small"
                           value={formik.values.companyName}
                           onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
                           error={
                             formik.touched.companyName &&
                             Boolean(formik.errors.companyName)
@@ -870,21 +876,23 @@ const InstituteProposal = () => {
               )}
 
               {/* Sole Proprietorship Section */}
-              {formik.values.ownershipTypeId === "4" && ( // Sole Proprietorship
+              {formik.values.ownershipTypeId === "4" && (
                 <>
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
-                      label={
-                        <span>
-                          Promoter Citizen ID No{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
+                      label={requiredLabel("Promoter Citizen ID No")}
                       name="promoterCitizenId"
                       size="small"
                       value={formik.values.promoterCitizenId}
                       onChange={formik.handleChange}
+                      onBlur={(e) => {
+                        formik.handleBlur(e);
+                        // Auto-fetch citizen details when CID is entered and is 11 digits
+                        if (e.target.value && e.target.value.length === 11) {
+                          fetchAndFillPromoterDetails(e.target.value, formik);
+                        }
+                      }}
                       error={
                         formik.touched.promoterCitizenId &&
                         Boolean(formik.errors.promoterCitizenId)
@@ -893,21 +901,23 @@ const InstituteProposal = () => {
                         formik.touched.promoterCitizenId &&
                         formik.errors.promoterCitizenId
                       }
+                      InputProps={{
+                        endAdornment: fetchingCitizen && (
+                          <CircularProgress size={20} />
+                        ),
+                      }}
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 4 }}>
                     <TextField
                       fullWidth
-                      label={
-                        <span>
-                          Promoter Name <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
+                      label={requiredLabel("Promoter Name")}
                       name="promoterName"
                       size="small"
                       value={formik.values.promoterName}
                       onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
                       error={
                         formik.touched.promoterName &&
                         Boolean(formik.errors.promoterName)
@@ -916,6 +926,14 @@ const InstituteProposal = () => {
                         formik.touched.promoterName &&
                         formik.errors.promoterName
                       }
+                      InputProps={{
+                        readOnly: true,
+                        sx: {
+                          backgroundColor: formik.values.promoterName
+                            ? (theme) => theme.palette.action.hover
+                            : "transparent",
+                        },
+                      }}
                     />
                   </Grid>
                 </>
@@ -940,16 +958,12 @@ const InstituteProposal = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label={
-                    <span>
-                      Proposed Institute Name{" "}
-                      <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Proposed Institute Name")}
                   name="proposedInstituteName"
                   size="small"
                   value={formik.values.proposedInstituteName}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={
                     formik.touched.proposedInstituteName &&
                     Boolean(formik.errors.proposedInstituteName)
@@ -965,16 +979,12 @@ const InstituteProposal = () => {
                 <TextField
                   select
                   fullWidth
-                  label={
-                    <span>
-                      Institute Location (Dzongkhag){" "}
-                      <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Institute Location (Dzongkhag)")}
                   name="dzongkhagId"
                   size="small"
                   value={formik.values.dzongkhagId}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={
                     formik.touched.dzongkhagId &&
                     Boolean(formik.errors.dzongkhagId)
@@ -984,7 +994,6 @@ const InstituteProposal = () => {
                   }
                 >
                   <MenuItem value="">Select</MenuItem>
-
                   {Array.isArray(dzongkhags) &&
                     dzongkhags.map((dz) => (
                       <MenuItem key={dz.id} value={dz.id.toString()}>
@@ -997,15 +1006,12 @@ const InstituteProposal = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label={
-                    <span>
-                      Exact Location <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Exact Location")}
                   name="exactLocation"
                   size="small"
                   value={formik.values.exactLocation}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={
                     formik.touched.exactLocation &&
                     Boolean(formik.errors.exactLocation)
@@ -1024,22 +1030,20 @@ const InstituteProposal = () => {
                   size="small"
                   value={formik.values.telephoneNo}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
               </Grid>
 
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label={
-                    <span>
-                      Mobile No <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Mobile No")}
                   name="mobileNo"
                   type="number"
                   size="small"
                   value={formik.values.mobileNo}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={
                     formik.touched.mobileNo && Boolean(formik.errors.mobileNo)
                   }
@@ -1050,15 +1054,12 @@ const InstituteProposal = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label={
-                    <span>
-                      Email Address <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Email Address")}
                   name="email"
                   size="small"
                   value={formik.values.email}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={formik.touched.email && Boolean(formik.errors.email)}
                   helperText={formik.touched.email && formik.errors.email}
                 />
@@ -1068,28 +1069,22 @@ const InstituteProposal = () => {
                 <TextField
                   select
                   fullWidth
-                  label={
-                    <span>
-                      Sector <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Sector")}
                   name="sectorId"
                   size="small"
                   value={formik.values.sectorId}
                   onChange={(e) => {
                     formik.handleChange(e);
-                    // Reset course when sector changes
                     formik.setFieldValue("courseId", "");
-                    // Fetch courses for selected sector
                     fetchCoursesBySector(e.target.value);
                   }}
+                  onBlur={formik.handleBlur}
                   error={
                     formik.touched.sectorId && Boolean(formik.errors.sectorId)
                   }
                   helperText={formik.touched.sectorId && formik.errors.sectorId}
                 >
                   <MenuItem value="">Select</MenuItem>
-
                   {Array.isArray(sectors) &&
                     sectors.map((field) => (
                       <MenuItem key={field.id} value={field.id.toString()}>
@@ -1103,15 +1098,12 @@ const InstituteProposal = () => {
                 <TextField
                   select
                   fullWidth
-                  label={
-                    <span>
-                      Course <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Course")}
                   name="courseId"
                   size="small"
                   value={formik.values.courseId}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={
                     formik.touched.courseId && Boolean(formik.errors.courseId)
                   }
@@ -1139,15 +1131,12 @@ const InstituteProposal = () => {
                 <TextField
                   select
                   fullWidth
-                  label={
-                    <span>
-                      Activity Level <span style={{ color: "red" }}>*</span>
-                    </span>
-                  }
+                  label={requiredLabel("Activity Level")}
                   name="activityLevelId"
                   size="small"
                   value={formik.values.activityLevelId}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={
                     formik.touched.activityLevelId &&
                     Boolean(formik.errors.activityLevelId)
@@ -1169,15 +1158,21 @@ const InstituteProposal = () => {
           </Paper>
 
           {/* Supporting Documents */}
+
           <Paper sx={{ p: 3, mb: 4 }}>
             <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Supporting Documents
+              {requiredLabel("Supporting Documents")}
             </Typography>
             <Divider sx={{ mb: 3 }} />
             <FileUpload
               files={formik.values.files}
               onFilesChange={(files) => formik.setFieldValue("files", files)}
             />
+            {formik.touched.files && formik.errors.files && (
+              <Typography color="error" variant="caption">
+                {formik.errors.files}
+              </Typography>
+            )}
           </Paper>
 
           <Box
@@ -1230,4 +1225,4 @@ const InstituteProposal = () => {
   );
 };
 
-export default InstituteProposal;
+export default InstituteSesCentreAssessmentCentreProposal;

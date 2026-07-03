@@ -23,6 +23,7 @@ import {
   MenuItem,
   Select,
   FormControl,
+  Tooltip,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -30,10 +31,12 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
+import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 
 const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
@@ -53,6 +56,10 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [pendingStatusId, setPendingStatusId] = useState(null);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [academicCompetency, setAcademicCompetency] = useState([]);
+  // State for payment advice
+  const [paymentStatusDetails, setPaymentStatusDetails] = useState([]);
+  const [paymentAdviceNo, setPaymentAdviceNo] = useState(null);
+  const [paymentRedirectUrl, setPaymentRedirectUrl] = useState(null);
 
   //State for qualifications lookup
   const [academicQualifications, setAcademicQualifications] = useState([]);
@@ -67,10 +74,14 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [traineeTheoryAssessments, setTraineeTheoryAssessments] = useState({});
   const [traineePracticalAssessments, setTraineePracticalAssessments] =
     useState({});
-  
+
   // State for storing viva and practical assessments for service_id 39
   const [traineeVivaAssessments, setTraineeVivaAssessments] = useState({});
-  const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] = useState({});
+  const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] =
+    useState({});
+
+  // State to track if any assessment values exist
+  const [hasAssessmentValues, setHasAssessmentValues] = useState(false);
 
   // Separate pagination for pending table
   const [pagePending, setPagePending] = useState(0);
@@ -92,23 +103,42 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   // Check if service_id is 39 for Viva assessments
   const isServiceId39 = courseDetails?.service_id === "39";
 
+  // Check if payment is paid
+  const isPaymentPaid =
+    paymentStatusDetails?.paymentStatus?.toLowerCase() === "paid";
+
   // Check if any trainee has assessments (theory/practical for normal, viva/practical for service_id 39)
-  const hasAssessments = selectedTrainees.some((trainee) => {
-    if (isServiceId39) {
-      return (trainee.viva_assessment && trainee.viva_assessment !== "") ||
-             (trainee.practical_assessment && trainee.practical_assessment !== "");
-    } else {
-      return (trainee.theory_assessment && trainee.theory_assessment !== "") ||
-             (trainee.practical_assessment && trainee.practical_assessment !== "");
-    }
-  });
+  // Only show assessments if payment is paid
+  const hasAssessments =
+    isPaymentPaid &&
+    selectedTrainees.some((trainee) => {
+      if (isServiceId39) {
+        return (
+          (trainee.viva_assessment && trainee.viva_assessment !== "") ||
+          (trainee.practical_assessment && trainee.practical_assessment !== "")
+        );
+      } else {
+        return (
+          (trainee.theory_assessment && trainee.theory_assessment !== "") ||
+          (trainee.practical_assessment && trainee.practical_assessment !== "")
+        );
+      }
+    });
+
+  // Check if any trainee has result status - only show if payment is paid
+  const hasResultStatus =
+    isPaymentPaid &&
+    selectedTrainees.some((trainee) => trainee.result_status_id);
 
   // Fetch academic qualifications and status list on component mount
   useEffect(() => {
     fetchAcademicQualification();
     fetchStatusList();
     fetchAcademicCompetency();
+    fetchPaymentDetail();
   }, []);
+
+  // REMOVED: Automatic payment tab opening useEffect
 
   // Fetch course details and applied trainees when dependencies are ready
   useEffect(() => {
@@ -128,6 +158,44 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     academicCompetency,
   ]);
 
+  // Check for assessment values whenever they change
+  useEffect(() => {
+    // Only check if payment is paid
+    if (isPaymentPaid) {
+      const hasValues = selectedTrainees.some((trainee) => {
+        if (isServiceId39) {
+          return (
+            (traineeVivaAssessments[trainee.id] &&
+              traineeVivaAssessments[trainee.id] !== "") ||
+            (traineeVivaPracticalAssessments[trainee.id] &&
+              traineeVivaPracticalAssessments[trainee.id] !== "") ||
+            trainee.result_status_id
+          );
+        } else {
+          return (
+            (traineeTheoryAssessments[trainee.id] &&
+              traineeTheoryAssessments[trainee.id] !== "") ||
+            (traineePracticalAssessments[trainee.id] &&
+              traineePracticalAssessments[trainee.id] !== "") ||
+            trainee.result_status_id
+          );
+        }
+      });
+
+      setHasAssessmentValues(hasValues);
+    } else {
+      setHasAssessmentValues(false);
+    }
+  }, [
+    selectedTrainees,
+    traineeTheoryAssessments,
+    traineePracticalAssessments,
+    traineeVivaAssessments,
+    traineeVivaPracticalAssessments,
+    isServiceId39,
+    isPaymentPaid,
+  ]);
+
   const fetchAcademicQualification = async () => {
     try {
       const response = await CommonService.getByParentId(18);
@@ -143,6 +211,34 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       console.log("Academic Qualifications:", qualifications);
     } catch (error) {
       console.error("Error fetching academic qualifications:", error);
+    }
+  };
+
+  const fetchPaymentDetail = async () => {
+    try {
+      const response =
+        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+
+      setPaymentStatusDetails(response.data);
+      console.log("payment details", response.data);
+
+      // Extract paymentAdviceNo if it exists
+      if (response.data && response.data.paymentAdviceNo) {
+        setPaymentAdviceNo(response.data.paymentAdviceNo);
+        if (response.data.redirectUrl) {
+          setPaymentRedirectUrl(response.data.redirectUrl);
+        }
+      } else {
+        setPaymentAdviceNo(null);
+        setPaymentRedirectUrl(null);
+      }
+
+      console.log("payment details:", response);
+    } catch (error) {
+      console.error("Error fetching payment details :", error);
+      toast.error("Failed to fetch payment details");
+      setPaymentAdviceNo(null);
+      setPaymentRedirectUrl(null);
     }
   };
 
@@ -227,7 +323,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       console.log("Applied Trainees Response:", response);
       const trainees = response.data || [];
       setAllTrainees(trainees);
-      
+
       // Filter trainees based on status IDs from API
       const pending = trainees.filter(
         (trainee) => trainee.status_id === pendingStatusId?.toString(),
@@ -257,7 +353,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         // Initialize theory and practical assessments
         initialTheory[trainee.id] = trainee.theory_assessment || "";
         initialPractical[trainee.id] = trainee.practical_assessment || "";
-        
+
         // Initialize viva assessments for service_id 39
         initialViva[trainee.id] = trainee.viva_assessment || "";
         initialVivaPractical[trainee.id] = trainee.practical_assessment || "";
@@ -268,7 +364,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       setTraineePracticalAssessments(initialPractical);
       setTraineeVivaAssessments(initialViva);
       setTraineeVivaPracticalAssessments(initialVivaPractical);
-
     } catch (error) {
       console.error("Error fetching applied trainees:", error);
       toast.error("Failed to fetch applied trainees");
@@ -435,11 +530,17 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
 
     setPendingTrainees(updatedPending);
     setSelectedTrainees(updatedSelected);
-    setTraineeInternalAssessments((prev) => ({ ...prev, ...newInternalAssessments }));
+    setTraineeInternalAssessments((prev) => ({
+      ...prev,
+      ...newInternalAssessments,
+    }));
     setTraineeTheoryAssessments((prev) => ({ ...prev, ...newTheory }));
     setTraineePracticalAssessments((prev) => ({ ...prev, ...newPractical }));
     setTraineeVivaAssessments((prev) => ({ ...prev, ...newViva }));
-    setTraineeVivaPracticalAssessments((prev) => ({ ...prev, ...newVivaPractical }));
+    setTraineeVivaPracticalAssessments((prev) => ({
+      ...prev,
+      ...newVivaPractical,
+    }));
     setSelectedPendingRows([]);
 
     toast.success(
@@ -503,6 +604,36 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     if (selectedTrainees.length === 0) {
       toast.warning("No trainees selected for this course");
       return;
+    }
+
+    // Check if any trainee has assessment values
+    if (isPaymentPaid) {
+      const hasValues = selectedTrainees.some((trainee) => {
+        if (isServiceId39) {
+          return (
+            (traineeVivaAssessments[trainee.id] &&
+              traineeVivaAssessments[trainee.id] !== "") ||
+            (traineeVivaPracticalAssessments[trainee.id] &&
+              traineeVivaPracticalAssessments[trainee.id] !== "") ||
+            trainee.result_status_id
+          );
+        } else {
+          return (
+            (traineeTheoryAssessments[trainee.id] &&
+              traineeTheoryAssessments[trainee.id] !== "") ||
+            (traineePracticalAssessments[trainee.id] &&
+              traineePracticalAssessments[trainee.id] !== "") ||
+            trainee.result_status_id
+          );
+        }
+      });
+
+      if (hasValues) {
+        toast.error(
+          "Cannot submit selection when trainees have assessment marks or result status. Please clear all assessment values first.",
+        );
+        return;
+      }
     }
 
     // Only validate internal assessments if CA dates exist
@@ -704,18 +835,22 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   // Calculate total columns for selected table
   const getSelectedTableColSpan = () => {
     let cols = 8; // checkbox, #, name, cid, contact, email, qualification, status
-    
-    // Add result status column if any trainee has result_status_id
-    const hasResultStatus = selectedTrainees.some(trainee => trainee.result_status_id);
-    if (hasResultStatus) cols++;
-    
+
     if (hasCADates) cols++;
-    if (hasAssessments) {
+    // Only add assessment columns if payment is paid
+    if (isPaymentPaid && hasAssessments) {
       if (isServiceId39) {
         cols += 2; // viva and practical for service_id 39
       } else {
         cols += 2; // theory and practical for other services
       }
+    }
+    // Add result status column if payment is paid and any trainee has result_status_id
+    if (
+      isPaymentPaid &&
+      selectedTrainees.some((trainee) => trainee.result_status_id)
+    ) {
+      cols++;
     }
     return cols;
   };
@@ -764,7 +899,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
               </FormControl>
             )}
           </TableCell>
-          
+
           {/* Practical Assessment Column for service_id 39 */}
           <TableCell>
             {courseDetails?.certification_level_id === "36" ? (
@@ -847,7 +982,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
               </FormControl>
             )}
           </TableCell>
-          
+
           {/* Practical Assessment Column for other services */}
           <TableCell>
             {courseDetails?.certification_level_id === "36" ? (
@@ -925,6 +1060,75 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           <RefreshIcon />
         </IconButton>
       </Box>
+
+      {/* Payment Status Banner - Show if payment is pending */}
+      {paymentStatusDetails?.paymentStatus?.toLowerCase() === "pending" && (
+        <Box
+          sx={{
+            mb: 3,
+            p: 2,
+            bgcolor: "#fff3cd",
+            border: "1px solid #ffc107",
+            borderRadius: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 2,
+          }}
+        >
+          <Typography color="warning.dark">
+            <strong>Payment Pending:</strong> Please complete your payment to
+            proceed.
+          </Typography>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={() => {
+                if (paymentRedirectUrl) {
+                  window.open(
+                    paymentRedirectUrl,
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                  toast.info("Payment page opened in new tab");
+                } else {
+                  toast.error("Payment URL not available");
+                }
+              }}
+              startIcon={<OpenInNewIcon />}
+            >
+              Pay Now
+            </Button>
+          </Box>
+        </Box>
+      )}
+
+      {/* Payment Status Banner - Show if payment is paid */}
+      {isPaymentPaid && (
+        <Box
+          sx={{
+            mb: 3,
+            p: 2,
+            bgcolor: "#d4edda",
+            border: "1px solid #28a745",
+            borderRadius: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
+          <Typography color="success.dark">
+            <strong>Payment Status:</strong> Paid ✓
+          </Typography>
+          {paymentAdviceNo && (
+            <Typography color="success.dark">
+              <strong>Payment Advice No:</strong> {paymentAdviceNo}
+            </Typography>
+          )}
+        </Box>
+      )}
 
       {/* Course Information Card */}
       {courseDetails && (
@@ -1025,7 +1229,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         {/* Selected Trainees Table (Top) */}
         <Grid item size={{ xs: 12, md: 12 }}>
           <Paper elevation={2} sx={{ p: 2 }}>
-            <Typography              variant="h6"
+            <Typography
+              variant="h6"
               gutterBottom
               sx={{ display: "flex", alignItems: "center", gap: 1 }}
             >
@@ -1076,21 +1281,24 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>Qualification</TableCell>
                     <TableCell>Status</TableCell>
-                    {/* Result Status Column - Only show if any trainee has result_status_id */}
-                    {selectedTrainees.some(trainee => trainee.result_status_id) && (
-                      <TableCell>Result Status</TableCell>
-                    )}
                     {/* Only show CA Mark/Competency column if CA dates exist */}
                     {hasCADates && <TableCell>CA Mark/Competency</TableCell>}
-                    {/* Show assessment columns if they exist */}
-                    {hasAssessments && (
+                    {/* Show assessment columns ONLY if payment is paid */}
+                    {isPaymentPaid && hasAssessments && (
                       <>
                         <TableCell>
-                          {isServiceId39 ? "Viva Assessment" : "Theory Assessment"}
+                          {isServiceId39
+                            ? "Viva Assessment"
+                            : "Theory Assessment"}
                         </TableCell>
                         <TableCell>Practical Assessment</TableCell>
                       </>
                     )}
+                    {/* Result Status Column - ONLY if payment is paid */}
+                    {isPaymentPaid &&
+                      selectedTrainees.some(
+                        (trainee) => trainee.result_status_id,
+                      ) && <TableCell>Result Status</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1117,7 +1325,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                             {index + 1 + pageSelected * rowsPerPageSelected}
                           </TableCell>
                           <TableCell>{trainee.applicant_name}</TableCell>
-                          <TableCell>{trainee.cid_no || trainee.reference_no}</TableCell>
+                          <TableCell>
+                            {trainee.cid_no || trainee.reference_no}
+                          </TableCell>
                           <TableCell>{trainee.mobile_no}</TableCell>
                           <TableCell>{trainee.email_id}</TableCell>
                           <TableCell>
@@ -1132,16 +1342,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                               sx={getStatusColor(trainee.status_id)}
                             />
                           </TableCell>
-                          {/* Result Status Cell - Only show if trainee has result_status_id */}
-                          {trainee.result_status_id && (
-                            <TableCell>
-                              <Chip
-                                label={getResultStatusName(trainee.result_status_id)}
-                                size="small"
-                                sx={getResultStatusColor(trainee.result_status_id)}
-                              />
-                            </TableCell>
-                          )}
                           {/* Only show CA Mark/Competency input if CA dates exist */}
                           {hasCADates && (
                             <TableCell>
@@ -1201,8 +1401,24 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                               )}
                             </TableCell>
                           )}
-                          {/* Show assessment columns (read-only) if they exist */}
-                          {hasAssessments && renderAssessmentColumns(trainee)}
+                          {/* Show assessment columns (read-only) ONLY if payment is paid */}
+                          {isPaymentPaid &&
+                            hasAssessments &&
+                            renderAssessmentColumns(trainee)}
+                          {/* Result Status Cell - ONLY if payment is paid */}
+                          {isPaymentPaid && trainee.result_status_id && (
+                            <TableCell>
+                              <Chip
+                                label={getResultStatusName(
+                                  trainee.result_status_id,
+                                )}
+                                size="small"
+                                sx={getResultStatusColor(
+                                  trainee.result_status_id,
+                                )}
+                              />
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                   ) : (
@@ -1253,25 +1469,39 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                 >
                   Move to Pending ({selectedSelectedRows.length})
                 </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleFinalizeSelection}
-                  disabled={
-                    loading || submitting || selectedTrainees.length === 0
+                <Tooltip
+                  title={
+                    hasAssessmentValues
+                      ? "Cannot submit when trainees have assessment marks or result status. Please clear all assessment values first."
+                      : ""
                   }
-                  startIcon={
-                    submitting ? (
-                      <CircularProgress size={20} />
-                    ) : (
-                      <CheckCircleIcon />
-                    )
-                  }
+                  arrow
                 >
-                  {submitting
-                    ? "Submitting..."
-                    : `Submit (${selectedTrainees.length} Trainees)`}
-                </Button>
+                  <span>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleFinalizeSelection}
+                      disabled={
+                        loading ||
+                        submitting ||
+                        selectedTrainees.length === 0 ||
+                        hasAssessmentValues
+                      }
+                      startIcon={
+                        submitting ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          <CheckCircleIcon />
+                        )
+                      }
+                    >
+                      {submitting
+                        ? "Submitting..."
+                        : `Submit (${selectedTrainees.length} Trainees)`}
+                    </Button>
+                  </span>
+                </Tooltip>
               </Box>
             </Box>
           </Paper>
@@ -1354,7 +1584,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                             {index + 1 + pagePending * rowsPerPagePending}
                           </TableCell>
                           <TableCell>{trainee.applicant_name}</TableCell>
-                          <TableCell>{trainee.cid_no || trainee.reference_no}</TableCell>
+                          <TableCell>
+                            {trainee.cid_no || trainee.reference_no}
+                          </TableCell>
                           <TableCell>{trainee.mobile_no}</TableCell>
                           <TableCell>{trainee.email_id}</TableCell>
                           <TableCell>

@@ -60,9 +60,7 @@ const SendTracerIndex = () => {
   const [selectedSubType, setSelectedSubType] = useState("");
   const [tracerDetails, setTracerDetails] = useState([]);
   const [tracerApplicationDetails, setTracerApplicationDetails] = useState([]);
-  const [tracerQuestionDropdownType, setTracerQuestionDropdownType] = useState(
-    [],
-  );
+  const [tracerQuestionDropdownType, setTracerQuestionDropdownType] = useState([]);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
@@ -104,54 +102,80 @@ const SendTracerIndex = () => {
 
   // Fetch parent tracer types on component mount
   useEffect(() => {
-    fetchParentTracerTypes();
-    fetchTracerDetails();
-    fetchTracerQuestionDropdownType();
-  }, []);
+    if (access_token) {
+      fetchParentTracerTypes();
+      fetchTracerDetails();
+      fetchTracerQuestionDropdownType();
+    }
+  }, [access_token]);
 
   const fetchParentTracerTypes = async () => {
+    if (!access_token) {
+      console.warn("No access token available");
+      return;
+    }
     try {
-      const response =
-        await GenerateTracerService.getParentTracerTypes(access_token);
-      setParentTracerTypes(response.data);
+      const response = await GenerateTracerService.getParentTracerTypes(access_token);
+      setParentTracerTypes(response.data || []);
       console.log("Parent Tracer Types:", response.data);
     } catch (error) {
       console.error("Error fetching parent tracer types:", error);
-      toast.error("Error fetching parent tracer types");
+      if (error.response?.status === 401) {
+        toast.error("Your session has expired. Please login again.");
+      } else {
+        toast.error("Error fetching parent tracer types");
+      }
+      setParentTracerTypes([]);
     }
   };
 
   const fetchTracerDetails = async () => {
+    if (!access_token) {
+      console.warn("No access token available");
+      return;
+    }
     setLoading(true);
     try {
-      const response =
-        await GenerateTracerService.getTracerAllApplications(access_token);
-      setTracerDetails(response.data);
+      const response = await GenerateTracerService.getTracerAllApplications(access_token);
+      setTracerDetails(response.data || []);
       console.log("Tracer Details:", response.data);
     } catch (error) {
       console.error("Error fetching tracer details:", error);
-      toast.error("Error fetching tracer details");
+      if (error.response?.status === 401) {
+        toast.error("Your session has expired. Please login again.");
+      } else {
+        toast.error("Error fetching tracer details");
+      }
+      setTracerDetails([]);
     } finally {
       setLoading(false);
     }
   };
 
   const fetchTracerApplicationDetails = async (applicationNo) => {
+    if (!access_token) {
+      console.warn("No access token available");
+      return [];
+    }
     setViewLoading(true);
     try {
-      const response =
-        await GenerateTracerService.getTracerDetailsByApplicationNo(
-          applicationNo,
-          access_token,
-        );
-      setTracerApplicationDetails(response.data);
+      const response = await GenerateTracerService.getTracerDetailsByApplicationNo(
+        applicationNo,
+        access_token,
+      );
+      setTracerApplicationDetails(response.data || []);
       console.log(
         `Tracer Application Details for ${applicationNo}:`,
         response.data,
       );
-      return response.data;
+      return response.data || [];
     } catch (error) {
       console.error("Error fetching tracer application details:", error);
+      if (error.response?.status === 401) {
+        toast.error("Your session has expired. Please login again.");
+      } else {
+        toast.error("Error fetching tracer application details");
+      }
       return [];
     } finally {
       setViewLoading(false);
@@ -159,14 +183,22 @@ const SendTracerIndex = () => {
   };
 
   const fetchTracerQuestionDropdownType = async () => {
+    if (!access_token) {
+      console.warn("No access token available");
+      return;
+    }
     try {
-      const response =
-        await GenerateTracerService.getTracerQuestionDropdownType(access_token);
-      setTracerQuestionDropdownType(response.data);
+      const response = await GenerateTracerService.getTracerQuestionDropdownType(access_token);
+      setTracerQuestionDropdownType(response.data || []);
       console.log("Tracer Question Dropdown Types:", response.data);
     } catch (error) {
       console.error("Error fetching tracer question dropdown types:", error);
-      toast.error("Error fetching question dropdown types");
+      if (error.response?.status === 401) {
+        toast.error("Your session has expired. Please login again.");
+      } else {
+        toast.error("Error fetching question dropdown types");
+      }
+      setTracerQuestionDropdownType([]);
     }
   };
 
@@ -180,7 +212,7 @@ const SendTracerIndex = () => {
     setIsLoadingSubTypes(true);
     try {
       const response = await CommonService.getByParentId(parentId);
-      const subTypes = response.data.map((item) => ({
+      const subTypes = (response.data || []).map((item) => ({
         id: item.id || item.sub_tracer_type_id,
         name: item.name || item.dropdown_name,
         ...item,
@@ -189,8 +221,8 @@ const SendTracerIndex = () => {
       console.log(`Sub Tracer Types for parent ${parentId}:`, subTypes);
     } catch (error) {
       console.error("Error fetching sub tracer types:", error);
-      setSubTracerTypes([]);
       toast.error("Error fetching sub tracer types");
+      setSubTracerTypes([]);
     } finally {
       setIsLoadingSubTypes(false);
     }
@@ -219,7 +251,7 @@ const SendTracerIndex = () => {
   // Helper function to get question type value by ID
   const getQuestionTypeValue = (typeId) => {
     if (!typeId) return null;
-    const questionType = tracerQuestionDropdownType.find(
+    const questionType = (tracerQuestionDropdownType || []).find(
       (t) => t.id === typeId.toString(),
     );
     return questionType ? questionType.value : null;
@@ -228,7 +260,7 @@ const SendTracerIndex = () => {
   // Get question type for a question (handles both main and sub questions)
   const getQuestionTypeForId = (typeId) => {
     if (!typeId) return null;
-    const questionType = tracerQuestionDropdownType.find(
+    const questionType = (tracerQuestionDropdownType || []).find(
       (t) => t.id === typeId.toString(),
     );
     return questionType ? questionType.value : null;
@@ -305,7 +337,7 @@ const SendTracerIndex = () => {
   };
 
   // Filter surveys based on selected parent and sub tracer types using IDs
-  const filteredTracerDetails = tracerDetails.filter((tracer) => {
+  const filteredTracerDetails = (tracerDetails || []).filter((tracer) => {
     const matchesParent = selectedParentType
       ? String(tracer.parent_tracer_type_id) === String(selectedParentType)
       : true;
@@ -316,9 +348,9 @@ const SendTracerIndex = () => {
   });
 
   // Filter surveys based on search
-  const filteredSurveys = filteredTracerDetails.filter((survey) => {
+  const filteredSurveys = (filteredTracerDetails || []).filter((survey) => {
     const matchesSearch = search
-      ? survey.application_no.toLowerCase().includes(search.toLowerCase())
+      ? survey.application_no?.toLowerCase().includes(search.toLowerCase())
       : true;
     return matchesSearch;
   });
@@ -334,7 +366,7 @@ const SendTracerIndex = () => {
   };
 
   // Get current page rows for display
-  const paginatedSurveys = filteredSurveys.slice(
+  const paginatedSurveys = (filteredSurveys || []).slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage,
   );
@@ -426,6 +458,7 @@ const SendTracerIndex = () => {
         `Trainee Tracer survey sent to ${selectedTrainees.length} trainee(s) successfully!`,
       );
       handleCloseSendDialog();
+      fetchTracerDetails(); // Refresh the list
     } catch (error) {
       console.error("Error sending trainee survey:", error);
       toast.error(
@@ -453,6 +486,7 @@ const SendTracerIndex = () => {
         `Employer Tracer survey sent to ${selectedEmployers.length} employer(s) successfully!`,
       );
       handleCloseSendDialog();
+      fetchTracerDetails(); // Refresh the list
     } catch (error) {
       console.error("Error sending employer survey:", error);
       toast.error(
@@ -540,7 +574,7 @@ const SendTracerIndex = () => {
     if (fieldName) {
       setFormResponses((prev) => ({
         ...prev,
-        [key]: { ...prev[key], [fieldName]: value },
+        [key]: { ...(prev[key] || {}), [fieldName]: value },
       }));
     } else {
       setFormResponses((prev) => ({ ...prev, [key]: value }));
@@ -637,7 +671,7 @@ const SendTracerIndex = () => {
           <MenuItem value="">
             <em>None</em>
           </MenuItem>
-          {options
+          {(options || [])
             .filter((opt) => opt && opt.trim() !== "")
             .map((option, idx) => (
               <MenuItem key={idx} value={option}>
@@ -669,13 +703,13 @@ const SendTracerIndex = () => {
           input={<OutlinedInput label="Select Options" />}
           renderValue={(selected) => (
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-              {selected.map((value) => (
+              {(selected || []).map((value) => (
                 <Chip key={value} label={value} size="small" />
               ))}
             </Box>
           )}
         >
-          {options
+          {(options || [])
             .filter((opt) => opt && opt.trim() !== "")
             .map((option, idx) => (
               <MenuItem key={idx} value={option}>
@@ -745,12 +779,12 @@ const SendTracerIndex = () => {
     const handleFieldChange = (fieldIndex, value) => {
       setMultipleTextValues((prev) => ({
         ...prev,
-        [questionId]: { ...prev[questionId], [fieldIndex]: value },
+        [questionId]: { ...(prev[questionId] || {}), [fieldIndex]: value },
       }));
     };
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {fields
+        {(fields || [])
           .filter((field) => field && field.trim() !== "")
           .map((field, idx) => (
             <Box key={idx}>
@@ -804,7 +838,7 @@ const SendTracerIndex = () => {
               handleResponseChange(questionId, e.target.value, isSubQuestion)
             }
           >
-            {options.map((opt, idx) => (
+            {(options || []).map((opt, idx) => (
               <FormControlLabel
                 key={idx}
                 value={opt}
@@ -818,7 +852,7 @@ const SendTracerIndex = () => {
       case "checkbox":
         return (
           <FormGroup>
-            {options.map((opt, idx) => (
+            {(options || []).map((opt, idx) => (
               <FormControlLabel
                 key={idx}
                 control={
@@ -914,7 +948,7 @@ const SendTracerIndex = () => {
               <MenuItem value="">
                 <em>-- Select Parent Tracer Type --</em>
               </MenuItem>
-              {parentTracerTypes.map((type) => (
+              {(parentTracerTypes || []).map((type) => (
                 <MenuItem key={type.id} value={type.id}>
                   {type.dropdown_name}
                 </MenuItem>
@@ -949,8 +983,8 @@ const SendTracerIndex = () => {
               <MenuItem value="">
                 <em>-- Select Sub Tracer Type --</em>
               </MenuItem>
-              {subTracerTypes.length > 0 ? (
-                subTracerTypes.map((type) => (
+              {(subTracerTypes || []).length > 0 ? (
+                (subTracerTypes || []).map((type) => (
                   <MenuItem key={type.id} value={type.id}>
                     {type.name || type.dropdown_name || `Sub Tracer ${type.id}`}
                   </MenuItem>
@@ -1039,7 +1073,7 @@ const SendTracerIndex = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {paginatedSurveys.map((survey, index) => (
+                {(paginatedSurveys || []).map((survey, index) => (
                   <TableRow
                     key={survey.application_no}
                     sx={{ "&:hover": { bgcolor: "#fafafa" } }}
@@ -1069,7 +1103,7 @@ const SendTracerIndex = () => {
                       <Chip
                         label={
                           survey.sub_tracer_type ||
-                          subTracerTypes.find(
+                          (subTracerTypes || []).find(
                             (st) =>
                               String(st.id) ===
                               String(survey.sub_tracer_type_id),
@@ -1083,8 +1117,7 @@ const SendTracerIndex = () => {
                     </TableCell>
                     <TableCell>{survey.created_at?.split(" ")[0]}</TableCell>
                     <TableCell align="center">
-                      <Stack
-                        direction="row"
+                      <Stack                        direction="row"
                         spacing={0.5}
                         justifyContent="center"
                       >
@@ -1216,9 +1249,8 @@ const SendTracerIndex = () => {
           ) : (
             selectedSurvey && (
               <Box>
-                {selectedSurvey.questions &&
-                selectedSurvey.questions.length > 0 ? (
-                  selectedSurvey.questions.map((question, index) => (
+                {(selectedSurvey.questions || []).length > 0 ? (
+                  (selectedSurvey.questions || []).map((question, index) => (
                     <Box key={question.id} sx={{ mb: 3 }}>
                       <Typography variant="body1" gutterBottom fontWeight={500}>
                         {index + 1}.{" "}
@@ -1234,51 +1266,50 @@ const SendTracerIndex = () => {
                           {renderPreviewOptions(question)}
                         </Box>
                       )}
-                      {question.subQuestions &&
-                        question.subQuestions.length > 0 && (
-                          <Box
-                            sx={{
-                              ml: 2,
-                              borderRadius: 1,
-                            }}
-                          >
-                            {question.subQuestions.map((sub, subIndex) => {
-                              const subQuestionType =
-                                sub.questionType ||
-                                getQuestionTypeForId(sub.questionTypeId);
-                              const subQuestionWithType = {
-                                ...sub,
-                                questionType: subQuestionType,
-                              };
-                              return (
-                                <Box key={sub.id} sx={{ mb: 2 }}>
-                                  <Typography variant="body2" gutterBottom>
-                                    {index + 1}.{subIndex + 1}{" "}
-                                    {sub.questionText ||
-                                      "Untitled Sub-question"}
-                                    {sub.isRequired === 1 && (
-                                      <span
-                                        style={{
-                                          color: "red",
-                                          marginLeft: "4px",
-                                        }}
-                                      >
-                                        *
-                                      </span>
-                                    )}
-                                  </Typography>
-                                  <Box sx={{ ml: 2, mt: 1 }}>
-                                    {renderPreviewOptions(
-                                      subQuestionWithType,
-                                      true,
-                                    )}
-                                  </Box>
+                      {(question.subQuestions || []).length > 0 && (
+                        <Box
+                          sx={{
+                            ml: 2,
+                            borderRadius: 1,
+                          }}
+                        >
+                          {(question.subQuestions || []).map((sub, subIndex) => {
+                            const subQuestionType =
+                              sub.questionType ||
+                              getQuestionTypeForId(sub.questionTypeId);
+                            const subQuestionWithType = {
+                              ...sub,
+                              questionType: subQuestionType,
+                            };
+                            return (
+                              <Box key={sub.id} sx={{ mb: 2 }}>
+                                <Typography variant="body2" gutterBottom>
+                                  {index + 1}.{subIndex + 1}{" "}
+                                  {sub.questionText ||
+                                    "Untitled Sub-question"}
+                                  {sub.isRequired === 1 && (
+                                    <span
+                                      style={{
+                                        color: "red",
+                                        marginLeft: "4px",
+                                      }}
+                                    >
+                                      *
+                                    </span>
+                                  )}
+                                </Typography>
+                                <Box sx={{ ml: 2, mt: 1 }}>
+                                  {renderPreviewOptions(
+                                    subQuestionWithType,
+                                    true,
+                                  )}
                                 </Box>
-                              );
-                            })}
-                          </Box>
-                        )}
-                      {index < selectedSurvey.questions.length - 1 && (
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+                      {index < (selectedSurvey.questions || []).length - 1 && (
                         <Divider sx={{ my: 2 }} />
                       )}
                     </Box>

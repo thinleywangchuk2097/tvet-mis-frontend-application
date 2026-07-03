@@ -202,7 +202,8 @@ const CommonQRCode = ({
   };
 
   const handleWatchVideo = () => {
-    window.open("https://www.youtube.com/watch?v=A_k79pml9k8", "_blank");
+    //window.open("https://www.youtube.com/watch?v=A_k79pml9k8", "_blank");
+    window.open("https://www.youtube.com/watch?v=A_k79pml9k8", "WindowName", "noopener");
   };
 
   return (

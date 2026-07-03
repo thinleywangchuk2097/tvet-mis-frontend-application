@@ -1,7 +1,8 @@
 import apiClient from "../../../axios";
 
-class CurriculumEndorsementIndexService {
-  submitCurriculumEndorsement(data, token) {
+class CurriculumIndexService {
+
+  submitCurriculum(data, token) {
     return apiClient
       .post(`/api/v1/user/management/curriculum/submit`, data, {
         headers: {
@@ -29,7 +30,7 @@ class CurriculumEndorsementIndexService {
   verifyCurriculumDevelopment(data, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/curriculum/verify-institute-proposal`,
+        `/api/v1/user/management/curriculum/verify-curriculum`,
         data,
         {
           headers: {
@@ -70,4 +71,4 @@ class CurriculumEndorsementIndexService {
   }
 }
 
-export default new CurriculumEndorsementIndexService();
+export default new CurriculumIndexService();

@@ -32,7 +32,7 @@ import * as Yup from "yup";
 import FileUpload from "../../../components/file/FileUpload";
 import ApplyNonAccreditedCourseService from "../../../api/services/internal/course/ApplyNonAccreditedCourseService";
 import CommonService from "../../../api/services/internal/common/CommonService";
-import CurriculumEndorsementIndexService from "../../../api/services/internal/course/CurriculumEndorsementIndexService";
+import CurriculumEndorsementIndexService from "../../../api/services/internal/course/CurriculumIndexService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";

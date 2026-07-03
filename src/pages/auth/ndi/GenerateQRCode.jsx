@@ -412,7 +412,8 @@ const GenerateQRCode = () => {
                 border: '2px solid #4CAF89'
               }
             }}
-            onClick={() => window.open('https://www.youtube.com/watch?v=A_k79pml9k8', '_blank')}
+           // onClick={() => window.open('https://www.youtube.com/watch?v=A_k79pml9k8', '_blank')}
+           onClick={() => window.open("https://www.youtube.com/watch?v=A_k79pml9k8", "WindowName", "noopener")}
           >
             Watch Video Guide
           </Button>
