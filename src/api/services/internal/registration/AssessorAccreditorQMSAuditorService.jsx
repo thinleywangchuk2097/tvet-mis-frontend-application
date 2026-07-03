@@ -7,6 +7,7 @@ class AssessorAccreditorQMSAuditorService {
       .then((response) => response)
       .catch((error) => error);
   }
+
   getDetailsByApplicationNo(application_no, token) {
     return apiClient
       .get(
@@ -20,7 +21,7 @@ class AssessorAccreditorQMSAuditorService {
       .then((response) => response)
       .catch((error) => error);
   }
-  
+
   verifyAssessorAccreditorQMSAuditor(data, token) {
     return apiClient
       .post(
@@ -31,6 +32,19 @@ class AssessorAccreditorQMSAuditorService {
             Authorization: `Bearer ${token}`,
           },
         },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  getApplicationByCitizenIdOrReferenceNo(
+    citizenId,
+    referenceNo,
+    serviceId
+  ) {
+    return apiClient
+      .get(
+        `/api/v1/public/register/get-applicant-details/${citizenId}/${referenceNo}/${serviceId}`,
       )
       .then((response) => response)
       .catch((error) => error);

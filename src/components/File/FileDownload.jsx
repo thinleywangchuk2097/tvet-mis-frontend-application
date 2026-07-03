@@ -51,7 +51,10 @@ const formatFileSize = (bytes) => {
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  // ✅ FIXED: Use Number.parseFloat instead of parseFloat
+  return (
+    Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+  );
 };
 
 // Convert File object to Documentdto format (base64 string)
@@ -59,8 +62,7 @@ const fileToDocumentDto = async (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const base64String = e.target.result.split(",")[1]; // Get base64 part after the comma
-
+      const base64String = e.target.result.split(",")[1];
       resolve({
         content: base64String,
         name: file.name,
@@ -69,9 +71,249 @@ const fileToDocumentDto = async (file) => {
         path: null,
       });
     };
-    reader.onerror = (error) => reject(error);
-    reader.readAsDataURL(file); // Read as base64
+    // ✅ FIXED: Reject with an Error object instead of a string
+    reader.onerror = (error) =>
+      reject(new Error(`Failed to read file: ${file.name}`));
+    reader.readAsDataURL(file);
   });
+};
+
+// Helper: Start progress simulation
+const startProgressSimulation = (fileName, setConvertProgress) => {
+  return setInterval(() => {
+    setConvertProgress((prev) => {
+      const currentProgress = prev[fileName] || 0;
+      if (currentProgress >= 100) {
+        clearInterval(interval);
+        return prev;
+      }
+      return {
+        ...prev,
+        [fileName]: Math.min(currentProgress + 20, 100),
+      };
+    });
+  }, 100);
+};
+
+// Helper: Convert files with progress
+const convertFilesWithProgress = async (
+  files,
+  setConvertingFiles,
+  setConvertProgress,
+) => {
+  const fileNames = files.map((f) => f.name);
+  setConvertingFiles(fileNames);
+
+  const progressMap = {};
+  fileNames.forEach((name) => {
+    progressMap[name] = 0;
+  });
+  setConvertProgress(progressMap);
+
+  const documentDtos = [];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    setConvertProgress((prev) => ({
+      ...prev,
+      [file.name]: 0,
+    }));
+
+    const progressInterval = startProgressSimulation(
+      file.name,
+      setConvertProgress,
+    );
+    const dto = await fileToDocumentDto(file.file);
+    documentDtos.push(dto);
+
+    clearInterval(progressInterval);
+    setConvertProgress((prev) => ({
+      ...prev,
+      [file.name]: 100,
+    }));
+  }
+
+  return documentDtos;
+};
+
+// Helper: Initialize converting state
+const initializeConvertingState = (
+  files,
+  setConvertingFiles,
+  setConvertProgress,
+) => {
+  const fileNames = files.map((f) => f.name);
+  setConvertingFiles(fileNames);
+
+  const progressMap = {};
+  fileNames.forEach((name) => {
+    progressMap[name] = 0;
+  });
+  setConvertProgress(progressMap);
+};
+
+// Helper: Validate files
+const validateFiles = (files, currentFileCount) => {
+  const errors = [];
+
+  if (currentFileCount + files.length > MAX_FILES) {
+    errors.push(`You can only upload up to ${MAX_FILES} files`);
+    return { validFiles: [], invalidFiles: [], errors };
+  }
+
+  const validFiles = [];
+  const invalidFiles = [];
+
+  files.forEach((file) => {
+    if (file.size <= MAX_FILE_SIZE) {
+      validFiles.push(file);
+    } else {
+      invalidFiles.push(file.name);
+    }
+  });
+
+  if (invalidFiles.length > 0) {
+    errors.push(`The following files exceed 2 MB: ${invalidFiles.join(", ")}`);
+  }
+
+  return { validFiles, invalidFiles, errors };
+};
+
+// Helper: Normalize files
+const normalizeFiles = (files) =>
+  files.map((f) =>
+    f instanceof File
+      ? { name: f.name, file: f, size: f.size, type: f.type }
+      : {
+          name: f.name || f,
+          url: f.url,
+          size: f.size || 0,
+          type: f.type || "",
+        },
+  );
+
+// Helper: Handle file download from URL
+const downloadFromUrl = async (file) => {
+  const response = await CommonService.fetchDocument(file.name, file.url);
+  const contentType = response.headers["content-type"];
+  const disposition = response.headers["content-disposition"];
+  const blob = new Blob([response.data], { type: contentType });
+  const url = window.URL.createObjectURL(blob);
+
+  const isInline = disposition && disposition.includes("inline");
+
+  if (isInline) {
+    openInlinePreview(url, contentType, file.name);
+  } else {
+    triggerDownload(url, file.name);
+  }
+
+  setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+};
+
+// Helper: Open inline preview
+const openInlinePreview = (url, contentType, fileName) => {
+  if (contentType.startsWith("image/")) {
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(
+        `<html><head><title>${fileName}</title></head><body style="margin:0"><img src="${url}" style="width:100%;height:auto"/></body></html>`,
+      );
+      newWindow.document.close();
+    } else {
+      alert("Please allow popups to preview the file.");
+    }
+  } else {
+    const newWindow = window.open(url);
+    if (!newWindow) alert("Please allow popups to preview the file.");
+  }
+};
+
+// Helper: Trigger file download
+const triggerDownload = (url, fileName) => {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+};
+
+// Helper: Download from File object
+const downloadFromFile = (file) => {
+  const url = URL.createObjectURL(file.file);
+  triggerDownload(url, file.name);
+  URL.revokeObjectURL(url);
+};
+
+// Helper: Handle conversion notification
+const handleConversionComplete = (
+  documentDtos,
+  onFileUpload,
+  setConvertingFiles,
+  setConvertProgress,
+  hasNotifiedRef,
+) => {
+  setTimeout(() => {
+    setConvertingFiles([]);
+    setConvertProgress({});
+    onFileUpload(documentDtos);
+    hasNotifiedRef.current = true;
+  }, 500);
+};
+
+// Helper: Handle conversion error
+const handleConversionError = (
+  error,
+  setErrorMessage,
+  setConvertingFiles,
+  setConvertProgress,
+) => {
+  console.error("Error converting files:", error);
+  setErrorMessage("Failed to process files");
+  setConvertingFiles([]);
+  setConvertProgress({});
+};
+
+// Helper: Check if upload is allowed
+const isUploadDisabled = (disabled, allowUpload, files, convertingFiles) => {
+  return (
+    disabled ||
+    !allowUpload ||
+    files.length >= MAX_FILES ||
+    convertingFiles.length > 0
+  );
+};
+
+// Helper: Get file status chip
+const getFileStatusChip = (isNew, isConverting, progress, theme) => {
+  if (isConverting) {
+    return (
+      <Chip
+        label={`${progress}%`}
+        size="small"
+        color="primary"
+        variant="outlined"
+        sx={{ height: 16, "& .MuiChip-label": { px: 0.5, fontSize: "0.5rem" } }}
+      />
+    );
+  }
+
+  if (isNew) {
+    return (
+      <Chip
+        label="New"
+        size="small"
+        color="info"
+        variant="outlined"
+        sx={{ height: 16, "& .MuiChip-label": { px: 0.5, fontSize: "0.5rem" } }}
+      />
+    );
+  }
+
+  return (
+    <CheckCircleIcon sx={{ fontSize: 12, color: theme.palette.success.main }} />
+  );
 };
 
 const FileDownload = ({
@@ -87,18 +329,6 @@ const FileDownload = ({
   const dropAreaRef = useRef(null);
   const hasNotifiedRef = useRef(false);
 
-  const normalizeFiles = (files) =>
-    files.map((f) =>
-      f instanceof File
-        ? { name: f.name, file: f, size: f.size, type: f.type }
-        : {
-            name: f.name || f,
-            url: f.url,
-            size: f.size || 0,
-            type: f.type || "",
-          },
-    );
-
   const [files, setFiles] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
   const [convertingFiles, setConvertingFiles] = useState([]);
@@ -107,6 +337,7 @@ const FileDownload = ({
   const [isDragging, setIsDragging] = useState(false);
   const [expanded, setExpanded] = useState(true);
 
+  // Initialize files from props
   useEffect(() => {
     const normalized = normalizeFiles(initialFiles);
     setFiles(normalized);
@@ -114,85 +345,53 @@ const FileDownload = ({
     hasNotifiedRef.current = false;
   }, [initialFiles]);
 
-  // Convert new files to Documentdto format and notify parent
+  // Handle file conversion and notification
   useEffect(() => {
-    if (
+    const shouldConvert =
       onFileUpload &&
       allowUpload &&
       newFiles.length > 0 &&
-      !hasNotifiedRef.current
-    ) {
-      const convertAndNotify = async () => {
-        try {
-          // Show converting status for each file
-          const fileNames = newFiles.map((f) => f.name);
-          setConvertingFiles(fileNames);
+      !hasNotifiedRef.current;
+    const isEmpty = newFiles.length === 0;
 
-          // Initialize progress for each file
-          const progressMap = {};
-          fileNames.forEach((name) => {
-            progressMap[name] = 0;
-          });
-          setConvertProgress(progressMap);
-
-          // Convert files one by one to show progress
-          const documentDtos = [];
-          for (let i = 0; i < newFiles.length; i++) {
-            const file = newFiles[i];
-            // Update progress for this file
-            setConvertProgress((prev) => ({
-              ...prev,
-              [file.name]: 0,
-            }));
-
-            // Simulate conversion progress
-            const interval = setInterval(() => {
-              setConvertProgress((prev) => {
-                const currentProgress = prev[file.name] || 0;
-                if (currentProgress >= 100) {
-                  clearInterval(interval);
-                  return prev;
-                }
-                return {
-                  ...prev,
-                  [file.name]: Math.min(currentProgress + 20, 100),
-                };
-              });
-            }, 100);
-
-            // Convert file
-            const dto = await fileToDocumentDto(file.file);
-            documentDtos.push(dto);
-
-            clearInterval(interval);
-            setConvertProgress((prev) => ({
-              ...prev,
-              [file.name]: 100,
-            }));
-          }
-
-          // Wait a moment to show 100% completion
-          setTimeout(() => {
-            setConvertingFiles([]);
-            setConvertProgress({});
-            onFileUpload(documentDtos);
-            hasNotifiedRef.current = true;
-          }, 500);
-        } catch (error) {
-          console.error("Error converting files:", error);
-          setErrorMessage("Failed to process files");
-          setConvertingFiles([]);
-          setConvertProgress({});
-        }
-      };
-
-      convertAndNotify();
-    } else if (newFiles.length === 0) {
+    if (isEmpty && onFileUpload && allowUpload) {
       hasNotifiedRef.current = false;
-      if (onFileUpload && allowUpload) {
-        onFileUpload([]);
-      }
+      onFileUpload([]);
+      return;
     }
+
+    if (!shouldConvert) return;
+
+    const handleConversion = async () => {
+      try {
+        initializeConvertingState(
+          newFiles,
+          setConvertingFiles,
+          setConvertProgress,
+        );
+        const documentDtos = await convertFilesWithProgress(
+          newFiles,
+          setConvertingFiles,
+          setConvertProgress,
+        );
+        handleConversionComplete(
+          documentDtos,
+          onFileUpload,
+          setConvertingFiles,
+          setConvertProgress,
+          hasNotifiedRef,
+        );
+      } catch (error) {
+        handleConversionError(
+          error,
+          setErrorMessage,
+          setConvertingFiles,
+          setConvertProgress,
+        );
+      }
+    };
+
+    handleConversion();
   }, [newFiles, onFileUpload, allowUpload]);
 
   // Drag and drop handlers
@@ -235,26 +434,13 @@ const FileDownload = ({
   const handleFiles = (selectedFiles) => {
     if (!selectedFiles.length) return;
 
-    if (files.length + selectedFiles.length > MAX_FILES) {
-      setErrorMessage(`You can only upload up to ${MAX_FILES} files`);
-      return;
-    }
+    const { validFiles, invalidFiles, errors } = validateFiles(
+      selectedFiles,
+      files.length,
+    );
 
-    const validFiles = [];
-    const invalidFiles = [];
-
-    selectedFiles.forEach((file) => {
-      if (file.size <= MAX_FILE_SIZE) {
-        validFiles.push(file);
-      } else {
-        invalidFiles.push(file.name);
-      }
-    });
-
-    if (invalidFiles.length > 0) {
-      setErrorMessage(
-        `The following files exceed 2 MB: ${invalidFiles.join(", ")}`,
-      );
+    if (errors.length > 0) {
+      setErrorMessage(errors[0]);
     } else {
       setErrorMessage("");
     }
@@ -269,7 +455,6 @@ const FileDownload = ({
       setFiles((prev) => [...prev, ...normalizedFiles]);
       setNewFiles((prev) => [...prev, ...normalizedFiles]);
       setExpanded(true);
-      // Reset notification flag when new files are added
       hasNotifiedRef.current = false;
     }
   };
@@ -278,46 +463,9 @@ const FileDownload = ({
   const handleDownload = async (file) => {
     try {
       if (file.url) {
-        const response = await CommonService.fetchDocument(file.name, file.url);
-        const contentType = response.headers["content-type"];
-        const disposition = response.headers["content-disposition"];
-        const blob = new Blob([response.data], { type: contentType });
-        const url = window.URL.createObjectURL(blob);
-
-        if (disposition && disposition.includes("inline")) {
-          if (contentType.startsWith("image/")) {
-            const newWindow = window.open();
-            if (newWindow) {
-              newWindow.document.write(
-                `<html><head><title>${file.name}</title></head><body style="margin:0"><img src="${url}" style="width:100%;height:auto"/></body></html>`,
-              );
-              newWindow.document.close();
-            } else {
-              alert("Please allow popups to preview the file.");
-            }
-          } else {
-            const newWindow = window.open(url);
-            if (!newWindow) alert("Please allow popups to preview the file.");
-          }
-        } else {
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = file.name;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-        }
-
-        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+        await downloadFromUrl(file);
       } else if (file.file) {
-        const url = URL.createObjectURL(file.file);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+        downloadFromFile(file);
       }
     } catch (error) {
       console.error("Error downloading file:", error);
@@ -330,7 +478,6 @@ const FileDownload = ({
     setNewFiles((prev) => prev.filter((_, i) => i !== index));
     setFiles((prev) => prev.filter((f) => f !== fileToDelete));
     setErrorMessage("");
-    // Reset notification flag when files are deleted
     hasNotifiedRef.current = false;
   };
 
@@ -355,6 +502,229 @@ const FileDownload = ({
   const isNewFile = (file) => newFiles.includes(file);
   const isConverting = (fileName) => convertingFiles.includes(fileName);
   const getConvertProgress = (fileName) => convertProgress[fileName] || 0;
+
+  // Render file item
+  const renderFileItem = (file, index) => {
+    const isNew = isNewFile(file);
+    const isConvertingFile = isConverting(file.name);
+    const progress = getConvertProgress(file.name);
+    const fileSize = file.size ? formatFileSize(file.size) : "";
+
+    return (
+      <Grid item xs={12} sm={6} md={4} key={index}>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1,
+            position: "relative",
+            overflow: "hidden",
+            transition: "all 0.2s ease",
+            "&:hover": !isConvertingFile && {
+              borderColor: theme.palette.primary.main,
+              bgcolor: alpha(theme.palette.primary.main, 0.02),
+            },
+            opacity: isConvertingFile ? 0.8 : 1,
+            bgcolor: isNew
+              ? alpha(theme.palette.info.main, 0.02)
+              : alpha(theme.palette.background.paper, 0.8),
+          }}
+        >
+          <Grid container spacing={1} alignItems="center">
+            <Grid item>
+              <Box sx={{ color: theme.palette.text.secondary }}>
+                {getFileIcon(file.name)}
+              </Box>
+            </Grid>
+
+            <Grid item xs>
+              <Tooltip title={file.name}>
+                <Typography
+                  variant="caption"
+                  fontWeight={500}
+                  sx={{
+                    display: "block",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    cursor: "pointer",
+                    "&:hover": {
+                      color: theme.palette.primary.main,
+                      textDecoration: "underline",
+                    },
+                  }}
+                  onClick={() => handleDownload(file)}
+                >
+                  {file.name}
+                </Typography>
+              </Tooltip>
+
+              <Stack
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                sx={{ mt: 0.5 }}
+              >
+                {fileSize && (
+                  <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    sx={{ fontSize: "0.6rem" }}
+                  >
+                    {fileSize}
+                  </Typography>
+                )}
+                {getFileStatusChip(isNew, isConvertingFile, progress, theme)}
+              </Stack>
+            </Grid>
+
+            <Grid item>
+              <Stack direction="row">
+                <Tooltip title="Download / Preview">
+                  <IconButton
+                    size="small"
+                    onClick={() => handleDownload(file)}
+                    disabled={isConvertingFile}
+                    sx={{ p: 0.5 }}
+                  >
+                    <LaunchIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {isNew && !isConvertingFile && (
+                  <Tooltip title="Remove">
+                    <IconButton
+                      size="small"
+                      onClick={() => handleDelete(newFiles.indexOf(file))}
+                      sx={{
+                        p: 0.5,
+                        color: theme.palette.error.main,
+                        "&:hover": {
+                          bgcolor: alpha(theme.palette.error.main, 0.1),
+                        },
+                      }}
+                    >
+                      <DeleteIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
+            </Grid>
+          </Grid>
+
+          {isConvertingFile && (
+            <LinearProgress
+              variant="determinate"
+              value={progress}
+              sx={{ mt: 0.5, height: 2, borderRadius: 0.5 }}
+            />
+          )}
+        </Paper>
+      </Grid>
+    );
+  };
+
+  // Render upload controls
+  const renderUploadControls = () => (
+    <Box sx={{ p: 2 }}>
+      <Grid container spacing={2} alignItems="center">
+        <Grid item xs>
+          {files.length > 0 && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Tooltip title={expanded ? "Hide file list" : "Show file list"}>
+                <IconButton
+                  size="small"
+                  onClick={toggleExpanded}
+                  sx={{
+                    color: theme.palette.text.secondary,
+                    "&:hover": {
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                    },
+                  }}
+                >
+                  {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              </Tooltip>
+
+              <Chip
+                label={`${files.length}/${MAX_FILES}`}
+                color="primary"
+                size="small"
+                onDelete={newFiles.length > 0 ? handleRemoveAll : undefined}
+                deleteIcon={
+                  newFiles.length > 0 ? (
+                    <DeleteIcon fontSize="small" />
+                  ) : undefined
+                }
+              />
+
+              {newFiles.length > 0 && (
+                <Typography variant="caption" color="info.main" sx={{ ml: 1 }}>
+                  {newFiles.length} new file(s)
+                </Typography>
+              )}
+            </Stack>
+          )}
+        </Grid>
+
+        <Grid item>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={handleUploadClick}
+            disabled={isUploadDisabled(
+              disabled,
+              allowUpload,
+              files,
+              convertingFiles,
+            )}
+            sx={{
+              borderRadius: 2,
+              textTransform: "none",
+              boxShadow: "none",
+              minWidth: 120,
+              "&:hover": { boxShadow: "none" },
+            }}
+          >
+            Add Files
+          </Button>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+
+  // Render empty state
+  const renderEmptyState = () => (
+    <Box sx={{ pb: 2, px: 2, textAlign: "center" }}>
+      <Typography variant="caption" color="textSecondary">
+        No documents attached. Click the "Add Files" button or drag and drop to
+        add files.
+      </Typography>
+    </Box>
+  );
+
+  // Render error message
+  const renderErrorMessage = () => {
+    if (!errorMessage) return null;
+    return (
+      <Paper
+        sx={{
+          mt: 1,
+          p: 1,
+          bgcolor: alpha(theme.palette.error.main, 0.1),
+          border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+          borderRadius: 1,
+        }}
+      >
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: 16 }} />
+          <Typography variant="caption" color="error">
+            {errorMessage}
+          </Typography>
+        </Stack>
+      </Paper>
+    );
+  };
 
   return (
     <Box>
@@ -387,6 +757,7 @@ const FileDownload = ({
           bgcolor: theme.palette.background.paper,
         }}
       >
+        {/* Header */}
         <Box sx={{ p: 2 }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={4}>
@@ -400,7 +771,6 @@ const FileDownload = ({
                 <Typography variant="caption" color="textSecondary">
                   {description}
                 </Typography>
-
                 <Typography
                   variant="caption"
                   color="textSecondary"
@@ -408,7 +778,6 @@ const FileDownload = ({
                 >
                   Max 2MB • {MAX_FILES} files max
                 </Typography>
-
                 {convertingFiles.length > 0 && (
                   <Typography variant="caption" color="primary">
                     Converting {convertingFiles.length} file(s)...
@@ -416,10 +785,8 @@ const FileDownload = ({
                 )}
               </Stack>
             </Grid>
-
             <Grid item xs={4} />
           </Grid>
-
           {errorMessage && (
             <Typography
               variant="caption"
@@ -431,286 +798,26 @@ const FileDownload = ({
           )}
         </Box>
 
+        {/* File List */}
         <Collapse in={expanded && files.length > 0}>
           <Box sx={{ px: 2, py: 2 }}>
             <Grid container spacing={1}>
-              {files.map((file, index) => {
-                const isNew = isNewFile(file);
-                const isConvertingFile = isConverting(file.name);
-                const progress = getConvertProgress(file.name);
-                const fileSize = file.size ? formatFileSize(file.size) : "";
-
-                return (
-                  <Grid item xs={12} sm={6} md={4} key={index}>
-                    <Paper
-                      variant="outlined"
-                      sx={{
-                        p: 1,
-                        position: "relative",
-                        overflow: "hidden",
-                        transition: "all 0.2s ease",
-                        "&:hover": !isConvertingFile && {
-                          borderColor: theme.palette.primary.main,
-                          bgcolor: alpha(theme.palette.primary.main, 0.02),
-                        },
-                        opacity: isConvertingFile ? 0.8 : 1,
-                        bgcolor: isNew
-                          ? alpha(theme.palette.info.main, 0.02)
-                          : alpha(theme.palette.background.paper, 0.8),
-                      }}
-                    >
-                      <Grid container spacing={1} alignItems="center">
-                        <Grid item>
-                          <Box sx={{ color: theme.palette.text.secondary }}>
-                            {getFileIcon(file.name)}
-                          </Box>
-                        </Grid>
-
-                        <Grid item xs>
-                          <Tooltip title={file.name}>
-                            <Typography
-                              variant="caption"
-                              fontWeight={500}
-                              sx={{
-                                display: "block",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                cursor: "pointer",
-                                "&:hover": {
-                                  color: theme.palette.primary.main,
-                                  textDecoration: "underline",
-                                },
-                              }}
-                              onClick={() => handleDownload(file)}
-                            >
-                              {file.name}
-                            </Typography>
-                          </Tooltip>
-
-                          <Stack
-                            direction="row"
-                            spacing={0.5}
-                            alignItems="center"
-                            sx={{ mt: 0.5 }}
-                          >
-                            {fileSize && (
-                              <Typography
-                                variant="caption"
-                                color="textSecondary"
-                                sx={{ fontSize: "0.6rem" }}
-                              >
-                                {fileSize}
-                              </Typography>
-                            )}
-
-                            {isConvertingFile && (
-                              <Chip
-                                label={`${progress}%`}
-                                size="small"
-                                color="primary"
-                                variant="outlined"
-                                sx={{
-                                  height: 16,
-                                  "& .MuiChip-label": {
-                                    px: 0.5,
-                                    fontSize: "0.5rem",
-                                  },
-                                }}
-                              />
-                            )}
-
-                            {isNew && !isConvertingFile && (
-                              <Chip
-                                label="New"
-                                size="small"
-                                color="info"
-                                variant="outlined"
-                                sx={{
-                                  height: 16,
-                                  "& .MuiChip-label": {
-                                    px: 0.5,
-                                    fontSize: "0.5rem",
-                                  },
-                                }}
-                              />
-                            )}
-
-                            {!isNew && !isConvertingFile && (
-                              <CheckCircleIcon
-                                sx={{
-                                  fontSize: 12,
-                                  color: theme.palette.success.main,
-                                }}
-                              />
-                            )}
-                          </Stack>
-                        </Grid>
-
-                        <Grid item>
-                          <Stack direction="row">
-                            <Tooltip title="Download / Preview">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDownload(file)}
-                                disabled={isConvertingFile}
-                                sx={{ p: 0.5 }}
-                              >
-                                <LaunchIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Tooltip>
-
-                            {isNew && !isConvertingFile && (
-                              <Tooltip title="Remove">
-                                <IconButton
-                                  size="small"
-                                  onClick={() =>
-                                    handleDelete(newFiles.indexOf(file))
-                                  }
-                                  sx={{
-                                    p: 0.5,
-                                    color: theme.palette.error.main,
-                                    "&:hover": {
-                                      bgcolor: alpha(
-                                        theme.palette.error.main,
-                                        0.1,
-                                      ),
-                                    },
-                                  }}
-                                >
-                                  <DeleteIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </Stack>
-                        </Grid>
-                      </Grid>
-
-                      {/* Progress bar for converting files */}
-                      {isConvertingFile && (
-                        <LinearProgress
-                          variant="determinate"
-                          value={progress}
-                          sx={{
-                            mt: 0.5,
-                            height: 2,
-                            borderRadius: 0.5,
-                          }}
-                        />
-                      )}
-                    </Paper>
-                  </Grid>
-                );
-              })}
+              {files.map((file, index) => renderFileItem(file, index))}
             </Grid>
           </Box>
         </Collapse>
 
         {files.length > 0 && <Divider />}
 
-        <Box sx={{ p: 2 }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs>
-              {files.length > 0 && (
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Tooltip
-                    title={expanded ? "Hide file list" : "Show file list"}
-                  >
-                    <IconButton
-                      size="small"
-                      onClick={toggleExpanded}
-                      sx={{
-                        color: theme.palette.text.secondary,
-                        "&:hover": {
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                        },
-                      }}
-                    >
-                      {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                    </IconButton>
-                  </Tooltip>
+        {/* Controls */}
+        {renderUploadControls()}
 
-                  <Chip
-                    label={`${files.length}/${MAX_FILES}`}
-                    color="primary"
-                    size="small"
-                    onDelete={newFiles.length > 0 ? handleRemoveAll : undefined}
-                    deleteIcon={
-                      newFiles.length > 0 ? (
-                        <DeleteIcon fontSize="small" />
-                      ) : undefined
-                    }
-                  />
-
-                  {newFiles.length > 0 && (
-                    <Typography
-                      variant="caption"
-                      color="info.main"
-                      sx={{ ml: 1 }}
-                    >
-                      {newFiles.length} new file(s)
-                    </Typography>
-                  )}
-                </Stack>
-              )}
-            </Grid>
-
-            <Grid item>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={handleUploadClick}
-                disabled={
-                  disabled ||
-                  !allowUpload ||
-                  files.length >= MAX_FILES ||
-                  convertingFiles.length > 0
-                }
-                sx={{
-                  borderRadius: 2,
-                  textTransform: "none",
-                  boxShadow: "none",
-                  minWidth: 120,
-                  "&:hover": {
-                    boxShadow: "none",
-                  },
-                }}
-              >
-                Add Files
-              </Button>
-            </Grid>
-          </Grid>
-        </Box>
-
-        {files.length === 0 && (
-          <Box sx={{ pb: 2, px: 2, textAlign: "center" }}>
-            <Typography variant="caption" color="textSecondary">
-              No documents attached. Click the "Add Files" button or drag and
-              drop to add files.
-            </Typography>
-          </Box>
-        )}
+        {/* Empty State */}
+        {files.length === 0 && renderEmptyState()}
       </Paper>
 
-      {errorMessage && (
-        <Paper
-          sx={{
-            mt: 1,
-            p: 1,
-            bgcolor: alpha(theme.palette.error.main, 0.1),
-            border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-            borderRadius: 1,
-          }}
-        >
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <ErrorIcon sx={{ color: theme.palette.error.main, fontSize: 16 }} />
-            <Typography variant="caption" color="error">
-              {errorMessage}
-            </Typography>
-          </Stack>
-        </Paper>
-      )}
+      {/* Error Display */}
+      {renderErrorMessage()}
     </Box>
   );
 };

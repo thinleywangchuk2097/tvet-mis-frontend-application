@@ -1,7 +1,7 @@
 import DashboardIndex from "../pages/dashboard/DashboardIndex";
 import RoleIndex from "../pages/admin/role/RoleIndex";
 import UserIndex from "../pages/admin/user/UserIndex";
-import DropdownIndex from "../pages/dropdown-management/DropdownIndex";
+import DropdownIndex from "../pages/admin/dropdown/DropdownIndex";
 //user profile
 import UserProfile from "../pages/auth/profile/UserProfile";
 import PasswordChange from "../pages/auth/password/PasswordChange";
@@ -20,7 +20,7 @@ import AccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/cours
 import ViewAccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/course-announcement/ViewAccreditatedRPLCourseTraineeSelectionIndex";
 import NonAccreditedCourseTraineeSelection from "../pages/institute/course-announcement/NonAccreditedCourseTraineeSelection";
 import ReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ReAssessmentTraineeSelectionIndex";
-import ViewReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ViewReAssessmentTraineeSelectionIndex"; 
+import ViewReAssessmentTraineeSelectionIndex from "../pages/institute/course-announcement/ViewReAssessmentTraineeSelectionIndex";
 
 //resource-management
 import StaffManagement from "../pages/institute/resource-management/StaffManagement";
@@ -30,14 +30,15 @@ import MonitoringReport from "../pages/institute/resource-management/MonitoringR
 import Notification from "../pages/institute/resource-management/Notification";
 //service
 import CreateCourse from "../pages/institute/service/CreateCourse";
-import AddTrainer from "../pages/institute/service/AddTrainer";
-import CurriculumEndorsementIndex from "../pages/institute/service/CurriculumEndorsementIndex";
 import ApplyNonAccreditedCourse from "../pages/institute/service/ApplyNonAccreditedCourse";
 import ApplyAccreditedCourse from "../pages/institute/service/ApplyAccreditedCourse";
 import InstituteChange from "../pages/institute/service/InstituteChange";
-import RenewRegistration from "../pages/institute/service/RenewRegistration";
 import ViewApplyNonAccreditedCourse from "../pages/institute/service/ViewApplyNonAccreditedCourse";
 import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";
+
+//curriculum
+import CurriculumIndex from "../pages/curriculum/CurriculumIndex";
+import ViewCurriculumIndex from "../pages/curriculum/ViewCurriculumIndex";
 
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
@@ -48,28 +49,58 @@ import GenerateTracerIndex from "../pages/dwps/tracer/GenerateTracerIndex";
 import SendTracerIndex from "../pages/dwps/tracer/SendTracerIndex";
 import ResponseTracerIndex from "../pages/dwps/tracer/ResponseTracerIndex";
 //registration and proposal view
-import ViewInstituteProposal from "../pages/public/proposal/ViewInstituteProposal";
-import ViewInstituteRegistration from "../pages/public/registration/ViewInstituteRegistration";
+import ViewInstituteSesCentreAssessmentCentreProposal from "../pages/public/proposal/ViewInstituteSesCentreAssessmentCentreProposal";
+import ViewInstituteSesCentreAssessmentCentre from "../pages/public/registration/ViewInstituteSesCentreAssessmentCentre";
 import ViewAssessorAccreditorQMSAuditor from "../pages/public/registration/ViewAssessorAccreditorQMSAuditor";
-
+import InstituteRenewalIndex from "../pages/renewal/InstituteRenewalIndex";
 //tot
 import CreateTotIndex from "../pages/dwps/tot/CreateTotIndex";
 import AddTraineeIndex from "../pages/dwps/tot/AddTraineeIndex";
 
-//service
-import ViewCurriculumEndorsementIndex from "../pages/institute/service/ViewCurriculumEndorsementIndex";
 //track application status
 import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
 
 //Certificate
 import Assessment from "../pages/certificate/Assessment";
+import CertificateIndex from "../pages/certificate/CertificateIndex";
 //birms
-import BirmsPrivatePaymentIndex from "../pages/birms/private/BirmsPrivatePaymentIndex";
-
+import BirmsAgencyPaymentIndex from "../pages/birms/private/BirmsAgencyPaymentIndex";
+import BirmsInstitutePaymentIndex from "../pages/birms/private/BirmsInstitutePaymentIndex";
+//master
+import SectorOccupationIndex from "../pages/master/SectorOccupationIndex";
+import ServiceMasterIndex from "../pages/master/ServiceMasterIndex";
 //reports
 import InstituteReportIndex from "../pages/report/InstituteReportIndex";
-import CourseReportIndex from "../pages/report/CourseReportIndex";  
+import CourseReportIndex from "../pages/report/CourseReportIndex";
 import TraineeReportIndex from "../pages/report/TraineeReportIndex";
+
+//BQPCA routes
+import MonitoringAssessmentIndex from "../pages/bqpca/monitoring/MonitoringAssessmentIndex";
+import InstituteMonitoringIndex from "../pages/bqpca/monitoring/InstituteMonitoringIndex";
+import ViewInstituteMonitoringIndex from "../pages/bqpca/monitoring/ViewInstituteMonitoringIndex";
+//ses centre
+import ChangeSesCentreIndex from "../pages/ses-centre/registration/ChangeSesCentreIndex";
+import SubjectIndex from "../pages/ses-centre/registration/SubjectIndex";
+import TutorIndex from "../pages/ses-centre/registration/TutorIndex";
+import TuitionAnnouncementIndex from "../pages/ses-centre/announcement/TuitionAnnouncementIndex";
+import AddStudentIndex from "../pages/ses-centre/announcement/AddStudentIndex";
+import StudentDetailsReport from "../pages/ses-centre/report/StudentDetailsReport";
+import TutorsDetailsReport from "../pages/ses-centre/report/TutorsDetailsReport";
+//assessment-centre
+import ChangeAssessmentCentre from "../pages/assessment-centre/registration/ChangeAssessmentCentre";
+import ProgramRegistration from "../pages/assessment-centre/registration/ProgramRegistration";
+import AssessmentCentreOffence from "../pages/assessment-centre/offence/AssessmentCentreOffence";
+import AssessmentCentreResult from "../pages/assessment-centre/assessment-result/AssessmentCentreResult";
+//registration
+import AddTrainerIndex from "../pages/trainer/AddTrainerIndex";
+
+//NCS Management
+import CreateNcsIndex from "../pages/bqpca/nac/CreateNcsIndex";
+//Curriculum Management
+import CreateCurriculumIndex from "../pages/bqpca/curriculum/CreateCurriculumIndex";
+//On-Job Training
+import OnJobTrainingIndex from "../pages/ojt/OnJobTrainingIndex";
+import OnCampusJobPlacement from "../pages/ojt/OnCampusJobPlacement";
 
 export const privateRoutes = [
   {
@@ -88,6 +119,13 @@ export const privateRoutes = [
     path: "dropdown-management",
     children: [{ path: "create-dropdown", element: <DropdownIndex /> }],
   },
+  {
+    path: "master",
+    children: [
+      { path: "sector-occupation-index", element: <SectorOccupationIndex /> },
+      { path: "service-master-index", element: <ServiceMasterIndex /> },
+    ],
+  },
 
   {
     path: "user",
@@ -103,13 +141,14 @@ export const privateRoutes = [
     children: [
       { path: "task-details-index", element: <TaskListIndex /> },
       { path: "group-task-index", element: <GroupTaskList /> },
+      { path: "my-task-index", element: <MyTaskList /> },
       {
         path: "view-proposal/:applicationNo",
-        element: <ViewInstituteProposal />,
+        element: <ViewInstituteSesCentreAssessmentCentreProposal />,
       },
       {
         path: "view-registration/:applicationNo",
-        element: <ViewInstituteRegistration />,
+        element: <ViewInstituteSesCentreAssessmentCentre />,
       },
       {
         path: "view-assessoraccreditorqmsquditor/:applicationNo",
@@ -124,8 +163,8 @@ export const privateRoutes = [
         element: <ViewApplyNonAccreditedCourse />,
       },
       {
-        path: "view-curriculum-endorsement/:applicationNo",
-        element: <ViewCurriculumEndorsementIndex />,
+        path: "view-curriculum-index/:applicationNo",
+        element: <ViewCurriculumIndex />,
       },
       {
         path: "view-accredited-course/:applicationNo",
@@ -139,24 +178,79 @@ export const privateRoutes = [
         path: "view-reassessment-trainee-selection/:applicationNo",
         element: <ViewReAssessmentTraineeSelectionIndex />,
       },
+      {
+        path: "view-institute-monitoring-index/:applicationNo",
+        element: <ViewInstituteMonitoringIndex />,
+      },
+    ],
+  },
+  {
+    path: "renewal",
+    children: [
+      {
+        path: ":renewalType/:serviceId",
+        element: <InstituteRenewalIndex />,
+      },
+    ],
+  },
+  {
+    path: "ses-centre",
+    children: [
+      { path: "change-ses-centre", element: <ChangeSesCentreIndex /> },
+      { path: "subject-index", element: <SubjectIndex /> },
+      { path: "tutor-index", element: <TutorIndex /> },
+      { path: "tuition-announcement", element: <TuitionAnnouncementIndex /> },
+      { path: "add-student", element: <AddStudentIndex /> },
+      { path: "student-details-report", element: <StudentDetailsReport /> },
+      { path: "tutors-details-report", element: <TutorsDetailsReport /> },
+    ],
+  },
+  {
+    path: "assessment-centre",
+    children: [
+      { path: "change-assessment-centre", element: <ChangeAssessmentCentre /> },
+      { path: "program-registration", element: <ProgramRegistration /> },
+      { path: "offence", element: <AssessmentCentreOffence /> },
+      { path: "result", element: <AssessmentCentreResult /> },
+    ],
+  },
+  {
+    path: "curriculum",
+    children: [
+      {
+        path: "curriculum-index",
+        element: <CurriculumIndex />,
+      },
+    ],
+  },
+  {
+    path: "ojt",
+    children: [
+      {
+        path: "job-training-index",
+        element: <OnJobTrainingIndex />,
+      },
+      {
+        path: "campus-job-placement",
+        element: <OnCampusJobPlacement />,
+      },
     ],
   },
   {
     path: "service",
     children: [
-      {
+      /*  {
         path: "curriculum-endorse-index",
         element: <CurriculumEndorsementIndex />,
-      },
+      }, */
       {
         path: "apply-non-accredited-course",
         element: <ApplyNonAccreditedCourse />,
       },
       { path: "apply-accredited-course", element: <ApplyAccreditedCourse /> },
       { path: "create-course", element: <CreateCourse /> },
-      { path: "add-trainer", element: <AddTrainer /> },
+      { path: "add-trainer", element: <AddTrainerIndex /> },
       { path: "institute-change", element: <InstituteChange /> },
-      { path: "renew-registration", element: <RenewRegistration /> },
     ],
   },
   {
@@ -177,7 +271,7 @@ export const privateRoutes = [
       {
         path: "reassessment-trainee-selection/:applicationNo/:courseId",
         element: <ReAssessmentTraineeSelectionIndex />,
-      }
+      },
     ],
   },
   {
@@ -188,7 +282,6 @@ export const privateRoutes = [
       { path: "annual-expenditure", element: <AnnualExpenditure /> },
       { path: "monitoring-report", element: <MonitoringReport /> },
       { path: "notification", element: <Notification /> },
-     
     ],
   },
   {
@@ -199,13 +292,19 @@ export const privateRoutes = [
       { path: "response-tracer", element: <ResponseTracerIndex /> },
     ],
   },
-  /*   {
-    path: "tracer",
+  {
+    path: "monitor-bqpca",
     children: [
-      { path: "sent-employer-survey", element: <SendEmployerTracerSurveyIndex /> },
-    
+      {
+        path: "monitoring-assessment-index",
+        element: <MonitoringAssessmentIndex />,
+      },
+      {
+        path: "institute-monitoring-index",
+        element: <InstituteMonitoringIndex />,
+      },
     ],
-  }, */
+  },
   {
     path: "tot",
     children: [
@@ -219,24 +318,36 @@ export const privateRoutes = [
     children: [
       { path: "institute-report-index", element: <InstituteReportIndex /> },
       { path: "course-report-index", element: <CourseReportIndex /> },
-      { path: "trainee-report-index", element: <TraineeReportIndex /> },  
+      { path: "trainee-report-index", element: <TraineeReportIndex /> },
       { path: "track-application-status", element: <TrackApplicationStatus /> },
     ],
   },
-   {
-    path: "auth-birms",
+  {
+    path: "birms",
     children: [
-      { path: "payment-index", element: <BirmsPrivatePaymentIndex /> },
-    
+      {
+        path: "institute-payment-index",
+        element: <BirmsInstitutePaymentIndex />,
+      },
+      { path: "agency-payment-index", element: <BirmsAgencyPaymentIndex /> },
     ],
   },
   {
     path: "certificate",
     children: [
       { path: "assessment", element: <Assessment /> },
+      { path: "trainee-certificate", element: <CertificateIndex /> },
     ],
   },
   //without children
   { path: "/apply-qms-certification", element: <ApplyQmsCertification /> },
   { path: "/track-trainee", element: <TrackTrainee /> },
+  {
+    path: "ncs",
+    children: [{ path: "create-index", element: <CreateNcsIndex /> }],
+  },
+  {
+    path: "curriculum",
+    children: [{ path: "create-index", element: <CreateCurriculumIndex /> }],
+  },
 ];

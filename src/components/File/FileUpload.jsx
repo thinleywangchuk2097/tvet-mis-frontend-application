@@ -69,7 +69,10 @@ const formatFileSize = (bytes) => {
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  // ✅ FIXED: Use Number.parseFloat instead of parseFloat
+  return (
+    Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+  );
 };
 
 // Convert File object to Documentdto format (base64 string)
@@ -77,17 +80,19 @@ const fileToDocumentDto = async (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const base64String = e.target.result.split(',')[1];
-      
+      const base64String = e.target.result.split(",")[1];
+
       resolve({
         content: base64String,
         name: file.name,
         originalFilename: file.name,
         contentType: file.type,
-        path: null
+        path: null,
       });
     };
-    reader.onerror = (error) => reject(error);
+    // ✅ FIXED: Reject with an Error object instead of the raw error
+    reader.onerror = (error) =>
+      reject(new Error(`Failed to read file: ${file.name}`));
     reader.readAsDataURL(file);
   });
 };
@@ -145,24 +150,24 @@ const FileUpload = ({
       const convertAndNotify = async () => {
         try {
           // Show converting status for each file
-          const fileNames = files.map(f => f.name);
+          const fileNames = files.map((f) => f.name);
           setConvertingFiles(fileNames);
-          
+
           // Initialize progress for each file
           const progressMap = {};
-          fileNames.forEach(name => {
+          fileNames.forEach((name) => {
             progressMap[name] = 0;
           });
           setConvertProgress(progressMap);
-          
+
           // Convert files one by one to show progress
           const documentDtos = [];
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            
+
             // Simulate conversion progress
             const interval = setInterval(() => {
-              setConvertProgress(prev => {
+              setConvertProgress((prev) => {
                 const currentProgress = prev[file.name] || 0;
                 if (currentProgress >= 100) {
                   clearInterval(interval);
@@ -170,22 +175,22 @@ const FileUpload = ({
                 }
                 return {
                   ...prev,
-                  [file.name]: Math.min(currentProgress + 20, 100)
+                  [file.name]: Math.min(currentProgress + 20, 100),
                 };
               });
             }, 100);
-            
+
             // Convert file
             const dto = await fileToDocumentDto(file);
             documentDtos.push(dto);
-            
+
             clearInterval(interval);
-            setConvertProgress(prev => ({
+            setConvertProgress((prev) => ({
               ...prev,
-              [file.name]: 100
+              [file.name]: 100,
             }));
           }
-          
+
           // Wait a moment to show 100% completion
           setTimeout(() => {
             setConvertingFiles([]);
@@ -200,7 +205,7 @@ const FileUpload = ({
           setConvertProgress({});
         }
       };
-      
+
       convertAndNotify();
     } else if (files.length === 0) {
       setHasNotifiedRef(false);
@@ -214,7 +219,7 @@ const FileUpload = ({
   useEffect(() => {
     if (isProcessing && files.length > 0) {
       // Show processing state with animation
-      setConvertingFiles(files.map(f => f.name));
+      setConvertingFiles(files.map((f) => f.name));
     } else if (!isProcessing && convertingFiles.length > 0 && !hasNotifiedRef) {
       // Clear converting state when processing is done
       setTimeout(() => {
@@ -632,7 +637,9 @@ const FileUpload = ({
         </Collapse>
 
         {/* Divider before bottom section (only if there are files) */}
-        {items.length > 0 && <Divider sx={{ position: "relative", zIndex: 2 }} />}
+        {items.length > 0 && (
+          <Divider sx={{ position: "relative", zIndex: 2 }} />
+        )}
 
         {/* Bottom Section with Upload Button and Controls */}
         <Box sx={{ p: 1, position: "relative", zIndex: 2 }}>
@@ -670,13 +677,18 @@ const FileUpload = ({
             </Grid>
 
             {/* Right side - Upload button */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item size={{ xs: 12, md: 6 }}>
               <Button
                 variant="contained"
                 size="small"
                 startIcon={<AddIcon />}
                 onClick={handleUploadClick}
-                disabled={disabled || isProcessing || files.length >= maxFiles || convertingFiles.length > 0}
+                disabled={
+                  disabled ||
+                  isProcessing ||
+                  files.length >= maxFiles ||
+                  convertingFiles.length > 0
+                }
                 sx={{
                   borderRadius: 2,
                   textTransform: "none",
@@ -695,7 +707,15 @@ const FileUpload = ({
 
         {/* Empty state when no files */}
         {items.length === 0 && !error && (
-          <Box sx={{ pb: 2, px: 2, textAlign: "center", position: "relative", zIndex: 2 }}>
+          <Box
+            sx={{
+              pb: 2,
+              px: 2,
+              textAlign: "center",
+              position: "relative",
+              zIndex: 2,
+            }}
+          >
             <Typography variant="caption" color="textSecondary">
               No files uploaded yet. Click the "Upload Files" button or drag and
               drop to add files.

@@ -215,7 +215,6 @@ const RoleIndex = () => {
     return selectedCount > 0 && selectedCount < privilegeIds.length;
   };
 
-  //UPDATED: Child checkbox always adds parent
   const handlePrivilegeChange = (childId, parentId) => {
     const currentPrivileges = formData.assignedPrivilegeId;
     const isSelected = currentPrivileges.includes(childId);
@@ -366,6 +365,7 @@ const RoleIndex = () => {
     return `Privilege ${id}`;
   };
 
+  // ✅ FIXED: Added comparator function to sort()
   const hasChanges = () => {
     if (!editMode) {
       return (
@@ -376,9 +376,16 @@ const RoleIndex = () => {
     } else if (currentRole) {
       const nameChanged = formData.roleName !== currentRole.roleName;
       const descChanged = formData.description !== currentRole.description;
-      const privilegesChanged =
-        formData.assignedPrivilegeId.sort().join(",") !==
-        (currentRole.assignedPrivilegeId || []).sort().join(",");
+
+      // ✅ Fixed: Added compare function (a, b) => a - b for numeric sorting
+      const currentPrivileges = [...formData.assignedPrivilegeId]
+        .sort((a, b) => a - b)
+        .join(",");
+      const rolePrivileges = [...(currentRole.assignedPrivilegeId || [])]
+        .sort((a, b) => a - b)
+        .join(",");
+      const privilegesChanged = currentPrivileges !== rolePrivileges;
+
       return nameChanged || descChanged || privilegesChanged;
     }
     return false;

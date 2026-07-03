@@ -94,6 +94,27 @@ class UserRoleManagementService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+   getActiveRecUsers(token) {
+    return apiClient
+      .get(`/api/v1/user/management/get-rec-users`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+   getActiveAccreditorUsers(token) {
+    return apiClient
+      .get(`/api/v1/user/management/get-accreditor-users`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new UserRoleManagementService();

@@ -7,3 +7,6 @@ Dockerfile
 dist
 build
 .env
+
+sonar-project.properties
+.scannerwork

@@ -309,7 +309,7 @@ const GenerateQRCode = () => {
         >
           {isMobile ? (
             <>
-              <Typography variant="h4" fontWeight="bold" mb={1}>
+              <Typography variant="h4" fontWeight="bold" mb={1} sx={{ fontSize: '18px', color: '#000000' }}>
                 Login with <span style={{ color: "#5AC994" }}>Bhutan NDI</span> Wallet
               </Typography>
               <Button
@@ -318,6 +318,7 @@ const GenerateQRCode = () => {
                 sx={{
                   bgcolor: '#5AC994',
                   color: '#fff',
+                  textTransform: 'none',
                   '&:hover': { bgcolor: '#4CAF89' },
                   width: '100%',
                   maxWidth: '290px',
@@ -342,7 +343,7 @@ const GenerateQRCode = () => {
               </Typography>
             </>
           ) : (
-            <Typography variant="h4" fontWeight="bold" mb={1}>
+            <Typography variant="h4" fontWeight="bold" mb={1} sx={{ fontSize: '18px', color: '#000000' }}>
               Scan with <span style={{ color: "#5AC994" }}>Bhutan NDI </span>
               Wallet
             </Typography>
@@ -356,7 +357,7 @@ const GenerateQRCode = () => {
             sx={{
               lineHeight: 1.8,
               color: '#666666',
-              textAlign: 'center',
+              textAlign: 'left',
               display: 'flex',
               justifyContent: 'center'
             }}
@@ -366,7 +367,6 @@ const GenerateQRCode = () => {
                 textAlign: 'left',
                 width: '100%',
                 maxWidth: '300px',
-                marginLeft: '35px'
               }}
             >
               1. Open Bhutan NDI Wallet on your Phone <br />
@@ -407,11 +407,13 @@ const GenerateQRCode = () => {
               borderRadius: '30px',
               margin: '0 auto',
               marginTop: 1,
+              textTransform: 'none',
               '&:hover': {
                 border: '2px solid #4CAF89'
               }
             }}
-            onClick={() => window.open('https://www.youtube.com/watch?v=A_k79pml9k8', '_blank')}
+           // onClick={() => window.open('https://www.youtube.com/watch?v=A_k79pml9k8', '_blank')}
+           onClick={() => window.open("https://www.youtube.com/watch?v=A_k79pml9k8", "WindowName", "noopener")}
           >
             Watch Video Guide
           </Button>

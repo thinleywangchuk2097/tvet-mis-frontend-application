@@ -36,6 +36,8 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
+import SkipNextIcon from "@mui/icons-material/SkipNext";
+import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
 import FileDownload from "../../../components/file/FileDownload";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -613,6 +615,23 @@ const ViewApplyNonAccreditedCourse = () => {
     { icon: <FileOpenIcon />, label: "Supporting Documents" },
   ];
 
+  // Navigation handlers
+  const handleNextTab = () => {
+    if (tabValue < tabs.length - 1) {
+      setTabValue(tabValue + 1);
+    }
+  };
+
+  const handlePreviousTab = () => {
+    if (tabValue > 0) {
+      setTabValue(tabValue - 1);
+    }
+  };
+
+  // Helper functions for button visibility
+  const isFirstTab = () => tabValue === 0;
+  const isLastTab = () => tabValue === tabs.length - 1;
+
   if (loading) {
     return (
       <Box sx={{ p: 1, minHeight: "100vh" }}>
@@ -839,82 +858,111 @@ const ViewApplyNonAccreditedCourse = () => {
           </Grid>
         )}
 
-        {/* Action Buttons */}
+        {/* Navigation and Action Buttons */}
         <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-          {roleId === "7" && (
-            <>
-              <Button
-                variant="contained"
-                color="success"
-                size="small"
-                startIcon={<CheckCircleIcon />}
-                onClick={() => openActionDialog(56)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Verify 1
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                size="small"
-                startIcon={<CancelIcon />}
-                onClick={() => openActionDialog(58)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Reject
-              </Button>
-            </>
+          {!isFirstTab() && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<SkipPreviousIcon />}
+              onClick={handlePreviousTab}
+              sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
+            >
+              Previous
+            </Button>
           )}
 
-          {roleId === "10" && (
-            <>
-              <Button
-                variant="contained"
-                color="success"
-                size="small"
-                startIcon={<CheckCircleIcon />}
-                onClick={() => openActionDialog(62)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Verify 2
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                size="small"
-                startIcon={<CancelIcon />}
-                onClick={() => openActionDialog(60)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Reject
-              </Button>
-            </>
-          )}
-
-          {roleId === "23" && (
+          {!isLastTab() && (
             <Button
               variant="contained"
               color="primary"
               size="small"
-              startIcon={<VerifiedIcon />}
-              onClick={() => openActionDialog(59)}
-              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+              endIcon={<SkipNextIcon />}
+              onClick={handleNextTab}
+              sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
             >
-              Endorse
+              Next
             </Button>
           )}
 
-          {roleId === "22" && (
-            <Button
-              variant="contained"
-              color="success"
-              size="small"
-              startIcon={<CheckCircleIcon />}
-              onClick={() => openActionDialog(57)}
-              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-            >
-              Approve
-            </Button>
+          {isLastTab() && (
+            <>
+              {roleId === "7" && (
+                <>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    size="small"
+                    startIcon={<CheckCircleIcon />}
+                    onClick={() => openActionDialog(56)}
+                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                  >
+                    Verify
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    size="small"
+                    startIcon={<CancelIcon />}
+                    onClick={() => openActionDialog(58)}
+                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
+
+              {roleId === "10" && (
+                <>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    size="small"
+                    startIcon={<CheckCircleIcon />}
+                    onClick={() => openActionDialog(62)}
+                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                  >
+                    Verify
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    size="small"
+                    startIcon={<CancelIcon />}
+                    onClick={() => openActionDialog(60)}
+                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
+
+              {roleId === "23" && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  startIcon={<VerifiedIcon />}
+                  onClick={() => openActionDialog(59)}
+                  sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                >
+                  Endorse
+                </Button>
+              )}
+
+              {roleId === "22" && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  startIcon={<CheckCircleIcon />}
+                  onClick={() => openActionDialog(57)}
+                  sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                >
+                  Approve
+                </Button>
+              )}
+            </>
           )}
         </Box>
       </Paper>

@@ -1,0 +1,82 @@
+import apiClient from "../../../axios";
+
+class MonitoringAssessmentService {
+  getInstituteTypeDropdown(token) {
+    return apiClient
+      .get(`/api/v1/user/management/monitoring/get-institute-type`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  getInstituteDropdown(service_id, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/monitoring/get-institutes-dropdown/${service_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  submitMonitoringAssessment(data, token) {
+    return apiClient
+      .post(`/api/v1/user/management/monitoring/submit`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+   getMonitoringAssessment(user_id, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/monitoring/get-monitoring-assessment/${user_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  updateMonitoringAssessment(data, token) {
+    return apiClient
+      .post(`/api/v1/user/management/monitoring/verify`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+   getMonitoringAssessmentByApplicationNo(applicationNo, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/monitoring/get-monitoring-assessment-details/${applicationNo}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+
+
+}
+
+export default new MonitoringAssessmentService();

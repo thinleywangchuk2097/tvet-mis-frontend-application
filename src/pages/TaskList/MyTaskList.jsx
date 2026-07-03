@@ -37,7 +37,6 @@ const MyTaskList = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [unclaimLoading, setUnclaimLoading] = useState(false);
 
   const navigate = useNavigate();
   const token = useSelector((state) => state.auth.accessToken);
@@ -60,7 +59,6 @@ const MyTaskList = () => {
           currentRoleId,
           token,
         );
-
         if (response.data && Array.isArray(response.data)) {
           setTasks(response.data);
         } else {
@@ -109,78 +107,6 @@ const MyTaskList = () => {
       }
     }
     handleMenuClose();
-  };
-
-  const handleReleaseTask = async () => {
-    if (!selectedTask || !token) {
-      toast.error("No task selected or authentication required");
-      handleMenuClose();
-      return;
-    }
-
-    try {
-      // Show loading state for unclaim action
-      setUnclaimLoading(true);
-
-      // Prepare the payload according to API requirements
-      const payload = {
-        applicationNo: selectedTask.application_no,
-        assignedUserId: null,
-        taskStatusId: null, // uncliam taskStatusId
-        assignedRoleId: null,
-        serviceId: null,
-      };
-
-      // Call the API to unclaim the task
-      const response = await TaskListService.unclaimTask(payload, token);
-
-      // Check response structure
-      if (response && response.data) {
-        const { status, message } = response.data;
-
-        if (status === 200) {
-          // Remove the task from local state
-          setTasks((prevTasks) =>
-            prevTasks.filter(
-              (task) => task.application_no !== selectedTask.application_no,
-            ),
-          );
-
-          // Show success message
-          toast.success(message || "Task unclaimed successfully");
-
-          // Reset pagination if needed
-          if (page > 0 && tasks.length <= page * rowsPerPage) {
-            setPage(Math.max(0, page - 1));
-          }
-        } else {
-          toast.error(message || "Failed to unclaim task");
-        }
-      } else {
-        toast.error("Invalid response from server");
-      }
-    } catch (err) {
-      console.error("Error releasing task:", err);
-
-      // Handle different error types
-      if (err.response) {
-        // Server responded with error status
-        const errorMessage =
-          err.response.data?.message ||
-          err.response.statusText ||
-          "Server error occurred";
-        toast.error(errorMessage);
-      } else if (err.request) {
-        // Request made but no response
-        toast.error("Network error. Please check your connection.");
-      } else {
-        // Other errors
-        toast.error("Failed to unclaim task. Please try again.");
-      }
-    } finally {
-      setUnclaimLoading(false);
-      handleMenuClose();
-    }
   };
 
   const handleSearchChange = (event) => {
@@ -367,7 +293,7 @@ const MyTaskList = () => {
                           label={task.current_status}
                           size="small"
                           sx={{
-                            backgroundColor: "#2196f3", // Simple blue background
+                            backgroundColor: "#2196f3",
                             color: "white",
                             fontWeight: "medium",
                             minWidth: "100px",
@@ -423,18 +349,6 @@ const MyTaskList = () => {
       >
         <MenuItem onClick={handleViewDetails}>
           <ListItemText>View</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={handleReleaseTask} disabled={unclaimLoading}>
-          {unclaimLoading ? (
-            <Box
-              sx={{ display: "flex", alignItems: "center", minWidth: "80px" }}
-            >
-              <CircularProgress size={16} sx={{ mr: 1.5 }} />
-              <ListItemText>Processing...</ListItemText>
-            </Box>
-          ) : (
-            <ListItemText>Unclaim</ListItemText>
-          )}
         </MenuItem>
       </Menu>
     </Paper>

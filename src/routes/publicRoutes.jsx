@@ -2,16 +2,20 @@ import PublicIndex from "../pages/public/PublicIndex";
 import Login from "../pages/auth/Login";
 import ForgotPassword from "../pages/auth/password/ForgotPassword";
 //public registration routes paths
-import InstituteProposal from "../pages/public/proposal/InstituteProposal";
-import InstituteRegistration from "../pages/public/registration/InstituteRegistration";
+import InstituteSesCentreAssessmentCentreProposal from "../pages/public/proposal/InstituteSesCentreAssessmentCentreProposal";
+import InstituteSesCentreAssessmentCentre from "../pages/public/registration/InstituteSesCentreAssessmentCentre";
+import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
+import AssessorAccreditorQMSAuditorRenewal from "../pages/renewal/AssessorAccreditorQMSAuditorRenewal";
 import RPLAssessment from "../pages/public/courses/RPLAssessment";
+
 // assessment result path
 import AssessmentResult from "../pages/public/assessment/AssessmentResult";
 //trainee course application
 import ApplyCourse from "../pages/trainee/ApplyCourse";
 import ResetPassword from "../pages/auth/password/ResetPassword";
 import GenerateQRCode from "../pages/auth/ndi/GenerateQRCode";
-import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
+import CommonQRCode from "../pages/auth/ndi/CommonQRCode";
+
 //import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex";
 //Reports
 import AssessorReport from "../pages/public/reports/Assessor";
@@ -21,9 +25,12 @@ import TrainerReport from "../pages/public/reports/Trainer";
 import QMSAuditorReport from "../pages/public/reports/QMSAuditor";
 import CoursesAccreditedReport from "../pages/public/reports/CoursesAccredited";
 import BirmsPublicPaymentIndex from "../pages/birms/pubilc/BirmsPublicPaymentIndex";
+import NcsPublication from "../pages/report/NcsPublication";
+import CurriculumPublication from "../pages/report/CurriculumPublication";
 //Feedback or Complain
 import FeedbackForm from "../pages/public/FeedbackForm";
 import ViewTracerSend from "../pages/dwps/tracer/ViewTracerSend";
+import PublicationIndex from "../pages/public/publication/PublicationIndex";
 
 //public routes ..
 export const publicRoutes = [
@@ -38,12 +45,13 @@ export const publicRoutes = [
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "reset-password", element: <ResetPassword /> },
       { path: "login-ndi-qrcode", element: <GenerateQRCode /> },
+      { path: "common-ndi-qrcode", element: <CommonQRCode /> }
     ],
   },
   {
     path: "proposal",
     children: [
-      { path: ":proposalType/:serviceId", element: <InstituteProposal /> },
+      { path: ":proposalType/:serviceId", element: <InstituteSesCentreAssessmentCentreProposal /> },
     ],
   },
   {
@@ -51,14 +59,22 @@ export const publicRoutes = [
     children: [
       {
         path: ":registrationType/:serviceId",
-        element: <InstituteRegistration />,
+        element: <InstituteSesCentreAssessmentCentre />,
       },
-      // { path: "assessment-centre", element: <AssessmentCentre /> },
-      // { path: "assessor", element: <Assessor /> },
-      //{ path: "accreditor", element: <Accreditor /> },
-      // { path: "qms-auditor", element: <QMSAuditor /> },//it is Quality Auditor Registration AssessorAccreditorQMSAuditor
+    
     ],
   },
+   {
+    path: "renewal",
+    children: [
+      {
+        path: ":renewalType/:serviceId",
+        element: <AssessorAccreditorQMSAuditorRenewal />,
+      },
+    
+    ],
+  },
+  
   {
     path: "registration",
     children: [
@@ -77,12 +93,18 @@ export const publicRoutes = [
       { path: "trainer", element: <TrainerReport /> },
       { path: "qms-auditor", element: <QMSAuditorReport /> },
       { path: "courses-accredited", element: <CoursesAccreditedReport /> },
+      { path: "ncs-publication", element: <NcsPublication /> },
+      { path: "curriculum-publication", element: <CurriculumPublication /> },
     ],
   },
 
   {
     path: "result",
     children: [{ path: "assessment-result", element: <AssessmentResult /> }],
+  },
+  {
+    path: "publication",
+    children: [{ path: "publication-index", element: <PublicationIndex /> }],
   },
   {
     path: "course",

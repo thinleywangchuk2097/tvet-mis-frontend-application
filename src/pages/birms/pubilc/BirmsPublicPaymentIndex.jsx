@@ -19,13 +19,15 @@ import {
   CircularProgress,
   Alert,
   Grid,
+  Tooltip,
+  Link,
 } from "@mui/material";
 import {
   Search as SearchIcon,
   Clear as ClearIcon,
-  Visibility as VisibilityIcon,
-  Print as PrintIcon,
+  OpenInNew as OpenInNewIcon,
 } from "@mui/icons-material";
+import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 
 const BirmsPublicPaymentIndex = () => {
   const [searchAdviceNo, setSearchAdviceNo] = useState("");
@@ -33,87 +35,49 @@ const BirmsPublicPaymentIndex = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchPerformed, setSearchPerformed] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState([]);
 
-  // Sample data - replace with your actual API data
-  const [paymentData, setPaymentData] = useState([
-    {
-      id: 1,
-      paymentAdviceNo: "PA-2024-001",
-      amount: 25000.0,
-      paymentDate: "2024-01-15",
-      status: "Completed",
-      beneficiary: "ABC Corporation",
-      bankName: "City Bank",
-      reference: "INV-2024-001",
-    },
-    {
-      id: 2,
-      paymentAdviceNo: "PA-2024-002",
-      amount: 18750.5,
-      paymentDate: "2024-01-20",
-      status: "Pending",
-      beneficiary: "XYZ Ltd",
-      bankName: "National Bank",
-      reference: "INV-2024-002",
-    },
-    {
-      id: 3,
-      paymentAdviceNo: "PA-2024-003",
-      amount: 42300.75,
-      paymentDate: "2024-01-25",
-      status: "Processing",
-      beneficiary: "Tech Solutions",
-      bankName: "Standard Bank",
-      reference: "INV-2024-003",
-    },
-    {
-      id: 4,
-      paymentAdviceNo: "PA-2024-004",
-      amount: 15600.0,
-      paymentDate: "2024-02-01",
-      status: "Completed",
-      beneficiary: "Global Trading",
-      bankName: "Commercial Bank",
-      reference: "INV-2024-004",
-    },
-    {
-      id: 5,
-      paymentAdviceNo: "PA-2024-005",
-      amount: 89500.25,
-      paymentDate: "2024-02-05",
-      status: "Failed",
-      beneficiary: "Metro Industries",
-      bankName: "United Bank",
-      reference: "INV-2024-005",
-    },
-  ]);
-
-  const [filteredData, setFilteredData] = useState([]);
-
-  const handleSearch = () => {
-    setLoading(true);
-    setSearchPerformed(true);
-    // Simulate API call
-    setTimeout(() => {
-      if (searchAdviceNo.trim() === "") {
-        setFilteredData(paymentData);
-      } else {
-        const filtered = paymentData.filter((item) =>
-          item.paymentAdviceNo
-            .toLowerCase()
-            .includes(searchAdviceNo.toLowerCase()),
-        );
-        setFilteredData(filtered);
-      }
+  const fetchPaymentDetails = async (paymentAdviceNo) => {
+    try {
+      console.log("payment advice no", paymentAdviceNo);
+      setLoading(true);
+      const response =
+        await BirmsPaymentService.getPaymentByPaymentAdviceNo(paymentAdviceNo);
+      const data = Array.isArray(response.data)
+        ? response.data
+        : [response.data];
+      setPaymentDetails(data);
+      console.log("payment Details:", data);
+      return data;
+    } catch (error) {
+      console.error("Error fetching payment details:", error);
+      throw error;
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchAdviceNo.trim()) {
+      setSearchPerformed(false);
+      setPaymentDetails([]);
+      return;
+    }
+
+    setSearchPerformed(true);
+    try {
+      const data = await fetchPaymentDetails(searchAdviceNo.trim());
+      setPaymentDetails(data);
       setPage(0);
-    }, 500);
+    } catch (error) {
+      setPaymentDetails([]);
+    }
   };
 
   const handleClearSearch = () => {
     setSearchAdviceNo("");
     setSearchPerformed(false);
-    setFilteredData([]);
+    setPaymentDetails([]);
     setPage(0);
   };
 
@@ -132,9 +96,22 @@ const BirmsPublicPaymentIndex = () => {
     setPage(0);
   };
 
+  // Function to open payment link
+  const handleOpenPaymentLink = (redirectUrl, paymentAdviceNo) => {
+    if (!redirectUrl) {
+      console.error("No redirect URL available for payment:", paymentAdviceNo);
+      alert("Payment URL is not available for this payment advice.");
+      return;
+    }
+
+    console.log("Opening payment link:", redirectUrl);
+    window.open(redirectUrl, "_blank", "noopener,noreferrer");
+  };
+
   const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case "completed":
+      case "paid":
         return "success";
       case "pending":
         return "warning";
@@ -148,13 +125,16 @@ const BirmsPublicPaymentIndex = () => {
   };
 
   const formatCurrency = (amount) => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) return "N/A";
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-    }).format(amount);
+    }).format(numAmount);
   };
 
   const formatDate = (dateString) => {
+    if (!dateString || dateString === "null") return "N/A";
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -162,110 +142,146 @@ const BirmsPublicPaymentIndex = () => {
     });
   };
 
-  const displayData = searchPerformed ? filteredData : [];
+  const displayData = searchPerformed ? paymentDetails : [];
 
   return (
-    <Box sx={{ p: 7 }}>
-      <Paper elevation={3} sx={{ p: 5, borderRadius: 2 }}>
-        {/* Header */}
-        <Typography gutterBottom sx={{ mb: 3, fontWeight: "bold" }}>
+    <Box sx={{ p: 3 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+        <Typography
+          gutterBottom
+          sx={{ mb: 2, fontWeight: "bold", fontSize: "1.1rem" }}
+        >
           Payment Advice Management
         </Typography>
 
-        {/* Search Section with Grid */}
-        <Box sx={{ mb: 2 }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                size="small"
-                placeholder="Enter Payment Advice Number..."
-                value={searchAdviceNo}
-                onChange={(e) => setSearchAdviceNo(e.target.value)}
-                onKeyPress={handleKeyPress}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon color="action" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchAdviceNo && (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setSearchAdviceNo("")}
-                        size="small"
-                      >
-                        <ClearIcon />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 1 }}>
+        <Box sx={{ mb: 1.5 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              flexWrap: "wrap",
+              justifyContent: "flex-end",
+            }}
+          >
+            <TextField
+              variant="outlined"
+              size="small"
+              placeholder="Enter Payment Advice Number..."
+              value={searchAdviceNo}
+              onChange={(e) => setSearchAdviceNo(e.target.value)}
+              onKeyPress={handleKeyPress}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchAdviceNo && (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setSearchAdviceNo("")}
+                      size="small"
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                width: { xs: "100%", md: 450 },
+                "& .MuiInputBase-root": {
+                  height: 40,
+                },
+              }}
+            />
+            <Button
+              variant="contained"
+              onClick={handleSearch}
+              disabled={loading || !searchAdviceNo.trim()}
+              startIcon={
+                loading ? (
+                  <CircularProgress size={18} />
+                ) : (
+                  <SearchIcon fontSize="small" />
+                )
+              }
+              size="medium"
+              sx={{
+                height: 40,
+                fontSize: "0.8125rem",
+                padding: "0 24px",
+                minWidth: "auto",
+                flexShrink: 0,
+              }}
+            >
+              Search
+            </Button>
+            {searchPerformed && (
               <Button
-                fullWidth
                 variant="contained"
-                onClick={handleSearch}
-                disabled={loading}
-                startIcon={
-                  loading ? <CircularProgress size={20} /> : <SearchIcon />
-                }
+                color="error"
+                onClick={handleClearSearch}
+                startIcon={<ClearIcon fontSize="small" />}
+                size="medium"
+                sx={{
+                  height: 40,
+                  fontSize: "0.8125rem",
+                  padding: "0 24px",
+                  minWidth: "auto",
+                  flexShrink: 0,
+                }}
               >
-                Search
+                Clear
               </Button>
-            </Grid>
-            <Grid item size={{ xs: 12, md: 1 }}>
-              {searchPerformed && (
-                <Button
-                  fullWidth
-                  variant="contained"
-                  color="error"
-                  onClick={handleClearSearch}
-                  startIcon={<ClearIcon />}
-                >
-                  Clear
-                </Button>
-              )}
-            </Grid>
-          </Grid>
+            )}
+          </Box>
         </Box>
 
-        {/* Results Summary */}
         {searchPerformed && !loading && (
-          <Box sx={{ mb: 2 }}>
-            <Alert severity="info" sx={{ borderRadius: 2 }}>
-              Found {displayData.length} payment advice record(s)
+          <Box sx={{ mb: 1.5 }}>
+            <Alert
+              severity={displayData.length > 0 ? "info" : "warning"}
+              sx={{
+                borderRadius: 1.5,
+                py: 0.5,
+                "& .MuiAlert-message": {
+                  fontSize: "0.875rem",
+                },
+              }}
+            >
+              {displayData.length > 0
+                ? `Found ${displayData.length} payment advice record(s)`
+                : "No payment advice records found for the given number"}
             </Alert>
           </Box>
         )}
 
-        {/* Loading State */}
         {loading && (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-            <CircularProgress />
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={32} />
           </Box>
         )}
 
-        {/* Table Section */}
-        {!loading && searchPerformed && (
+        {!loading && searchPerformed && displayData.length > 0 && (
           <TableContainer
             component={Paper}
             variant="outlined"
             sx={{
-              borderRadius: 2,
+              borderRadius: 1.5,
               border: "1px solid #e0e0e0",
               overflow: "hidden",
             }}
           >
-            <Table sx={{ borderCollapse: "collapse" }}>
+            <Table sx={{ borderCollapse: "collapse" }} size="small">
               <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
                 <TableRow
                   sx={{
                     "& th": {
                       borderBottom: "2px solid #ddd",
                       fontWeight: "bold",
+                      fontSize: "0.75rem",
+                      padding: "6px 8px",
                     },
                   }}
                 >
@@ -273,6 +289,7 @@ const BirmsPublicPaymentIndex = () => {
                     sx={{
                       fontWeight: "bold",
                       borderRight: "1px solid #e0e0e0",
+                      padding: "6px 8px",
                     }}
                   >
                     Payment Advice No.
@@ -281,6 +298,7 @@ const BirmsPublicPaymentIndex = () => {
                     sx={{
                       fontWeight: "bold",
                       borderRight: "1px solid #e0e0e0",
+                      padding: "6px 8px",
                     }}
                   >
                     Beneficiary
@@ -289,6 +307,7 @@ const BirmsPublicPaymentIndex = () => {
                     sx={{
                       fontWeight: "bold",
                       borderRight: "1px solid #e0e0e0",
+                      padding: "6px 8px",
                     }}
                   >
                     Amount
@@ -297,118 +316,147 @@ const BirmsPublicPaymentIndex = () => {
                     sx={{
                       fontWeight: "bold",
                       borderRight: "1px solid #e0e0e0",
+                      padding: "6px 8px",
                     }}
                   >
-                    Payment Date
+                    Due Date
                   </TableCell>
                   <TableCell
                     sx={{
                       fontWeight: "bold",
                       borderRight: "1px solid #e0e0e0",
+                      padding: "6px 8px",
                     }}
                   >
-                    Bank Name
+                    Platform
                   </TableCell>
                   <TableCell
                     sx={{
                       fontWeight: "bold",
                       borderRight: "1px solid #e0e0e0",
-                    }}
-                  >
-                    Reference
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      borderRight: "1px solid #e0e0e0",
+                      padding: "6px 8px",
                     }}
                   >
                     Status
                   </TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Actions</TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: "bold",
+                      padding: "6px 8px",
+                    }}
+                  >
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {displayData.length > 0 ? (
-                  displayData
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((row, index) => (
-                      <TableRow
-                        key={row.id}
-                        hover
+                {displayData
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((row, index) => (
+                    <TableRow
+                      key={row.id || index}
+                      hover
+                      sx={{
+                        "& td": {
+                          borderBottom: "1px solid #e0e0e0",
+                          borderRight: "1px solid #e0e0e0",
+                          padding: "4px 8px",
+                          fontSize: "0.8125rem",
+                        },
+                        "& td:last-child": { borderRight: "none" },
+                        backgroundColor: index % 2 === 0 ? "white" : "#fafafa",
+                      }}
+                    >
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: "medium",
+                            fontSize: "0.8125rem",
+                          }}
+                        >
+                          {row.paymentAdviceNo || "N/A"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ fontSize: "0.8125rem" }}>
+                        {row.taxPayerName || "N/A"}
+                      </TableCell>
+                      <TableCell
                         sx={{
-                          "& td": {
-                            borderBottom: "1px solid #e0e0e0",
-                            borderRight: "1px solid #e0e0e0",
-                            padding: "12px 16px",
-                          },
-                          "& td:last-child": { borderRight: "none" },
-                          backgroundColor:
-                            index % 2 === 0 ? "white" : "#fafafa",
+                          fontWeight: "bold",
+                          color: "#2e7d32",
+                          fontSize: "0.8125rem",
                         }}
                       >
-                        <TableCell>
-                          <Typography
+                        {formatCurrency(row.totalPayableAmount)}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: "0.8125rem" }}>
+                        {formatDate(row.paymentDueDate)}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: "0.8125rem" }}>
+                        {row.platform || "N/A"}
+                      </TableCell>
+                      <TableCell sx={{ padding: "2px 8px" }}>
+                        <Chip
+                          label={row.paymentStatus || "Unknown"}
+                          color={getStatusColor(row.paymentStatus)}
+                          size="small"
+                          sx={{
+                            fontWeight: "medium",
+                            height: 22,
+                            fontSize: "0.6875rem",
+                            "& .MuiChip-label": {
+                              px: 1,
+                              py: 0.5,
+                            },
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ padding: "2px 8px" }}>
+                        <Tooltip title="Make Payment">
+                          <Link
+                            component="button"
                             variant="body2"
-                            sx={{ fontWeight: "medium" }}
-                          >
-                            {row.paymentAdviceNo}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{row.beneficiary}</TableCell>
-                        <TableCell
-                          sx={{ fontWeight: "bold", color: "#2e7d32" }}
-                        >
-                          {formatCurrency(row.amount)}
-                        </TableCell>
-                        <TableCell>{formatDate(row.paymentDate)}</TableCell>
-                        <TableCell>{row.bankName}</TableCell>
-                        <TableCell>{row.reference}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={row.status}
-                            color={getStatusColor(row.status)}
-                            size="small"
-                            sx={{ fontWeight: "medium" }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <IconButton
-                            size="small"
-                            color="primary"
                             onClick={() =>
-                              console.log("View details:", row.paymentAdviceNo)
+                              handleOpenPaymentLink(
+                                row.redirectUrl,
+                                row.paymentAdviceNo,
+                              )
                             }
-                            title="View Details"
+                            disabled={!row.redirectUrl}
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              color: !row.redirectUrl ? "#bdbdbd" : "#1976d2",
+                              textDecoration: "underline",
+                              textUnderlineOffset: "2px",
+                              fontWeight: 500,
+                              fontSize: "0.8125rem",
+                              cursor: !row.redirectUrl
+                                ? "not-allowed"
+                                : "pointer",
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              fontFamily: "inherit",
+                              "&:hover": {
+                                color: !row.redirectUrl ? "#bdbdbd" : "#1565c0",
+                                textDecoration: "underline",
+                              },
+                              "&:disabled": {
+                                color: "#bdbdbd",
+                                cursor: "not-allowed",
+                              },
+                            }}
                           >
-                            <VisibilityIcon />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            color="secondary"
-                            onClick={() =>
-                              console.log("Print:", row.paymentAdviceNo)
-                            }
-                            title="Print"
-                          >
-                            <PrintIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={8}
-                      align="center"
-                      sx={{ py: 8, borderRight: "none" }}
-                    >
-                      <Typography variant="body1" color="textSecondary">
-                        No payment advice records found
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
+                            <OpenInNewIcon fontSize="small" />
+                            Make Payment
+                          </Link>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
             <TablePagination
@@ -423,28 +471,74 @@ const BirmsPublicPaymentIndex = () => {
                 borderTop: "1px solid #e0e0e0",
                 "& .MuiTablePagination-toolbar": {
                   borderTop: "none",
+                  minHeight: 44,
+                },
+                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                  {
+                    fontSize: "0.75rem",
+                  },
+                "& .MuiTablePagination-select": {
+                  fontSize: "0.75rem",
+                  padding: "4px 8px",
                 },
               }}
             />
           </TableContainer>
         )}
 
-        {/* Initial State - No Search Performed */}
-        {!searchPerformed && !loading && (
+        {!loading && searchPerformed && displayData.length === 0 && (
           <Box
             sx={{
               textAlign: "center",
-              py: 5,
+              py: 4,
               backgroundColor: "#fafafa",
               borderRadius: 2,
               border: "1px dashed #ccc",
             }}
           >
-            <SearchIcon sx={{ fontSize: 50, color: "#ccc", mb: 2 }} />
-            <Typography variant="h6" color="textSecondary" gutterBottom>
+            <SearchIcon sx={{ fontSize: 40, color: "#ccc", mb: 1 }} />
+            <Typography
+              variant="h6"
+              color="textSecondary"
+              gutterBottom
+              sx={{ fontSize: "1rem" }}
+            >
+              No Results Found
+            </Typography>
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              sx={{ fontSize: "0.875rem" }}
+            >
+              No payment advice found for "{searchAdviceNo}"
+            </Typography>
+          </Box>
+        )}
+
+        {!searchPerformed && !loading && (
+          <Box
+            sx={{
+              textAlign: "center",
+              py: 4,
+              backgroundColor: "#fafafa",
+              borderRadius: 2,
+              border: "1px dashed #ccc",
+            }}
+          >
+            <SearchIcon sx={{ fontSize: 40, color: "#ccc", mb: 1 }} />
+            <Typography
+              variant="h6"
+              color="textSecondary"
+              gutterBottom
+              sx={{ fontSize: "1rem" }}
+            >
               Search for Payment Advice
             </Typography>
-            <Typography variant="body2" color="textSecondary">
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              sx={{ fontSize: "0.875rem" }}
+            >
               Enter a Payment Advice Number and click Search to view details
             </Typography>
           </Box>

@@ -177,7 +177,6 @@ const ProfileHeader = () => {
     const loadImage = async () => {
       try {
         const res = await UserProfileService.getUserProfileImage(userId, token);
-
         const blob = new Blob([res.data], {
           type: res.headers["content-type"],
         });

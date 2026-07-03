@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+// AssessorAccreditorQMSAuditor.jsx
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import {
   Box,
@@ -27,6 +28,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import AssessorAccreditorQMSAuditorService from "../../../api/services/internal/registration/AssessorAccreditorQMSAuditorService";
+import DatahubService from "../../../api/services/external/datahub/DatahubService";
 import { useNavigate } from "react-router-dom";
 
 // Helper function to convert file to Base64
@@ -46,8 +48,10 @@ const fileToBase64 = (file) =>
 const AssessorAccreditorQMSAuditor = () => {
   const { serviceId } = useParams();
   const [serviceName, setServiceName] = useState("");
-  const [hasCitizenId, setHasCitizenId] = useState("no");
+  const [hasCitizenId, setHasCitizenId] = useState("yes"); // Changed default to "yes"
   const [loading, setLoading] = useState(false);
+  const [fetchingCitizen, setFetchingCitizen] = useState(false);
+  const formikRef = useRef();
 
   // State for dropdown data
   const [sectors, setSectors] = useState([]);
@@ -62,9 +66,14 @@ const AssessorAccreditorQMSAuditor = () => {
     fetchServiceName();
   }, [serviceId]);
 
+  // Reset form when Citizen ID selection changes
   useEffect(() => {
-    if (hasCitizenId === "yes") {
-      window.location.href = "/auth/login-ndi-qrcode";
+    if (formikRef.current) {
+      if (hasCitizenId === "yes") {
+        formikRef.current.setFieldValue("referenceNo", "");
+      } else {
+        formikRef.current.setFieldValue("citizenId", "");
+      }
     }
   }, [hasCitizenId]);
 
@@ -137,10 +146,62 @@ const AssessorAccreditorQMSAuditor = () => {
     }
   };
 
+  // Function to fetch and auto-fill citizen details
+  const fetchAndFillCitizenDetails = async (cid, formik) => {
+    if (!cid || cid.length !== 11) {
+      toast.warning("Please enter a valid 11-digit CID");
+      return;
+    }
+
+    setFetchingCitizen(true);
+    try {
+      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
+      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
+        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
+
+        // Map gender from API response to dropdown value
+        let genderValue = "";
+        if (citizen.gender === "M") {
+          const genderOption = genders.find(
+            (opt) => opt.name === "Male"
+          );
+          genderValue = genderOption?.id || "";
+        } else if (citizen.gender === "F") {
+          const genderOption = genders.find(
+            (opt) => opt.name === "Female"
+          );
+          genderValue = genderOption?.id || "";
+        } else {
+          const genderOption = genders.find(
+            (opt) => opt.name === "Others"
+          );
+          genderValue = genderOption?.id || "";
+        }
+
+        const fullName =
+          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
+        
+        // Auto-fill the form fields
+        formik.setFieldValue("fullName", fullName);
+        formik.setFieldValue("genderId", genderValue);
+
+        toast.success(`Citizen details fetched successfully for ${fullName}`);
+      } else {
+        toast.warning("No citizen details found for this CID");
+      }
+    } catch (error) {
+      console.error("Error fetching citizen details:", error);
+      toast.error(
+        "Failed to fetch citizen details. Please check the CID number.",
+      );
+    } finally {
+      setFetchingCitizen(false);
+    }
+  };
+
   // Dynamic validation schema based on serviceId
-  const getValidationSchema = () => {
+  const getValidationSchema = (values = {}) => {
     const baseSchema = {
-      referenceNo: Yup.string(),
       fullName: Yup.string().required("Full Name is required"),
       genderId: Yup.number().required("Gender is required"),
       mobileNo: Yup.string().required("Mobile No is required"),
@@ -149,6 +210,17 @@ const AssessorAccreditorQMSAuditor = () => {
       organizationName: Yup.string().required("Organization Name is required"),
       documents: Yup.array().min(1, "Please upload at least one file"),
     };
+
+    // Add conditional validation based on hasCitizenId
+    if (hasCitizenId === "yes") {
+      baseSchema.citizenId = Yup.string()
+        .matches(/^[0-9]{11}$/, "Invalid CID number (11 digits required)")
+        .required("Citizen ID Number is required");
+    } else {
+      baseSchema.referenceNo = Yup.string().required(
+        "Reference No is required",
+      );
+    }
 
     // Service 32: Assessor
     if (serviceId === "32") {
@@ -203,15 +275,13 @@ const AssessorAccreditorQMSAuditor = () => {
       };
 
       // Add conditional validation for academic background
-      return Yup.object(schema).when("qmsTraining", {
-        is: "Yes",
-        then: Yup.object({
-          ...schema,
-          academicBackground: Yup.string().required(
-            "Academic / Technical / Professional Background is required when QMS training is Yes",
-          ),
-        }),
-      });
+      if (values.qmsTraining === "Yes") {
+        schema.academicBackground = Yup.string().required(
+          "Academic / Technical / Professional Background is required when QMS training is Yes",
+        );
+      }
+
+      return Yup.object(schema);
     }
 
     return Yup.object(baseSchema);
@@ -220,6 +290,7 @@ const AssessorAccreditorQMSAuditor = () => {
   // Dynamic initial values based on serviceId
   const getInitialValues = () => {
     const baseValues = {
+      citizenId: "",
       referenceNo: "",
       fullName: "",
       genderId: "",
@@ -287,15 +358,19 @@ const AssessorAccreditorQMSAuditor = () => {
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
     setLoading(true);
     try {
-      // Convert documents to Base64 format
       const documents = await Promise.all(
         values.documents.map((file) => fileToBase64(file)),
       );
 
       const submitData = { ...values };
-
-      // Replace documents with converted ones
       submitData.documents = documents;
+
+      // Remove the field that is not needed based on selection
+      if (hasCitizenId === "yes") {
+        delete submitData.referenceNo;
+      } else {
+        delete submitData.citizenId;
+      }
 
       // Ensure numeric fields are properly formatted
       if (submitData.genderId)
@@ -313,7 +388,6 @@ const AssessorAccreditorQMSAuditor = () => {
       if (submitData.yearsOfExperience)
         submitData.yearsOfExperience = Number(submitData.yearsOfExperience);
 
-      // For work experiences, ensure year is a number
       if (submitData.workExperiences) {
         submitData.workExperiences = submitData.workExperiences.map((exp) => ({
           ...exp,
@@ -321,7 +395,7 @@ const AssessorAccreditorQMSAuditor = () => {
         }));
       }
 
-      console.log("Payload being sent:", submitData); // For debugging
+      console.log("Payload being sent:", submitData);
 
       const response =
         await AssessorAccreditorQMSAuditorService.registerAssessorAccreditorQMSAuditor(
@@ -332,6 +406,7 @@ const AssessorAccreditorQMSAuditor = () => {
         toast.success(`${serviceName} submitted successfully!`);
         resetForm();
         setSelectedSectorId("");
+        setHasCitizenId("yes");
         navigate("/");
       }
     } catch (error) {
@@ -394,17 +469,240 @@ const AssessorAccreditorQMSAuditor = () => {
           </FormControl>
         </Box>
 
-        {/* Registration Form - Only show if Citizen ID is "No" */}
-        {hasCitizenId === "no" && (
-          <Formik
-            initialValues={getInitialValues()}
-            validationSchema={getValidationSchema()}
-            enableReinitialize={true}
-            onSubmit={handleSubmit}
-          >
-            {(formik) => (
-              <form onSubmit={formik.handleSubmit}>
-                {/* Section: Basic Info */}
+        {/* Registration Form */}
+        <Formik
+          innerRef={formikRef}
+          initialValues={getInitialValues()}
+          validationSchema={(values) => getValidationSchema(values)}
+          enableReinitialize={true}
+          onSubmit={handleSubmit}
+        >
+          {(formik) => (
+            <form onSubmit={formik.handleSubmit}>
+              {/* Section: Basic Info */}
+              <Paper
+                sx={{
+                  p: { xs: 2, md: 3 },
+                  mb: 4,
+                  borderRadius: 2,
+                  border: "1px solid #e0e0e0",
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                  Basic Information
+                </Typography>
+                <Divider sx={{ mb: 3 }} />
+
+                <Grid container spacing={3}>
+                  {/* Show Citizen ID field when "Yes" is selected */}
+                  {hasCitizenId === "yes" && (
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        label={requiredLabel("Citizen ID Number")}
+                        name="citizenId"
+                        size="small"
+                        value={formik.values.citizenId || ""}
+                        onChange={formik.handleChange}
+                        onBlur={(e) => {
+                          formik.handleBlur(e);
+                          // Auto-fetch citizen details when CID is entered and is 11 digits
+                          if (
+                            e.target.value &&
+                            e.target.value.length === 11
+                          ) {
+                            fetchAndFillCitizenDetails(e.target.value, formik);
+                          }
+                        }}
+                        error={
+                          formik.touched.citizenId &&
+                          Boolean(formik.errors.citizenId)
+                        }
+                        helperText={
+                          formik.touched.citizenId && formik.errors.citizenId
+                        }
+                        disabled={loading}
+                        placeholder="Enter your Citizen ID Number"
+                        InputProps={{
+                          endAdornment: fetchingCitizen && (
+                            <CircularProgress size={20} />
+                          ),
+                        }}
+                      />
+                    </Grid>
+                  )}
+
+                  {/* Show Reference No field when "No" is selected */}
+                  {hasCitizenId === "no" && (
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        label={requiredLabel("Reference No")}
+                        name="referenceNo"
+                        size="small"
+                        value={formik.values.referenceNo || ""}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.referenceNo &&
+                          Boolean(formik.errors.referenceNo)
+                        }
+                        helperText={
+                          formik.touched.referenceNo &&
+                          formik.errors.referenceNo
+                        }
+                        disabled={loading}
+                        placeholder="Enter reference number"
+                      />
+                    </Grid>
+                  )}
+
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label={requiredLabel("Full Name")}
+                      name="fullName"
+                      size="small"
+                      value={formik.values.fullName || ""}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.fullName &&
+                        Boolean(formik.errors.fullName)
+                      }
+                      helperText={
+                        formik.touched.fullName && formik.errors.fullName
+                      }
+                      InputProps={{
+                        readOnly: hasCitizenId === "yes" && formik.values.citizenId?.length === 11,
+                        sx: {
+                          backgroundColor: hasCitizenId === "yes" && formik.values.citizenId?.length === 11 ? 
+                            (theme) => theme.palette.action.hover : 'transparent',
+                        },
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label={requiredLabel("Gender")}
+                      name="genderId"
+                      size="small"
+                      value={formik.values.genderId || ""}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.genderId &&
+                        Boolean(formik.errors.genderId)
+                      }
+                      helperText={
+                        formik.touched.genderId && formik.errors.genderId
+                      }
+                      disabled={hasCitizenId === "yes" && formik.values.citizenId?.length === 11}
+                    >
+                      <MenuItem value="">Select</MenuItem>
+                      {genders.map((gender) => (
+                        <MenuItem key={gender.id} value={gender.id}>
+                          {gender.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label={requiredLabel("Mobile No")}
+                      name="mobileNo"
+                      size="small"
+                      value={formik.values.mobileNo || ""}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.mobileNo &&
+                        Boolean(formik.errors.mobileNo)
+                      }
+                      helperText={
+                        formik.touched.mobileNo && formik.errors.mobileNo
+                      }
+                      disabled={loading}
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label={requiredLabel("Email")}
+                      name="email"
+                      size="small"
+                      value={formik.values.email || ""}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.email && Boolean(formik.errors.email)
+                      }
+                      helperText={formik.touched.email && formik.errors.email}
+                      disabled={loading}
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      select
+                      fullWidth
+                      label={requiredLabel(
+                        "Location of Working Organization (Dzongkhag)",
+                      )}
+                      name="dzongkhagId"
+                      size="small"
+                      value={formik.values.dzongkhagId || ""}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.dzongkhagId &&
+                        Boolean(formik.errors.dzongkhagId)
+                      }
+                      helperText={
+                        formik.touched.dzongkhagId && formik.errors.dzongkhagId
+                      }
+                      disabled={loading}
+                    >
+                      <MenuItem value="">Select</MenuItem>
+                      {dzongkhags.map((dz) => (
+                        <MenuItem key={dz.id} value={dz.id}>
+                          {dz.dzonkhagName || dz.dzongkhagName}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label={requiredLabel("Name of the Working Organization")}
+                      name="organizationName"
+                      size="small"
+                      value={formik.values.organizationName || ""}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={
+                        formik.touched.organizationName &&
+                        Boolean(formik.errors.organizationName)
+                      }
+                      helperText={
+                        formik.touched.organizationName &&
+                        formik.errors.organizationName
+                      }
+                      disabled={loading}
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Section: Assessor Criteria (Service 32) */}
+              {serviceId === "32" && (
                 <Paper
                   sx={{
                     p: { xs: 2, md: 3 },
@@ -418,66 +716,209 @@ const AssessorAccreditorQMSAuditor = () => {
                     fontWeight={600}
                     sx={{ mb: 2 }}
                   >
-                    Basic Information
+                    Assessor Registration Criteria
                   </Typography>
                   <Divider sx={{ mb: 3 }} />
-
                   <Grid container spacing={3}>
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
+                        select
                         fullWidth
-                        label="Reference No"
-                        name="referenceNo"
+                        label={requiredLabel("Sector")}
+                        name="sectorId"
                         size="small"
-                        value={formik.values.referenceNo || ""}
-                        onChange={formik.handleChange}
-                        disabled={loading}
-                      />
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={requiredLabel("Full Name")}
-                        name="fullName"
-                        size="small"
-                        value={formik.values.fullName || ""}
-                        onChange={formik.handleChange}
+                        value={formik.values.sectorId || ""}
+                        onChange={(e) => {
+                          const sectorId = e.target.value;
+                          formik.handleChange(e);
+                          setSelectedSectorId(sectorId);
+                          formik.setFieldValue("occupationId", "");
+                        }}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.fullName &&
-                          Boolean(formik.errors.fullName)
+                          formik.touched.sectorId &&
+                          Boolean(formik.errors.sectorId)
                         }
                         helperText={
-                          formik.touched.fullName && formik.errors.fullName
+                          formik.touched.sectorId && formik.errors.sectorId
                         }
                         disabled={loading}
-                      />
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        {sectors.map((sec) => (
+                          <MenuItem key={sec.id} value={sec.id}>
+                            {sec.sectorName}
+                          </MenuItem>
+                        ))}
+                      </TextField>
                     </Grid>
 
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         select
                         fullWidth
-                        label={requiredLabel("Gender")}
-                        name="genderId"
+                        label={requiredLabel("Occupation")}
+                        name="occupationId"
                         size="small"
-                        value={formik.values.genderId || ""}
+                        value={formik.values.occupationId || ""}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.genderId &&
-                          Boolean(formik.errors.genderId)
+                          formik.touched.occupationId &&
+                          Boolean(formik.errors.occupationId)
                         }
                         helperText={
-                          formik.touched.genderId && formik.errors.genderId
+                          formik.touched.occupationId &&
+                          formik.errors.occupationId
+                        }
+                        disabled={loading || !formik.values.sectorId}
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        {occupations.map((occ) => (
+                          <MenuItem key={occ.id} value={occ.id}>
+                            {occ.occupationName}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={requiredLabel("Certification Level")}
+                        name="certificationLevelId"
+                        size="small"
+                        value={formik.values.certificationLevelId || ""}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.certificationLevelId &&
+                          Boolean(formik.errors.certificationLevelId)
+                        }
+                        helperText={
+                          formik.touched.certificationLevelId &&
+                          formik.errors.certificationLevelId
                         }
                         disabled={loading}
                       >
                         <MenuItem value="">Select</MenuItem>
-                        {genders.map((gender) => (
-                          <MenuItem key={gender.id} value={gender.id}>
-                            {gender.name}
+                        {certificationLevels.map((lvl) => (
+                          <MenuItem key={lvl.id} value={lvl.id}>
+                            {lvl.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              )}
+
+              {/* Section: Accreditor Criteria (Service 5) */}
+              {serviceId === "5" && (
+                <Paper
+                  sx={{
+                    p: { xs: 2, md: 3 },
+                    mb: 4,
+                    borderRadius: 2,
+                    border: "1px solid #e0e0e0",
+                  }}
+                >
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={600}
+                    sx={{ mb: 2 }}
+                  >
+                    Accreditor Registration Criteria
+                  </Typography>
+                  <Divider sx={{ mb: 3 }} />
+                  <Grid container spacing={3}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={requiredLabel("Sector")}
+                        name="sectorId"
+                        size="small"
+                        value={formik.values.sectorId || ""}
+                        onChange={(e) => {
+                          const sectorId = e.target.value;
+                          formik.handleChange(e);
+                          setSelectedSectorId(sectorId);
+                          formik.setFieldValue("occupationId", "");
+                        }}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.sectorId &&
+                          Boolean(formik.errors.sectorId)
+                        }
+                        helperText={
+                          formik.touched.sectorId && formik.errors.sectorId
+                        }
+                        disabled={loading}
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        {sectors.map((sec) => (
+                          <MenuItem key={sec.id} value={sec.id}>
+                            {sec.sectorName}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={requiredLabel("Occupation")}
+                        name="occupationId"
+                        size="small"
+                        value={formik.values.occupationId || ""}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.occupationId &&
+                          Boolean(formik.errors.occupationId)
+                        }
+                        helperText={
+                          formik.touched.occupationId &&
+                          formik.errors.occupationId
+                        }
+                        disabled={loading || !formik.values.sectorId}
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        {occupations.map((occ) => (
+                          <MenuItem key={occ.id} value={occ.id}>
+                            {occ.occupationName}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={requiredLabel("Certification Level")}
+                        name="certificationLevelId"
+                        size="small"
+                        value={formik.values.certificationLevelId || ""}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.certificationLevelId &&
+                          Boolean(formik.errors.certificationLevelId)
+                        }
+                        helperText={
+                          formik.touched.certificationLevelId &&
+                          formik.errors.certificationLevelId
+                        }
+                        disabled={loading}
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        {certificationLevels.map((lvl) => (
+                          <MenuItem key={lvl.id} value={lvl.id}>
+                            {lvl.name}
                           </MenuItem>
                         ))}
                       </TextField>
@@ -486,18 +927,19 @@ const AssessorAccreditorQMSAuditor = () => {
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
-                        label={requiredLabel("Mobile No")}
-                        name="mobileNo"
+                        label={requiredLabel("Designation")}
+                        name="designation"
                         size="small"
-                        value={formik.values.mobileNo || ""}
+                        value={formik.values.designation || ""}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.mobileNo &&
-                          Boolean(formik.errors.mobileNo)
+                          formik.touched.designation &&
+                          Boolean(formik.errors.designation)
                         }
                         helperText={
-                          formik.touched.mobileNo && formik.errors.mobileNo
+                          formik.touched.designation &&
+                          formik.errors.designation
                         }
                         disabled={loading}
                       />
@@ -506,78 +948,52 @@ const AssessorAccreditorQMSAuditor = () => {
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
-                        label={requiredLabel("Email")}
-                        name="email"
+                        label={requiredLabel("Number of Years")}
+                        name="yearsOfExperience"
                         size="small"
-                        value={formik.values.email || ""}
+                        type="number"
+                        value={formik.values.yearsOfExperience || ""}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.email && Boolean(formik.errors.email)
+                          formik.touched.yearsOfExperience &&
+                          Boolean(formik.errors.yearsOfExperience)
                         }
-                        helperText={formik.touched.email && formik.errors.email}
+                        helperText={
+                          formik.touched.yearsOfExperience &&
+                          formik.errors.yearsOfExperience
+                        }
                         disabled={loading}
                       />
                     </Grid>
 
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
-                        select
                         fullWidth
-                        label={requiredLabel(
-                          "Location of Working Organization (Dzongkhag)",
-                        )}
-                        name="dzongkhagId"
+                        label={requiredLabel("Responsibility")}
+                        name="responsibility"
                         size="small"
-                        value={formik.values.dzongkhagId || ""}
+                        value={formik.values.responsibility || ""}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.dzongkhagId &&
-                          Boolean(formik.errors.dzongkhagId)
+                          formik.touched.responsibility &&
+                          Boolean(formik.errors.responsibility)
                         }
                         helperText={
-                          formik.touched.dzongkhagId &&
-                          formik.errors.dzongkhagId
-                        }
-                        disabled={loading}
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        {dzongkhags.map((dz) => (
-                          <MenuItem key={dz.id} value={dz.id}>
-                            {dz.dzonkhagName || dz.dzongkhagName}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={requiredLabel(
-                          "Name of the Working Organization",
-                        )}
-                        name="organizationName"
-                        size="small"
-                        value={formik.values.organizationName || ""}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.organizationName &&
-                          Boolean(formik.errors.organizationName)
-                        }
-                        helperText={
-                          formik.touched.organizationName &&
-                          formik.errors.organizationName
+                          formik.touched.responsibility &&
+                          formik.errors.responsibility
                         }
                         disabled={loading}
                       />
                     </Grid>
                   </Grid>
                 </Paper>
+              )}
 
-                {/* Section: Assessor Criteria (Service 32) */}
-                {serviceId === "32" && (
+              {/* Section: QMS Auditor Criteria (Service 3) */}
+              {serviceId === "3" && (
+                <>
                   <Paper
                     sx={{
                       p: { xs: 2, md: 3 },
@@ -591,650 +1007,340 @@ const AssessorAccreditorQMSAuditor = () => {
                       fontWeight={600}
                       sx={{ mb: 2 }}
                     >
-                      Assessor Registration Criteria
+                      Registration Criteria
                     </Typography>
                     <Divider sx={{ mb: 3 }} />
                     <Grid container spacing={3}>
-                      <Grid item size={{ xs: 12, md: 4 }}>
+                      <Grid item size={{ xs: 12, md: 6 }}>
                         <TextField
                           select
                           fullWidth
-                          label={requiredLabel("Sector")}
-                          name="sectorId"
+                          label={requiredLabel("QMS Auditor Training Attended")}
+                          name="qmsTraining"
                           size="small"
-                          value={formik.values.sectorId || ""}
-                          onChange={(e) => {
-                            const sectorId = e.target.value;
-                            formik.handleChange(e);
-                            setSelectedSectorId(sectorId);
-                            // Reset occupation when sector changes
-                            formik.setFieldValue("occupationId", "");
-                          }}
+                          value={formik.values.qmsTraining || ""}
+                          onChange={formik.handleChange}
                           onBlur={formik.handleBlur}
                           error={
-                            formik.touched.sectorId &&
-                            Boolean(formik.errors.sectorId)
+                            formik.touched.qmsTraining &&
+                            Boolean(formik.errors.qmsTraining)
                           }
                           helperText={
-                            formik.touched.sectorId && formik.errors.sectorId
+                            formik.touched.qmsTraining &&
+                            formik.errors.qmsTraining
                           }
                           disabled={loading}
                         >
                           <MenuItem value="">Select</MenuItem>
-                          {sectors.map((sec) => (
-                            <MenuItem key={sec.id} value={sec.id}>
-                              {sec.sectorName}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-
-                      <Grid item size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          select
-                          fullWidth
-                          label={requiredLabel("Occupation")}
-                          name="occupationId"
-                          size="small"
-                          value={formik.values.occupationId || ""}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.occupationId &&
-                            Boolean(formik.errors.occupationId)
-                          }
-                          helperText={
-                            formik.touched.occupationId &&
-                            formik.errors.occupationId
-                          }
-                          disabled={loading || !formik.values.sectorId}
-                        >
-                          <MenuItem value="">Select</MenuItem>
-                          {occupations.map((occ) => (
-                            <MenuItem key={occ.id} value={occ.id}>
-                              {occ.occupationName}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-
-                      <Grid item size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          select
-                          fullWidth
-                          label={requiredLabel("Certification Level")}
-                          name="certificationLevelId"
-                          size="small"
-                          value={formik.values.certificationLevelId || ""}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.certificationLevelId &&
-                            Boolean(formik.errors.certificationLevelId)
-                          }
-                          helperText={
-                            formik.touched.certificationLevelId &&
-                            formik.errors.certificationLevelId
-                          }
-                          disabled={loading}
-                        >
-                          <MenuItem value="">Select</MenuItem>
-                          {certificationLevels.map((lvl) => (
-                            <MenuItem key={lvl.id} value={lvl.id}>
-                              {lvl.name}
-                            </MenuItem>
-                          ))}
+                          <MenuItem value="Yes">Yes</MenuItem>
+                          <MenuItem value="No">No</MenuItem>
                         </TextField>
                       </Grid>
                     </Grid>
-                  </Paper>
-                )}
 
-                {/* Section: Accreditor Criteria (Service 5) */}
-                {serviceId === "5" && (
-                  <Paper
-                    sx={{
-                      p: { xs: 2, md: 3 },
-                      mb: 4,
-                      borderRadius: 2,
-                      border: "1px solid #e0e0e0",
-                    }}
-                  >
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={600}
-                      sx={{ mb: 2 }}
-                    >
-                      Accreditor Registration Criteria
-                    </Typography>
-                    <Divider sx={{ mb: 3 }} />
-                    <Grid container spacing={3}>
-                      <Grid item size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          select
-                          fullWidth
-                          label={requiredLabel("Sector")}
-                          name="sectorId"
-                          size="small"
-                          value={formik.values.sectorId || ""}
-                          onChange={(e) => {
-                            const sectorId = e.target.value;
-                            formik.handleChange(e);
-                            setSelectedSectorId(sectorId);
-                            formik.setFieldValue("occupationId", "");
-                          }}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.sectorId &&
-                            Boolean(formik.errors.sectorId)
-                          }
-                          helperText={
-                            formik.touched.sectorId && formik.errors.sectorId
-                          }
-                          disabled={loading}
-                        >
-                          <MenuItem value="">Select</MenuItem>
-                          {sectors.map((sec) => (
-                            <MenuItem key={sec.id} value={sec.id}>
-                              {sec.sectorName}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-
-                      <Grid item size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          select
-                          fullWidth
-                          label={requiredLabel("Occupation")}
-                          name="occupationId"
-                          size="small"
-                          value={formik.values.occupationId || ""}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.occupationId &&
-                            Boolean(formik.errors.occupationId)
-                          }
-                          helperText={
-                            formik.touched.occupationId &&
-                            formik.errors.occupationId
-                          }
-                          disabled={loading || !formik.values.sectorId}
-                        >
-                          <MenuItem value="">Select</MenuItem>
-                          {occupations.map((occ) => (
-                            <MenuItem key={occ.id} value={occ.id}>
-                              {occ.occupationName}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-
-                      <Grid item size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          select
-                          fullWidth
-                          label={requiredLabel("Certification Level")}
-                          name="certificationLevelId"
-                          size="small"
-                          value={formik.values.certificationLevelId || ""}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.certificationLevelId &&
-                            Boolean(formik.errors.certificationLevelId)
-                          }
-                          helperText={
-                            formik.touched.certificationLevelId &&
-                            formik.errors.certificationLevelId
-                          }
-                          disabled={loading}
-                        >
-                          <MenuItem value="">Select</MenuItem>
-                          {certificationLevels.map((lvl) => (
-                            <MenuItem key={lvl.id} value={lvl.id}>
-                              {lvl.name}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-
-                      <Grid item size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          fullWidth
-                          label={requiredLabel("Designation")}
-                          name="designation"
-                          size="small"
-                          value={formik.values.designation || ""}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.designation &&
-                            Boolean(formik.errors.designation)
-                          }
-                          helperText={
-                            formik.touched.designation &&
-                            formik.errors.designation
-                          }
-                          disabled={loading}
-                        />
-                      </Grid>
-
-                      <Grid item size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          fullWidth
-                          label={requiredLabel("Number of Years")}
-                          name="yearsOfExperience"
-                          size="small"
-                          type="number"
-                          value={formik.values.yearsOfExperience || ""}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.yearsOfExperience &&
-                            Boolean(formik.errors.yearsOfExperience)
-                          }
-                          helperText={
-                            formik.touched.yearsOfExperience &&
-                            formik.errors.yearsOfExperience
-                          }
-                          disabled={loading}
-                        />
-                      </Grid>
-
-                      <Grid item size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          fullWidth
-                          label={requiredLabel("Responsibility")}
-                          name="responsibility"
-                          size="small"
-                          value={formik.values.responsibility || ""}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.responsibility &&
-                            Boolean(formik.errors.responsibility)
-                          }
-                          helperText={
-                            formik.touched.responsibility &&
-                            formik.errors.responsibility
-                          }
-                          disabled={loading}
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-                )}
-
-                {/* Section: QMS Auditor Criteria (Service 3) */}
-                {serviceId === "3" && (
-                  <>
-                    <Paper
-                      sx={{
-                        p: { xs: 2, md: 3 },
-                        mb: 4,
-                        borderRadius: 2,
-                        border: "1px solid #e0e0e0",
-                      }}
-                    >
-                      <Typography
-                        variant="subtitle1"
-                        fontWeight={600}
-                        sx={{ mb: 2 }}
-                      >
-                        Registration Criteria
-                      </Typography>
-                      <Divider sx={{ mb: 3 }} />
-                      <Grid container spacing={3}>
-                        <Grid item size={{ xs: 12, md: 6 }}>
+                    {formik.values.qmsTraining === "Yes" && (
+                      <Grid container spacing={3} sx={{ mt: 2 }}>
+                        <Grid item size={{ xs: 12 }}>
                           <TextField
-                            select
                             fullWidth
+                            multiline
+                            rows={4}
                             label={requiredLabel(
-                              "QMS Auditor Training Attended",
+                              "Academic / Technical / Professional Background",
                             )}
-                            name="qmsTraining"
+                            name="academicBackground"
                             size="small"
-                            value={formik.values.qmsTraining || ""}
+                            value={formik.values.academicBackground || ""}
                             onChange={formik.handleChange}
                             onBlur={formik.handleBlur}
                             error={
-                              formik.touched.qmsTraining &&
-                              Boolean(formik.errors.qmsTraining)
+                              formik.touched.academicBackground &&
+                              Boolean(formik.errors.academicBackground)
                             }
                             helperText={
-                              formik.touched.qmsTraining &&
-                              formik.errors.qmsTraining
+                              formik.touched.academicBackground &&
+                              formik.errors.academicBackground
                             }
                             disabled={loading}
-                          >
-                            <MenuItem value="">Select</MenuItem>
-                            <MenuItem value="Yes">Yes</MenuItem>
-                            <MenuItem value="No">No</MenuItem>
-                          </TextField>
+                            placeholder="Please provide details of your academic qualifications, technical certifications, and professional background..."
+                          />
                         </Grid>
                       </Grid>
+                    )}
+                  </Paper>
 
-                      {formik.values.qmsTraining === "Yes" && (
-                        <Grid container spacing={3} sx={{ mt: 2 }}>
-                          <Grid item size={{ xs: 12 }}>
-                            <TextField
-                              fullWidth
-                              multiline
-                              rows={4}
-                              label={requiredLabel(
-                                "Academic / Technical / Professional Background",
-                              )}
-                              name="academicBackground"
-                              size="small"
-                              value={formik.values.academicBackground || ""}
-                              onChange={formik.handleChange}
-                              onBlur={formik.handleBlur}
-                              error={
-                                formik.touched.academicBackground &&
-                                Boolean(formik.errors.academicBackground)
-                              }
-                              helperText={
-                                formik.touched.academicBackground &&
-                                formik.errors.academicBackground
-                              }
-                              disabled={loading}
-                              placeholder="Please provide details of your academic qualifications, technical certifications, and professional background..."
-                            />
-                          </Grid>
-                        </Grid>
-                      )}
-                    </Paper>
-
-                    {/* Work Experience - Dynamic with FieldArray */}
-                    <Paper
-                      sx={{
-                        p: { xs: 2, md: 3 },
-                        mb: 4,
-                        borderRadius: 2,
-                        border: "1px solid #e0e0e0",
-                      }}
+                  {/* Work Experience - Dynamic with FieldArray */}
+                  <Paper
+                    sx={{
+                      p: { xs: 2, md: 3 },
+                      mb: 4,
+                      borderRadius: 2,
+                      border: "1px solid #e0e0e0",
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={600}
+                      sx={{ mb: 2 }}
                     >
-                      <Typography
-                        variant="subtitle1"
-                        fontWeight={600}
-                        sx={{ mb: 2 }}
-                      >
-                        Registration Criteria: Relevant Work Experience (Minimum
-                        of 5 years)
-                      </Typography>
-                      <Divider sx={{ mb: 3 }} />
+                      Registration Criteria: Relevant Work Experience (Minimum
+                      of 5 years)
+                    </Typography>
+                    <Divider sx={{ mb: 3 }} />
 
-                      <FieldArray
-                        name="workExperiences"
-                        render={(arrayHelpers) => (
-                          <>
-                            {formik.values.workExperiences &&
-                              formik.values.workExperiences.map(
-                                (exp, index) => (
-                                  <Grid
-                                    container
-                                    spacing={3}
-                                    key={index}
-                                    sx={{ mb: 2, alignItems: "flex-start" }}
-                                  >
-                                    <Grid item size={{ xs: 12, md: 3 }}>
-                                      <TextField
-                                        fullWidth
-                                        label={requiredLabel(
-                                          "Organization Name",
-                                        )}
-                                        name={`workExperiences[${index}].organizationName`}
-                                        size="small"
-                                        value={exp.organizationName || ""}
-                                        onChange={formik.handleChange}
-                                        onBlur={formik.handleBlur}
-                                        error={
-                                          formik.touched.workExperiences &&
-                                          formik.touched.workExperiences[index]
-                                            ?.organizationName &&
-                                          Boolean(
-                                            formik.errors.workExperiences?.[
-                                              index
-                                            ]?.organizationName,
-                                          )
-                                        }
-                                        helperText={
-                                          formik.touched.workExperiences &&
-                                          formik.touched.workExperiences[index]
-                                            ?.organizationName &&
-                                          formik.errors.workExperiences?.[index]
-                                            ?.organizationName
-                                        }
-                                        disabled={loading}
-                                      />
-                                    </Grid>
-                                    <Grid item size={{ xs: 12, md: 2 }}>
-                                      <TextField
-                                        fullWidth
-                                        label={requiredLabel("Designation")}
-                                        name={`workExperiences[${index}].designation`}
-                                        size="small"
-                                        value={exp.designation || ""}
-                                        onChange={formik.handleChange}
-                                        onBlur={formik.handleBlur}
-                                        error={
-                                          formik.touched.workExperiences &&
-                                          formik.touched.workExperiences[index]
-                                            ?.designation &&
-                                          Boolean(
-                                            formik.errors.workExperiences?.[
-                                              index
-                                            ]?.designation,
-                                          )
-                                        }
-                                        helperText={
-                                          formik.touched.workExperiences &&
-                                          formik.touched.workExperiences[index]
-                                            ?.designation &&
-                                          formik.errors.workExperiences?.[index]
-                                            ?.designation
-                                        }
-                                        disabled={loading}
-                                      />
-                                    </Grid>
-                                    <Grid item size={{ xs: 12, md: 3 }}>
-                                      <TextField
-                                        fullWidth
-                                        type="number"
-                                        label={requiredLabel("Number of Years")}
-                                        name={`workExperiences[${index}].year`}
-                                        size="small"
-                                        value={exp.year || ""}
-                                        onChange={formik.handleChange}
-                                        onBlur={formik.handleBlur}
-                                        error={
-                                          formik.touched.workExperiences &&
-                                          formik.touched.workExperiences[index]
-                                            ?.year &&
-                                          Boolean(
-                                            formik.errors.workExperiences?.[
-                                              index
-                                            ]?.year,
-                                          )
-                                        }
-                                        helperText={
-                                          formik.touched.workExperiences &&
-                                          formik.touched.workExperiences[index]
-                                            ?.year &&
-                                          formik.errors.workExperiences?.[index]
-                                            ?.year
-                                        }
-                                        disabled={loading}
-                                      />
-                                    </Grid>
-                                    <Grid item size={{ xs: 12, md: 3 }}>
-                                      <TextField
-                                        fullWidth
-                                        rows={2}
-                                        label={requiredLabel("Responsibility")}
-                                        name={`workExperiences[${index}].responsibility`}
-                                        size="small"
-                                        value={exp.responsibility || ""}
-                                        onChange={formik.handleChange}
-                                        onBlur={formik.handleBlur}
-                                        error={
-                                          formik.touched.workExperiences &&
-                                          formik.touched.workExperiences[index]
-                                            ?.responsibility &&
-                                          Boolean(
-                                            formik.errors.workExperiences?.[
-                                              index
-                                            ]?.responsibility,
-                                          )
-                                        }
-                                        helperText={
-                                          formik.touched.workExperiences &&
-                                          formik.touched.workExperiences[index]
-                                            ?.responsibility &&
-                                          formik.errors.workExperiences?.[index]
-                                            ?.responsibility
-                                        }
-                                        disabled={loading}
-                                      />
-                                    </Grid>
-                                    <Grid
-                                      item
-                                      size={{ xs: 12, md: 1 }}
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        pt: 1,
-                                      }}
+                    <FieldArray
+                      name="workExperiences"
+                      render={(arrayHelpers) => (
+                        <>
+                          {formik.values.workExperiences &&
+                            formik.values.workExperiences.map((exp, index) => (
+                              <Grid
+                                container
+                                spacing={3}
+                                key={index}
+                                sx={{ mb: 2, alignItems: "flex-start" }}
+                              >
+                                <Grid item size={{ xs: 12, md: 3 }}>
+                                  <TextField
+                                    fullWidth
+                                    label={requiredLabel("Organization Name")}
+                                    name={`workExperiences[${index}].organizationName`}
+                                    size="small"
+                                    value={exp.organizationName || ""}
+                                    onChange={formik.handleChange}
+                                    onBlur={formik.handleBlur}
+                                    error={
+                                      formik.touched.workExperiences &&
+                                      formik.touched.workExperiences[index]
+                                        ?.organizationName &&
+                                      Boolean(
+                                        formik.errors.workExperiences?.[index]
+                                          ?.organizationName,
+                                      )
+                                    }
+                                    helperText={
+                                      formik.touched.workExperiences &&
+                                      formik.touched.workExperiences[index]
+                                        ?.organizationName &&
+                                      formik.errors.workExperiences?.[index]
+                                        ?.organizationName
+                                    }
+                                    disabled={loading}
+                                  />
+                                </Grid>
+                                <Grid item size={{ xs: 12, md: 2 }}>
+                                  <TextField
+                                    fullWidth
+                                    label={requiredLabel("Designation")}
+                                    name={`workExperiences[${index}].designation`}
+                                    size="small"
+                                    value={exp.designation || ""}
+                                    onChange={formik.handleChange}
+                                    onBlur={formik.handleBlur}
+                                    error={
+                                      formik.touched.workExperiences &&
+                                      formik.touched.workExperiences[index]
+                                        ?.designation &&
+                                      Boolean(
+                                        formik.errors.workExperiences?.[index]
+                                          ?.designation,
+                                      )
+                                    }
+                                    helperText={
+                                      formik.touched.workExperiences &&
+                                      formik.touched.workExperiences[index]
+                                        ?.designation &&
+                                      formik.errors.workExperiences?.[index]
+                                        ?.designation
+                                    }
+                                    disabled={loading}
+                                  />
+                                </Grid>
+                                <Grid item size={{ xs: 12, md: 3 }}>
+                                  <TextField
+                                    fullWidth
+                                    type="number"
+                                    label={requiredLabel("Number of Years")}
+                                    name={`workExperiences[${index}].year`}
+                                    size="small"
+                                    value={exp.year || ""}
+                                    onChange={formik.handleChange}
+                                    onBlur={formik.handleBlur}
+                                    error={
+                                      formik.touched.workExperiences &&
+                                      formik.touched.workExperiences[index]
+                                        ?.year &&
+                                      Boolean(
+                                        formik.errors.workExperiences?.[index]
+                                          ?.year,
+                                      )
+                                    }
+                                    helperText={
+                                      formik.touched.workExperiences &&
+                                      formik.touched.workExperiences[index]
+                                        ?.year &&
+                                      formik.errors.workExperiences?.[index]
+                                        ?.year
+                                    }
+                                    disabled={loading}
+                                  />
+                                </Grid>
+                                <Grid item size={{ xs: 12, md: 3 }}>
+                                  <TextField
+                                    fullWidth
+                                    rows={2}
+                                    label={requiredLabel("Responsibility")}
+                                    name={`workExperiences[${index}].responsibility`}
+                                    size="small"
+                                    value={exp.responsibility || ""}
+                                    onChange={formik.handleChange}
+                                    onBlur={formik.handleBlur}
+                                    error={
+                                      formik.touched.workExperiences &&
+                                      formik.touched.workExperiences[index]
+                                        ?.responsibility &&
+                                      Boolean(
+                                        formik.errors.workExperiences?.[index]
+                                          ?.responsibility,
+                                      )
+                                    }
+                                    helperText={
+                                      formik.touched.workExperiences &&
+                                      formik.touched.workExperiences[index]
+                                        ?.responsibility &&
+                                      formik.errors.workExperiences?.[index]
+                                        ?.responsibility
+                                    }
+                                    disabled={loading}
+                                  />
+                                </Grid>
+                                <Grid
+                                  item
+                                  size={{ xs: 12, md: 1 }}
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    pt: 1,
+                                  }}
+                                >
+                                  {index > 0 && (
+                                    <IconButton
+                                      color="error"
+                                      onClick={() => arrayHelpers.remove(index)}
+                                      disabled={loading}
                                     >
-                                      {index > 0 && (
-                                        <IconButton
-                                          color="error"
-                                          onClick={() =>
-                                            arrayHelpers.remove(index)
-                                          }
-                                          disabled={loading}
-                                        >
-                                          <RemoveCircleOutlineIcon />
-                                        </IconButton>
-                                      )}
-                                    </Grid>
-                                  </Grid>
-                                ),
-                              )}
+                                      <RemoveCircleOutlineIcon />
+                                    </IconButton>
+                                  )}
+                                </Grid>
+                              </Grid>
+                            ))}
 
-                            <Button
-                              variant="contained"
-                              startIcon={<AddCircleOutlineIcon />}
-                              onClick={() =>
-                                arrayHelpers.push({
-                                  organizationName: "",
-                                  designation: "",
-                                  year: "",
-                                  responsibility: "",
-                                })
-                              }
-                              sx={{ mt: 2 }}
-                              disabled={loading}
-                            >
-                              Add More
-                            </Button>
-                          </>
-                        )}
-                      />
-                    </Paper>
-                  </>
-                )}
+                          <Button
+                            variant="contained"
+                            startIcon={<AddCircleOutlineIcon />}
+                            onClick={() =>
+                              arrayHelpers.push({
+                                organizationName: "",
+                                designation: "",
+                                year: "",
+                                responsibility: "",
+                              })
+                            }
+                            sx={{ mt: 2 }}
+                            disabled={loading}
+                          >
+                            Add More
+                          </Button>
+                        </>
+                      )}
+                    />
+                  </Paper>
+                </>
+              )}
 
-                {/* Section: Supporting Documents */}
-                <Paper
+              {/* Section: Supporting Documents */}
+              <Paper
+                sx={{
+                  p: { xs: 2, md: 3 },
+                  mb: 4,
+                  borderRadius: 2,
+                  border: "1px solid #e0e0e0",
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                  Supporting Documents
+                </Typography>
+                <Divider sx={{ mb: 3 }} />
+                <Box
                   sx={{
-                    p: { xs: 2, md: 3 },
-                    mb: 4,
+                    p: 2,
+                    border: "1px dashed #bdbdbd",
                     borderRadius: 2,
-                    border: "1px solid #e0e0e0",
+                    minHeight: 100,
                   }}
                 >
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight={600}
-                    sx={{ mb: 2 }}
-                  >
-                    Supporting Documents
-                  </Typography>
-                  <Divider sx={{ mb: 3 }} />
-                  <Box
-                    sx={{
-                      p: 2,
-                      border: "1px dashed #bdbdbd",
-                      borderRadius: 2,
-                      minHeight: 100,
-                    }}
-                  >
-                    <FileUpload
-                      files={formik.values.documents}
-                      onFilesChange={(files) =>
-                        formik.setFieldValue("documents", files)
-                      }
-                      disabled={loading}
-                    />
-                  </Box>
-                  {formik.touched.documents && formik.errors.documents && (
-                    <Typography color="error" variant="caption">
-                      {formik.errors.documents}
-                    </Typography>
-                  )}
-                </Paper>
-
-                {/* Form Actions */}
-                <Box
-                  sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}
-                >
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    startIcon={
-                      loading ? (
-                        <CircularProgress size={20} sx={{ color: "#fff" }} />
-                      ) : (
-                        <ArrowUpwardIcon />
-                      )
+                  <FileUpload
+                    files={formik.values.documents}
+                    onFilesChange={(files) =>
+                      formik.setFieldValue("documents", files)
                     }
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
                     disabled={loading}
-                  >
-                    Submit
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="contained"
-                    color="error"
-                    startIcon={<LockResetIcon />}
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
-                    onClick={() => {
-                      formik.resetForm();
-                      setSelectedSectorId("");
-                    }}
-                    disabled={loading}
-                  >
-                    Reset
-                  </Button>
+                  />
                 </Box>
-              </form>
-            )}
-          </Formik>
-        )}
+                {formik.touched.documents && formik.errors.documents && (
+                  <Typography color="error" variant="caption">
+                    {formik.errors.documents}
+                  </Typography>
+                )}
+              </Paper>
+
+              {/* Form Actions */}
+              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={
+                    loading ? (
+                      <CircularProgress size={20} sx={{ color: "#fff" }} />
+                    ) : (
+                      <ArrowUpwardIcon />
+                    )
+                  }
+                  sx={{
+                    px: 3,
+                    py: 0.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
+                  disabled={loading}
+                >
+                  Submit
+                </Button>
+                <Button
+                  type="button"
+                  variant="contained"
+                  color="error"
+                  startIcon={<LockResetIcon />}
+                  sx={{
+                    px: 3,
+                    py: 0.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
+                  onClick={() => {
+                    formik.resetForm();
+                    setSelectedSectorId("");
+                    setHasCitizenId("yes");
+                  }}
+                  disabled={loading}
+                >
+                  Reset
+                </Button>
+              </Box>
+            </form>
+          )}
+        </Formik>
       </Paper>
     </Box>
   );

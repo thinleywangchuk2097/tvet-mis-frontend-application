@@ -34,7 +34,7 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import FileUpload from "../../../components/file/FileUpload";
 import CommonService from "../../../api/services/internal/common/CommonService";
-import CurriculumEndorsementIndexService from "../../../api/services/internal/course/CurriculumEndorsementIndexService";
+import CurriculumEndorsementIndexService from "../../../api/services/internal/course/CurriculumIndexService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
@@ -568,7 +568,6 @@ const ApplyAccreditedCourse = () => {
 
   const handleReset = () => {
     setQualitySelections({});
-    toast.info("Form has been reset");
   };
 
   return (

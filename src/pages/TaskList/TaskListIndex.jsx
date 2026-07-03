@@ -158,7 +158,7 @@ const TaskListIndex = () => {
           mb: 2,
         }}
       >
-        <Typography variant="h5">Task List Index</Typography>
+        <Typography variant="h5">Task List </Typography>
 
         <TextField
           variant="outlined"
@@ -340,7 +340,7 @@ const TaskListIndex = () => {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       align="center"
                       sx={{ border: "1px solid #e0e0e0", py: 4 }}
                     >

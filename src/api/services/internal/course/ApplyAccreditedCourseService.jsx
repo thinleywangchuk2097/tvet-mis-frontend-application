@@ -1,8 +1,6 @@
 import apiClient from "../../../axios";
 
-
 class ApplyAccreditedCourseService {
-    
   submitAccreditedCourse(data, token) {
     return apiClient
       .post(`/api/v1/user/management/accredited-course/submit`, data, {
@@ -14,7 +12,7 @@ class ApplyAccreditedCourseService {
       .catch((error) => error);
   }
 
-    getAccreditedCourseByApplicationNo(application_no, token) {
+  getAccreditedCourseByApplicationNo(application_no, token) {
     return apiClient
       .get(
         `/api/v1/user/management/accredited-course/get-course-details/${application_no}`,
@@ -27,7 +25,7 @@ class ApplyAccreditedCourseService {
       .then((response) => response)
       .catch((error) => error);
   }
-   getAccreditedCourseDetailsByUserId(user_id, token) {
+  getAccreditedCourseDetailsByUserId(user_id, token) {
     return apiClient
       .get(
         `/api/v1/user/management/accredited-course/get-application-details/${user_id}`,
@@ -40,7 +38,8 @@ class ApplyAccreditedCourseService {
       .then((response) => response)
       .catch((error) => error);
   }
-   verifyAccreditedCourse(data, token) {
+
+  verifyAccreditedCourse(data, token) {
     return apiClient
       .post(
         `/api/v1/user/management/accredited-course/verify-accredited-course`,
@@ -55,7 +54,7 @@ class ApplyAccreditedCourseService {
       .catch((error) => error);
   }
 
-   getAccreditedApprovedCourseByUserId (user_id, token) {
+  getAccreditedApprovedCourseByUserId(user_id, token) {
     return apiClient
       .get(
         `/api/v1/user/management/accredited-course/get-accredited-approved-course-details/${user_id}`,
@@ -69,9 +68,19 @@ class ApplyAccreditedCourseService {
       .catch((error) => error);
   }
 
-
-  
-
+  getAccreditedCourseByInstituteId(institute_id, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/accredited-course/get-accredited-course/${institute_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new ApplyAccreditedCourseService();
