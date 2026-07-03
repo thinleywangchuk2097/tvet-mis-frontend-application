@@ -19,9 +19,18 @@ import {
   Box,
   Divider,
   TablePagination,
+  Chip,
+  IconButton,
+  Tooltip,
+  Stack
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
+import DownloadIcon from "@mui/icons-material/Download";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import ImageIcon from "@mui/icons-material/Image";
+import DescriptionIcon from "@mui/icons-material/Description";
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 
 const NcsPublication = () => {
   const [filters, setFilters] = useState({
@@ -33,167 +42,128 @@ const NcsPublication = () => {
   const [allStandards, setAllStandards] = useState([]);
   const [filteredStandards, setFilteredStandards] = useState([]);
 
-  // Sample data with multiple sectors
+  // Static sample data with NCS structure
   const sampleData = [
     {
       id: 1,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Seed Production Technician",
-      ncsCode: "6113",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "8th August 2025",
-      fileAttachment: "NCS for Seed Production Technician.pdf",
+      sector: "Construction",
+      occupationTitle: "Mason",
+      ncsCode: "BQF-2024-001",
+      qualificationLevel: "Certificate Level I",
+      validity: "2027-03-25",
+      courseTitle: "Masonry Course",
+      units: [
+        { unitCode: "BQF-2024-001", unitTitle: "Basic Masonry Techniques" },
+        { unitCode: "BQF-2024-002", unitTitle: "Advanced Masonry Techniques" }
+      ],
+      documents: [
+        { name: "Masonry_NCS.pdf", documentId: 1, contentType: "application/pdf" }
+      ]
     },
     {
       id: 2,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Ornamental Horticulturist",
-      ncsCode: "6113",
-      qualificationLevel: "BQF Certificate 3",
-      validity: "30th May 2030",
-      fileAttachment: "Finalized Validated NCS for Ornamental Horticulture.pdf",
+      sector: "Construction",
+      occupationTitle: "Plumber",
+      ncsCode: "BQF-2026-001",
+      qualificationLevel: "Certificate Level I",
+      validity: "2027-03-25",
+      courseTitle: "Plumbing Course",
+      units: [
+        { unitCode: "BQF-2026-001", unitTitle: "Basic Plumbing Systems" },
+        { unitCode: "BQF-2026-002", unitTitle: "Advanced Plumbing Systems" },
+        { unitCode: "BQF-2026-003", unitTitle: "Pipe Fitting Techniques" }
+      ],
+      documents: [
+        { name: "Plumbing_NCS.pdf", documentId: 2, contentType: "application/pdf" }
+      ]
     },
     {
       id: 3,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Power Tiller Mechanic",
-      ncsCode: "7412",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "11th April 2025",
-      fileAttachment: "NCS for Power Tiller Technician-2022.pdf",
+      sector: "Construction",
+      occupationTitle: "Carpenter",
+      ncsCode: "BQF-2025-001",
+      qualificationLevel: "Certificate Level II",
+      validity: "2027-06-30",
+      courseTitle: "Carpentry Course",
+      units: [
+        { unitCode: "BQF-2025-001", unitTitle: "Basic Carpentry Skills" },
+        { unitCode: "BQF-2025-002", unitTitle: "Advanced Woodworking" }
+      ],
+      documents: [
+        { name: "Carpentry_NCS.pdf", documentId: 3, contentType: "application/pdf" }
+      ]
     },
     {
       id: 4,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Food Processing Technician",
-      ncsCode: "8160",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "11th August 2025",
-      fileAttachment: "NCS for Food Processing Technician-2022.pdf",
+      sector: "Information Technology",
+      occupationTitle: "Software Developer",
+      ncsCode: "BQF-2023-001",
+      qualificationLevel: "Diploma",
+      validity: "2027-12-31",
+      courseTitle: "Full Stack Development",
+      units: [
+        { unitCode: "BQF-2023-001", unitTitle: "Frontend Development" },
+        { unitCode: "BQF-2023-002", unitTitle: "Backend Development" },
+        { unitCode: "BQF-2023-003", unitTitle: "Database Management" },
+        { unitCode: "BQF-2023-004", unitTitle: "DevOps Fundamentals" }
+      ],
+      documents: [
+        { name: "Software_Developer_NCS.pdf", documentId: 4, contentType: "application/pdf" }
+      ]
     },
     {
       id: 5,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Farm Machinery Technician",
-      ncsCode: "7233",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "15th September 2017",
-      fileAttachment: "NCS_Farm_Machinery_Technician_2014.pdf",
+      sector: "Manufacturing",
+      occupationTitle: "Welder",
+      ncsCode: "BQF-2022-001",
+      qualificationLevel: "Certificate Level II",
+      validity: "2026-12-31",
+      courseTitle: "Welding Course",
+      units: [
+        { unitCode: "BQF-2022-001", unitTitle: "Basic Welding" },
+        { unitCode: "BQF-2022-002", unitTitle: "Advanced Welding" }
+      ],
+      documents: [
+        { name: "Welding_NCS.pdf", documentId: 5, contentType: "application/pdf" }
+      ]
     },
     {
       id: 6,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Power Tiller Operator",
-      ncsCode: "7412",
-      qualificationLevel: "BQF Certificate 3",
-      validity: "19th August 2019",
-      fileAttachment: "Power Tiller Operator_2016.pdf",
+      sector: "Healthcare",
+      occupationTitle: "Nurse",
+      ncsCode: "BQF-2021-001",
+      qualificationLevel: "Certificate Level III",
+      validity: "2028-06-30",
+      courseTitle: "Nursing Course",
+      units: [
+        { unitCode: "BQF-2021-001", unitTitle: "Basic Nursing" },
+        { unitCode: "BQF-2021-002", unitTitle: "Advanced Nursing" }
+      ],
+      documents: [
+        { name: "Nursing_NCS.pdf", documentId: 6, contentType: "application/pdf" }
+      ]
     },
     {
       id: 7,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Forester",
-      ncsCode: "6210",
-      qualificationLevel: "BQF Certificate 3",
-      validity: "4th February 2030",
-      fileAttachment: "Validated NCS for Forester.pdf",
-    },
-    {
-      id: 8,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Mushroom Farmer",
-      ncsCode: "6113",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "8th October 2021",
-      fileAttachment: "Agriculturist (mushroom farming).pdf",
-    },
-    {
-      id: 9,
-      sector: "Agriculture & Forestry",
-      occupationTitle: "Poultry Farmer",
-      ncsCode: "6123",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "8th July 2021",
-      fileAttachment: "Agriculturist (poultry farming).pdf",
-    },
-    {
-      id: 10,
-      sector: "Manufacturing",
-      occupationTitle: "CNC Machine Operator",
-      ncsCode: "7223",
-      qualificationLevel: "BQF Certificate 3",
-      validity: "15th March 2026",
-      fileAttachment: "NCS for CNC Machine Operator.pdf",
-    },
-    {
-      id: 11,
-      sector: "Manufacturing",
-      occupationTitle: "Quality Control Inspector",
-      ncsCode: "8132",
-      qualificationLevel: "BQF Certificate 4",
-      validity: "20th June 2027",
-      fileAttachment: "NCS for Quality Control Inspector.pdf",
-    },
-    {
-      id: 12,
-      sector: "Information Technology",
-      occupationTitle: "Software Developer",
-      ncsCode: "2512",
-      qualificationLevel: "BQF Certificate 5",
-      validity: "10th December 2028",
-      fileAttachment: "NCS for Software Developer.pdf",
-    },
-    {
-      id: 13,
-      sector: "Information Technology",
-      occupationTitle: "Network Administrator",
-      ncsCode: "2523",
-      qualificationLevel: "BQF Certificate 4",
-      validity: "5th September 2026",
-      fileAttachment: "NCS for Network Administrator.pdf",
-    },
-    {
-      id: 14,
-      sector: "Healthcare",
-      occupationTitle: "Medical Laboratory Technician",
-      ncsCode: "3212",
-      qualificationLevel: "BQF Certificate 3",
-      validity: "18th November 2025",
-      fileAttachment: "NCS for Medical Laboratory Technician.pdf",
-    },
-    {
-      id: 15,
-      sector: "Healthcare",
-      occupationTitle: "Pharmacy Technician",
-      ncsCode: "3221",
-      qualificationLevel: "BQF Certificate 4",
-      validity: "22nd February 2029",
-      fileAttachment: "NCS for Pharmacy Technician.pdf",
-    },
-    {
-      id: 16,
-      sector: "Construction",
-      occupationTitle: "Site Supervisor",
-      ncsCode: "3113",
-      qualificationLevel: "BQF Certificate 3",
-      validity: "14th April 2027",
-      fileAttachment: "NCS for Site Supervisor.pdf",
-    },
-    {
-      id: 17,
-      sector: "Construction",
-      occupationTitle: "Building Inspector",
-      ncsCode: "3122",
-      qualificationLevel: "BQF Certificate 4",
-      validity: "30th August 2028",
-      fileAttachment: "NCS for Building Inspector.pdf",
-    },
+      sector: "Agriculture",
+      occupationTitle: "Farmer",
+      ncsCode: "BQF-2020-001",
+      qualificationLevel: "Certificate Level I",
+      validity: "2029-12-31",
+      courseTitle: "Farming Course",
+      units: [
+        { unitCode: "BQF-2020-001", unitTitle: "Basic Farming" }
+      ],
+      documents: [
+        { name: "Farming_NCS.pdf", documentId: 7, contentType: "application/pdf" }
+      ]
+    }
   ];
 
   // Get unique sectors from data
   const sectors = ["All", ...new Set(sampleData.map(item => item.sector))];
 
-  // Load data on component mount - FIXED: Load data and apply filters
+  // Load data on component mount
   useEffect(() => {
     setAllStandards(sampleData);
     setFilteredStandards(sampleData);
@@ -201,7 +171,6 @@ const NcsPublication = () => {
 
   // Apply filters whenever allStandards, sector, or search changes
   useEffect(() => {
-    // Only apply filters if allStandards has data
     if (allStandards.length > 0) {
       applyFilters();
     }
@@ -220,7 +189,12 @@ const NcsPublication = () => {
         (item) =>
           item.occupationTitle.toLowerCase().includes(searchLower) ||
           item.ncsCode.toLowerCase().includes(searchLower) ||
-          item.sector.toLowerCase().includes(searchLower)
+          item.sector.toLowerCase().includes(searchLower) ||
+          item.courseTitle.toLowerCase().includes(searchLower) ||
+          item.units.some(unit =>
+            unit.unitCode.toLowerCase().includes(searchLower) ||
+            unit.unitTitle.toLowerCase().includes(searchLower)
+          )
       );
     }
 
@@ -254,6 +228,136 @@ const NcsPublication = () => {
     setPage(0);
   };
 
+  // Helper function to get file icon
+  const getFileIcon = (fileName) => {
+    if (!fileName) return <InsertDriveFileIcon />;
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    if (extension === 'pdf') return <PictureAsPdfIcon color="error" />;
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(extension)) return <ImageIcon color="primary" />;
+    if (['doc', 'docx'].includes(extension)) return <DescriptionIcon color="primary" />;
+    if (['xls', 'xlsx'].includes(extension)) return <DescriptionIcon color="success" />;
+    return <InsertDriveFileIcon />;
+  };
+
+  // Handle file view
+  const handleFileView = (file) => {
+    if (file.documentId) {
+      // Open file in new tab (would call API in real implementation)
+      window.open(`/api/v1/user/management/ncs/download-file/${file.documentId}`, '_blank');
+    } else if (file.url) {
+      window.open(file.url, '_blank');
+    } else if (file.content) {
+      const fileUrl = `data:${file.contentType || 'application/octet-stream'};base64,${file.content}`;
+      window.open(fileUrl, '_blank');
+    } else {
+      alert("File URL not available");
+    }
+  };
+
+  // Handle file download
+  const handleFileDownload = (file) => {
+    if (file.documentId) {
+      // Download file (would call API in real implementation)
+      const link = document.createElement('a');
+      link.href = `/api/v1/user/management/ncs/download-file/${file.documentId}`;
+      link.download = file.name || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (file.url) {
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.download = file.name || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (file.content) {
+      const link = document.createElement('a');
+      link.href = `data:${file.contentType || 'application/octet-stream'};base64,${file.content}`;
+      link.download = file.name || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert("File content not available");
+    }
+  };
+
+  // Render unit codes
+  const renderUnitCodes = (units) => {
+    if (!units || units.length === 0) return "N/A";
+    return units.map((unit, idx) => (
+      <Box key={`code-${idx}`} sx={{ mb: 0.5 }}>
+        <Chip
+          label={unit.unitCode}
+          size="small"
+          color="secondary"
+          variant="outlined"
+        />
+        {idx < units.length - 1 && <Divider sx={{ my: 0.5 }} />}
+      </Box>
+    ));
+  };
+
+  // Render unit titles
+  const renderUnitTitles = (units) => {
+    if (!units || units.length === 0) return "N/A";
+    return units.map((unit, idx) => (
+      <Box key={`title-${idx}`} sx={{ mb: 0.5 }}>
+        <Typography variant="body2">
+          {unit.unitTitle}
+        </Typography>
+        {idx < units.length - 1 && <Divider sx={{ my: 0.5 }} />}
+      </Box>
+    ));
+  };
+
+  // Render file attachments
+  const renderFileAttachments = (documents) => {
+    if (!documents || documents.length === 0) {
+      return (
+        <Typography variant="caption" color="textSecondary">
+          No files
+        </Typography>
+      );
+    }
+    return (
+      <Stack direction="column" spacing={0.5}>
+        {documents.map((file, index) => (
+          <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {getFileIcon(file.name)}
+            <Typography variant="caption" sx={{
+              maxWidth: '80px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {file.name || `File ${index + 1}`}
+            </Typography>
+            <Tooltip title="View">
+              <IconButton
+                size="small"
+                onClick={() => handleFileView(file)}
+                sx={{ p: 0.3 }}
+              >
+                <VisibilityIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Download">
+              <IconButton
+                size="small"
+                onClick={() => handleFileDownload(file)}
+                sx={{ p: 0.3 }}
+              >
+                <DownloadIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ))}
+      </Stack>
+    );
+  };
+
   const paginatedStandards = filteredStandards.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
@@ -262,7 +366,7 @@ const NcsPublication = () => {
   return (
     <Paper sx={{ p: 3, mt: 2 }}>
       <Typography variant="h5" gutterBottom fontWeight={600}>
-        National Competency Standards
+        National Competency Standards (NCS)
       </Typography>
 
       <Grid container spacing={2} sx={{ mb: 3, mt: 1 }}>
@@ -307,7 +411,7 @@ const NcsPublication = () => {
           <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
             <TextField
               size="small"
-              placeholder="Search..."
+              placeholder="Search by Occupation, NCS Code, Course Title..."
               name="search"
               value={filters.search}
               onChange={handleFilterChange}
@@ -350,8 +454,11 @@ const NcsPublication = () => {
               <TableCell sx={{ fontWeight: 600 }}>Sector</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Occupation Title</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>NCS Code</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Qualification Level</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>BQF Level</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Course Title</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Validity</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Unit Code</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Unit Title</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>File Attachment(s)</TableCell>
             </TableRow>
           </TableHead>
@@ -364,33 +471,41 @@ const NcsPublication = () => {
                     <TableCell>{page * rowsPerPage + index + 1}</TableCell>
                     <TableCell>{item.sector}</TableCell>
                     <TableCell>{item.occupationTitle}</TableCell>
-                    <TableCell>{item.ncsCode}</TableCell>
-                    <TableCell>{item.qualificationLevel}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={item.ncsCode}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={item.qualificationLevel}
+                        size="small"
+                        color="secondary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{item.courseTitle}</TableCell>
                     <TableCell>{item.validity}</TableCell>
                     <TableCell>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                          fontSize: "0.75rem",
-                          color: "#1976d2",
-                          cursor: "pointer",
-                          "&:hover": {
-                            textDecoration: "underline",
-                          },
-                        }}
-                      >
-                        <AttachFileIcon sx={{ fontSize: "16px" }} />
-                        {item.fileAttachment}
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+                        {renderUnitCodes(item.units)}
                       </Box>
+                    </TableCell>
+                    <TableCell>
+                      {renderUnitTitles(item.units)}
+                    </TableCell>
+                    <TableCell>
+                      {renderFileAttachments(item.documents)}
                     </TableCell>
                   </TableRow>
                 );
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                   <Typography color="text.secondary">
                     {filters.search || filters.sector !== "All"
                       ? "No records found matching your filters"

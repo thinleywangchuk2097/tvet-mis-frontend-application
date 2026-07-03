@@ -516,14 +516,10 @@ const MonitoringAssessmentIndex = () => {
         exactLocation: formData.exactLocation,
         qualityStandards: qualityStandardsData,
         createdBy: actionId,
-        serviceId: parentEntityId,
+        serviceId: parentEntityId,//this serviceId is use to get checklist
         // serviceId: 47,
         statusId: 55,
       };
-
-      console.log("Monitoring Assessment Payload:", payload);
-      console.log("Quality Standards with Y/N:", qualityStandardsData);
-
       // TODO: Call your API to save monitoring assessment
       const response =
         await MonitoringAssessmentService.submitMonitoringAssessment(

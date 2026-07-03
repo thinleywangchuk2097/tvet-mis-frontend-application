@@ -2,9 +2,12 @@ import PublicIndex from "../pages/public/PublicIndex";
 import Login from "../pages/auth/Login";
 import ForgotPassword from "../pages/auth/password/ForgotPassword";
 //public registration routes paths
-import InstituteProposal from "../pages/public/proposal/InstituteProposal";
-import InstituteRegistration from "../pages/public/registration/InstituteRegistration";
+import InstituteSesCentreAssessmentCentreProposal from "../pages/public/proposal/InstituteSesCentreAssessmentCentreProposal";
+import InstituteSesCentreAssessmentCentre from "../pages/public/registration/InstituteSesCentreAssessmentCentre";
+import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
+import AssessorAccreditorQMSAuditorRenewal from "../pages/renewal/AssessorAccreditorQMSAuditorRenewal";
 import RPLAssessment from "../pages/public/courses/RPLAssessment";
+
 // assessment result path
 import AssessmentResult from "../pages/public/assessment/AssessmentResult";
 //trainee course application
@@ -12,7 +15,7 @@ import ApplyCourse from "../pages/trainee/ApplyCourse";
 import ResetPassword from "../pages/auth/password/ResetPassword";
 import GenerateQRCode from "../pages/auth/ndi/GenerateQRCode";
 import CommonQRCode from "../pages/auth/ndi/CommonQRCode";
-import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
+
 //import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex";
 //Reports
 import AssessorReport from "../pages/public/reports/Assessor";
@@ -48,7 +51,7 @@ export const publicRoutes = [
   {
     path: "proposal",
     children: [
-      { path: ":proposalType/:serviceId", element: <InstituteProposal /> },
+      { path: ":proposalType/:serviceId", element: <InstituteSesCentreAssessmentCentreProposal /> },
     ],
   },
   {
@@ -56,11 +59,22 @@ export const publicRoutes = [
     children: [
       {
         path: ":registrationType/:serviceId",
-        element: <InstituteRegistration />,
+        element: <InstituteSesCentreAssessmentCentre />,
       },
     
     ],
   },
+   {
+    path: "renewal",
+    children: [
+      {
+        path: ":renewalType/:serviceId",
+        element: <AssessorAccreditorQMSAuditorRenewal />,
+      },
+    
+    ],
+  },
+  
   {
     path: "registration",
     children: [

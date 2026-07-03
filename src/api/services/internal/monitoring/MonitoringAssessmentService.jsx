@@ -61,6 +61,21 @@ class MonitoringAssessmentService {
       .catch((error) => error);
   }
 
+   getMonitoringAssessmentByApplicationNo(applicationNo, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/monitoring/get-monitoring-assessment-details/${applicationNo}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+
 
 }
 

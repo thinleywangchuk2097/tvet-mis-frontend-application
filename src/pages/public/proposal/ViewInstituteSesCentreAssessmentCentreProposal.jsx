@@ -27,7 +27,7 @@ import FileDownload from "../../../components/file/FileDownload";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 
-const ViewInstituteProposal = () => {
+const ViewInstituteSesCentreAssessmentCentreProposal = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
   const { applicationNo } = useParams();
@@ -153,7 +153,6 @@ const ViewInstituteProposal = () => {
           access_token,
         );
       let data = response.data;
-      console.log("response api", response);
       if (Array.isArray(data) && data.length > 0) {
         data = data[0];
       }
@@ -325,10 +324,8 @@ const ViewInstituteProposal = () => {
         payload,
         access_token,
       );
-      console.log("response api2", response);
-      toast.success(
-        response.data?.message ||
-          `Proposal ${currentAction === 57 ? "Approved" : "Rejected"} successfully`,
+      toast.error(
+          `Proposal ${currentAction == 57 ? "Approved" : "Rejected"} successfully`,
       );
       navigate(-1);
       closeDialog();
@@ -1134,4 +1131,4 @@ const ViewInstituteProposal = () => {
   );
 };
 
-export default ViewInstituteProposal;
+export default ViewInstituteSesCentreAssessmentCentreProposal;

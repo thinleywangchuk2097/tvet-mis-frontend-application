@@ -124,17 +124,17 @@ const NAV_MENU = [
       {
         label: "Assessor",
         icon: <GroupsIcon sx={{ fontSize: 16 }} />,
-        path: "/renewal/assessor",
+        path: "/renewal/assessor/32",
       },
       {
         label: "Accreditor",
         icon: <VerifiedIcon sx={{ fontSize: 16 }} />,
-        path: "/renewal/accreditor",
+        path: "/renewal/accreditor/5",
       },
       {
         label: "Quality Auditor",
         icon: <GavelIcon sx={{ fontSize: 16 }} />,
-        path: "/renewal/qms-auditor",
+        path: "/renewal/qms-auditor/3",
       },
     ],
   },

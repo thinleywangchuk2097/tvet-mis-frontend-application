@@ -20,15 +20,14 @@ import {
 } from "@mui/material";
 import { Formik, FieldArray } from "formik";
 import * as Yup from "yup";
-import FileUpload from "../../../components/file/FileUpload";
+import FileUpload from "../../components/file/FileUpload";
 import { toast } from "react-toastify";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
-import CommonService from "../../../api/services/internal/common/CommonService";
-import AssessorAccreditorQMSAuditorService from "../../../api/services/internal/registration/AssessorAccreditorQMSAuditorService";
-import DatahubService from "../../../api/services/external/datahub/DatahubService";
+import CommonService from "../../api/services/internal/common/CommonService";
+import AssessorAccreditorQMSAuditorService from "../../api/services/internal/registration/AssessorAccreditorQMSAuditorService";
 import { useNavigate } from "react-router-dom";
 
 // Helper function to convert file to Base64
@@ -45,12 +44,11 @@ const fileToBase64 = (file) =>
     reader.onerror = reject;
   });
 
-const AssessorAccreditorQMSAuditor = () => {
+const AssessorAccreditorQMSAuditorRenewal = () => {
   const { serviceId } = useParams();
   const [serviceName, setServiceName] = useState("");
-  const [hasCitizenId, setHasCitizenId] = useState("yes"); // Changed default to "yes"
+  const [hasCitizenId, setHasCitizenId] = useState("yes");
   const [loading, setLoading] = useState(false);
-  const [fetchingCitizen, setFetchingCitizen] = useState(false);
   const formikRef = useRef();
 
   // State for dropdown data
@@ -60,22 +58,173 @@ const AssessorAccreditorQMSAuditor = () => {
   const [genders, setGenders] = useState([]);
   const [occupations, setOccupations] = useState([]);
   const [selectedSectorId, setSelectedSectorId] = useState("");
+  const [renewalApplicantDetails, setRenewalApplicantDetails] = useState(null);
+  const [fetchingDetails, setFetchingDetails] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchServiceName();
   }, [serviceId]);
 
-  // Reset form when Citizen ID selection changes
-  useEffect(() => {
-    if (formikRef.current) {
-      if (hasCitizenId === "yes") {
-        formikRef.current.setFieldValue("referenceNo", "");
-      } else {
-        formikRef.current.setFieldValue("citizenId", "");
-      }
+  // Function to fetch renewal applicant details
+  const fetchRenewalApplicantDetails = async (citizenId, referenceNo) => {
+    // Don't fetch if both are empty
+    if (!citizenId && !referenceNo) {
+      return;
     }
-  }, [hasCitizenId]);
+
+    // Don't fetch if citizenId is provided but not complete (11 digits)
+    if (citizenId && citizenId.length !== 11) {
+      return;
+    }
+
+    setFetchingDetails(true);
+    try {
+      const response = await AssessorAccreditorQMSAuditorService.getApplicationByCitizenIdOrReferenceNo(
+        citizenId || null,
+        referenceNo || null,
+        serviceId
+      );
+      
+      console.log("fetch Renewal Applicant Details response", response);
+
+      // Check if response.data is an array and has at least one item
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        const applicantData = response.data[0]; // Get the first applicant from the array
+        
+        setRenewalApplicantDetails(applicantData);
+        
+        // Auto-fill the form with the fetched data
+        if (formikRef.current) {
+          // Map snake_case to camelCase for form fields
+          formikRef.current.setFieldValue("fullName", applicantData.full_name || "");
+          formikRef.current.setFieldValue("genderId", applicantData.gender_id || "");
+          formikRef.current.setFieldValue("mobileNo", applicantData.mobile_no || "");
+          formikRef.current.setFieldValue("email", applicantData.email || "");
+          formikRef.current.setFieldValue("dzongkhagId", applicantData.dzongkhag_id || "");
+          formikRef.current.setFieldValue("organizationName", applicantData.organization_name || "");
+          
+          // Set citizenId if available
+          if (applicantData.citizen_id) {
+            formikRef.current.setFieldValue("citizenId", applicantData.citizen_id);
+          }
+          
+          // For service 32 (Assessor)
+          if (serviceId === "32") {
+            formikRef.current.setFieldValue("sectorId", applicantData.sector_id || "");
+            formikRef.current.setFieldValue("occupationId", applicantData.occupation_id || "");
+            formikRef.current.setFieldValue("certificationLevelId", applicantData.certification_level_id || "");
+            if (applicantData.sector_id) {
+              setSelectedSectorId(applicantData.sector_id);
+            }
+          }
+          
+          // For service 5 (Accreditor)
+          if (serviceId === "5") {
+            formikRef.current.setFieldValue("sectorId", applicantData.sector_id || "");
+            formikRef.current.setFieldValue("occupationId", applicantData.occupation_id || "");
+            formikRef.current.setFieldValue("certificationLevelId", applicantData.certification_level_id || "");
+            formikRef.current.setFieldValue("designation", applicantData.designation || "");
+            formikRef.current.setFieldValue("yearsOfExperience", applicantData.years_of_experience || "");
+            formikRef.current.setFieldValue("responsibility", applicantData.responsibility || "");
+            if (applicantData.sector_id) {
+              setSelectedSectorId(applicantData.sector_id);
+            }
+          }
+          
+          // For service 3 (QMS Auditor)
+          if (serviceId === "3") {
+            formikRef.current.setFieldValue("qmsTraining", applicantData.qms_training || "");
+            formikRef.current.setFieldValue("academicBackground", applicantData.academic_background || "");
+            
+            // Handle work_experiences - parse if it's a string
+            if (applicantData.work_experiences) {
+              let workExperiences = applicantData.work_experiences;
+              if (typeof workExperiences === 'string') {
+                try {
+                  workExperiences = JSON.parse(workExperiences);
+                } catch (e) {
+                  workExperiences = [];
+                }
+              }
+              if (Array.isArray(workExperiences) && workExperiences.length > 0) {
+                formikRef.current.setFieldValue("workExperiences", workExperiences);
+              }
+            }
+          }
+          
+          toast.success("Applicant details fetched successfully!");
+        }
+      } else {
+        toast.warning("No existing application found for the provided ID");
+        setRenewalApplicantDetails(null);
+      }
+    } catch (error) {
+      console.error("Error fetching Renewal Applicant Details:", error);
+      toast.error("Failed to fetch applicant details. Please try again.");
+      setRenewalApplicantDetails(null);
+    } finally {
+      setFetchingDetails(false);
+    }
+  };
+
+  // Handle Citizen ID change
+  const handleCitizenIdChange = (e, formik) => {
+    const value = e.target.value;
+    formik.setFieldValue("citizenId", value);
+    
+    // Clear previous reference number when citizen ID is entered
+    if (value) {
+      formik.setFieldValue("referenceNo", "");
+    }
+    
+    // Fetch details when CID is complete (11 digits)
+    if (value && value.length === 11) {
+      fetchRenewalApplicantDetails(value, null);
+    }
+  };
+
+  // Handle Reference No change
+  const handleReferenceNoChange = (e, formik) => {
+    const value = e.target.value;
+    formik.setFieldValue("referenceNo", value);
+    
+    // Clear previous citizen ID when reference number is entered
+    if (value) {
+      formik.setFieldValue("citizenId", "");
+    }
+    
+    // Fetch details when reference number has at least 3 characters
+    if (value && value.length >= 3) {
+      fetchRenewalApplicantDetails(null, value);
+    }
+  };
+
+  // Reset all form fields when switching between Yes/No
+  const handleHasCitizenIdChange = (e) => {
+    const newValue = e.target.value;
+    setHasCitizenId(newValue);
+    setRenewalApplicantDetails(null);
+    setSelectedSectorId("");
+    
+    // Reset all form fields
+    if (formikRef.current) {
+      // Reset to initial values based on serviceId
+      const initialValues = getInitialValues();
+      formikRef.current.resetForm({
+        values: initialValues
+      });
+      
+      // Clear any touched state
+      formikRef.current.setTouched({});
+      
+      // Clear any errors
+      formikRef.current.setErrors({});
+      
+      // Clear documents
+      formikRef.current.setFieldValue("documents", []);
+    }
+  };
 
   useEffect(() => {
     fetchSectors();
@@ -143,59 +292,6 @@ const AssessorAccreditorQMSAuditor = () => {
       setOccupations(occupationLists.data);
     } catch (error) {
       console.error("Error fetching occupations:", error);
-    }
-  };
-
-  // Function to fetch and auto-fill citizen details
-  const fetchAndFillCitizenDetails = async (cid, formik) => {
-    if (!cid || cid.length !== 11) {
-      toast.warning("Please enter a valid 11-digit CID");
-      return;
-    }
-
-    setFetchingCitizen(true);
-    try {
-      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
-      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
-        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
-
-        // Map gender from API response to dropdown value
-        let genderValue = "";
-        if (citizen.gender === "M") {
-          const genderOption = genders.find(
-            (opt) => opt.name === "Male"
-          );
-          genderValue = genderOption?.id || "";
-        } else if (citizen.gender === "F") {
-          const genderOption = genders.find(
-            (opt) => opt.name === "Female"
-          );
-          genderValue = genderOption?.id || "";
-        } else {
-          const genderOption = genders.find(
-            (opt) => opt.name === "Others"
-          );
-          genderValue = genderOption?.id || "";
-        }
-
-        const fullName =
-          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
-        
-        // Auto-fill the form fields
-        formik.setFieldValue("fullName", fullName);
-        formik.setFieldValue("genderId", genderValue);
-
-        toast.success(`Citizen details fetched successfully for ${fullName}`);
-      } else {
-        toast.warning("No citizen details found for this CID");
-      }
-    } catch (error) {
-      console.error("Error fetching citizen details:", error);
-      toast.error(
-        "Failed to fetch citizen details. Please check the CID number.",
-      );
-    } finally {
-      setFetchingCitizen(false);
     }
   };
 
@@ -407,6 +503,7 @@ const AssessorAccreditorQMSAuditor = () => {
         resetForm();
         setSelectedSectorId("");
         setHasCitizenId("yes");
+        setRenewalApplicantDetails(null);
         navigate("/");
       }
     } catch (error) {
@@ -447,7 +544,7 @@ const AssessorAccreditorQMSAuditor = () => {
               },
             }}
           >
-            {serviceName} Form
+            {serviceName} Renewal
           </Typography>
         </Box>
 
@@ -460,7 +557,7 @@ const AssessorAccreditorQMSAuditor = () => {
             <RadioGroup
               row
               value={hasCitizenId}
-              onChange={(e) => setHasCitizenId(e.target.value)}
+              onChange={handleHasCitizenIdChange}
               sx={{ mt: 1 }}
             >
               <FormControlLabel value="yes" control={<Radio />} label="Yes" />
@@ -503,17 +600,8 @@ const AssessorAccreditorQMSAuditor = () => {
                         name="citizenId"
                         size="small"
                         value={formik.values.citizenId || ""}
-                        onChange={formik.handleChange}
-                        onBlur={(e) => {
-                          formik.handleBlur(e);
-                          // Auto-fetch citizen details when CID is entered and is 11 digits
-                          if (
-                            e.target.value &&
-                            e.target.value.length === 11
-                          ) {
-                            fetchAndFillCitizenDetails(e.target.value, formik);
-                          }
-                        }}
+                        onChange={(e) => handleCitizenIdChange(e, formik)}
+                        onBlur={formik.handleBlur}
                         error={
                           formik.touched.citizenId &&
                           Boolean(formik.errors.citizenId)
@@ -521,10 +609,10 @@ const AssessorAccreditorQMSAuditor = () => {
                         helperText={
                           formik.touched.citizenId && formik.errors.citizenId
                         }
-                        disabled={loading}
+                        disabled={loading || fetchingDetails}
                         placeholder="Enter your Citizen ID Number"
                         InputProps={{
-                          endAdornment: fetchingCitizen && (
+                          endAdornment: fetchingDetails && (
                             <CircularProgress size={20} />
                           ),
                         }}
@@ -541,7 +629,7 @@ const AssessorAccreditorQMSAuditor = () => {
                         name="referenceNo"
                         size="small"
                         value={formik.values.referenceNo || ""}
-                        onChange={formik.handleChange}
+                        onChange={(e) => handleReferenceNoChange(e, formik)}
                         onBlur={formik.handleBlur}
                         error={
                           formik.touched.referenceNo &&
@@ -551,8 +639,13 @@ const AssessorAccreditorQMSAuditor = () => {
                           formik.touched.referenceNo &&
                           formik.errors.referenceNo
                         }
-                        disabled={loading}
+                        disabled={loading || fetchingDetails}
                         placeholder="Enter reference number"
+                        InputProps={{
+                          endAdornment: fetchingDetails && (
+                            <CircularProgress size={20} />
+                          ),
+                        }}
                       />
                     </Grid>
                   )}
@@ -573,13 +666,7 @@ const AssessorAccreditorQMSAuditor = () => {
                       helperText={
                         formik.touched.fullName && formik.errors.fullName
                       }
-                      InputProps={{
-                        readOnly: hasCitizenId === "yes" && formik.values.citizenId?.length === 11,
-                        sx: {
-                          backgroundColor: hasCitizenId === "yes" && formik.values.citizenId?.length === 11 ? 
-                            (theme) => theme.palette.action.hover : 'transparent',
-                        },
-                      }}
+                      disabled={loading}
                     />
                   </Grid>
 
@@ -600,7 +687,7 @@ const AssessorAccreditorQMSAuditor = () => {
                       helperText={
                         formik.touched.genderId && formik.errors.genderId
                       }
-                      disabled={hasCitizenId === "yes" && formik.values.citizenId?.length === 11}
+                      disabled={loading}
                     >
                       <MenuItem value="">Select</MenuItem>
                       {genders.map((gender) => (
@@ -1332,6 +1419,7 @@ const AssessorAccreditorQMSAuditor = () => {
                     formik.resetForm();
                     setSelectedSectorId("");
                     setHasCitizenId("yes");
+                    setRenewalApplicantDetails(null);
                   }}
                   disabled={loading}
                 >
@@ -1346,4 +1434,4 @@ const AssessorAccreditorQMSAuditor = () => {
   );
 };
 
-export default AssessorAccreditorQMSAuditor;
+export default AssessorAccreditorQMSAuditorRenewal;

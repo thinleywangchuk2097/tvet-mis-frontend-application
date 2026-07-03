@@ -133,10 +133,10 @@
   dependencies:
     "@babel/helper-plugin-utils" "^7.25.9"
 
-"@babel/runtime@^7.12.5", "@babel/runtime@^7.18.3", "@babel/runtime@^7.27.0", "@babel/runtime@^7.28.4", "@babel/runtime@^7.28.6", "@babel/runtime@^7.5.5", "@babel/runtime@^7.8.7":
-  version "7.28.6"
-  resolved "https://registry.npmjs.org/@babel/runtime/-/runtime-7.28.6.tgz"
-  integrity sha512-05WQkdpL9COIMz4LjTxGpPNCdlpyimKppYNoJ5Di5EUObifl8t4tuLuUBBZEpoLYOmfvIWrsp9fCl0HoPRVTdA==
+"@babel/runtime@^7.12.5", "@babel/runtime@^7.18.3", "@babel/runtime@^7.27.0", "@babel/runtime@^7.28.4", "@babel/runtime@^7.28.6", "@babel/runtime@^7.29.2", "@babel/runtime@^7.29.7", "@babel/runtime@^7.5.5", "@babel/runtime@^7.8.7":
+  version "7.29.7"
+  resolved "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.7.tgz"
+  integrity sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==
 
 "@babel/template@^7.26.9", "@babel/template@^7.27.0":
   version "7.27.0"
@@ -167,6 +167,16 @@
   dependencies:
     "@babel/helper-string-parser" "^7.25.9"
     "@babel/helper-validator-identifier" "^7.25.9"
+
+"@base-ui/utils@^0.2.9":
+  version "0.2.9"
+  resolved "https://registry.npmjs.org/@base-ui/utils/-/utils-0.2.9.tgz"
+  integrity sha512-x/PDDCYzoqPpjrdyb3VcyylTI2IjUXEtYDGi5foh7KsnmNJIIaVwA2GLgDH1dps1GgXiJbA60hM+AyuTfQzIvw==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
+    "@floating-ui/utils" "^0.2.11"
+    reselect "^5.1.1"
+    use-sync-external-store "^1.6.0"
 
 "@emotion/babel-plugin@^11.13.5":
   version "11.13.5"
@@ -370,6 +380,11 @@
     "@eslint/core" "^0.13.0"
     levn "^0.4.1"
 
+"@floating-ui/utils@^0.2.11":
+  version "0.2.11"
+  resolved "https://registry.npmjs.org/@floating-ui/utils/-/utils-0.2.11.tgz"
+  integrity sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==
+
 "@humanfs/core@^0.19.1":
   version "0.19.1"
   resolved "https://registry.npmjs.org/@humanfs/core/-/core-0.19.1.tgz"
@@ -513,6 +528,13 @@
   dependencies:
     "@babel/runtime" "^7.28.6"
 
+"@mui/types@^9.1.1":
+  version "9.1.1"
+  resolved "https://registry.npmjs.org/@mui/types/-/types-9.1.1.tgz"
+  integrity sha512-Zjt7u8wNvDg40rPTGoL+TnfkpuSKjwubsNSFRH1KAVZLcaV4I3AFNHIFbvH7p4F3alEibSbdd90xAgn5Rnfndg==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
+
 "@mui/utils@^7.3.5", "@mui/utils@^7.3.8":
   version "7.3.8"
   resolved "https://registry.npmjs.org/@mui/utils/-/utils-7.3.8.tgz"
@@ -524,6 +546,18 @@
     clsx "^2.1.1"
     prop-types "^15.8.1"
     react-is "^19.2.3"
+
+"@mui/utils@^9.0.1":
+  version "9.1.1"
+  resolved "https://registry.npmjs.org/@mui/utils/-/utils-9.1.1.tgz"
+  integrity sha512-qSNfnkzZMptaaWFFklpDf4NPJztgwsMDVfM/sSDt+wq4ssYSBhLYwwjuB6eS/+p2IUYbeRzHluzXbw0Zn7aI4A==
+  dependencies:
+    "@babel/runtime" "^7.29.2"
+    "@mui/types" "^9.1.1"
+    "@types/prop-types" "^15.7.15"
+    clsx "^2.1.1"
+    prop-types "^15.8.1"
+    react-is "^19.2.6"
 
 "@mui/x-charts-vendor@8.26.0":
   version "8.26.0"
@@ -570,6 +604,19 @@
     reselect "^5.1.1"
     use-sync-external-store "^1.6.0"
 
+"@mui/x-data-grid@^9.6.0":
+  version "9.6.0"
+  resolved "https://registry.npmjs.org/@mui/x-data-grid/-/x-data-grid-9.6.0.tgz"
+  integrity sha512-T2Zp264VERDPBUobdqODEi8YqcgZpCDgzrb5p0w5e+DHHjgacizuZBL8PuWORxvJR0j5ucUn64+Fq9ZgoI4WBw==
+  dependencies:
+    "@babel/runtime" "^7.29.7"
+    "@mui/utils" "^9.0.1"
+    "@mui/x-internals" "^9.6.0"
+    "@mui/x-virtualizer" "9.0.0-alpha.10"
+    clsx "^2.1.1"
+    prop-types "^15.8.1"
+    use-sync-external-store "^1.6.0"
+
 "@mui/x-date-pickers@^8.27.2":
   version "8.27.2"
   resolved "https://registry.npmjs.org/@mui/x-date-pickers/-/x-date-pickers-8.27.2.tgz"
@@ -590,6 +637,18 @@
   dependencies:
     "@babel/runtime" "^7.28.4"
 
+"@mui/x-internals@^9.6.0":
+  version "9.6.0"
+  resolved "https://registry.npmjs.org/@mui/x-internals/-/x-internals-9.6.0.tgz"
+  integrity sha512-lBh+4P2CRyspoFbBwCemTFIYmAAX8esznDsYYDGgV0+Id9z7Xi5pRZUAFY33XodYgTnMPiN4TJyfd8bfJbPNzg==
+  dependencies:
+    "@babel/runtime" "^7.29.7"
+    "@base-ui/utils" "^0.2.9"
+    "@mui/utils" "^9.0.1"
+    core-js-pure "^3.49.0"
+    reselect "^5.2.0"
+    use-sync-external-store "^1.6.0"
+
 "@mui/x-internals@8.26.0":
   version "8.26.0"
   resolved "https://registry.npmjs.org/@mui/x-internals/-/x-internals-8.26.0.tgz"
@@ -599,6 +658,15 @@
     "@mui/utils" "^7.3.5"
     reselect "^5.1.1"
     use-sync-external-store "^1.6.0"
+
+"@mui/x-virtualizer@9.0.0-alpha.10":
+  version "9.0.0-alpha.10"
+  resolved "https://registry.npmjs.org/@mui/x-virtualizer/-/x-virtualizer-9.0.0-alpha.10.tgz"
+  integrity sha512-Et1wloXfxD/z037Wk6H0lGFcFzH4o/+5VL+faLgkE1IZHzV64PEg7Z4OLoi9vwSMsfOB35OBVNjBajiepD8L+w==
+  dependencies:
+    "@babel/runtime" "^7.29.7"
+    "@mui/utils" "^9.0.1"
+    "@mui/x-internals" "^9.6.0"
 
 "@popperjs/core@^2.11.8":
   version "2.11.8"
@@ -619,6 +687,18 @@
   version "4.39.0"
   resolved "https://registry.npmjs.org/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.39.0.tgz"
   integrity sha512-yAkUOkIKZlK5dl7u6dg897doBgLXmUHhIINM2c+sND3DZwnrdQkkSiDh7N75Ll4mM4dxSkYfXqU9fW3lLkMFug==
+
+"@tabler/icons-react@^3.44.0":
+  version "3.44.0"
+  resolved "https://registry.npmjs.org/@tabler/icons-react/-/icons-react-3.44.0.tgz"
+  integrity sha512-8+rvzBbVm/1Z3sG3x7GUNAaxIKxwgz8xaMhRs23nrCnMTKRFAhEC+82zAIFeAA0seXdrAGX5HFCkaLpGK2rVHg==
+  dependencies:
+    "@tabler/icons" "3.44.0"
+
+"@tabler/icons@3.44.0":
+  version "3.44.0"
+  resolved "https://registry.npmjs.org/@tabler/icons/-/icons-3.44.0.tgz"
+  integrity sha512-Wn0AOZG9sg0L+bjfMqq4eNhC6pQjIrk94LvvWYNYkY8KH8wC3YILRzQlrnVJc4FUeMxH/AK97QsYCX35H3LndA==
 
 "@types/babel__core@^7.20.5":
   version "7.20.5"
@@ -994,6 +1074,11 @@ cookie@^1.0.1, cookie@^1.0.2:
   version "1.0.2"
   resolved "https://registry.npmjs.org/cookie/-/cookie-1.0.2.tgz"
   integrity sha512-9Kr/j4O16ISv8zBBhJoi4bXOYNTkFLOqSL3UDB0njXxCXNezjeyVrJyGOWtgfs/q2km1gwBcfH8q1yEGoMYunA==
+
+core-js-pure@^3.49.0:
+  version "3.49.0"
+  resolved "https://registry.npmjs.org/core-js-pure/-/core-js-pure-3.49.0.tgz"
+  integrity sha512-XM4RFka59xATyJv/cS3O3Kml72hQXUeGRuuTmMYFxwzc9/7C8OYTaIR/Ji+Yt8DXzsFLNhat15cE/JP15HrCgw==
 
 core-js@^3.6.0, core-js@^3.8.3:
   version "3.49.0"
@@ -2023,10 +2108,10 @@ react-is@^16.7.0:
   resolved "https://registry.npmjs.org/react-is/-/react-is-16.13.1.tgz"
   integrity sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
 
-react-is@^19.2.3:
-  version "19.2.4"
-  resolved "https://registry.npmjs.org/react-is/-/react-is-19.2.4.tgz"
-  integrity sha512-W+EWGn2v0ApPKgKKCy/7s7WHXkboGcsrXE+2joLyVxkbyVQfO3MUEaUQDHoSmb8TFFrSKYa9mw64WZHNHSDzYA==
+react-is@^19.2.3, react-is@^19.2.6:
+  version "19.2.7"
+  resolved "https://registry.npmjs.org/react-is/-/react-is-19.2.7.tgz"
+  integrity sha512-kZFnouyVv7eP/Phmrlo9FK+zcAdriZJvzxXHF1Sl1P377WSGe2G/JxVolhTrB/jeV47lKImhNUsijjHAAbcl/A==
 
 react-redux@^9.2.0, "react-redux@8.x.x || 9.x.x":
   version "9.2.0"
@@ -2121,6 +2206,11 @@ reselect@^5.1.0, reselect@^5.1.1, reselect@5.1.1:
   version "5.1.1"
   resolved "https://registry.npmjs.org/reselect/-/reselect-5.1.1.tgz"
   integrity sha512-K/BG6eIky/SBpzfHZv/dd+9JBFiS4SWV7FIujVyJRux6e45+73RaUHXLmIR1f7WOMaQ0U1km6qwklRQxpJJY0w==
+
+reselect@^5.2.0:
+  version "5.2.0"
+  resolved "https://registry.npmjs.org/reselect/-/reselect-5.2.0.tgz"
+  integrity sha512-AgZ3UOZm3YndfrJ4OYjgrT7bmCm/1iqkjvEfH/oYjzh6PD2qw4QuT3jjnXIrpdt4MTpMXclMT3lXbmRY+XRakw==
 
 resolve-from@^4.0.0:
   version "4.0.0"

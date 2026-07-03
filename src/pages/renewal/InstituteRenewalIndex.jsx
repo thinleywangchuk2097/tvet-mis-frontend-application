@@ -151,15 +151,95 @@ const InstituteRenewalIndex = () => {
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [existingDocuments, setExistingDocuments] = useState([]);
   const { serviceId } = useParams();
-
+  const [instituteRenewalStatus, setInstituteRenewalStatus] = useState([]);
   // Refs to prevent infinite loops
   const hasFetchedData = useRef(false);
   const hasFetchedInstitute = useRef(false);
+  const hasFetchedStatus = useRef(false);
 
   // Check if this is a tuition service (service_id 36)
   const isTuitionService = useMemo(() => {
     return serviceId === "36" || serviceId === 36;
   }, [serviceId]);
+
+  // Check if renewal is allowed (status_id === 57)
+  const isRenewalAllowed = useMemo(() => {
+    if (!instituteRenewalStatus || instituteRenewalStatus.length === 0) {
+      return false;
+    }
+
+    // Check if any status has status_id === 57 (as string or number)
+    const allowed = instituteRenewalStatus.some((status) => {
+      const statusId = status.status_id?.toString();
+      return statusId === "57";
+    });
+
+    return allowed;
+  }, [instituteRenewalStatus]);
+
+  // Get renewal status message
+  const getRenewalStatusMessage = useMemo(() => {
+    if (!instituteRenewalStatus || instituteRenewalStatus.length === 0) {
+      return "No renewal application found.";
+    }
+
+    const status = instituteRenewalStatus[0];
+    if (status.status_id?.toString() === "57") {
+      return "Renewal is approved. You can proceed with the renewal application.";
+    } else {
+      return `Your monitoring assessment is not yet completed. Current status: ${
+        status.description || "Pending"
+      }`;
+    }
+  }, [instituteRenewalStatus]);
+
+  // Fetch renewal status
+  const fetchInstitutesRenewalStatus = async () => {
+    try {
+      const response =
+        await InstituteRegistrationRenewalService.getInstitutesRenewalStatus(
+          registration_no,
+          access_token,
+        );
+
+      // Ensure we're setting the data correctly
+      const statusData = Array.isArray(response.data) ? response.data : [];
+      setInstituteRenewalStatus(statusData);
+      hasFetchedStatus.current = true;
+
+      // Check if renewal is allowed
+      const isAllowed = statusData.some((status) => {
+        const statusId = status.status_id?.toString();
+        return statusId === "57";
+      });
+
+      // If not allowed, stop loading immediately
+      if (!isAllowed) {
+        setLoadingInitialData(false);
+      }
+    } catch (error) {
+      console.error("Error fetching Institute Renewal Status:", error);
+      toast.error("Failed to load Institute Renewal Status");
+      setLoadingInitialData(false);
+    }
+  };
+
+  // Effect to monitor status changes
+  useEffect(() => {
+    // If status is fetched and renewal is allowed, we should fetch institute details
+    if (
+      hasFetchedStatus.current &&
+      isRenewalAllowed &&
+      !hasFetchedInstitute.current
+    ) {
+      fetchInstituteDetails();
+    }
+
+    // If status is fetched and renewal is not allowed, stop loading
+    if (hasFetchedStatus.current && !isRenewalAllowed) {
+      setLoadingInitialData(false);
+    }
+  }, [instituteRenewalStatus, isRenewalAllowed]);
 
   // Validation Schema - Dynamic based on service type
   const validationSchema = useMemo(() => {
@@ -614,8 +694,6 @@ const InstituteRenewalIndex = () => {
           }));
         }
 
-        console.log("Submit Data:", submitData);
-
         const response =
           await InstituteRegistrationRenewalService.resubmitInstitute(
             submitData,
@@ -769,13 +847,22 @@ const InstituteRenewalIndex = () => {
   );
 
   const fetchInstituteDetails = useCallback(async () => {
-    if (hasFetchedInstitute.current) return;
+    // Only fetch if renewal is allowed
+    if (!isRenewalAllowed) {
+      setLoadingInitialData(false);
+      return;
+    }
+
+    if (hasFetchedInstitute.current) {
+      return;
+    }
 
     try {
       const response =
         await InstituteRegistrationRenewalService.getInstituteRenewalDetails(
           registration_no,
         );
+
       let data = response.data;
 
       if (Array.isArray(data) && data.length > 0) {
@@ -783,7 +870,6 @@ const InstituteRenewalIndex = () => {
       }
 
       if (!data) {
-        console.warn("No renewal data found");
         setLoadingInitialData(false);
         return;
       }
@@ -832,7 +918,12 @@ const InstituteRenewalIndex = () => {
     } finally {
       setLoadingInitialData(false);
     }
-  }, [registration_no, populateFormWithExistingData, isTuitionService]);
+  }, [
+    registration_no,
+    populateFormWithExistingData,
+    isTuitionService,
+    isRenewalAllowed,
+  ]);
 
   const fetchServiceName = async () => {
     try {
@@ -999,24 +1090,29 @@ const InstituteRenewalIndex = () => {
       setCertificateLevel(certificateLevelRes.data || []);
 
       hasFetchedData.current = true;
+
+      // After data is fetched, check if we should fetch institute details
+      if (
+        hasFetchedStatus.current &&
+        isRenewalAllowed &&
+        !hasFetchedInstitute.current
+      ) {
+        fetchInstituteDetails();
+      } else if (hasFetchedStatus.current && !isRenewalAllowed) {
+        setLoadingInitialData(false);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Error loading form data");
       setLoadingInitialData(false);
     }
-  }, [serviceId]);
-
-  // Effect to fetch institute details after dropdown data is loaded
-  useEffect(() => {
-    if (hasFetchedData.current && !hasFetchedInstitute.current) {
-      fetchInstituteDetails();
-    }
-  }, [fetchInstituteDetails]);
+  }, [serviceId, isRenewalAllowed, fetchInstituteDetails]);
 
   // Main effect - only run once on mount
   useEffect(() => {
     fetchServiceName();
     fetchData();
+    fetchInstitutesRenewalStatus();
   }, []);
 
   const handleReset = () => {
@@ -1143,7 +1239,7 @@ const InstituteRenewalIndex = () => {
     return allAnswered && allYes;
   }, [qualitySelections, qualityData]);
 
-  // Validation helpers - FIXED
+  // Validation helpers
   const isSubmitEnabled = useMemo(() => {
     if (!formik.isValid) return false;
 
@@ -1291,6 +1387,7 @@ const InstituteRenewalIndex = () => {
     return baseTabs;
   }, [isTuitionService]);
 
+  // Show loading state
   if (loadingInitialData) {
     return (
       <Box sx={{ p: 1, minHeight: "100vh" }}>
@@ -1302,12 +1399,92 @@ const InstituteRenewalIndex = () => {
     );
   }
 
+  // Show notification if renewal is not allowed
+  if (!isRenewalAllowed) {
+    return (
+      <Box sx={{ p: 1, minHeight: "100vh" }}>
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
+            {serviceName} - Renewal Application
+          </Typography>
+
+          <Divider sx={{ mb: 3 }} />
+
+          <Box
+            sx={{
+              p: 4,
+              textAlign: "center",
+              backgroundColor: "#fff3e0",
+              borderRadius: 2,
+              border: "1px solid #ffb74d",
+            }}
+          >
+            <VerifiedIcon sx={{ fontSize: 60, color: "#ff9800", mb: 2 }} />
+            <Typography variant="h6" sx={{ mb: 1, color: "#e65100" }}>
+              Monitoring Assessment Incomplete
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2, color: "#bf360c" }}>
+              {getRenewalStatusMessage}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Please ensure all monitoring assessments are completed before
+              submitting a renewal application.
+            </Typography>
+            {instituteRenewalStatus && instituteRenewalStatus.length > 0 && (
+              <Box
+                sx={{
+                  mt: 2,
+                  p: 2,
+                  backgroundColor: "#fff",
+                  borderRadius: 1,
+                  display: "inline-block",
+                  textAlign: "left",
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  display="block"
+                  sx={{ fontWeight: 600 }}
+                >
+                  Application No: {instituteRenewalStatus[0].application_no}
+                </Typography>
+                <Typography variant="caption" display="block">
+                  Status: {instituteRenewalStatus[0].description || "Pending"}
+                </Typography>
+                <Typography variant="caption" display="block">
+                  Monitoring Date: {instituteRenewalStatus[0].monitoring_date}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Box>
+    );
+  }
+
+  // Show renewal form if allowed
   return (
     <Box sx={{ p: 1, minHeight: "100vh" }}>
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
           {serviceName} - Renewal Application
         </Typography>
+
+        {/* Success banner */}
+        <Box
+          sx={{
+            mb: 3,
+            p: 2,
+            backgroundColor: "#e8f5e9",
+            borderRadius: 1,
+            border: "1px solid #4caf50",
+          }}
+        >
+          <Typography variant="body2" sx={{ color: "#2e7d32" }}>
+            ✓ Your monitoring assessment is completed. You can proceed with your
+            renewal application.
+          </Typography>
+        </Box>
 
         <Divider />
 

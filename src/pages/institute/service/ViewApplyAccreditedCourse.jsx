@@ -26,18 +26,33 @@ import {
   FormControlLabel,
   FormControl,
   FormLabel,
+  Select,
+  MenuItem,
+  Chip,
+  Card,
+  CardContent,
+  Alert,
+  Stack,
+  InputLabel,
 } from "@mui/material";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import BusinessIcon from "@mui/icons-material/Business";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import EngineeringIcon from "@mui/icons-material/Engineering";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import DeleteIcon from "@mui/icons-material/Delete";
+import GroupAddIcon from "@mui/icons-material/GroupAdd";
+import SkipNextIcon from "@mui/icons-material/SkipNext";
+import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
 import FileDownload from "../../../components/file/FileDownload";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 import CommonService from "../../../api/services/internal/common/CommonService";
+import UserRoleManagementService from "../../../api/services/internal/userrole/UserRoleManagementService";
 
 const TABLE_STYLE = {
   border: "1px solid",
@@ -79,6 +94,21 @@ const ViewApplyAccreditedCourse = () => {
   const [qualityRemarks, setQualityRemarks] = useState({});
   const [rawQualityStandards, setRawQualityStandards] = useState(null);
 
+  // REC assignment states
+  const [recList, setRecList] = useState([]);
+  const [selectedRec, setSelectedRec] = useState("");
+  const [assignedRecs, setAssignedRecs] = useState([]);
+
+  // Accreditor assignment states
+  const [accreditorList, setAccreditorList] = useState([]);
+  const [selectedAccreditor, setSelectedAccreditor] = useState("");
+  const [assignedAccreditors, setAssignedAccreditors] = useState([]);
+
+  // Delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recToDelete, setRecToDelete] = useState(null);
+  const [accreditorToDelete, setAccreditorToDelete] = useState(null);
+
   // Dialog states
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
@@ -87,9 +117,19 @@ const ViewApplyAccreditedCourse = () => {
 
   const roleId = currentRoleId?.toString();
 
+  // Check if currentRoleId is 7 for REC tab
+  const showRecTab = currentRoleId == 7;
+  const showAccreditorTab = currentRoleId == 7;
+
   useEffect(() => {
     if (applicationNo) {
       fetchAllData();
+      if (showRecTab) {
+        fetchRecUsers();
+      }
+      if (showAccreditorTab) {
+        fetchAccreditorUsers();
+      }
     }
   }, [applicationNo]);
 
@@ -97,12 +137,62 @@ const ViewApplyAccreditedCourse = () => {
     if (qualityData.length > 0 && rawQualityStandards) {
       const { responses, remarks } = parseQualityStandardsWithData(
         rawQualityStandards,
-        qualityData
+        qualityData,
       );
       setQualityResponses(responses);
       setQualityRemarks(remarks);
     }
   }, [qualityData, rawQualityStandards]);
+
+  const fetchRecUsers = async () => {
+    try {
+      console.log("Fetching REC users...");
+      const response =
+        await UserRoleManagementService.getActiveRecUsers(access_token);
+      console.log("REC users response:", response.data);
+
+      const mappedRecList = response.data.map((user) => ({
+        id: user.id,
+        userId: user.user_id,
+        name: `${user.first_name} ${user.middle_name ? user.middle_name + " " : ""}${user.last_name}`,
+        email: user.email_id,
+        mobileNo: user.mobile_no,
+        designation: user.current_role || "REC Member",
+        department: user.location_id || "N/A",
+      }));
+
+      setRecList(mappedRecList);
+      console.log("Mapped REC list:", mappedRecList);
+    } catch (error) {
+      console.error("Error fetching rec user:", error);
+      toast.error("Failed to load REC members");
+    }
+  };
+
+  const fetchAccreditorUsers = async () => {
+    try {
+      console.log("Fetching Accreditor users...");
+      const response =
+        await UserRoleManagementService.getActiveAccreditorUsers(access_token);
+      console.log("Accreditor users response:", response.data);
+
+      const mappedAccreditorList = response.data.map((user) => ({
+        id: user.id,
+        userId: user.user_id,
+        name: `${user.first_name} ${user.middle_name ? user.middle_name + " " : ""}${user.last_name}`,
+        email: user.email_id,
+        mobileNo: user.mobile_no,
+        designation: user.current_role || "Accreditor",
+        department: user.location_id || "N/A",
+      }));
+
+      setAccreditorList(mappedAccreditorList);
+      console.log("Mapped Accreditor list:", mappedAccreditorList);
+    } catch (error) {
+      console.error("Error fetching accreditor users:", error);
+      toast.error("Failed to load Accreditor members");
+    }
+  };
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -126,10 +216,10 @@ const ViewApplyAccreditedCourse = () => {
       const response = await CommonService.getAllQualitystandards(26);
       if (response.data && response.data.length > 0) {
         const mainCategories = response.data.filter(
-          (item) => item.parentId === 0
+          (item) => item.parentId === 0,
         );
         const subCategories = response.data.filter(
-          (item) => item.parentId !== 0
+          (item) => item.parentId !== 0,
         );
         const structured = mainCategories.map((category) => ({
           id: category.id.toString(),
@@ -166,7 +256,7 @@ const ViewApplyAccreditedCourse = () => {
         let categoryId = null;
         for (const category of qualityDataRef) {
           const foundRow = category.rows.find(
-            (row) => row.id === subQuestionId
+            (row) => row.id === subQuestionId,
           );
           if (foundRow) {
             categoryId = category.id;
@@ -213,7 +303,7 @@ const ViewApplyAccreditedCourse = () => {
       const response =
         await ApplyAccreditedCourseService.getAccreditedCourseByApplicationNo(
           applicationNo,
-          access_token
+          access_token,
         );
 
       let data = response.data;
@@ -250,6 +340,16 @@ const ViewApplyAccreditedCourse = () => {
       if (data.quality_standard_responses) {
         setRawQualityStandards(data.quality_standard_responses);
       }
+
+      // Set assigned RECs if exists
+      if (data.assigned_recs) {
+        setAssignedRecs(data.assigned_recs);
+      }
+
+      // Set assigned Accreditors if exists
+      if (data.assigned_accreditors) {
+        setAssignedAccreditors(data.assigned_accreditors);
+      }
     } catch (error) {
       console.error("Error fetching course details:", error);
       throw error;
@@ -266,18 +366,20 @@ const ViewApplyAccreditedCourse = () => {
       const sector = sectors.find((s) => String(s.id) === String(id));
       return sector ? sector.sectorName || sector.name : id;
     },
-    [sectors]
+    [sectors],
   );
 
   const getCourseName = useCallback(
     (id) => {
       if (!id) return "N/A";
-      const occupation = occupations.find((occ) => String(occ.id) === String(id));
+      const occupation = occupations.find(
+        (occ) => String(occ.id) === String(id),
+      );
       return occupation
         ? occupation.occupationName || occupation.title || occupation.name
         : id;
     },
-    [occupations]
+    [occupations],
   );
 
   const handleQualityResponseChange = (categoryId, subQuestionId, value) => {
@@ -332,6 +434,126 @@ const ViewApplyAccreditedCourse = () => {
     return qualityStandardsData;
   };
 
+  // REC handlers
+  const handleAddREC = () => {
+    if (!selectedRec) {
+      toast.error("Please select a REC member to add");
+      return;
+    }
+
+    if (
+      assignedRecs.some((rec) => rec.id.toString() === selectedRec.toString())
+    ) {
+      toast.error("This REC member is already assigned");
+      return;
+    }
+
+    const selectedRecDetails = recList.find(
+      (rec) => rec.id.toString() === selectedRec.toString(),
+    );
+
+    if (!selectedRecDetails) {
+      toast.error("Selected REC member not found");
+      return;
+    }
+
+    const assignmentRecord = {
+      id: selectedRecDetails.id,
+      userId: selectedRecDetails.userId,
+      name: selectedRecDetails.name,
+      email: selectedRecDetails.email,
+      mobileNo: selectedRecDetails.mobileNo,
+      designation: selectedRecDetails.designation || "REC Member",
+      department: selectedRecDetails.department || "N/A",
+      assignedDate: new Date().toISOString(),
+      assignedBy: actionId,
+    };
+
+    setAssignedRecs((prev) => [...prev, assignmentRecord]);
+    toast.success(`${selectedRecDetails.name} added successfully`);
+    setSelectedRec("");
+  };
+
+  const openDeleteRECDialog = (rec) => {
+    setRecToDelete(rec);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteREC = () => {
+    if (recToDelete) {
+      setAssignedRecs((prev) =>
+        prev.filter((rec) => rec.id !== recToDelete.id),
+      );
+      toast.info(`${recToDelete.name} has been removed`);
+      setDeleteDialogOpen(false);
+      setRecToDelete(null);
+    }
+  };
+
+  // Accreditor handlers
+  const handleAddAccreditor = () => {
+    if (!selectedAccreditor) {
+      toast.error("Please select an Accreditor to add");
+      return;
+    }
+
+    if (
+      assignedAccreditors.some(
+        (acc) => acc.id.toString() === selectedAccreditor.toString(),
+      )
+    ) {
+      toast.error("This Accreditor is already assigned");
+      return;
+    }
+
+    const selectedAccreditorDetails = accreditorList.find(
+      (acc) => acc.id.toString() === selectedAccreditor.toString(),
+    );
+
+    if (!selectedAccreditorDetails) {
+      toast.error("Selected Accreditor not found");
+      return;
+    }
+
+    const assignmentRecord = {
+      id: selectedAccreditorDetails.id,
+      userId: selectedAccreditorDetails.userId,
+      name: selectedAccreditorDetails.name,
+      email: selectedAccreditorDetails.email,
+      mobileNo: selectedAccreditorDetails.mobileNo,
+      designation: selectedAccreditorDetails.designation || "Accreditor",
+      department: selectedAccreditorDetails.department || "N/A",
+      assignedDate: new Date().toISOString(),
+      assignedBy: actionId,
+    };
+
+    setAssignedAccreditors((prev) => [...prev, assignmentRecord]);
+    toast.success(`${selectedAccreditorDetails.name} added successfully`);
+    setSelectedAccreditor("");
+  };
+
+  const openDeleteAccreditorDialog = (acc) => {
+    setAccreditorToDelete(acc);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteAccreditor = () => {
+    if (accreditorToDelete) {
+      setAssignedAccreditors((prev) =>
+        prev.filter((acc) => acc.id !== accreditorToDelete.id),
+      );
+      toast.info(`${accreditorToDelete.name} has been removed`);
+      setDeleteDialogOpen(false);
+      setAccreditorToDelete(null);
+    }
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setRecToDelete(null);
+    setAccreditorToDelete(null);
+  };
+
   const openActionDialog = (statusId) => {
     setSelectedStatusId(statusId);
     setRemarks("");
@@ -346,15 +568,50 @@ const ViewApplyAccreditedCourse = () => {
     setRemarksError("");
   };
 
+  const validateAssignments = (statusId) => {
+    // Skip REC validation when rejecting (statusId === 58 or 60)
+    if (statusId !== 58 && statusId !== 60) {
+      if (showRecTab && assignedRecs.length === 0) {
+        toast.error("Please assign at least one REC member before proceeding");
+        return false;
+      }
+    }
+
+    // Always validate Accreditor if tab is shown (including rejection)
+    if (showAccreditorTab && assignedAccreditors.length === 0) {
+      toast.error("Please assign at least one Accreditor before proceeding");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleAction = async () => {
-    if ((selectedStatusId === 58 || selectedStatusId === 60) && !remarks.trim()) {
+    if (
+      (selectedStatusId === 58 || selectedStatusId === 60) &&
+      !remarks.trim()
+    ) {
       setRemarksError("Remarks are required for rejection");
+      return;
+    }
+
+    // Validate assignments before proceeding
+    if (!validateAssignments(selectedStatusId)) {
       return;
     }
 
     setActionLoading(true);
     try {
       const qualityStandardsData = prepareQualityStandardsForBackend();
+
+      // Prepare payloads
+      const assignedRecsPayload = assignedRecs.map((rec) => ({
+        userId: rec.userId,
+      }));
+
+      const assignedAccreditorsPayload = assignedAccreditors.map((acc) => ({
+        userId: acc.userId,
+      }));
 
       const payload = {
         applicationNo: applicationNo,
@@ -365,12 +622,15 @@ const ViewApplyAccreditedCourse = () => {
         updatedBy: actionId,
         documents: newDocuments,
         qualityStandards: qualityStandardsData,
+        assignedRecs: assignedRecsPayload,
+        assignedAccreditors: assignedAccreditorsPayload,
       };
 
-      const response = await ApplyAccreditedCourseService.verifyAccreditedCourse(
-        payload,
-        access_token
-      );
+      const response =
+        await ApplyAccreditedCourseService.verifyAccreditedCourse(
+          payload,
+          access_token,
+        );
 
       if (response.status === 200 || response.status === 201) {
         let successMessage;
@@ -435,11 +695,14 @@ const ViewApplyAccreditedCourse = () => {
       return (
         <>
           <DialogContentText sx={{ mb: 2 }}>
-            Please provide remarks for rejecting this accredited course application:
+            Please provide remarks for rejecting this accredited course
+            application:
             <br />
             <strong>Application No: {applicationNo}</strong>
             <br />
-            <strong>Course Title: {getCourseName(courseData?.course_id)}</strong>
+            <strong>
+              Course Title: {getCourseName(courseData?.course_id)}
+            </strong>
           </DialogContentText>
           <TextField
             autoFocus
@@ -464,12 +727,13 @@ const ViewApplyAccreditedCourse = () => {
         selectedStatusId === 56 || selectedStatusId === 62
           ? "verify"
           : selectedStatusId === 59
-          ? "endorse"
-          : "approve";
+            ? "endorse"
+            : "approve";
 
       return (
         <DialogContentText>
-          Are you sure you want to {actionText} this accredited course application?
+          Are you sure you want to {actionText} this accredited course
+          application?
           <br />
           <strong>Application No: {applicationNo}</strong>
           <br />
@@ -540,7 +804,8 @@ const ViewApplyAccreditedCourse = () => {
                 </TableHead>
                 <TableBody>
                   {standard.rows.map((row, index) => {
-                    const selectedValue = qualityResponses[standard.id]?.[row.id];
+                    const selectedValue =
+                      qualityResponses[standard.id]?.[row.id];
                     const isYes = selectedValue === "Y";
                     const isNo = selectedValue === "N";
                     const remark = qualityRemarks[standard.id]?.[row.id] || "";
@@ -559,7 +824,7 @@ const ViewApplyAccreditedCourse = () => {
                               handleQualityResponseChange(
                                 standard.id,
                                 row.id,
-                                newValue
+                                newValue,
                               );
                             }}
                           />
@@ -574,7 +839,7 @@ const ViewApplyAccreditedCourse = () => {
                               handleQualityResponseChange(
                                 standard.id,
                                 row.id,
-                                newValue
+                                newValue,
                               );
                             }}
                           />
@@ -589,7 +854,7 @@ const ViewApplyAccreditedCourse = () => {
                               handleQualityRemarkChange(
                                 standard.id,
                                 row.id,
-                                e.target.value
+                                e.target.value,
                               )
                             }
                             slotProps={{
@@ -611,14 +876,86 @@ const ViewApplyAccreditedCourse = () => {
         </Grid>
       );
     },
-    [qualityResponses, qualityRemarks]
+    [qualityResponses, qualityRemarks],
   );
 
-  const tabs = [
-    { icon: <BusinessIcon />, label: "Course Information" },
-    { icon: <VerifiedIcon />, label: "Quality Standards" },
-    { icon: <FileOpenIcon />, label: "Supporting Documents" },
-  ];
+  const getTabs = () => {
+    const baseTabs = [
+      { icon: <BusinessIcon />, label: "Course Information" },
+      { icon: <VerifiedIcon />, label: "Quality Standards" },
+      { icon: <FileOpenIcon />, label: "Supporting Documents" },
+    ];
+
+    // Add Accreditor tab if currentRoleId is 7
+    if (showAccreditorTab) {
+      baseTabs.push({
+        icon: <GroupAddIcon />,
+        label: "Add Accreditors",
+      });
+    }
+
+    // Add REC tab if currentRoleId is 7
+    if (showRecTab) {
+      baseTabs.push({ icon: <EngineeringIcon />, label: "Assign REC" });
+    }
+
+    return baseTabs;
+  };
+
+  // Navigation handlers
+  const handleNextTab = () => {
+    const tabs = getTabs();
+    if (tabValue < tabs.length - 1) {
+      setTabValue(tabValue + 1);
+    }
+  };
+
+  const handlePreviousTab = () => {
+    if (tabValue > 0) {
+      setTabValue(tabValue - 1);
+    }
+  };
+
+  // Helper functions for button visibility
+  const isFirstTab = () => tabValue === 0;
+  const isLastTab = () => {
+    const tabs = getTabs();
+    return tabValue === tabs.length - 1;
+  };
+
+  // Get tab indices
+  const getTabIndices = () => {
+    const tabs = getTabs();
+    let accreditorIndex = -1;
+    let recIndex = -1;
+
+    tabs.forEach((tab, index) => {
+      if (tab.label === "Add Accreditors") accreditorIndex = index;
+      if (tab.label === "Assign REC") recIndex = index;
+    });
+
+    return { accreditorIndex, recIndex };
+  };
+
+  const { accreditorIndex, recIndex } = getTabIndices();
+
+  // Get available REC members (not yet assigned)
+  const availableRecs = recList.filter(
+    (rec) => !assignedRecs.some((assigned) => assigned.id === rec.id),
+  );
+
+  const selectedRecDetails = recList.find(
+    (rec) => rec.id.toString() === selectedRec?.toString(),
+  );
+
+  // Get available Accreditors (not yet assigned)
+  const availableAccreditors = accreditorList.filter(
+    (acc) => !assignedAccreditors.some((assigned) => assigned.id === acc.id),
+  );
+
+  const selectedAccreditorDetails = accreditorList.find(
+    (acc) => acc.id.toString() === selectedAccreditor?.toString(),
+  );
 
   if (loading) {
     return (
@@ -663,7 +1000,7 @@ const ViewApplyAccreditedCourse = () => {
             "& .MuiTab-root": { textTransform: "none", fontWeight: 600 },
           }}
         >
-          {tabs.map((tab, index) => (
+          {getTabs().map((tab, index) => (
             <Tab key={index} icon={tab.icon} label={tab.label} />
           ))}
         </Tabs>
@@ -771,88 +1108,582 @@ const ViewApplyAccreditedCourse = () => {
           </Grid>
         )}
 
-        {/* Action Buttons */}
-        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-          {roleId === "7" && (
-            <>
-              <Button
-                variant="contained"
-                color="success"
-                size="small"
-                startIcon={<CheckCircleIcon />}
-                onClick={() => openActionDialog(56)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Verify 1
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                size="small"
-                startIcon={<CancelIcon />}
-                onClick={() => openActionDialog(58)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Reject
-              </Button>
-            </>
+        {/* Add Accreditors Tab */}
+        {showAccreditorTab && tabValue === accreditorIndex && (
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid item size={{ xs: 12 }}>
+              <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+                  <GroupAddIcon sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6" fontWeight={600}>
+                    Add Accreditors
+                  </Typography>
+                </Box>
+
+                <Card variant="outlined" sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={600}
+                      gutterBottom
+                    >
+                      Add Accreditor Members
+                    </Typography>
+
+                    {assignedAccreditors.length > 0 && (
+                      <Box sx={{ mb: 3 }}>
+                        <Typography
+                          variant="subtitle2"
+                          color="text.secondary"
+                          gutterBottom
+                        >
+                          Assigned Accreditors ({assignedAccreditors.length}):
+                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          flexWrap="wrap"
+                          useFlexGap
+                        >
+                          {assignedAccreditors.map((acc) => (
+                            <Chip
+                              key={acc.id}
+                              label={`${acc.name} (${acc.userId})`}
+                              color="success"
+                              onDelete={() => openDeleteAccreditorDialog(acc)}
+                              deleteIcon={
+                                <DeleteIcon sx={{ color: "#d32f2f" }} />
+                              }
+                              sx={{
+                                mb: 1,
+                                "& .MuiChip-deleteIcon": {
+                                  color: "#d32f2f",
+                                  "&:hover": { color: "#b71c1c" },
+                                },
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item size={{ xs: 12, md: 8 }}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Select Accreditor</InputLabel>
+                          <Select
+                            value={selectedAccreditor}
+                            onChange={(e) =>
+                              setSelectedAccreditor(e.target.value)
+                            }
+                            label="Select Accreditor"
+                          >
+                            <MenuItem value="">Select an Accreditor</MenuItem>
+                            {availableAccreditors.length > 0 ? (
+                              availableAccreditors.map((acc) => (
+                                <MenuItem key={acc.id} value={acc.id}>
+                                  {acc.name} - {acc.userId}
+                                </MenuItem>
+                              ))
+                            ) : (
+                              <MenuItem disabled>
+                                No Accreditors available
+                              </MenuItem>
+                            )}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="medium"
+                          startIcon={<PersonAddIcon />}
+                          onClick={handleAddAccreditor}
+                          disabled={
+                            !selectedAccreditor ||
+                            availableAccreditors.length === 0
+                          }
+                          sx={{
+                            fontWeight: 600,
+                            textTransform: "none",
+                            width: "100%",
+                          }}
+                        >
+                          Add Accreditor
+                        </Button>
+                      </Grid>
+                    </Grid>
+
+                    {selectedAccreditor && selectedAccreditorDetails && (
+                      <Box
+                        sx={{
+                          mt: 2,
+                          p: 2,
+                          bgcolor: "action.hover",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight={600}
+                          gutterBottom
+                        >
+                          Selected Accreditor Details:
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Name
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedAccreditorDetails.name}
+                            </Typography>
+                          </Grid>
+                          <Grid item size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              User ID
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedAccreditorDetails.userId}
+                            </Typography>
+                          </Grid>
+                          <Grid item size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Designation
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedAccreditorDetails.designation}
+                            </Typography>
+                          </Grid>
+                          <Grid item size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Department
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedAccreditorDetails.department}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    )}
+
+                    {assignedAccreditors.length === 0 && (
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        No Accreditors have been assigned yet. Use the form
+                        above to add Accreditor members.
+                      </Alert>
+                    )}
+
+                    {accreditorList.length === 0 && (
+                      <Alert severity="warning" sx={{ mt: 2 }}>
+                        No Accreditor members found. Please check if there are
+                        active Accreditor users in the system.
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Assign REC Tab */}
+        {showRecTab && tabValue === recIndex && (
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid item size={{ xs: 12 }}>
+              <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+                  <EngineeringIcon sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6" fontWeight={600}>
+                    Assign Regulatory and Evaluation Committee (REC)
+                  </Typography>
+                </Box>
+
+                <Card variant="outlined" sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={600}
+                      gutterBottom
+                    >
+                      Add REC Members
+                    </Typography>
+
+                    {assignedRecs.length > 0 && (
+                      <Box sx={{ mb: 3 }}>
+                        <Typography
+                          variant="subtitle2"
+                          color="text.secondary"
+                          gutterBottom
+                        >
+                          Assigned REC Members ({assignedRecs.length}):
+                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          flexWrap="wrap"
+                          useFlexGap
+                        >
+                          {assignedRecs.map((rec) => (
+                            <Chip
+                              key={rec.id}
+                              label={`${rec.name} (${rec.userId})`}
+                              color="success"
+                              onDelete={() => openDeleteRECDialog(rec)}
+                              deleteIcon={
+                                <DeleteIcon sx={{ color: "#d32f2f" }} />
+                              }
+                              sx={{
+                                mb: 1,
+                                "& .MuiChip-deleteIcon": {
+                                  color: "#d32f2f",
+                                  "&:hover": { color: "#b71c1c" },
+                                },
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item size={{ xs: 12, md: 8 }}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Select REC Member</InputLabel>
+                          <Select
+                            value={selectedRec}
+                            onChange={(e) => setSelectedRec(e.target.value)}
+                            label="Select REC Member"
+                          >
+                            <MenuItem value="">Select a REC member</MenuItem>
+                            {availableRecs.length > 0 ? (
+                              availableRecs.map((rec) => (
+                                <MenuItem key={rec.id} value={rec.id}>
+                                  {rec.name} - {rec.userId}
+                                </MenuItem>
+                              ))
+                            ) : (
+                              <MenuItem disabled>
+                                No REC members available
+                              </MenuItem>
+                            )}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="medium"
+                          startIcon={<PersonAddIcon />}
+                          onClick={handleAddREC}
+                          disabled={!selectedRec || availableRecs.length === 0}
+                          sx={{
+                            fontWeight: 600,
+                            textTransform: "none",
+                            width: "100%",
+                          }}
+                        >
+                          Add REC
+                        </Button>
+                      </Grid>
+                    </Grid>
+
+                    {selectedRec && selectedRecDetails && (
+                      <Box
+                        sx={{
+                          mt: 2,
+                          p: 2,
+                          bgcolor: "action.hover",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight={600}
+                          gutterBottom
+                        >
+                          Selected REC Details:
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Name
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedRecDetails.name}
+                            </Typography>
+                          </Grid>
+                          <Grid item size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              User ID
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedRecDetails.userId}
+                            </Typography>
+                          </Grid>
+                          <Grid item size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Email
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedRecDetails.email || "N/A"}
+                            </Typography>
+                          </Grid>
+                          <Grid item size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Mobile No
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedRecDetails.mobileNo || "N/A"}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    )}
+
+                    {assignedRecs.length === 0 && (
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        No REC members have been assigned yet. Use the form
+                        above to add REC members.
+                      </Alert>
+                    )}
+
+                    {recList.length === 0 && (
+                      <Alert severity="warning" sx={{ mt: 2 }}>
+                        No REC members found. Please check if there are active
+                        REC users in the system.
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Navigation and Action Buttons */}
+        <Box
+          sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}
+        >
+          {!isFirstTab() && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<SkipPreviousIcon />}
+              onClick={handlePreviousTab}
+              sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
+            >
+              Previous
+            </Button>
           )}
 
-          {roleId === "10" && (
-            <>
-              <Button
-                variant="contained"
-                color="success"
-                size="small"
-                startIcon={<CheckCircleIcon />}
-                onClick={() => openActionDialog(62)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Verify 2
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                size="small"
-                startIcon={<CancelIcon />}
-                onClick={() => openActionDialog(60)}
-                sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-              >
-                Reject
-              </Button>
-            </>
-          )}
-
-          {roleId === "23" && (
+          {!isLastTab() && (
             <Button
               variant="contained"
               color="primary"
               size="small"
-              startIcon={<VerifiedIcon />}
-              onClick={() => openActionDialog(59)}
-              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+              endIcon={<SkipNextIcon />}
+              onClick={handleNextTab}
+              sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
             >
-              Endorse
+              Next
             </Button>
           )}
 
-          {roleId === "22" && (
-            <Button
-              variant="contained"
-              color="success"
-              size="small"
-              startIcon={<CheckCircleIcon />}
-              onClick={() => openActionDialog(57)}
-              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-            >
-              Approve
-            </Button>
+          {isLastTab() && (
+            <>
+              {roleId === "7" && (
+                <>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    size="small"
+                    startIcon={<CheckCircleIcon />}
+                    onClick={() => openActionDialog(56)}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
+                  >
+                    Verify
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    size="small"
+                    startIcon={<CancelIcon />}
+                    onClick={() => openActionDialog(58)}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
+
+              {roleId === "10" && (
+                <>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    size="small"
+                    startIcon={<CheckCircleIcon />}
+                    onClick={() => openActionDialog(62)}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
+                  >
+                    Verify
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    size="small"
+                    startIcon={<CancelIcon />}
+                    onClick={() => openActionDialog(60)}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
+
+              {roleId === "23" && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  startIcon={<VerifiedIcon />}
+                  onClick={() => openActionDialog(59)}
+                  sx={{
+                    px: 3,
+                    py: 0.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
+                >
+                  Endorse
+                </Button>
+              )}
+
+              {roleId === "22" && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  startIcon={<CheckCircleIcon />}
+                  onClick={() => openActionDialog(57)}
+                  sx={{
+                    px: 3,
+                    py: 0.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
+                >
+                  Approve
+                </Button>
+              )}
+            </>
           )}
         </Box>
       </Paper>
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={closeDeleteDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Confirm Removal</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {recToDelete && (
+              <>
+                Are you sure you want to remove{" "}
+                <strong>{recToDelete?.name}</strong> ({recToDelete?.userId})
+                from the REC assignment?
+              </>
+            )}
+            {accreditorToDelete && (
+              <>
+                Are you sure you want to remove{" "}
+                <strong>{accreditorToDelete?.name}</strong> (
+                {accreditorToDelete?.userId}) from the Accreditor assignment?
+              </>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            color="primary"
+            variant="outlined"
+            size="small"
+            onClick={closeDeleteDialog}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={recToDelete ? handleDeleteREC : handleDeleteAccreditor}
+            color="error"
+            variant="contained"
+            size="small"
+            startIcon={<DeleteIcon />}
+          >
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Action Dialog */}
-      <Dialog open={actionDialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+      <Dialog
+        open={actionDialogOpen}
+        onClose={closeDialog}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>{getDialogTitle()}</DialogTitle>
         <DialogContent>{getDialogContent()}</DialogContent>
         <DialogActions>
@@ -872,7 +1703,8 @@ const ViewApplyAccreditedCourse = () => {
             size="small"
             disabled={
               actionLoading ||
-              ((selectedStatusId === 58 || selectedStatusId === 60) && !remarks.trim())
+              ((selectedStatusId === 58 || selectedStatusId === 60) &&
+                !remarks.trim())
             }
           >
             {getConfirmButtonText()}
