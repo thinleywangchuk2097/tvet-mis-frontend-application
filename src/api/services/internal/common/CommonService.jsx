@@ -93,6 +93,15 @@ class CommonService {
       .catch((error) => error);
   }
 
+   getInstituteNameByInstituteId(instituteId) {
+    return apiClient
+      .get(
+        `/api/v1/common/get-institute-name/${instituteId}`,
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   fetchDocument(fileName, upload_url) {
     return apiClient.get("/api/v1/common/download-document", {
       params: {

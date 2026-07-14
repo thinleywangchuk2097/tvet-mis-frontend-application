@@ -28,13 +28,14 @@ import AnnualBudget from "../pages/institute/resource-management/AnnualBudget";
 import AnnualExpenditure from "../pages/institute/resource-management/AnnualExpenditure";
 import MonitoringReport from "../pages/institute/resource-management/MonitoringReport";
 import Notification from "../pages/institute/resource-management/Notification";
-//service
-import CreateCourse from "../pages/institute/service/CreateCourse";
-import ApplyNonAccreditedCourse from "../pages/institute/service/ApplyNonAccreditedCourse";
-import ApplyAccreditedCourse from "../pages/institute/service/ApplyAccreditedCourse";
-import InstituteChange from "../pages/institute/service/InstituteChange";
-import ViewApplyNonAccreditedCourse from "../pages/institute/service/ViewApplyNonAccreditedCourse";
-import ViewApplyAccreditedCourse from "../pages/institute/service/ViewApplyAccreditedCourse";
+
+
+//registration
+import AccreditedCourseRegistration from "../pages/institute/registration/AccreditedCourseRegistration";
+import NonAccreditedCourseRegistration from "../pages/institute/registration/NonAccreditedCourseRegistration";
+import ViewAccreditedCourseRegistration from "../pages/institute/registration/ViewAccreditedCourseRegistration";
+import ViewNonAccreditedCourseRegistration from "../pages/institute/registration/ViewNonAccreditedCourseRegistration";
+import InstituteChange from "../pages/institute/registration/InstituteChange";
 
 //curriculum
 import CurriculumIndex from "../pages/curriculum/CurriculumIndex";
@@ -43,7 +44,6 @@ import ViewCurriculumIndex from "../pages/curriculum/ViewCurriculumIndex";
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
 import TrackTrainee from "../pages/institute/TrackTrainee";
-import ApplyTot from "../pages/institute/ApplyTot";
 // tvet data manager
 import GenerateTracerIndex from "../pages/dwps/tracer/GenerateTracerIndex";
 import SendTracerIndex from "../pages/dwps/tracer/SendTracerIndex";
@@ -55,7 +55,8 @@ import ViewAssessorAccreditorQMSAuditor from "../pages/public/registration/ViewA
 import InstituteRenewalIndex from "../pages/renewal/InstituteRenewalIndex";
 //tot
 import CreateTotIndex from "../pages/dwps/tot/CreateTotIndex";
-import AddTraineeIndex from "../pages/dwps/tot/AddTraineeIndex";
+import ApplyTrainerToTProgram from "../pages/dwps/tot/ApplyTrainerToTProgram";
+import ViewApplyTrainerToTProgram from "../pages/dwps/tot/ViewApplyTrainerToTProgram";
 
 //track application status
 import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
@@ -66,6 +67,7 @@ import CertificateIndex from "../pages/certificate/CertificateIndex";
 //birms
 import BirmsAgencyPaymentIndex from "../pages/birms/private/BirmsAgencyPaymentIndex";
 import BirmsInstitutePaymentIndex from "../pages/birms/private/BirmsInstitutePaymentIndex";
+import CommonBirmsPayment from "../pages/birms/private/CommonBirmsPayment";
 //master
 import SectorOccupationIndex from "../pages/master/SectorOccupationIndex";
 import ServiceMasterIndex from "../pages/master/ServiceMasterIndex";
@@ -96,11 +98,10 @@ import AddTrainerIndex from "../pages/trainer/AddTrainerIndex";
 
 //NCS Management
 import CreateNcsIndex from "../pages/bqpca/nac/CreateNcsIndex";
-//Curriculum Management
-import CreateCurriculumIndex from "../pages/bqpca/curriculum/CreateCurriculumIndex";
 //On-Job Training
-import OnJobTrainingIndex from "../pages/ojt/OnJobTrainingIndex";
-import OnCampusJobPlacement from "../pages/ojt/OnCampusJobPlacement";
+import OnJobTrainingIndex from "../pages/dwps/ojt/OnJobTrainingIndex";
+import OnCampusJobPlacement from "../pages/dwps/ojt/OnCampusJobPlacement";
+import TrainingJobPlacementReportIndex from "../pages/dwps/ojt/TrainingJobPlacementReportIndex";
 
 export const privateRoutes = [
   {
@@ -160,7 +161,7 @@ export const privateRoutes = [
       },
       {
         path: "view-non-accredited-course/:applicationNo",
-        element: <ViewApplyNonAccreditedCourse />,
+        element: <ViewNonAccreditedCourseRegistration />,
       },
       {
         path: "view-curriculum-index/:applicationNo",
@@ -168,7 +169,7 @@ export const privateRoutes = [
       },
       {
         path: "view-accredited-course/:applicationNo",
-        element: <ViewApplyAccreditedCourse />,
+        element: <ViewAccreditedCourseRegistration />,
       },
       {
         path: "view-trainee-selection/:applicationNo",
@@ -182,6 +183,10 @@ export const privateRoutes = [
         path: "view-institute-monitoring-index/:applicationNo",
         element: <ViewInstituteMonitoringIndex />,
       },
+      {
+        path: "view-apply-trainer-tot-program/:applicationNo",
+        element: <ViewApplyTrainerToTProgram />,
+      }
     ],
   },
   {
@@ -234,21 +239,20 @@ export const privateRoutes = [
         path: "campus-job-placement",
         element: <OnCampusJobPlacement />,
       },
+      {
+        path: "training-job-placement-report",
+        element: <TrainingJobPlacementReportIndex />,
+      }
     ],
   },
   {
-    path: "service",
+    path: "registration",
     children: [
-      /*  {
-        path: "curriculum-endorse-index",
-        element: <CurriculumEndorsementIndex />,
-      }, */
       {
-        path: "apply-non-accredited-course",
-        element: <ApplyNonAccreditedCourse />,
+        path: "non-accredited-course",
+        element: <NonAccreditedCourseRegistration />,
       },
-      { path: "apply-accredited-course", element: <ApplyAccreditedCourse /> },
-      { path: "create-course", element: <CreateCourse /> },
+      { path: "accredited-course", element: <AccreditedCourseRegistration /> },
       { path: "add-trainer", element: <AddTrainerIndex /> },
       { path: "institute-change", element: <InstituteChange /> },
     ],
@@ -309,8 +313,7 @@ export const privateRoutes = [
     path: "tot",
     children: [
       { path: "create-index", element: <CreateTotIndex /> },
-      { path: "add-trainee-index", element: <AddTraineeIndex /> },
-      { path: "apply-tot-index", element: <ApplyTot /> },
+      { path: "apply-trainer-tot-index", element: <ApplyTrainerToTProgram /> }
     ],
   },
   {
@@ -330,6 +333,7 @@ export const privateRoutes = [
         element: <BirmsInstitutePaymentIndex />,
       },
       { path: "agency-payment-index", element: <BirmsAgencyPaymentIndex /> },
+      { path: "common-payment-index/:applicationNo/:serviceCode/:taxPayerNo/:taxPayerEmail/:taxPayerMobileNo/:taxPayerName/:instituteId", element: <CommonBirmsPayment /> }
     ],
   },
   {
@@ -346,8 +350,5 @@ export const privateRoutes = [
     path: "ncs",
     children: [{ path: "create-index", element: <CreateNcsIndex /> }],
   },
-  {
-    path: "curriculum",
-    children: [{ path: "create-index", element: <CreateCurriculumIndex /> }],
-  },
+ 
 ];

@@ -71,9 +71,9 @@ const DropdownIndex = () => {
   const [dropdownToDelete, setDropdownToDelete] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Pagination
+  // Pagination - Default: 5 for mobile, 10 for desktop
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 3 : 5);
+  const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
 
   // Original values & change tracking
   const [originalValues, setOriginalValues] = useState({
@@ -104,7 +104,7 @@ const DropdownIndex = () => {
 
   // Update rows per page on screen size change
   useEffect(() => {
-    setRowsPerPage(isMobile ? 3 : 5);
+    setRowsPerPage(isMobile ? 5 : 10);
   }, [isMobile]);
 
   // Search filtering
@@ -492,7 +492,7 @@ const DropdownIndex = () => {
       </Table>
 
       <TablePagination
-        rowsPerPageOptions={[3, 5, 10, 25]}
+        rowsPerPageOptions={[5, 10, 25, 50]}
         component="div"
         count={filteredDropdowns.length}
         rowsPerPage={rowsPerPage}
@@ -601,7 +601,7 @@ const DropdownIndex = () => {
             {/* Mobile Pagination */}
             {filteredDropdowns.length > 0 && (
               <TablePagination
-                rowsPerPageOptions={[3, 5, 10]}
+                rowsPerPageOptions={[5, 10, 25, 50]}
                 component="div"
                 count={filteredDropdowns.length}
                 rowsPerPage={rowsPerPage}

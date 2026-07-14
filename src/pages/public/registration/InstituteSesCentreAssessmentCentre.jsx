@@ -19,6 +19,8 @@ import {
   IconButton,
   Divider,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import SearchIcon from "@mui/icons-material/Search";
@@ -29,6 +31,8 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
+import FastForwardIcon from "@mui/icons-material/FastForward";
+import FastRewindIcon from "@mui/icons-material/FastRewind";
 import FileUpload from "../../../components/file/FileUpload";
 import { useFormik } from "formik";
 import * as Yup from "yup";
@@ -37,7 +41,6 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import InstituteProposalService from "../../../api/services/internal/registration/InstituteProposalService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import DatahubService from "../../../api/services/external/datahub/DatahubService";
-
 import { useParams } from "react-router-dom";
 
 // Constants
@@ -160,6 +163,7 @@ const InstituteSesCentreAssessmentCentre = () => {
   const [courseError, setCourseError] = useState("");
   const [tuitionError, setTuitionError] = useState("");
   const [serviceName, setServiceName] = useState();
+  const [declaration, setDeclaration] = useState([]);
 
   const [pendingMappings, setPendingMappings] = useState({
     sectorId: null,
@@ -322,12 +326,17 @@ const InstituteSesCentreAssessmentCentre = () => {
         }),
 
         files: Yup.array().min(1, "Upload at least one document"),
+        declarationAccepted: Yup.boolean().oneOf(
+          [true],
+          "You must accept the declaration to submit",
+        ),
       }),
     [isTuitionService],
   );
 
   useEffect(() => {
     fetchServiceName();
+    fetchDeclaration();
   }, [serviceId]);
 
   const fetchServiceName = async () => {
@@ -336,6 +345,15 @@ const InstituteSesCentreAssessmentCentre = () => {
       setServiceName(response.data.serviceName);
     } catch (error) {
       console.error("Error fetching sectors:", error);
+    }
+  };
+
+  const fetchDeclaration = async () => {
+    try {
+      const response = await CommonService.getByParentId(30);
+      setDeclaration(response.data);
+    } catch (error) {
+      console.error("Error fetching declaration:", error);
     }
   };
 
@@ -575,6 +593,7 @@ const InstituteSesCentreAssessmentCentre = () => {
       courses: isTuitionService ? [] : [{ ...initialCourse }],
       tuitionDetails: isTuitionService ? [{ ...initialTuition }] : [],
       files: [],
+      declarationAccepted: false,
     },
     validationSchema,
     validateOnChange: true,
@@ -615,6 +634,7 @@ const InstituteSesCentreAssessmentCentre = () => {
           userId: null,
           documents: documents,
           qualityStandards: qualityStandardsList,
+          declarationAccepted: values.declarationAccepted || false,
         };
 
         // Add conditional data based on service type
@@ -1084,7 +1104,8 @@ const InstituteSesCentreAssessmentCentre = () => {
       formik.values.files?.length > 0 &&
       trainersValid &&
       coursesValid &&
-      tuitionValid
+      tuitionValid &&
+      formik.values.declarationAccepted === true
     );
   }, [
     formik.isValid,
@@ -1177,9 +1198,1290 @@ const InstituteSesCentreAssessmentCentre = () => {
     baseTabs.push(
       { icon: <VerifiedIcon />, label: "Quality Standards" },
       { icon: <FileOpenIcon />, label: "Supporting Documents" },
+      { icon: <VerifiedIcon />, label: "Declaration" },
     );
 
     return baseTabs;
+  };
+
+  const tabs = getTabs();
+  const isFirstTab = tabValue === 0;
+  const isLastTab = tabValue === tabs.length - 1;
+
+  const handleNext = () => {
+    if (tabValue < tabs.length - 1) {
+      setTabValue(tabValue + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (tabValue > 0) {
+      setTabValue(tabValue - 1);
+    }
+  };
+
+  // Render tab content
+  const renderTabContent = () => {
+    // Basic Information - Tab 0
+    if (tabValue === 0) {
+      return (
+        <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
+          <Grid container spacing={2}>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="instituteName"
+                label={
+                  <span>
+                    Name of Training Provider / Institution{" "}
+                    <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.instituteName}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.instituteName &&
+                  Boolean(formik.errors.instituteName)
+                }
+                helperText={
+                  formik.touched.instituteName && formik.errors.instituteName
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                name="dzongkhag"
+                label={
+                  <span>
+                    Dzongkhag <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.dzongkhag}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.dzongkhag && Boolean(formik.errors.dzongkhag)
+                }
+                helperText={formik.touched.dzongkhag && formik.errors.dzongkhag}
+              >
+                {dzongkhagOptions.map((opt) => (
+                  <MenuItem key={opt.id} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="location"
+                label={
+                  <span>
+                    Location of the Institute{" "}
+                    <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.location}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.location && Boolean(formik.errors.location)
+                }
+                helperText={formik.touched.location && formik.errors.location}
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="telephone"
+                label={
+                  <span>
+                    Telephone No <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.telephone}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.telephone && Boolean(formik.errors.telephone)
+                }
+                helperText={formik.touched.telephone && formik.errors.telephone}
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="mobile"
+                label={
+                  <span>
+                    Mobile No <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.mobile}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.mobile && Boolean(formik.errors.mobile)}
+                helperText={formik.touched.mobile && formik.errors.mobile}
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="email"
+                label={
+                  <span>
+                    Email Id <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.email}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.email && Boolean(formik.errors.email)}
+                helperText={formik.touched.email && formik.errors.email}
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="website"
+                label="Website Address"
+                value={formik.values.website}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.website && Boolean(formik.errors.website)}
+                helperText={formik.touched.website && formik.errors.website}
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="businessLicenseNo"
+                label={
+                  <span>
+                    Business License No <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.businessLicenseNo}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.businessLicenseNo &&
+                  Boolean(formik.errors.businessLicenseNo)
+                }
+                helperText={
+                  formik.touched.businessLicenseNo &&
+                  formik.errors.businessLicenseNo
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                name="ownershipType"
+                label={
+                  <span>
+                    Type of Ownership <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.ownershipType}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.ownershipType &&
+                  Boolean(formik.errors.ownershipType)
+                }
+                helperText={
+                  formik.touched.ownershipType && formik.errors.ownershipType
+                }
+              >
+                {ownershipOptions.map((opt) => (
+                  <MenuItem key={opt.id} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                type="number"
+                fullWidth
+                size="small"
+                name="bhutaneseEmployees"
+                label={
+                  <span>
+                    Total Number of Bhutanese Employees{" "}
+                    <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.bhutaneseEmployees}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.bhutaneseEmployees &&
+                  Boolean(formik.errors.bhutaneseEmployees)
+                }
+                helperText={
+                  formik.touched.bhutaneseEmployees &&
+                  formik.errors.bhutaneseEmployees
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                type="number"
+                fullWidth
+                size="small"
+                name="nonBhutaneseEmployees"
+                label={
+                  <span>
+                    Total Number of Non Bhutanese Employees{" "}
+                    <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.nonBhutaneseEmployees}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.nonBhutaneseEmployees &&
+                  Boolean(formik.errors.nonBhutaneseEmployees)
+                }
+                helperText={
+                  formik.touched.nonBhutaneseEmployees &&
+                  formik.errors.nonBhutaneseEmployees
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="keyContactName"
+                label={
+                  <span>
+                    Key Contact Person Name{" "}
+                    <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.keyContactName}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.keyContactName &&
+                  Boolean(formik.errors.keyContactName)
+                }
+                helperText={
+                  formik.touched.keyContactName && formik.errors.keyContactName
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="keyContactDesignation"
+                label={
+                  <span>
+                    Key Contact Person Designation{" "}
+                    <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.keyContactDesignation}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.keyContactDesignation &&
+                  Boolean(formik.errors.keyContactDesignation)
+                }
+                helperText={
+                  formik.touched.keyContactDesignation &&
+                  formik.errors.keyContactDesignation
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                size="small"
+                name="keyContactMobileNo"
+                label={
+                  <span>
+                    Key Contact Person Mobile No{" "}
+                    <span style={{ color: "red" }}>*</span>
+                  </span>
+                }
+                value={formik.values.keyContactMobileNo}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.keyContactMobileNo &&
+                  Boolean(formik.errors.keyContactMobileNo)
+                }
+                helperText={
+                  formik.touched.keyContactMobileNo &&
+                  formik.errors.keyContactMobileNo
+                }
+              />
+            </Grid>
+          </Grid>
+        </Paper>
+      );
+    }
+
+    // Trainer Details - Tab 1 (only for non-tuition)
+    if (!isTuitionService && tabValue === 1) {
+      return (
+        <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
+          <Grid container spacing={3}>
+            {formik.values.trainers.map((trainer, index) => (
+              <Grid item size={{ xs: 12 }} key={index}>
+                <Paper
+                  sx={{
+                    p: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        label={
+                          <span>
+                            Nationality <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        name={`trainers[${index}].nationality`}
+                        value={trainer.nationality}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.trainers?.[index]?.nationality &&
+                          Boolean(formik.errors.trainers?.[index]?.nationality)
+                        }
+                        helperText={
+                          formik.touched.trainers?.[index]?.nationality &&
+                          formik.errors.trainers?.[index]?.nationality
+                        }
+                      >
+                        {nationalityOptions.map((opt) => (
+                          <MenuItem key={opt.id} value={opt.value}>
+                            {opt.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    {trainer.nationality === "Bhutanese" && (
+                      <Grid item size={{ xs: 12, md: 3 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label={
+                            <span>
+                              CID <span style={{ color: "red" }}>*</span>
+                            </span>
+                          }
+                          name={`trainers[${index}].cid`}
+                          value={trainer.cid}
+                          onChange={formik.handleChange}
+                          onBlur={(e) => {
+                            formik.handleBlur(e);
+                            if (
+                              e.target.value &&
+                              e.target.value.length === 11
+                            ) {
+                              fetchAndFillCitizenDetails(e.target.value, index);
+                            }
+                          }}
+                          error={
+                            formik.touched.trainers?.[index]?.cid &&
+                            Boolean(formik.errors.trainers?.[index]?.cid)
+                          }
+                          helperText={
+                            formik.touched.trainers?.[index]?.cid &&
+                            formik.errors.trainers?.[index]?.cid
+                          }
+                          InputProps={{
+                            endAdornment: fetchingCitizen && (
+                              <CircularProgress size={20} />
+                            ),
+                          }}
+                        />
+                      </Grid>
+                    )}
+
+                    {trainer.nationality === "Non-Bhutanese" && (
+                      <Grid item size={{ xs: 12, md: 3 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label={
+                            <span>
+                              Work Permit{" "}
+                              <span style={{ color: "red" }}>*</span>
+                            </span>
+                          }
+                          name={`trainers[${index}].workPermit`}
+                          value={trainer.workPermit}
+                          onChange={formik.handleChange}
+                          error={
+                            formik.touched.trainers?.[index]?.workPermit &&
+                            Boolean(formik.errors.trainers?.[index]?.workPermit)
+                          }
+                          helperText={
+                            formik.touched.trainers?.[index]?.workPermit &&
+                            formik.errors.trainers?.[index]?.workPermit
+                          }
+                        />
+                      </Grid>
+                    )}
+
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label={
+                          <span>
+                            Name <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        name={`trainers[${index}].name`}
+                        value={trainer.name}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.trainers?.[index]?.name &&
+                          Boolean(formik.errors.trainers?.[index]?.name)
+                        }
+                        helperText={
+                          formik.touched.trainers?.[index]?.name &&
+                          formik.errors.trainers?.[index]?.name
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        label={
+                          <span>
+                            Gender <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        name={`trainers[${index}].gender`}
+                        value={trainer.gender}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.trainers?.[index]?.gender &&
+                          Boolean(formik.errors.trainers?.[index]?.gender)
+                        }
+                        helperText={
+                          formik.touched.trainers?.[index]?.gender &&
+                          formik.errors.trainers?.[index]?.gender
+                        }
+                      >
+                        {genderOptions.map((opt) => (
+                          <MenuItem key={opt.id} value={opt.value}>
+                            {opt.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label={
+                          <span>
+                            Qualification{" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        name={`trainers[${index}].qualification`}
+                        value={trainer.qualification}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.trainers?.[index]?.qualification &&
+                          Boolean(
+                            formik.errors.trainers?.[index]?.qualification,
+                          )
+                        }
+                        helperText={
+                          formik.touched.trainers?.[index]?.qualification &&
+                          formik.errors.trainers?.[index]?.qualification
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        label={
+                          <span>
+                            Experience (Years){" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        name={`trainers[${index}].experience`}
+                        value={trainer.experience}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.trainers?.[index]?.experience &&
+                          Boolean(formik.errors.trainers?.[index]?.experience)
+                        }
+                        helperText={
+                          formik.touched.trainers?.[index]?.experience &&
+                          formik.errors.trainers?.[index]?.experience
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        label={
+                          <span>
+                            Type <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        name={`trainers[${index}].type`}
+                        value={trainer.type}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.trainers?.[index]?.type &&
+                          Boolean(formik.errors.trainers?.[index]?.type)
+                        }
+                        helperText={
+                          formik.touched.trainers?.[index]?.type &&
+                          formik.errors.trainers?.[index]?.type
+                        }
+                      >
+                        {jobTypeOptions.map((opt) => (
+                          <MenuItem key={opt.id} value={opt.value}>
+                            {opt.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    {index > 0 && (
+                      <Grid item size={{ xs: 12, md: 1 }}>
+                        <IconButton
+                          color="error"
+                          onClick={() => handleDeleteTrainer(index)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+            ))}
+
+            <Grid item xs={12} sx={{ textAlign: "center", mt: 2 }}>
+              {trainerError && (
+                <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                  {trainerError}
+                </Typography>
+              )}
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleAddTrainer}
+              >
+                Add Trainer
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      );
+    }
+
+    // Course Details - Tab 2 (only for non-tuition)
+    if (!isTuitionService && tabValue === 2) {
+      return (
+        <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
+          <Grid container spacing={3}>
+            {formik.values.courses.map((course, index) => (
+              <Grid item size={{ xs: 12 }} key={index}>
+                <Paper
+                  sx={{
+                    p: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography variant="subtitle2" fontWeight={600} mb={2}>
+                    Course {index + 1}
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        name={`courses[${index}].sector`}
+                        label={
+                          <span>
+                            Sector <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={course.sector}
+                        onChange={(e) =>
+                          handleSectorChange(index, e.target.value)
+                        }
+                        error={
+                          formik.touched.courses?.[index]?.sector &&
+                          Boolean(formik.errors.courses?.[index]?.sector)
+                        }
+                        helperText={
+                          formik.touched.courses?.[index]?.sector &&
+                          formik.errors.courses?.[index]?.sector
+                        }
+                      >
+                        {sectorOptions.map((opt) => (
+                          <MenuItem key={opt.id} value={opt.value}>
+                            {opt.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        name={`courses[${index}].course`}
+                        label={
+                          <span>
+                            Course <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={course.course}
+                        onChange={formik.handleChange}
+                        disabled={!course.sector}
+                        error={
+                          formik.touched.courses?.[index]?.course &&
+                          Boolean(formik.errors.courses?.[index]?.course)
+                        }
+                        helperText={
+                          !course.sector
+                            ? "Select sector first"
+                            : formik.touched.courses?.[index]?.course &&
+                              formik.errors.courses?.[index]?.course
+                        }
+                        InputProps={{
+                          endAdornment: loadingCourses[course.sector] && (
+                            <CircularProgress size={20} />
+                          ),
+                        }}
+                      >
+                        <MenuItem value="">
+                          {!course.sector
+                            ? "Select sector first"
+                            : loadingCourses[course.sector]
+                              ? "Loading courses..."
+                              : coursesMap[course.sector]?.length === 0
+                                ? "No courses available"
+                                : "Select Course"}
+                        </MenuItem>
+                        {coursesMap[course.sector]?.map((opt) => (
+                          <MenuItem key={opt.id} value={opt.id}>
+                            {opt.occupationName || opt.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        name={`courses[${index}].courseLevel`}
+                        label={
+                          <span>
+                            Level Certificate / Diploma{" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={course.courseLevel}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.courses?.[index]?.courseLevel &&
+                          Boolean(formik.errors.courses?.[index]?.courseLevel)
+                        }
+                        helperText={
+                          formik.touched.courses?.[index]?.courseLevel &&
+                          formik.errors.courses?.[index]?.courseLevel
+                        }
+                      >
+                        {certificateLevelOptions.map((opt) => (
+                          <MenuItem key={opt.id} value={opt.value}>
+                            {opt.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        name={`courses[${index}].theoryHours`}
+                        label={
+                          <span>
+                            Theory (Hours){" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={course.theoryHours}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.courses?.[index]?.theoryHours &&
+                          Boolean(formik.errors.courses?.[index]?.theoryHours)
+                        }
+                        helperText={
+                          formik.touched.courses?.[index]?.theoryHours &&
+                          formik.errors.courses?.[index]?.theoryHours
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        name={`courses[${index}].practicalHours`}
+                        label={
+                          <span>
+                            Practical (Hours){" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={course.practicalHours}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.courses?.[index]?.practicalHours &&
+                          Boolean(
+                            formik.errors.courses?.[index]?.practicalHours,
+                          )
+                        }
+                        helperText={
+                          formik.touched.courses?.[index]?.practicalHours &&
+                          formik.errors.courses?.[index]?.practicalHours
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        name={`courses[${index}].ojtHours`}
+                        label={
+                          <span>
+                            OJT (Hours) <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={course.ojtHours}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.courses?.[index]?.ojtHours &&
+                          Boolean(formik.errors.courses?.[index]?.ojtHours)
+                        }
+                        helperText={
+                          formik.touched.courses?.[index]?.ojtHours &&
+                          formik.errors.courses?.[index]?.ojtHours
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        name={`courses[${index}].feesPerTrainee`}
+                        label={
+                          <span>
+                            Fees per Trainee{" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={course.feesPerTrainee}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.courses?.[index]?.feesPerTrainee &&
+                          Boolean(
+                            formik.errors.courses?.[index]?.feesPerTrainee,
+                          )
+                        }
+                        helperText={
+                          formik.touched.courses?.[index]?.feesPerTrainee &&
+                          formik.errors.courses?.[index]?.feesPerTrainee
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        name={`courses[${index}].enrollmentCapacity`}
+                        label={
+                          <span>
+                            Enrollment Capacity per Batch{" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={course.enrollmentCapacity}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.courses?.[index]?.enrollmentCapacity &&
+                          Boolean(
+                            formik.errors.courses?.[index]?.enrollmentCapacity,
+                          )
+                        }
+                        helperText={
+                          formik.touched.courses?.[index]?.enrollmentCapacity &&
+                          formik.errors.courses?.[index]?.enrollmentCapacity
+                        }
+                      />
+                    </Grid>
+
+                    {index > 0 && (
+                      <Grid item size={{ xs: 12 }}>
+                        <Box display="flex" justifyContent="flex-end">
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDeleteCourse(index)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+            ))}
+
+            <Grid item xs={12} sx={{ textAlign: "center", mt: 2 }}>
+              {courseError && (
+                <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                  {courseError}
+                </Typography>
+              )}
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleAddCourse}
+              >
+                Add Course
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      );
+    }
+
+    // Tuition/Coaching Details - Tab 1 (only for tuition service)
+    if (isTuitionService && tabValue === 1) {
+      return (
+        <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
+          <Grid container spacing={3}>
+            {formik.values.tuitionDetails.map((tuition, index) => (
+              <Grid item size={{ xs: 12 }} key={index}>
+                <Paper
+                  sx={{
+                    p: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography variant="subtitle2" fontWeight={600} mb={2}>
+                    Tuition/Coaching {index + 1}
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        name={`tuitionDetails[${index}].classLevel`}
+                        label={
+                          <span>
+                            Class Level <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={tuition.classLevel}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.tuitionDetails?.[index]?.classLevel &&
+                          Boolean(
+                            formik.errors.tuitionDetails?.[index]?.classLevel,
+                          )
+                        }
+                        helperText={
+                          formik.touched.tuitionDetails?.[index]?.classLevel &&
+                          formik.errors.tuitionDetails?.[index]?.classLevel
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        name={`tuitionDetails[${index}].subjects`}
+                        label={
+                          <span>
+                            Subjects <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={tuition.subjects}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.tuitionDetails?.[index]?.subjects &&
+                          Boolean(
+                            formik.errors.tuitionDetails?.[index]?.subjects,
+                          )
+                        }
+                        helperText={
+                          formik.touched.tuitionDetails?.[index]?.subjects &&
+                          formik.errors.tuitionDetails?.[index]?.subjects
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        name={`tuitionDetails[${index}].duration`}
+                        label={
+                          <span>
+                            Duration (Hours/Months){" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={tuition.duration}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.tuitionDetails?.[index]?.duration &&
+                          Boolean(
+                            formik.errors.tuitionDetails?.[index]?.duration,
+                          )
+                        }
+                        helperText={
+                          formik.touched.tuitionDetails?.[index]?.duration &&
+                          formik.errors.tuitionDetails?.[index]?.duration
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        name={`tuitionDetails[${index}].fees`}
+                        label={
+                          <span>
+                            Fees (Nu.) <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={tuition.fees}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.tuitionDetails?.[index]?.fees &&
+                          Boolean(formik.errors.tuitionDetails?.[index]?.fees)
+                        }
+                        helperText={
+                          formik.touched.tuitionDetails?.[index]?.fees &&
+                          formik.errors.tuitionDetails?.[index]?.fees
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        name={`tuitionDetails[${index}].tutorCid`}
+                        label={
+                          <span>
+                            Tutor CID <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={tuition.tutorCid}
+                        onChange={formik.handleChange}
+                        onBlur={(e) => {
+                          formik.handleBlur(e);
+                          if (e.target.value && e.target.value.length === 11) {
+                            fetchAndFillTutorDetails(e.target.value, index);
+                          }
+                        }}
+                        error={
+                          formik.touched.tuitionDetails?.[index]?.tutorCid &&
+                          Boolean(
+                            formik.errors.tuitionDetails?.[index]?.tutorCid,
+                          )
+                        }
+                        helperText={
+                          formik.touched.tuitionDetails?.[index]?.tutorCid &&
+                          formik.errors.tuitionDetails?.[index]?.tutorCid
+                        }
+                        InputProps={{
+                          endAdornment: fetchingCitizen && (
+                            <CircularProgress size={20} />
+                          ),
+                        }}
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        name={`tuitionDetails[${index}].tutorName`}
+                        label={
+                          <span>
+                            Subject Wise Tutor Name{" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={tuition.tutorName}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.tuitionDetails?.[index]?.tutorName &&
+                          Boolean(
+                            formik.errors.tuitionDetails?.[index]?.tutorName,
+                          )
+                        }
+                        helperText={
+                          formik.touched.tuitionDetails?.[index]?.tutorName &&
+                          formik.errors.tuitionDetails?.[index]?.tutorName
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        name={`tuitionDetails[${index}].tutorQualification`}
+                        label={
+                          <span>
+                            Tutor Qualification{" "}
+                            <span style={{ color: "red" }}>*</span>
+                          </span>
+                        }
+                        value={tuition.tutorQualification}
+                        onChange={formik.handleChange}
+                        error={
+                          formik.touched.tuitionDetails?.[index]
+                            ?.tutorQualification &&
+                          Boolean(
+                            formik.errors.tuitionDetails?.[index]
+                              ?.tutorQualification,
+                          )
+                        }
+                        helperText={
+                          formik.touched.tuitionDetails?.[index]
+                            ?.tutorQualification &&
+                          formik.errors.tuitionDetails?.[index]
+                            ?.tutorQualification
+                        }
+                      />
+                    </Grid>
+
+                    {index > 0 && (
+                      <Grid item size={{ xs: 12 }}>
+                        <Box display="flex" justifyContent="flex-end">
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDeleteTuition(index)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+            ))}
+
+            <Grid item xs={12} sx={{ textAlign: "center", mt: 2 }}>
+              {tuitionError && (
+                <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                  {tuitionError}
+                </Typography>
+              )}
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleAddTuition}
+              >
+                Add Tuition/Coaching Detail
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      );
+    }
+
+    // Quality Standards
+    const qualityStandardsTabIndex = isTuitionService ? 2 : 3;
+    if (tabValue === qualityStandardsTabIndex) {
+      return (
+        <Grid container spacing={2} sx={{ mt: 1 }}>
+          <Grid item size={{ xs: 12 }}>
+            {qualityData.slice(0, 3).map(renderChecklist)}
+          </Grid>
+        </Grid>
+      );
+    }
+
+    // Supporting Documents
+    const documentsTabIndex = isTuitionService ? 3 : 4;
+    if (tabValue === documentsTabIndex) {
+      return (
+        <Grid container spacing={2} sx={{ mt: 1 }}>
+          <Grid item size={{ xs: 12 }}>
+            <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+              <Box
+                component="ol"
+                sx={{
+                  pl: 3,
+                  mb: 2,
+                  "& li": {
+                    fontSize: "0.85rem",
+                    fontStyle: "italic",
+                    mb: 0.5,
+                  },
+                }}
+              >
+                <li>
+                  Photocopy of business license (Not Applicable for Government
+                  Institutes)
+                </li>
+                <li>
+                  List of trainees for each course, indicating year of
+                  graduation/male/female/CID No
+                </li>
+              </Box>
+              <FileUpload
+                files={formik.values.files}
+                onFilesChange={(files) => formik.setFieldValue("files", files)}
+              />
+            </Paper>
+          </Grid>
+        </Grid>
+      );
+    }
+
+    // Declaration - Last Tab
+    const declarationTabIndex = isTuitionService ? 4 : 5;
+    if (tabValue === declarationTabIndex) {
+      return (
+        <Grid container spacing={2} sx={{ mt: 1 }}>
+          <Grid item size={{ xs: 12 }}>
+            <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                <span>
+                  Declaration <span style={{ color: "red" }}>*</span>
+                </span>
+              </Typography>
+              <Divider sx={{ mb: 3 }} />
+
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      name="declarationAccepted"
+                      checked={formik.values.declarationAccepted || false}
+                      onChange={(e) => {
+                        formik.setFieldValue(
+                          "declarationAccepted",
+                          e.target.checked,
+                        );
+                      }}
+                      onBlur={formik.handleBlur}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2">
+                      {declaration.length > 0
+                        ? declaration[0].name
+                        : "I hereby declare that the information provided is true and accurate to the best of my knowledge. I understand that any false information may result in appropriate action."}
+                    </Typography>
+                  }
+                />
+              </Box>
+
+              {formik.touched.declarationAccepted &&
+                formik.errors.declarationAccepted && (
+                  <Typography
+                    color="error"
+                    variant="caption"
+                    sx={{ mt: 1, display: "block" }}
+                  >
+                    {formik.errors.declarationAccepted}
+                  </Typography>
+                )}
+            </Paper>
+          </Grid>
+        </Grid>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -1228,1314 +2530,72 @@ const InstituteSesCentreAssessmentCentre = () => {
                 "& .MuiTab-root": { textTransform: "none", fontWeight: 600 },
               }}
             >
-              {getTabs().map((tab, index) => (
+              {tabs.map((tab, index) => (
                 <Tab key={index} icon={tab.icon} label={tab.label} />
               ))}
             </Tabs>
 
-            {/* Institute Details */}
-            {tabValue === 0 && (
-              <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
-                <Grid container spacing={2}>
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="instituteName"
-                      label={
-                        <span>
-                          Name of Training Provider / Institution{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.instituteName}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.instituteName &&
-                        Boolean(formik.errors.instituteName)
-                      }
-                      helperText={
-                        formik.touched.instituteName &&
-                        formik.errors.instituteName
-                      }
-                    />
-                  </Grid>
+            {/* Tab Content */}
+            {renderTabContent()}
 
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      size="small"
-                      name="dzongkhag"
-                      label={
-                        <span>
-                          Dzongkhag <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.dzongkhag}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.dzongkhag &&
-                        Boolean(formik.errors.dzongkhag)
-                      }
-                      helperText={
-                        formik.touched.dzongkhag && formik.errors.dzongkhag
-                      }
-                    >
-                      {dzongkhagOptions.map((opt) => (
-                        <MenuItem key={opt.id} value={opt.value}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="location"
-                      label={
-                        <span>
-                          Location of the Institute{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.location}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.location &&
-                        Boolean(formik.errors.location)
-                      }
-                      helperText={
-                        formik.touched.location && formik.errors.location
-                      }
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="telephone"
-                      label={
-                        <span>
-                          Telephone No <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.telephone}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.telephone &&
-                        Boolean(formik.errors.telephone)
-                      }
-                      helperText={
-                        formik.touched.telephone && formik.errors.telephone
-                      }
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="mobile"
-                      label={
-                        <span>
-                          Mobile No <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.mobile}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.mobile && Boolean(formik.errors.mobile)
-                      }
-                      helperText={formik.touched.mobile && formik.errors.mobile}
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="email"
-                      label={
-                        <span>
-                          Email Id <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.email}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.email && Boolean(formik.errors.email)
-                      }
-                      helperText={formik.touched.email && formik.errors.email}
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="website"
-                      label="Website Address"
-                      value={formik.values.website}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.website && Boolean(formik.errors.website)
-                      }
-                      helperText={
-                        formik.touched.website && formik.errors.website
-                      }
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="businessLicenseNo"
-                      label={
-                        <span>
-                          Business License No{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.businessLicenseNo}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.businessLicenseNo &&
-                        Boolean(formik.errors.businessLicenseNo)
-                      }
-                      helperText={
-                        formik.touched.businessLicenseNo &&
-                        formik.errors.businessLicenseNo
-                      }
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      size="small"
-                      name="ownershipType"
-                      label={
-                        <span>
-                          Type of Ownership{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.ownershipType}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.ownershipType &&
-                        Boolean(formik.errors.ownershipType)
-                      }
-                      helperText={
-                        formik.touched.ownershipType &&
-                        formik.errors.ownershipType
-                      }
-                    >
-                      {ownershipOptions.map((opt) => (
-                        <MenuItem key={opt.id} value={opt.value}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      type="number"
-                      fullWidth
-                      size="small"
-                      name="bhutaneseEmployees"
-                      label={
-                        <span>
-                          Total Number of Bhutanese Employees{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.bhutaneseEmployees}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.bhutaneseEmployees &&
-                        Boolean(formik.errors.bhutaneseEmployees)
-                      }
-                      helperText={
-                        formik.touched.bhutaneseEmployees &&
-                        formik.errors.bhutaneseEmployees
-                      }
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      type="number"
-                      fullWidth
-                      size="small"
-                      name="nonBhutaneseEmployees"
-                      label={
-                        <span>
-                          Total Number of Non Bhutanese Employees{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.nonBhutaneseEmployees}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.nonBhutaneseEmployees &&
-                        Boolean(formik.errors.nonBhutaneseEmployees)
-                      }
-                      helperText={
-                        formik.touched.nonBhutaneseEmployees &&
-                        formik.errors.nonBhutaneseEmployees
-                      }
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="keyContactName"
-                      label={
-                        <span>
-                          Key Contact Person Name{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.keyContactName}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.keyContactName &&
-                        Boolean(formik.errors.keyContactName)
-                      }
-                      helperText={
-                        formik.touched.keyContactName &&
-                        formik.errors.keyContactName
-                      }
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="keyContactDesignation"
-                      label={
-                        <span>
-                          Key Contact Person Designation{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.keyContactDesignation}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.keyContactDesignation &&
-                        Boolean(formik.errors.keyContactDesignation)
-                      }
-                      helperText={
-                        formik.touched.keyContactDesignation &&
-                        formik.errors.keyContactDesignation
-                      }
-                    />
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="keyContactMobileNo"
-                      label={
-                        <span>
-                          Key Contact Person Mobile No{" "}
-                          <span style={{ color: "red" }}>*</span>
-                        </span>
-                      }
-                      value={formik.values.keyContactMobileNo}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.keyContactMobileNo &&
-                        Boolean(formik.errors.keyContactMobileNo)
-                      }
-                      helperText={
-                        formik.touched.keyContactMobileNo &&
-                        formik.errors.keyContactMobileNo
-                      }
-                    />
-                  </Grid>
-                </Grid>
-              </Paper>
-            )}
-
-            {/* Trainer Details */}
-            {!isTuitionService && tabValue === 1 && (
-              <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
-                <Grid container spacing={3}>
-                  {formik.values.trainers.map((trainer, index) => (
-                    <Grid item size={{ xs: 12 }} key={index}>
-                      <Paper
-                        sx={{
-                          p: 2,
-                          border: "1px solid",
-                          borderColor: "divider",
-                        }}
-                      >
-                        <Grid container spacing={2} alignItems="center">
-                          <Grid item size={{ xs: 12, md: 3 }}>
-                            <TextField
-                              select
-                              fullWidth
-                              size="small"
-                              label={
-                                <span>
-                                  Nationality{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              name={`trainers[${index}].nationality`}
-                              value={trainer.nationality}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.trainers?.[index]?.nationality &&
-                                Boolean(
-                                  formik.errors.trainers?.[index]?.nationality,
-                                )
-                              }
-                              helperText={
-                                formik.touched.trainers?.[index]?.nationality &&
-                                formik.errors.trainers?.[index]?.nationality
-                              }
-                            >
-                              {nationalityOptions.map((opt) => (
-                                <MenuItem key={opt.id} value={opt.value}>
-                                  {opt.label}
-                                </MenuItem>
-                              ))}
-                            </TextField>
-                          </Grid>
-
-                          {trainer.nationality === "Bhutanese" && (
-                            <Grid item size={{ xs: 12, md: 3 }}>
-                              <TextField
-                                fullWidth
-                                size="small"
-                                label={
-                                  <span>
-                                    CID <span style={{ color: "red" }}>*</span>
-                                  </span>
-                                }
-                                name={`trainers[${index}].cid`}
-                                value={trainer.cid}
-                                onChange={formik.handleChange}
-                                onBlur={(e) => {
-                                  formik.handleBlur(e);
-                                  if (
-                                    e.target.value &&
-                                    e.target.value.length === 11
-                                  ) {
-                                    fetchAndFillCitizenDetails(
-                                      e.target.value,
-                                      index,
-                                    );
-                                  }
-                                }}
-                                error={
-                                  formik.touched.trainers?.[index]?.cid &&
-                                  Boolean(formik.errors.trainers?.[index]?.cid)
-                                }
-                                helperText={
-                                  formik.touched.trainers?.[index]?.cid &&
-                                  formik.errors.trainers?.[index]?.cid
-                                }
-                                InputProps={{
-                                  endAdornment: fetchingCitizen && (
-                                    <CircularProgress size={20} />
-                                  ),
-                                }}
-                              />
-                            </Grid>
-                          )}
-
-                          {trainer.nationality === "Non-Bhutanese" && (
-                            <Grid item size={{ xs: 12, md: 3 }}>
-                              <TextField
-                                fullWidth
-                                size="small"
-                                label={
-                                  <span>
-                                    Work Permit{" "}
-                                    <span style={{ color: "red" }}>*</span>
-                                  </span>
-                                }
-                                name={`trainers[${index}].workPermit`}
-                                value={trainer.workPermit}
-                                onChange={formik.handleChange}
-                                error={
-                                  formik.touched.trainers?.[index]
-                                    ?.workPermit &&
-                                  Boolean(
-                                    formik.errors.trainers?.[index]?.workPermit,
-                                  )
-                                }
-                                helperText={
-                                  formik.touched.trainers?.[index]
-                                    ?.workPermit &&
-                                  formik.errors.trainers?.[index]?.workPermit
-                                }
-                              />
-                            </Grid>
-                          )}
-
-                          <Grid item size={{ xs: 12, md: 3 }}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              label={
-                                <span>
-                                  Name <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              name={`trainers[${index}].name`}
-                              value={trainer.name}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.trainers?.[index]?.name &&
-                                Boolean(formik.errors.trainers?.[index]?.name)
-                              }
-                              helperText={
-                                formik.touched.trainers?.[index]?.name &&
-                                formik.errors.trainers?.[index]?.name
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 3 }}>
-                            <TextField
-                              select
-                              fullWidth
-                              size="small"
-                              label={
-                                <span>
-                                  Gender <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              name={`trainers[${index}].gender`}
-                              value={trainer.gender}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.trainers?.[index]?.gender &&
-                                Boolean(formik.errors.trainers?.[index]?.gender)
-                              }
-                              helperText={
-                                formik.touched.trainers?.[index]?.gender &&
-                                formik.errors.trainers?.[index]?.gender
-                              }
-                            >
-                              {genderOptions.map((opt) => (
-                                <MenuItem key={opt.id} value={opt.value}>
-                                  {opt.label}
-                                </MenuItem>
-                              ))}
-                            </TextField>
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 3 }}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              label={
-                                <span>
-                                  Qualification{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              name={`trainers[${index}].qualification`}
-                              value={trainer.qualification}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.trainers?.[index]
-                                  ?.qualification &&
-                                Boolean(
-                                  formik.errors.trainers?.[index]
-                                    ?.qualification,
-                                )
-                              }
-                              helperText={
-                                formik.touched.trainers?.[index]
-                                  ?.qualification &&
-                                formik.errors.trainers?.[index]?.qualification
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 3 }}>
-                            <TextField
-                              type="number"
-                              fullWidth
-                              size="small"
-                              label={
-                                <span>
-                                  Experience (Years){" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              name={`trainers[${index}].experience`}
-                              value={trainer.experience}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.trainers?.[index]?.experience &&
-                                Boolean(
-                                  formik.errors.trainers?.[index]?.experience,
-                                )
-                              }
-                              helperText={
-                                formik.touched.trainers?.[index]?.experience &&
-                                formik.errors.trainers?.[index]?.experience
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 3 }}>
-                            <TextField
-                              select
-                              fullWidth
-                              size="small"
-                              label={
-                                <span>
-                                  Type <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              name={`trainers[${index}].type`}
-                              value={trainer.type}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.trainers?.[index]?.type &&
-                                Boolean(formik.errors.trainers?.[index]?.type)
-                              }
-                              helperText={
-                                formik.touched.trainers?.[index]?.type &&
-                                formik.errors.trainers?.[index]?.type
-                              }
-                            >
-                              {jobTypeOptions.map((opt) => (
-                                <MenuItem key={opt.id} value={opt.value}>
-                                  {opt.label}
-                                </MenuItem>
-                              ))}
-                            </TextField>
-                          </Grid>
-
-                          {index > 0 && (
-                            <Grid item size={{ xs: 12, md: 1 }}>
-                              <IconButton
-                                color="error"
-                                onClick={() => handleDeleteTrainer(index)}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </Grid>
-                          )}
-                        </Grid>
-                      </Paper>
-                    </Grid>
-                  ))}
-
-                  <Grid item xs={12} sx={{ textAlign: "center", mt: 2 }}>
-                    {trainerError && (
-                      <Typography color="error" variant="body2" sx={{ mb: 1 }}>
-                        {trainerError}
-                      </Typography>
-                    )}
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<AddIcon />}
-                      onClick={handleAddTrainer}
-                    >
-                      Add Trainer
-                    </Button>
-                  </Grid>
-                </Grid>
-              </Paper>
-            )}
-
-            {/* Course Details */}
-            {!isTuitionService && tabValue === 2 && (
-              <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
-                <Grid container spacing={3}>
-                  {formik.values.courses.map((course, index) => (
-                    <Grid item size={{ xs: 12 }} key={index}>
-                      <Paper
-                        sx={{
-                          p: 2,
-                          border: "1px solid",
-                          borderColor: "divider",
-                        }}
-                      >
-                        <Typography variant="subtitle2" fontWeight={600} mb={2}>
-                          Course {index + 1}
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              select
-                              fullWidth
-                              size="small"
-                              name={`courses[${index}].sector`}
-                              label={
-                                <span>
-                                  Sector <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={course.sector}
-                              onChange={(e) =>
-                                handleSectorChange(index, e.target.value)
-                              }
-                              error={
-                                formik.touched.courses?.[index]?.sector &&
-                                Boolean(formik.errors.courses?.[index]?.sector)
-                              }
-                              helperText={
-                                formik.touched.courses?.[index]?.sector &&
-                                formik.errors.courses?.[index]?.sector
-                              }
-                            >
-                              {sectorOptions.map((opt) => (
-                                <MenuItem key={opt.id} value={opt.value}>
-                                  {opt.label}
-                                </MenuItem>
-                              ))}
-                            </TextField>
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              select
-                              fullWidth
-                              size="small"
-                              name={`courses[${index}].course`}
-                              label={
-                                <span>
-                                  Course <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={course.course}
-                              onChange={formik.handleChange}
-                              disabled={!course.sector}
-                              error={
-                                formik.touched.courses?.[index]?.course &&
-                                Boolean(formik.errors.courses?.[index]?.course)
-                              }
-                              helperText={
-                                !course.sector
-                                  ? "Select sector first"
-                                  : formik.touched.courses?.[index]?.course &&
-                                    formik.errors.courses?.[index]?.course
-                              }
-                              InputProps={{
-                                endAdornment: loadingCourses[course.sector] && (
-                                  <CircularProgress size={20} />
-                                ),
-                              }}
-                            >
-                              <MenuItem value="">
-                                {!course.sector
-                                  ? "Select sector first"
-                                  : loadingCourses[course.sector]
-                                    ? "Loading courses..."
-                                    : coursesMap[course.sector]?.length === 0
-                                      ? "No courses available"
-                                      : "Select Course"}
-                              </MenuItem>
-                              {coursesMap[course.sector]?.map((opt) => (
-                                <MenuItem key={opt.id} value={opt.id}>
-                                  {opt.occupationName || opt.name}
-                                </MenuItem>
-                              ))}
-                            </TextField>
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              select
-                              fullWidth
-                              size="small"
-                              name={`courses[${index}].courseLevel`}
-                              label={
-                                <span>
-                                  Level Certificate / Diploma{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={course.courseLevel}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.courses?.[index]?.courseLevel &&
-                                Boolean(
-                                  formik.errors.courses?.[index]?.courseLevel,
-                                )
-                              }
-                              helperText={
-                                formik.touched.courses?.[index]?.courseLevel &&
-                                formik.errors.courses?.[index]?.courseLevel
-                              }
-                            >
-                              {certificateLevelOptions.map((opt) => (
-                                <MenuItem key={opt.id} value={opt.value}>
-                                  {opt.label}
-                                </MenuItem>
-                              ))}
-                            </TextField>
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              type="number"
-                              fullWidth
-                              size="small"
-                              name={`courses[${index}].theoryHours`}
-                              label={
-                                <span>
-                                  Theory (Hours){" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={course.theoryHours}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.courses?.[index]?.theoryHours &&
-                                Boolean(
-                                  formik.errors.courses?.[index]?.theoryHours,
-                                )
-                              }
-                              helperText={
-                                formik.touched.courses?.[index]?.theoryHours &&
-                                formik.errors.courses?.[index]?.theoryHours
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              type="number"
-                              fullWidth
-                              size="small"
-                              name={`courses[${index}].practicalHours`}
-                              label={
-                                <span>
-                                  Practical (Hours){" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={course.practicalHours}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.courses?.[index]
-                                  ?.practicalHours &&
-                                Boolean(
-                                  formik.errors.courses?.[index]
-                                    ?.practicalHours,
-                                )
-                              }
-                              helperText={
-                                formik.touched.courses?.[index]
-                                  ?.practicalHours &&
-                                formik.errors.courses?.[index]?.practicalHours
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              type="number"
-                              fullWidth
-                              size="small"
-                              name={`courses[${index}].ojtHours`}
-                              label={
-                                <span>
-                                  OJT (Hours){" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={course.ojtHours}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.courses?.[index]?.ojtHours &&
-                                Boolean(
-                                  formik.errors.courses?.[index]?.ojtHours,
-                                )
-                              }
-                              helperText={
-                                formik.touched.courses?.[index]?.ojtHours &&
-                                formik.errors.courses?.[index]?.ojtHours
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              type="number"
-                              fullWidth
-                              size="small"
-                              name={`courses[${index}].feesPerTrainee`}
-                              label={
-                                <span>
-                                  Fees per Trainee{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={course.feesPerTrainee}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.courses?.[index]
-                                  ?.feesPerTrainee &&
-                                Boolean(
-                                  formik.errors.courses?.[index]
-                                    ?.feesPerTrainee,
-                                )
-                              }
-                              helperText={
-                                formik.touched.courses?.[index]
-                                  ?.feesPerTrainee &&
-                                formik.errors.courses?.[index]?.feesPerTrainee
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              type="number"
-                              fullWidth
-                              size="small"
-                              name={`courses[${index}].enrollmentCapacity`}
-                              label={
-                                <span>
-                                  Enrollment Capacity per Batch{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={course.enrollmentCapacity}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.courses?.[index]
-                                  ?.enrollmentCapacity &&
-                                Boolean(
-                                  formik.errors.courses?.[index]
-                                    ?.enrollmentCapacity,
-                                )
-                              }
-                              helperText={
-                                formik.touched.courses?.[index]
-                                  ?.enrollmentCapacity &&
-                                formik.errors.courses?.[index]
-                                  ?.enrollmentCapacity
-                              }
-                            />
-                          </Grid>
-
-                          {index > 0 && (
-                            <Grid item size={{ xs: 12 }}>
-                              <Box display="flex" justifyContent="flex-end">
-                                <IconButton
-                                  color="error"
-                                  onClick={() => handleDeleteCourse(index)}
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </Box>
-                            </Grid>
-                          )}
-                        </Grid>
-                      </Paper>
-                    </Grid>
-                  ))}
-
-                  <Grid item xs={12} sx={{ textAlign: "center", mt: 2 }}>
-                    {courseError && (
-                      <Typography color="error" variant="body2" sx={{ mb: 1 }}>
-                        {courseError}
-                      </Typography>
-                    )}
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<AddIcon />}
-                      onClick={handleAddCourse}
-                    >
-                      Add Course
-                    </Button>
-                  </Grid>
-                </Grid>
-              </Paper>
-            )}
-
-            {/* Tuition/Coaching Details */}
-            {isTuitionService && tabValue === 1 && (
-              <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
-                <Grid container spacing={3}>
-                  {formik.values.tuitionDetails.map((tuition, index) => (
-                    <Grid item size={{ xs: 12 }} key={index}>
-                      <Paper
-                        sx={{
-                          p: 2,
-                          border: "1px solid",
-                          borderColor: "divider",
-                        }}
-                      >
-                        <Typography variant="subtitle2" fontWeight={600} mb={2}>
-                          Tuition/Coaching {index + 1}
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              name={`tuitionDetails[${index}].classLevel`}
-                              label={
-                                <span>
-                                  Class Level{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={tuition.classLevel}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.classLevel &&
-                                Boolean(
-                                  formik.errors.tuitionDetails?.[index]
-                                    ?.classLevel,
-                                )
-                              }
-                              helperText={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.classLevel &&
-                                formik.errors.tuitionDetails?.[index]
-                                  ?.classLevel
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              name={`tuitionDetails[${index}].subjects`}
-                              label={
-                                <span>
-                                  Subjects{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={tuition.subjects}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.subjects &&
-                                Boolean(
-                                  formik.errors.tuitionDetails?.[index]
-                                    ?.subjects,
-                                )
-                              }
-                              helperText={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.subjects &&
-                                formik.errors.tuitionDetails?.[index]?.subjects
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              type="number"
-                              fullWidth
-                              size="small"
-                              name={`tuitionDetails[${index}].duration`}
-                              label={
-                                <span>
-                                  Duration (Hours/Months){" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={tuition.duration}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.duration &&
-                                Boolean(
-                                  formik.errors.tuitionDetails?.[index]
-                                    ?.duration,
-                                )
-                              }
-                              helperText={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.duration &&
-                                formik.errors.tuitionDetails?.[index]?.duration
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              type="number"
-                              fullWidth
-                              size="small"
-                              name={`tuitionDetails[${index}].fees`}
-                              label={
-                                <span>
-                                  Fees (Nu.){" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={tuition.fees}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.tuitionDetails?.[index]?.fees &&
-                                Boolean(
-                                  formik.errors.tuitionDetails?.[index]?.fees,
-                                )
-                              }
-                              helperText={
-                                formik.touched.tuitionDetails?.[index]?.fees &&
-                                formik.errors.tuitionDetails?.[index]?.fees
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              name={`tuitionDetails[${index}].tutorCid`}
-                              label={
-                                <span>
-                                  Tutor CID{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={tuition.tutorCid}
-                              onChange={formik.handleChange}
-                              onBlur={(e) => {
-                                formik.handleBlur(e);
-                                if (
-                                  e.target.value &&
-                                  e.target.value.length === 11
-                                ) {
-                                  fetchAndFillTutorDetails(
-                                    e.target.value,
-                                    index,
-                                  );
-                                }
-                              }}
-                              error={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.tutorCid &&
-                                Boolean(
-                                  formik.errors.tuitionDetails?.[index]
-                                    ?.tutorCid,
-                                )
-                              }
-                              helperText={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.tutorCid &&
-                                formik.errors.tuitionDetails?.[index]?.tutorCid
-                              }
-                              InputProps={{
-                                endAdornment: fetchingCitizen && (
-                                  <CircularProgress size={20} />
-                                ),
-                              }}
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              name={`tuitionDetails[${index}].tutorName`}
-                              label={
-                                <span>
-                                  Subject Wise Tutor Name{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={tuition.tutorName}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.tutorName &&
-                                Boolean(
-                                  formik.errors.tuitionDetails?.[index]
-                                    ?.tutorName,
-                                )
-                              }
-                              helperText={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.tutorName &&
-                                formik.errors.tuitionDetails?.[index]?.tutorName
-                              }
-                            />
-                          </Grid>
-
-                          <Grid item size={{ xs: 12, md: 4 }}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              name={`tuitionDetails[${index}].tutorQualification`}
-                              label={
-                                <span>
-                                  Tutor Qualification{" "}
-                                  <span style={{ color: "red" }}>*</span>
-                                </span>
-                              }
-                              value={tuition.tutorQualification}
-                              onChange={formik.handleChange}
-                              error={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.tutorQualification &&
-                                Boolean(
-                                  formik.errors.tuitionDetails?.[index]
-                                    ?.tutorQualification,
-                                )
-                              }
-                              helperText={
-                                formik.touched.tuitionDetails?.[index]
-                                  ?.tutorQualification &&
-                                formik.errors.tuitionDetails?.[index]
-                                  ?.tutorQualification
-                              }
-                            />
-                          </Grid>
-
-                          {index > 0 && (
-                            <Grid item size={{ xs: 12 }}>
-                              <Box display="flex" justifyContent="flex-end">
-                                <IconButton
-                                  color="error"
-                                  onClick={() => handleDeleteTuition(index)}
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </Box>
-                            </Grid>
-                          )}
-                        </Grid>
-                      </Paper>
-                    </Grid>
-                  ))}
-
-                  <Grid item xs={12} sx={{ textAlign: "center", mt: 2 }}>
-                    {tuitionError && (
-                      <Typography color="error" variant="body2" sx={{ mb: 1 }}>
-                        {tuitionError}
-                      </Typography>
-                    )}
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<AddIcon />}
-                      onClick={handleAddTuition}
-                    >
-                      Add Tuition/Coaching Detail
-                    </Button>
-                  </Grid>
-                </Grid>
-              </Paper>
-            )}
-
-            {/* Quality Standards */}
-            {tabValue === (isTuitionService ? 2 : 3) && (
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item size={{ xs: 12 }}>
-                  {qualityData.slice(0, 3).map(renderChecklist)}
-                </Grid>
+            {/* Navigation Buttons */}
+            <Grid
+              container
+              spacing={2}
+              sx={{ mt: 3, mb: 2 }}
+              alignItems="center"
+            >
+              <Grid item>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<FastRewindIcon />}
+                  onClick={handlePrevious}
+                  disabled={isFirstTab}
+                >
+                  Previous
+                </Button>
               </Grid>
-            )}
+              <Grid item>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  endIcon={<FastForwardIcon />}
+                  onClick={handleNext}
+                  disabled={isLastTab}
+                >
+                  Next
+                </Button>
+              </Grid>
 
-            {/* Supporting Documents */}
-            {tabValue === (isTuitionService ? 3 : 4) && (
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item size={{ xs: 12 }}>
-                  <Paper
-                    sx={{ p: 2, border: "1px solid", borderColor: "divider" }}
+              {/* Submit and Reset Buttons - Only on Last Tab, positioned on the right */}
+              {isLastTab && (
+                <Grid item sx={{ ml: "auto" }}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={!isSubmitEnabled || loading}
+                    onClick={formik.handleSubmit}
+                    startIcon={
+                      loading ? (
+                        <CircularProgress size={20} sx={{ color: "#fff" }} />
+                      ) : null
+                    }
+                    sx={{ mr: 1 }}
                   >
-                    <Box
-                      component="ol"
-                      sx={{
-                        pl: 3,
-                        mb: 2,
-                        "& li": {
-                          fontSize: "0.85rem",
-                          fontStyle: "italic",
-                          mb: 0.5,
-                        },
-                      }}
-                    >
-                      <li>
-                        Photocopy of business license (Not Applicable for
-                        Government Institutes)
-                      </li>
-                      <li>
-                        List of trainees for each course, indicating year of
-                        graduation/male/female/CID No
-                      </li>
-                    </Box>
-                    <FileUpload
-                      files={formik.values.files}
-                      onFilesChange={(files) =>
-                        formik.setFieldValue("files", files)
-                      }
-                    />
-                  </Paper>
+                    {loading ? "Submitting..." : "Submit"}
+                  </Button>
+                  <Button
+                    color="error"
+                    variant="contained"
+                    size="small"
+                    onClick={handleReset}
+                    startIcon={<RotateLeftIcon />}
+                  >
+                    Reset
+                  </Button>
                 </Grid>
-              </Grid>
-            )}
-
-            {/* Buttons */}
-            <Grid container spacing={2} sx={{ mt: 3 }}>
-              <Grid item>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={!isSubmitEnabled || loading}
-                  onClick={formik.handleSubmit}
-                  startIcon={
-                    loading ? (
-                      <CircularProgress size={20} sx={{ color: "#fff" }} />
-                    ) : null
-                  }
-                >
-                  {loading ? "Submitting..." : "Submit"}
-                </Button>
-              </Grid>
-              <Grid item>
-                <Button
-                  color="error"
-                  variant="contained"
-                  size="small"
-                  onClick={handleReset}
-                  startIcon={<RotateLeftIcon />}
-                >
-                  Reset
-                </Button>
-              </Grid>
+              )}
             </Grid>
           </>
         )}

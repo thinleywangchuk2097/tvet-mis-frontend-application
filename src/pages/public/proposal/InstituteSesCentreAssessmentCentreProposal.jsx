@@ -10,6 +10,8 @@ import {
   Button,
   IconButton,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
@@ -118,6 +120,11 @@ const validationSchema = Yup.object({
       }),
     }),
   ),
+
+  declarationAccepted: Yup.boolean().oneOf(
+    [true],
+    "You must accept the declaration to submit",
+  ),
 });
 
 const InstituteSesCentreAssessmentCentreProposal = () => {
@@ -132,6 +139,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
   const [typeOfOwners, setTypeOfOwners] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
+  const [declaration, setDeclaration] = useState([]);
 
   const navigate = useNavigate();
   const { serviceId } = useParams();
@@ -144,6 +152,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
     fetchOtherOwnershipTypes();
     fetchActivityLevels();
     fetchTypeOfOwner();
+    fetchDeclaration();
   }, []);
 
   useEffect(() => {
@@ -156,6 +165,15 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       setSectors(response.data);
     } catch (error) {
       console.error("Error fetching sectors:", error);
+    }
+  };
+
+  const fetchDeclaration = async () => {
+    try {
+      const response = await CommonService.getByParentId(30);
+      setDeclaration(response.data);
+    } catch (error) {
+      console.error("Error fetching declaration:", error);
     }
   };
 
@@ -337,6 +355,8 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       activityLevelId: "",
       // Supporting Documents
       files: [],
+      // Declaration
+      declarationAccepted: false,
     },
 
     validationSchema,
@@ -373,6 +393,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
           userId: null,
           documents,
           partners: values.partners || [],
+          declarationAccepted: values.declarationAccepted || false,
         };
 
         const response =
@@ -1158,7 +1179,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
           </Paper>
 
           {/* Supporting Documents */}
-
           <Paper sx={{ p: 3, mb: 4 }}>
             <Typography fontWeight={600} sx={{ mb: 2 }}>
               {requiredLabel("Supporting Documents")}
@@ -1173,6 +1193,51 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                 {formik.errors.files}
               </Typography>
             )}
+          </Paper>
+
+          {/* Declaration */}
+          <Paper sx={{ p: 3, mb: 4 }}>
+            <Typography fontWeight={600} sx={{ mb: 2 }}>
+              {requiredLabel("Declaration")}
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    name="declarationAccepted"
+                    checked={formik.values.declarationAccepted}
+                    onChange={(e) => {
+                      formik.setFieldValue(
+                        "declarationAccepted",
+                        e.target.checked,
+                      );
+                    }}
+                    onBlur={formik.handleBlur}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="body2">
+                    {declaration.length > 0
+                      ? declaration[0].name
+                      : "I hereby declare that the information provided is true and accurate to the best of my knowledge. I understand that any false information may result in appropriate action."}
+                  </Typography>
+                }
+              />
+            </Box>
+
+            {formik.touched.declarationAccepted &&
+              formik.errors.declarationAccepted && (
+                <Typography
+                  color="error"
+                  variant="caption"
+                  sx={{ mt: 1, display: "block" }}
+                >
+                  {formik.errors.declarationAccepted}
+                </Typography>
+              )}
           </Paper>
 
           <Box
@@ -1198,7 +1263,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                   <ArrowUpwardIcon />
                 )
               }
-              disabled={loading}
+              disabled={loading || !formik.values.declarationAccepted}
             >
               Submit
             </Button>
