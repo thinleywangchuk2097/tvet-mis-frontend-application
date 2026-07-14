@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Paper,
   Typography,
@@ -79,7 +79,7 @@ const TABLE_STYLE = {
   },
 };
 
-const ApplyNonAccreditedCourse = () => {
+const NonAccreditedCourseRegistration = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
@@ -102,6 +102,9 @@ const ApplyNonAccreditedCourse = () => {
   const [qualityData, setQualityData] = useState([]);
   const [qualitySelections, setQualitySelections] = useState({});
 
+  // Formik ref for auto-fill functionality
+  const formikRef = useRef(null);
+
   useEffect(() => {
     fetchCurriculumTypes();
     fetchCertificateLevels();
@@ -115,6 +118,21 @@ const ApplyNonAccreditedCourse = () => {
       fetchNonAccreditedCourseDetails();
     }
   }, [curriculumTypes]);
+
+  // Auto-fill theory, practical, and OJT hours when curriculum is selected
+  useEffect(() => {
+    if (formikRef.current && formikRef.current.values.curriculumId && curriculumTypes.length > 0) {
+      const selectedCurriculum = curriculumTypes.find(
+        (type) => String(type.id) === String(formikRef.current.values.curriculumId)
+      );
+      
+      if (selectedCurriculum) {
+        formikRef.current.setFieldValue('theoryHour', selectedCurriculum.total_theory_duration || 0);
+        formikRef.current.setFieldValue('practicalHour', selectedCurriculum.total_practical_duration || 0);
+        formikRef.current.setFieldValue('ojtHour', selectedCurriculum.total_ojt_duration || 0);
+      }
+    }
+  }, [formikRef.current?.values?.curriculumId, curriculumTypes]);
 
   const fetchQualityStandards = async () => {
     try {
@@ -523,6 +541,11 @@ const ApplyNonAccreditedCourse = () => {
 
   const handleReset = () => {
     setQualitySelections({});
+    if (formikRef.current) {
+      formikRef.current.setFieldValue('theoryHour', '');
+      formikRef.current.setFieldValue('practicalHour', '');
+      formikRef.current.setFieldValue('ojtHour', '');
+    }
   };
 
   const getCertificateLevelName = (levelId) => {
@@ -908,6 +931,7 @@ const ApplyNonAccreditedCourse = () => {
       >
         <DialogTitle>Add Non Accredited Course</DialogTitle>
         <Formik
+          innerRef={formikRef}
           initialValues={initialValues}
           validationSchema={validationSchema}
           onSubmit={handleSubmit}
@@ -960,6 +984,54 @@ const ApplyNonAccreditedCourse = () => {
                     </Grid>
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
+                        select
+                        fullWidth
+                        label="Curriculum Type"
+                        name="curriculumId"
+                        size="small"
+                        value={formik.values.curriculumId}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          formik.handleChange(e);
+                          
+                          // Auto-fill hours if a curriculum is selected
+                          if (selectedId) {
+                            const selectedCurriculum = curriculumTypes.find(
+                              (type) => String(type.id) === String(selectedId)
+                            );
+                            
+                            if (selectedCurriculum) {
+                              formik.setFieldValue('theoryHour', selectedCurriculum.total_theory_duration || 0);
+                              formik.setFieldValue('practicalHour', selectedCurriculum.total_practical_duration || 0);
+                              formik.setFieldValue('ojtHour', selectedCurriculum.total_ojt_duration || 0);
+                            }
+                          } else {
+                            // Clear hours if no curriculum selected
+                            formik.setFieldValue('theoryHour', '');
+                            formik.setFieldValue('practicalHour', '');
+                            formik.setFieldValue('ojtHour', '');
+                          }
+                        }}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.curriculumId &&
+                          Boolean(formik.errors.curriculumId)
+                        }
+                        helperText={
+                          formik.touched.curriculumId &&
+                          formik.errors.curriculumId
+                        }
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {curriculumTypes.map((type) => (
+                          <MenuItem key={type.id} value={type.id}>
+                            {type.curriculum_name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
                         fullWidth
                         label="Course Title"
                         name="courseTitle"
@@ -994,6 +1066,14 @@ const ApplyNonAccreditedCourse = () => {
                         helperText={
                           formik.touched.theoryHour && formik.errors.theoryHour
                         }
+                        slotProps={{
+                          input: {
+                            readOnly: true,
+                          },
+                        }}
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
                       />
                     </Grid>
                     <Grid item size={{ xs: 12, md: 4 }}>
@@ -1014,6 +1094,14 @@ const ApplyNonAccreditedCourse = () => {
                           formik.touched.practicalHour &&
                           formik.errors.practicalHour
                         }
+                        slotProps={{
+                          input: {
+                            readOnly: true,
+                          },
+                        }}
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
                       />
                     </Grid>
                     <Grid item size={{ xs: 12, md: 4 }}>
@@ -1033,6 +1121,14 @@ const ApplyNonAccreditedCourse = () => {
                         helperText={
                           formik.touched.ojtHour && formik.errors.ojtHour
                         }
+                        slotProps={{
+                          input: {
+                            readOnly: true,
+                          },
+                        }}
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
                       />
                     </Grid>
                     <Grid item size={{ xs: 12, md: 4 }}>
@@ -1100,33 +1196,6 @@ const ApplyNonAccreditedCourse = () => {
                             {level.name ||
                               level.value ||
                               level.certificate_level_name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label="Curriculum Type"
-                        name="curriculumId"
-                        size="small"
-                        value={formik.values.curriculumId}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.curriculumId &&
-                          Boolean(formik.errors.curriculumId)
-                        }
-                        helperText={
-                          formik.touched.curriculumId &&
-                          formik.errors.curriculumId
-                        }
-                      >
-                        <MenuItem value="">-select-</MenuItem>
-                        {curriculumTypes.map((type) => (
-                          <MenuItem key={type.id} value={type.id}>
-                            {type.curriculum_name}
                           </MenuItem>
                         ))}
                       </TextField>
@@ -1231,4 +1300,4 @@ const ApplyNonAccreditedCourse = () => {
   );
 };
 
-export default ApplyNonAccreditedCourse;
+export default NonAccreditedCourseRegistration;

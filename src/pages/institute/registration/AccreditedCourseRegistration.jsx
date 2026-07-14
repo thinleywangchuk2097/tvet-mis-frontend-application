@@ -80,7 +80,7 @@ const tableStyle = {
   },
 };
 
-const ApplyAccreditedCourse = () => {
+const AccreditedCourseRegistration = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
@@ -1047,4 +1047,4 @@ const ApplyAccreditedCourse = () => {
   );
 };
 
-export default ApplyAccreditedCourse;
+export default AccreditedCourseRegistration;

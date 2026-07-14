@@ -34,6 +34,8 @@ import {
   Alert,
   Stack,
   InputLabel,
+  Autocomplete,
+  Tooltip,
 } from "@mui/material";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import BusinessIcon from "@mui/icons-material/Business";
@@ -44,6 +46,9 @@ import EngineeringIcon from "@mui/icons-material/Engineering";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import DeleteIcon from "@mui/icons-material/Delete";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
+import PaymentIcon from "@mui/icons-material/Payment";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
 import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
 import FileDownload from "../../../components/file/FileDownload";
@@ -53,6 +58,8 @@ import { useSelector } from "react-redux";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import UserRoleManagementService from "../../../api/services/internal/userrole/UserRoleManagementService";
+import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
+import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 
 const TABLE_STYLE = {
   border: "1px solid",
@@ -72,12 +79,14 @@ const TABLE_STYLE = {
   },
 };
 
-const ViewApplyAccreditedCourse = () => {
+const ViewAccreditedCourseRegistration = () => {
   const { applicationNo } = useParams();
   const navigate = useNavigate();
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
+  const [instituteData, setInstituteData] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -131,7 +140,15 @@ const ViewApplyAccreditedCourse = () => {
         fetchAccreditorUsers();
       }
     }
+    fetchPaymentStatus();
   }, [applicationNo]);
+
+  // Fetch institute data when courseData is available
+  useEffect(() => {
+    if (courseData?.registration_no) {
+      fetchInstituteData();
+    }
+  }, [courseData]);
 
   useEffect(() => {
     if (qualityData.length > 0 && rawQualityStandards) {
@@ -143,6 +160,40 @@ const ViewApplyAccreditedCourse = () => {
       setQualityRemarks(remarks);
     }
   }, [qualityData, rawQualityStandards]);
+
+  const fetchPaymentStatus = async () => {
+    try {
+      const response =
+        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      setPaymentStatus(response.data);
+      console.log("Payment status fetched:", response.data);
+    } catch (error) {
+      console.error("Error fetching payment status:", error);
+      setPaymentStatus(null);
+    }
+  };
+
+  const fetchInstituteData = async () => {
+    try {
+      if (!courseData?.registration_no) {
+        console.log("No registration number available yet");
+        return;
+      }
+      const response = await InstituteRegistrationService.getInstituteDetails(
+        courseData.registration_no,
+      );
+      // Check if response.data is an array and get the first element
+      const data =
+        Array.isArray(response.data) && response.data.length > 0
+          ? response.data[0]
+          : response.data;
+      setInstituteData(data);
+      console.log("Institute data fetched:", data);
+    } catch (error) {
+      console.error("Error fetching institute data:", error);
+      setInstituteData(null);
+    }
+  };
 
   const fetchRecUsers = async () => {
     try {
@@ -779,10 +830,47 @@ const ViewApplyAccreditedCourse = () => {
     }
   };
 
+  // Generate PA Number handler
+  const handleGeneratePANumber = () => {
+    if (!courseData) {
+      toast.error("Course data not found");
+      return;
+    }
+
+    // Get institute data (handle both array and object)
+    const institute =
+      Array.isArray(instituteData) && instituteData.length > 0
+        ? instituteData[0]
+        : instituteData;
+
+    // Get mobile and email from institute data
+    const taxPayerEmail = institute?.email_id || "N/A";
+    const taxPayerMobileNo = institute?.mobile_no || "N/A";
+    const instituteId = institute?.institute_id || "N/A";
+    // Prepare the data for BIRMS payment
+    const applicationNo = courseData.application_no;
+    const serviceCode = 100578;
+    const taxPayerNo = courseData.registration_no || "N/A";
+    const taxPayerName = courseData.proposed_institute_name || "N/A";
+    // Navigate to BIRMS payment page
+    navigate(
+      `/birms/common-payment-index/${applicationNo}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId} `,
+    );
+  };
+
+  // Function to handle redirect to payment
+  const handleRedirectToPayment = (redirectUrl) => {
+    if (redirectUrl) {
+      window.open(redirectUrl, "_blank");
+    } else {
+      toast.error("No redirect URL available");
+    }
+  };
+
   const renderChecklist = useCallback(
     (standard) => {
       return (
-        <Grid item xs={12} key={standard.id}>
+        <Grid size={{ xs: 12 }} key={standard.id}>
           <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
             <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
               {standard.title}
@@ -899,6 +987,14 @@ const ViewApplyAccreditedCourse = () => {
       baseTabs.push({ icon: <EngineeringIcon />, label: "Assign REC" });
     }
 
+    // Add Generate PA Number tab for role 22
+    if (currentRoleId == 22) {
+      baseTabs.push({
+        icon: <SettingsSuggestIcon />,
+        label: "Generate PA Number",
+      });
+    }
+
     return baseTabs;
   };
 
@@ -928,22 +1024,25 @@ const ViewApplyAccreditedCourse = () => {
     const tabs = getTabs();
     let accreditorIndex = -1;
     let recIndex = -1;
+    let paNumberIndex = -1;
 
     tabs.forEach((tab, index) => {
       if (tab.label === "Add Accreditors") accreditorIndex = index;
       if (tab.label === "Assign REC") recIndex = index;
+      if (tab.label === "Generate PA Number") paNumberIndex = index;
     });
 
-    return { accreditorIndex, recIndex };
+    return { accreditorIndex, recIndex, paNumberIndex };
   };
 
-  const { accreditorIndex, recIndex } = getTabIndices();
+  const { accreditorIndex, recIndex, paNumberIndex } = getTabIndices();
 
   // Get available REC members (not yet assigned)
   const availableRecs = recList.filter(
     (rec) => !assignedRecs.some((assigned) => assigned.id === rec.id),
   );
 
+  // Get selected REC details
   const selectedRecDetails = recList.find(
     (rec) => rec.id.toString() === selectedRec?.toString(),
   );
@@ -953,6 +1052,7 @@ const ViewApplyAccreditedCourse = () => {
     (acc) => !assignedAccreditors.some((assigned) => assigned.id === acc.id),
   );
 
+  // Get selected Accreditor details
   const selectedAccreditorDetails = accreditorList.find(
     (acc) => acc.id.toString() === selectedAccreditor?.toString(),
   );
@@ -1009,7 +1109,7 @@ const ViewApplyAccreditedCourse = () => {
         {tabValue === 0 && (
           <Paper sx={{ p: 3, mb: 2 }} variant="outlined">
             <Grid container spacing={2}>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -1018,7 +1118,7 @@ const ViewApplyAccreditedCourse = () => {
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -1027,7 +1127,7 @@ const ViewApplyAccreditedCourse = () => {
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -1036,7 +1136,7 @@ const ViewApplyAccreditedCourse = () => {
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -1045,7 +1145,7 @@ const ViewApplyAccreditedCourse = () => {
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -1054,7 +1154,7 @@ const ViewApplyAccreditedCourse = () => {
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -1063,7 +1163,7 @@ const ViewApplyAccreditedCourse = () => {
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -1079,7 +1179,7 @@ const ViewApplyAccreditedCourse = () => {
         {/* Tab 1: Quality Standards */}
         {tabValue === 1 && (
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item size={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}>
               {qualityData.length > 0 ? (
                 qualityData.map(renderChecklist)
               ) : (
@@ -1096,7 +1196,7 @@ const ViewApplyAccreditedCourse = () => {
         {/* Tab 2: Supporting Documents */}
         {tabValue === 2 && (
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item size={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}>
               <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
                 <FileDownload
                   initialFiles={documents}
@@ -1111,7 +1211,7 @@ const ViewApplyAccreditedCourse = () => {
         {/* Add Accreditors Tab */}
         {showAccreditorTab && tabValue === accreditorIndex && (
           <Grid container spacing={3} sx={{ mt: 1 }}>
-            <Grid item size={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}>
               <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
                 <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
                   <GroupAddIcon sx={{ mr: 1, color: "primary.main" }} />
@@ -1168,33 +1268,72 @@ const ViewApplyAccreditedCourse = () => {
                     )}
 
                     <Grid container spacing={2} alignItems="center">
-                      <Grid item size={{ xs: 12, md: 8 }}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Select Accreditor</InputLabel>
-                          <Select
-                            value={selectedAccreditor}
-                            onChange={(e) =>
-                              setSelectedAccreditor(e.target.value)
+                      <Grid size={{ xs: 12, md: 8 }}>
+                        <Autocomplete
+                          fullWidth
+                          size="small"
+                          options={availableAccreditors}
+                          getOptionLabel={(option) =>
+                            `${option.name} (${option.userId})`
+                          }
+                          value={selectedAccreditorDetails || null}
+                          onChange={(event, newValue) => {
+                            setSelectedAccreditor(newValue ? newValue.id : "");
+                          }}
+                          filterOptions={(options, state) => {
+                            const searchTerm = state.inputValue
+                              .toLowerCase()
+                              .trim();
+                            if (!searchTerm || searchTerm.length < 2) {
+                              return [];
                             }
-                            label="Select Accreditor"
-                          >
-                            <MenuItem value="">Select an Accreditor</MenuItem>
-                            {availableAccreditors.length > 0 ? (
-                              availableAccreditors.map((acc) => (
-                                <MenuItem key={acc.id} value={acc.id}>
-                                  {acc.name} - {acc.userId}
-                                </MenuItem>
-                              ))
-                            ) : (
-                              <MenuItem disabled>
-                                No Accreditors available
-                              </MenuItem>
-                            )}
-                          </Select>
-                        </FormControl>
+
+                            return options.filter(
+                              (option) =>
+                                option.name
+                                  .toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.userId
+                                  ?.toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.email
+                                  ?.toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.mobileNo?.includes(searchTerm),
+                            );
+                          }}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="Search Accreditor by Name or User ID"
+                              placeholder="Type at least 2 characters to search..."
+                            />
+                          )}
+                          renderOption={(props, option) => (
+                            <li {...props}>
+                              <Box>
+                                <Typography variant="body2">
+                                  {option.name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  User ID: {option.userId} | Email:{" "}
+                                  {option.email || "N/A"} | Mobile:{" "}
+                                  {option.mobileNo || "N/A"}
+                                </Typography>
+                              </Box>
+                            </li>
+                          )}
+                          noOptionsText="No Accreditors available"
+                          loadingText="Loading..."
+                          disabled={availableAccreditors.length === 0}
+                          openOnFocus={false}
+                        />
                       </Grid>
 
-                      <Grid item size={{ xs: 12, md: 4 }}>
+                      <Grid size={{ xs: 12, md: 4 }}>
                         <Button
                           variant="contained"
                           color="primary"
@@ -1233,7 +1372,7 @@ const ViewApplyAccreditedCourse = () => {
                           Selected Accreditor Details:
                         </Typography>
                         <Grid container spacing={2}>
-                          <Grid item size={{ xs: 12, md: 3 }}>
+                          <Grid size={{ xs: 12, md: 3 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
@@ -1244,7 +1383,7 @@ const ViewApplyAccreditedCourse = () => {
                               {selectedAccreditorDetails.name}
                             </Typography>
                           </Grid>
-                          <Grid item size={{ xs: 12, md: 3 }}>
+                          <Grid size={{ xs: 12, md: 3 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
@@ -1255,26 +1394,26 @@ const ViewApplyAccreditedCourse = () => {
                               {selectedAccreditorDetails.userId}
                             </Typography>
                           </Grid>
-                          <Grid item size={{ xs: 12, md: 3 }}>
+                          <Grid size={{ xs: 12, md: 3 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              Designation
+                              Email
                             </Typography>
                             <Typography variant="body2">
-                              {selectedAccreditorDetails.designation}
+                              {selectedAccreditorDetails.email || "N/A"}
                             </Typography>
                           </Grid>
-                          <Grid item size={{ xs: 12, md: 3 }}>
+                          <Grid size={{ xs: 12, md: 3 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              Department
+                              Mobile No
                             </Typography>
                             <Typography variant="body2">
-                              {selectedAccreditorDetails.department}
+                              {selectedAccreditorDetails.mobileNo || "N/A"}
                             </Typography>
                           </Grid>
                         </Grid>
@@ -1283,7 +1422,7 @@ const ViewApplyAccreditedCourse = () => {
 
                     {assignedAccreditors.length === 0 && (
                       <Alert severity="info" sx={{ mt: 2 }}>
-                        No Accreditors have been assigned yet. Use the form
+                        No Accreditors have been assigned yet. Use the search
                         above to add Accreditor members.
                       </Alert>
                     )}
@@ -1304,7 +1443,7 @@ const ViewApplyAccreditedCourse = () => {
         {/* Assign REC Tab */}
         {showRecTab && tabValue === recIndex && (
           <Grid container spacing={3} sx={{ mt: 1 }}>
-            <Grid item size={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}>
               <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
                 <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
                   <EngineeringIcon sx={{ mr: 1, color: "primary.main" }} />
@@ -1361,31 +1500,72 @@ const ViewApplyAccreditedCourse = () => {
                     )}
 
                     <Grid container spacing={2} alignItems="center">
-                      <Grid item size={{ xs: 12, md: 8 }}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Select REC Member</InputLabel>
-                          <Select
-                            value={selectedRec}
-                            onChange={(e) => setSelectedRec(e.target.value)}
-                            label="Select REC Member"
-                          >
-                            <MenuItem value="">Select a REC member</MenuItem>
-                            {availableRecs.length > 0 ? (
-                              availableRecs.map((rec) => (
-                                <MenuItem key={rec.id} value={rec.id}>
-                                  {rec.name} - {rec.userId}
-                                </MenuItem>
-                              ))
-                            ) : (
-                              <MenuItem disabled>
-                                No REC members available
-                              </MenuItem>
-                            )}
-                          </Select>
-                        </FormControl>
+                      <Grid size={{ xs: 12, md: 8 }}>
+                        <Autocomplete
+                          fullWidth
+                          size="small"
+                          options={availableRecs}
+                          getOptionLabel={(option) =>
+                            `${option.name} (${option.userId})`
+                          }
+                          value={selectedRecDetails || null}
+                          onChange={(event, newValue) => {
+                            setSelectedRec(newValue ? newValue.id : "");
+                          }}
+                          filterOptions={(options, state) => {
+                            const searchTerm = state.inputValue
+                              .toLowerCase()
+                              .trim();
+                            if (!searchTerm || searchTerm.length < 2) {
+                              return [];
+                            }
+
+                            return options.filter(
+                              (option) =>
+                                option.name
+                                  .toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.userId
+                                  ?.toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.email
+                                  ?.toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.mobileNo?.includes(searchTerm),
+                            );
+                          }}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="Search REC Member by Name or User ID"
+                              placeholder="Type at least 2 characters to search..."
+                            />
+                          )}
+                          renderOption={(props, option) => (
+                            <li {...props}>
+                              <Box>
+                                <Typography variant="body2">
+                                  {option.name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  User ID: {option.userId} | Email:{" "}
+                                  {option.email || "N/A"} | Mobile:{" "}
+                                  {option.mobileNo || "N/A"}
+                                </Typography>
+                              </Box>
+                            </li>
+                          )}
+                          noOptionsText="No REC members available"
+                          loadingText="Loading..."
+                          disabled={availableRecs.length === 0}
+                          openOnFocus={false}
+                        />
                       </Grid>
 
-                      <Grid item size={{ xs: 12, md: 4 }}>
+                      <Grid size={{ xs: 12, md: 4 }}>
                         <Button
                           variant="contained"
                           color="primary"
@@ -1421,7 +1601,7 @@ const ViewApplyAccreditedCourse = () => {
                           Selected REC Details:
                         </Typography>
                         <Grid container spacing={2}>
-                          <Grid item size={{ xs: 12, md: 3 }}>
+                          <Grid size={{ xs: 12, md: 3 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
@@ -1432,7 +1612,7 @@ const ViewApplyAccreditedCourse = () => {
                               {selectedRecDetails.name}
                             </Typography>
                           </Grid>
-                          <Grid item size={{ xs: 12, md: 3 }}>
+                          <Grid size={{ xs: 12, md: 3 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
@@ -1443,7 +1623,7 @@ const ViewApplyAccreditedCourse = () => {
                               {selectedRecDetails.userId}
                             </Typography>
                           </Grid>
-                          <Grid item size={{ xs: 12, md: 3 }}>
+                          <Grid size={{ xs: 12, md: 3 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
@@ -1454,7 +1634,7 @@ const ViewApplyAccreditedCourse = () => {
                               {selectedRecDetails.email || "N/A"}
                             </Typography>
                           </Grid>
-                          <Grid item size={{ xs: 12, md: 3 }}>
+                          <Grid size={{ xs: 12, md: 3 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
@@ -1471,7 +1651,7 @@ const ViewApplyAccreditedCourse = () => {
 
                     {assignedRecs.length === 0 && (
                       <Alert severity="info" sx={{ mt: 2 }}>
-                        No REC members have been assigned yet. Use the form
+                        No REC members have been assigned yet. Use the search
                         above to add REC members.
                       </Alert>
                     )}
@@ -1484,6 +1664,348 @@ const ViewApplyAccreditedCourse = () => {
                     )}
                   </CardContent>
                 </Card>
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Generate PA Number Tab - Only for role 22 */}
+        {currentRoleId == 22 && tabValue === paNumberIndex && (
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid size={{ xs: 12 }}>
+              <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <AccountBalanceIcon
+                    sx={{ mr: 1, color: "primary.main", fontSize: 20 }}
+                  />
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    Generate PA Number
+                  </Typography>
+                </Box>
+
+                {paymentStatus ? (
+                  <Card variant="outlined" sx={{ p: 0 }}>
+                    <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+                      <Grid container spacing={0.5}>
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 100 }}
+                            >
+                              Payment Advice No:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ fontSize: "0.75rem" }}
+                            >
+                              {paymentStatus.paymentAdviceNo || "N/A"}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 70 }}
+                            >
+                              Ref No:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ fontSize: "0.75rem" }}
+                            >
+                              {paymentStatus.refNo || "N/A"}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 70 }}
+                            >
+                              Tax Payer:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ fontSize: "0.75rem" }}
+                              noWrap
+                            >
+                              {paymentStatus.taxPayerName || "N/A"}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 60 }}
+                            >
+                              Status:
+                            </Typography>
+                            <Chip
+                              label={paymentStatus.paymentStatus || "N/A"}
+                              color={
+                                paymentStatus.paymentStatus === "paid"
+                                  ? "success"
+                                  : "warning"
+                              }
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: "0.65rem",
+                                "& .MuiChip-label": { px: 1 },
+                              }}
+                            />
+                          </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 70 }}
+                            >
+                              Due Date:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ fontSize: "0.75rem" }}
+                            >
+                              {paymentStatus.paymentDueDate || "N/A"}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 60 }}
+                            >
+                              Platform:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ fontSize: "0.75rem" }}
+                            >
+                              {paymentStatus.platform || "N/A"}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 70 }}
+                            >
+                              Amount:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={600}
+                              color="primary"
+                              sx={{ fontSize: "0.8rem" }}
+                            >
+                              Nu. {paymentStatus.totalPayableAmount || "0.00"}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 70 }}
+                            >
+                              Payment Mode:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ fontSize: "0.75rem" }}
+                            >
+                              {paymentStatus.paymentMode || "Not yet paid"}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+
+                      {paymentStatus.redirectUrl && (
+                        <Box
+                          sx={{
+                            mt: 1.5,
+                            display: "flex",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            size="small"
+                            startIcon={<PaymentIcon sx={{ fontSize: 18 }} />}
+                            onClick={() =>
+                              handleRedirectToPayment(paymentStatus.redirectUrl)
+                            }
+                            sx={{
+                              px: 2.5,
+                              py: 0.5,
+                              fontWeight: 600,
+                              textTransform: "none",
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            Proceed to Payment
+                          </Button>
+                        </Box>
+                      )}
+
+                      <Alert
+                        severity="info"
+                        sx={{
+                          mt: 1,
+                          py: 0.25,
+                          "& .MuiAlert-message": {
+                            fontSize: "0.7rem",
+                            py: 0.25,
+                          },
+                        }}
+                      >
+                        PA number already generated. Click above to proceed with
+                        payment.
+                      </Alert>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                      <Typography
+                        variant="body2"
+                        gutterBottom
+                        sx={{ fontSize: "0.8rem" }}
+                      >
+                        Click the button below to generate a PA number and
+                        proceed to payment.
+                      </Typography>
+
+                      <Box
+                        sx={{
+                          mt: 1.5,
+                          display: "flex",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          startIcon={
+                            <SettingsSuggestIcon sx={{ fontSize: 18 }} />
+                          }
+                          onClick={handleGeneratePANumber}
+                          sx={{
+                            px: 3,
+                            py: 0.5,
+                            fontWeight: 600,
+                            textTransform: "none",
+                            fontSize: "0.75rem",
+                          }}
+                        >
+                          Generate PA Number
+                        </Button>
+                      </Box>
+
+                      <Alert
+                        severity="info"
+                        sx={{
+                          mt: 1.5,
+                          py: 0.25,
+                          "& .MuiAlert-message": {
+                            fontSize: "0.7rem",
+                            py: 0.25,
+                          },
+                        }}
+                      >
+                        <strong>Note:</strong> This will create a payment
+                        request and redirect you to the payment portal.
+                      </Alert>
+                    </CardContent>
+                  </Card>
+                )}
               </Paper>
             </Grid>
           </Grid>
@@ -1609,21 +2131,33 @@ const ViewApplyAccreditedCourse = () => {
               )}
 
               {roleId === "22" && (
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="small"
-                  startIcon={<CheckCircleIcon />}
-                  onClick={() => openActionDialog(57)}
-                  sx={{
-                    px: 3,
-                    py: 0.5,
-                    fontWeight: 600,
-                    textTransform: "none",
-                  }}
+                <Tooltip
+                  title={
+                    !paymentStatus
+                      ? "Payment must be completed before approval"
+                      : ""
+                  }
+                  arrow
                 >
-                  Approve
-                </Button>
+                  <span>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      size="small"
+                      startIcon={<CheckCircleIcon />}
+                      onClick={() => openActionDialog(57)}
+                      disabled={!paymentStatus}
+                      sx={{
+                        px: 3,
+                        py: 0.5,
+                        fontWeight: 600,
+                        textTransform: "none",
+                      }}
+                    >
+                      Approve
+                    </Button>
+                  </span>
+                </Tooltip>
               )}
             </>
           )}
@@ -1715,4 +2249,4 @@ const ViewApplyAccreditedCourse = () => {
   );
 };
 
-export default ViewApplyAccreditedCourse;
+export default ViewAccreditedCourseRegistration;

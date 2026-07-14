@@ -17,6 +17,7 @@ import {
   FormControl,
   FormLabel,
   IconButton,
+  Checkbox,
 } from "@mui/material";
 import { Formik, FieldArray } from "formik";
 import * as Yup from "yup";
@@ -48,7 +49,7 @@ const fileToBase64 = (file) =>
 const AssessorAccreditorQMSAuditor = () => {
   const { serviceId } = useParams();
   const [serviceName, setServiceName] = useState("");
-  const [hasCitizenId, setHasCitizenId] = useState("yes"); // Changed default to "yes"
+  const [hasCitizenId, setHasCitizenId] = useState("yes");
   const [loading, setLoading] = useState(false);
   const [fetchingCitizen, setFetchingCitizen] = useState(false);
   const formikRef = useRef();
@@ -60,10 +61,12 @@ const AssessorAccreditorQMSAuditor = () => {
   const [genders, setGenders] = useState([]);
   const [occupations, setOccupations] = useState([]);
   const [selectedSectorId, setSelectedSectorId] = useState("");
+  const [declaration, setDeclaration] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchServiceName();
+    fetchDeclaration();
   }, [serviceId]);
 
   // Reset form when Citizen ID selection changes
@@ -97,6 +100,15 @@ const AssessorAccreditorQMSAuditor = () => {
       setServiceName(response.data.serviceName);
     } catch (error) {
       console.error("Error fetching service name:", error);
+    }
+  };
+
+  const fetchDeclaration = async () => {
+    try {
+      const response = await CommonService.getByParentId(30);
+      setDeclaration(response.data);
+    } catch (error) {
+      console.error("Error fetching declaration:", error);
     }
   };
 
@@ -162,25 +174,19 @@ const AssessorAccreditorQMSAuditor = () => {
         // Map gender from API response to dropdown value
         let genderValue = "";
         if (citizen.gender === "M") {
-          const genderOption = genders.find(
-            (opt) => opt.name === "Male"
-          );
+          const genderOption = genders.find((opt) => opt.name === "Male");
           genderValue = genderOption?.id || "";
         } else if (citizen.gender === "F") {
-          const genderOption = genders.find(
-            (opt) => opt.name === "Female"
-          );
+          const genderOption = genders.find((opt) => opt.name === "Female");
           genderValue = genderOption?.id || "";
         } else {
-          const genderOption = genders.find(
-            (opt) => opt.name === "Others"
-          );
+          const genderOption = genders.find((opt) => opt.name === "Others");
           genderValue = genderOption?.id || "";
         }
 
         const fullName =
           `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
-        
+
         // Auto-fill the form fields
         formik.setFieldValue("fullName", fullName);
         formik.setFieldValue("genderId", genderValue);
@@ -204,11 +210,20 @@ const AssessorAccreditorQMSAuditor = () => {
     const baseSchema = {
       fullName: Yup.string().required("Full Name is required"),
       genderId: Yup.number().required("Gender is required"),
-      mobileNo: Yup.string().required("Mobile No is required"),
+      mobileNo: Yup.string()
+        .required("Mobile No is required")
+        .matches(
+          /^\d{8}$/,
+          "Mobile No must be exactly 8 digits and contain only numbers",
+        ),
       email: Yup.string().email("Invalid email").required("Email is required"),
       dzongkhagId: Yup.number().required("Dzongkhag is required"),
       organizationName: Yup.string().required("Organization Name is required"),
       documents: Yup.array().min(1, "Please upload at least one file"),
+      declarationAccepted: Yup.boolean().oneOf(
+        [true],
+        "You must accept the declaration to submit",
+      ),
     };
 
     // Add conditional validation based on hasCitizenId
@@ -304,6 +319,7 @@ const AssessorAccreditorQMSAuditor = () => {
       assignedUserId: null,
       statusId: 55,
       remarks: "",
+      declarationAccepted: false,
     };
 
     if (serviceId === "32") {
@@ -507,10 +523,7 @@ const AssessorAccreditorQMSAuditor = () => {
                         onBlur={(e) => {
                           formik.handleBlur(e);
                           // Auto-fetch citizen details when CID is entered and is 11 digits
-                          if (
-                            e.target.value &&
-                            e.target.value.length === 11
-                          ) {
+                          if (e.target.value && e.target.value.length === 11) {
                             fetchAndFillCitizenDetails(e.target.value, formik);
                           }
                         }}
@@ -574,10 +587,15 @@ const AssessorAccreditorQMSAuditor = () => {
                         formik.touched.fullName && formik.errors.fullName
                       }
                       InputProps={{
-                        readOnly: hasCitizenId === "yes" && formik.values.citizenId?.length === 11,
+                        readOnly:
+                          hasCitizenId === "yes" &&
+                          formik.values.citizenId?.length === 11,
                         sx: {
-                          backgroundColor: hasCitizenId === "yes" && formik.values.citizenId?.length === 11 ? 
-                            (theme) => theme.palette.action.hover : 'transparent',
+                          backgroundColor:
+                            hasCitizenId === "yes" &&
+                            formik.values.citizenId?.length === 11
+                              ? (theme) => theme.palette.action.hover
+                              : "transparent",
                         },
                       }}
                     />
@@ -600,7 +618,10 @@ const AssessorAccreditorQMSAuditor = () => {
                       helperText={
                         formik.touched.genderId && formik.errors.genderId
                       }
-                      disabled={hasCitizenId === "yes" && formik.values.citizenId?.length === 11}
+                      disabled={
+                        hasCitizenId === "yes" &&
+                        formik.values.citizenId?.length === 11
+                      }
                     >
                       <MenuItem value="">Select</MenuItem>
                       {genders.map((gender) => (
@@ -617,8 +638,13 @@ const AssessorAccreditorQMSAuditor = () => {
                       label={requiredLabel("Mobile No")}
                       name="mobileNo"
                       size="small"
+                      type="text"
                       value={formik.values.mobileNo || ""}
-                      onChange={formik.handleChange}
+                      onChange={(e) => {
+                        // Only allow numbers
+                        const value = e.target.value.replace(/\D/g, "");
+                        formik.setFieldValue("mobileNo", value);
+                      }}
                       onBlur={formik.handleBlur}
                       error={
                         formik.touched.mobileNo &&
@@ -628,6 +654,11 @@ const AssessorAccreditorQMSAuditor = () => {
                         formik.touched.mobileNo && formik.errors.mobileNo
                       }
                       disabled={loading}
+                      inputProps={{
+                        maxLength: 8,
+                        inputMode: "numeric",
+                        pattern: "[0-9]*",
+                      }}
                     />
                   </Grid>
 
@@ -1295,6 +1326,58 @@ const AssessorAccreditorQMSAuditor = () => {
                 )}
               </Paper>
 
+              {/* Declaration Section */}
+              <Paper
+                sx={{
+                  p: { xs: 2, md: 3 },
+                  mb: 4,
+                  borderRadius: 2,
+                  border: "1px solid #e0e0e0",
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                  {requiredLabel("Declaration")}
+                </Typography>
+                <Divider sx={{ mb: 3 }} />
+
+                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        name="declarationAccepted"
+                        checked={formik.values.declarationAccepted || false}
+                        onChange={(e) => {
+                          formik.setFieldValue(
+                            "declarationAccepted",
+                            e.target.checked,
+                          );
+                        }}
+                        onBlur={formik.handleBlur}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">
+                        {declaration.length > 0
+                          ? declaration[0].name
+                          : "I hereby declare that the information provided is true and accurate to the best of my knowledge. I understand that any false information may result in appropriate action."}
+                      </Typography>
+                    }
+                  />
+                </Box>
+
+                {formik.touched.declarationAccepted &&
+                  formik.errors.declarationAccepted && (
+                    <Typography
+                      color="error"
+                      variant="caption"
+                      sx={{ mt: 1, display: "block" }}
+                    >
+                      {formik.errors.declarationAccepted}
+                    </Typography>
+                  )}
+              </Paper>
+
               {/* Form Actions */}
               <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
                 <Button
@@ -1313,7 +1396,7 @@ const AssessorAccreditorQMSAuditor = () => {
                     fontWeight: 600,
                     textTransform: "none",
                   }}
-                  disabled={loading}
+                  disabled={loading || !formik.values.declarationAccepted}
                 >
                   Submit
                 </Button>

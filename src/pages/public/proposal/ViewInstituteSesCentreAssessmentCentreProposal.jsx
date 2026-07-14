@@ -324,7 +324,7 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
         payload,
         access_token,
       );
-      toast.error(
+      toast.success(
           `Proposal ${currentAction == 57 ? "Approved" : "Rejected"} successfully`,
       );
       navigate(-1);

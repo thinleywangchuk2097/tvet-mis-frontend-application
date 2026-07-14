@@ -66,6 +66,17 @@ class OJTService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  getTraineeOJTReport(token) {
+    return apiClient
+      .get(`/api/v1/user/management/ojt/get-trainee-ojt-report`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new OJTService();
