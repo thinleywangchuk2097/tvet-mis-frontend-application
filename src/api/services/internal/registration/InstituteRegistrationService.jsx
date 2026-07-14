@@ -52,6 +52,16 @@ class InstituteRegistrationService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+   getInstituteChangeDetails(registration_no) {
+    return apiClient
+      .get(
+        `/api/v1/public/institute-registration/get-institute-change-details/${registration_no}`,
+        {},
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new InstituteRegistrationService();

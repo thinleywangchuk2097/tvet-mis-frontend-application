@@ -14,7 +14,6 @@ import AssessmentResult from "../pages/public/assessment/AssessmentResult";
 import ApplyCourse from "../pages/trainee/ApplyCourse";
 import ResetPassword from "../pages/auth/password/ResetPassword";
 import GenerateQRCode from "../pages/auth/ndi/GenerateQRCode";
-import CommonQRCode from "../pages/auth/ndi/CommonQRCode";
 
 //import BirmsPaymentIndex from "../pages/birms/BirmsPaymentIndex";
 //Reports
@@ -45,7 +44,6 @@ export const publicRoutes = [
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "reset-password", element: <ResetPassword /> },
       { path: "login-ndi-qrcode", element: <GenerateQRCode /> },
-      { path: "common-ndi-qrcode", element: <CommonQRCode /> }
     ],
   },
   {

@@ -155,7 +155,7 @@ const SectorOccupationIndex = () => {
     try {
       const response =
         await SectorOccupationService.getAllSectorOccupationsList(access_token);
-
+      console.log("Fetched Sectors with Occupations data:", response.data);  
       if (response && response.data) {
         const transformedData = transformApiData(response.data);
         setSectors(transformedData);
@@ -396,12 +396,13 @@ const SectorOccupationIndex = () => {
         }
       } else {
         // Create new sector
-        const response =
+        console.log("Creating new sector with data:", sectorData);
+       /*  const response =
           await SectorOccupationService.submitSectorWithOccupations(
             sectorData,
             access_token,
-          );
-
+          ); */
+        
         if (response.status === 200 || response.status === 201) {
           toast.success("Sector created successfully!");
           await fetchSectorsOccupationDetails();

@@ -35,16 +35,16 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import BusinessIcon from "@mui/icons-material/Business";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import AssignmentIcon from "@mui/icons-material/Assignment";
+import EventIcon from "@mui/icons-material/Event";
+import FileUpload from "../../../components/file/FileUpload";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import FileUpload from "../../components/file/FileUpload";
-import CommonService from "../../api/services/internal/common/CommonService";
-import OJTService from "../../api/services/internal/ojt/OJTService";
-import InstituteRegistrationService from "../../api/services/internal/registration/InstituteRegistrationService";
-import ApplyAccreditedCourseService from "../../api/services/internal/course/ApplyAccreditedCourseService";
+import CommonService from "../../../api/services/internal/common/CommonService";
+import CampusPlacementService from "../../../api/services/internal/ojt/CampusPlacementService";
+import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
+import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
 // ==================== HELPERS ====================
 const fileToBase64 = (file) =>
@@ -171,26 +171,23 @@ const FormField = ({
       helperText={formik.touched[name] && formik.errors[name]}
       {...props}
     >
-      {select && (
-        <>
-          <MenuItem value="">-select-</MenuItem>
-          {options.map((opt) => (
-            <MenuItem key={opt.id} value={opt.id.toString()}>
-              {opt.name ||
-                opt.company_name ||
-                opt.agreement_title ||
-                opt.course_name}
-            </MenuItem>
-          ))}
-        </>
-      )}
+      {select && [
+        <MenuItem key="select-placeholder" value="">
+          -select-
+        </MenuItem>,
+        ...options.map((opt) => (
+          <MenuItem key={opt.id} value={opt.id.toString()}>
+            {opt.name || opt.firm_name || opt.session_name || opt.course_name || opt.dzonkhagName}
+          </MenuItem>
+        ))
+      ]}
     </TextField>
   );
   return field;
 };
 
 // ==================== MAIN COMPONENT ====================
-const OnJobTrainingIndex = () => {
+const OnCampusJobPlacement = () => {
   // ===== STATE =====
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -199,26 +196,26 @@ const OnJobTrainingIndex = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [duplicateError, setDuplicateError] = useState("");
 
   // Data states
-  const [ojtData, setOjtData] = useState([]);
+  const [sessionData, setSessionData] = useState([]);
   const [firmData, setFirmData] = useState([]);
   const [placementData, setPlacementData] = useState([]);
   const [courses, setCourses] = useState([]);
   const [employmentStatuses, setEmploymentStatuses] = useState([]);
   const [dropdownData, setDropdownData] = useState([]);
   const [dzongkhags, setDzongkhags] = useState([]);
+  const [instituteId, setInstituteId] = useState(null);
 
   // Dialog states
   const [dialogState, setDialogState] = useState({
-    ojt: { open: false, edit: false, view: false },
+    session: { open: false, edit: false, view: false },
     firm: { open: false, edit: false },
     placement: { open: false },
     delete: { open: false, item: null, type: "" },
   });
   const [selected, setSelected] = useState({
-    ojt: null,
+    session: null,
     firm: null,
     placement: null,
   });
@@ -227,12 +224,11 @@ const OnJobTrainingIndex = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
-  const [instituteId, setInstituteId] = useState(null);
 
   // ===== TABS =====
   const tabs = [
+    { label: "Placement Sessions", icon: <EventIcon /> },
     { label: "Firms/Companies", icon: <BusinessIcon /> },
-    { label: "OJT Agreements", icon: <AssignmentIcon /> },
     { label: "Trainee Placements", icon: <PersonAddIcon /> },
   ];
 
@@ -258,9 +254,9 @@ const OnJobTrainingIndex = () => {
       const loadDependent = async () => {
         try {
           await Promise.all([
+            fetchSessionData(instituteId),
             fetchFirmData(instituteId),
-            fetchOjtData(instituteId),
-            fetchPlacementData(),
+            fetchPlacementData(instituteId),
             fetchCourses(instituteId, access_token),
           ]);
         } catch (error) {
@@ -272,10 +268,10 @@ const OnJobTrainingIndex = () => {
   }, [instituteId, access_token]);
 
   // ===== API CALLS =====
-  const fetchApi = async (service, params, setter, errorMsg) => {
+  const fetchApi = async (serviceFn, params, setter, errorMsg) => {
     try {
       setLoading(true);
-      const response = await service(...params);
+      const response = await serviceFn(...params);
       setter(response.data || []);
       return response;
     } catch (error) {
@@ -307,6 +303,7 @@ const OnJobTrainingIndex = () => {
       setDzongkhags,
       "Failed to load dzongkhags",
     );
+
   const fetchInstituteDetails = async () => {
     try {
       const response =
@@ -316,6 +313,7 @@ const OnJobTrainingIndex = () => {
       toast.error("Failed to load institute details");
     }
   };
+
   const fetchCourses = (id, token) =>
     fetchApi(
       ApplyAccreditedCourseService.getAccreditedCourseByInstituteId,
@@ -323,59 +321,61 @@ const OnJobTrainingIndex = () => {
       setCourses,
       "Failed to load courses",
     );
-  const fetchOjtData = (id) =>
+  const fetchSessionData = (id) =>
     fetchApi(
-      OJTService.getAgreementByInstituteId,
+      CampusPlacementService.getPlacementSessionByInstituteId,
       [id, access_token],
-      setOjtData,
-      "Failed to load OJT agreements",
+      setSessionData,
+      "Failed to load sessions",
     );
   const fetchFirmData = (id) =>
     fetchApi(
-      OJTService.getCompanyByInstituteId,
+      CampusPlacementService.getFirmByInstituteId,
       [id, access_token],
       setFirmData,
       "Failed to load firms",
     );
-  const fetchPlacementData = () => {
-    if (!instituteId || !access_token) return;
-    return fetchApi(
-      OJTService.getTraineeByInstituteId,
-      [instituteId, access_token],
+  const fetchPlacementData = (id) =>
+    fetchApi(
+      CampusPlacementService.getTraineeByInstituteId,
+      [id, access_token],
       setPlacementData,
       "Failed to load placements",
     );
-  };
 
   // ===== HELPERS =====
   const getStatusName = (id) =>
     dropdownData.find((s) => s.id === parseInt(id))?.name || "Pending";
   const getStatusColor = (id) => {
     const name = getStatusName(id)?.toLowerCase() || "";
-    if (name.includes("approve") || name.includes("complete")) return "success";
+    if (
+      name.includes("approve") ||
+      name.includes("complete") ||
+      name.includes("placed") ||
+      name.includes("confirmed")
+    )
+      return "success";
     if (name.includes("reject") || name.includes("cancel")) return "error";
-    if (name.includes("pending") || name.includes("review")) return "warning";
+    if (name.includes("pending") || name.includes("scheduled"))
+      return "warning";
     return "default";
   };
-  const getDzongkhagName = (id) =>
-    dzongkhags.find((d) => d.id === parseInt(id))?.dzonkhagName || "N/A";
   const getEmploymentStatusName = (id) =>
     employmentStatuses.find((s) => String(s.id) === String(id))?.name ||
     "Not Set";
-  const getEmploymentStatusColor = (name) =>
-    ({
+  const getEmploymentStatusColor = (name) => {
+    const colors = {
       Employed: "success",
       Unemployed: "error",
       Student: "info",
       Intern: "info",
       Contract: "warning",
       Probation: "secondary",
-    })[name] || "default";
-  const getCompanyName = (id) =>
-    firmData.find((f) => String(f.id) === String(id))?.company_name || "N/A";
-  const getAgreementTitle = (id) =>
-    ojtData.find((o) => String(o.id) === String(id))?.agreement_title ||
-    `ID: ${id}`;
+    };
+    return colors[name] || "default";
+  };
+  const getDzongkhagName = (id) =>
+    dzongkhags.find((d) => String(d.id) === String(id))?.dzonkhagName || "N/A";
   const getDocumentLinks = (str) => {
     try {
       return str
@@ -412,6 +412,16 @@ const OnJobTrainingIndex = () => {
     }
   };
 
+  const handleTabChange = (_, newValue) => {
+    setTabValue(newValue);
+    setPage(0);
+  };
+  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (e) => {
+    setRowsPerPage(+e.target.value);
+    setPage(0);
+  };
+
   // ===== CRUD OPERATIONS =====
   const handleDelete = (item, type) => {
     setDialogState((prev) => ({ ...prev, delete: { open: true, item, type } }));
@@ -421,18 +431,18 @@ const OnJobTrainingIndex = () => {
     const { item, type } = dialogState.delete;
     try {
       const services = {
-        firm: {
-          fn: OJTService.deleteFirm,
-          refetch: fetchFirmData,
-          msg: `Firm "${item.company_name}" deleted`,
+        session: {
+          fn: CampusPlacementService.deleteSession,
+          refetch: fetchSessionData,
+          msg: `Session "${item.session_name}" deleted`,
         },
-        ojt: {
-          fn: OJTService.deleteOjtAgreement,
-          refetch: fetchOjtData,
-          msg: `OJT Agreement "${item.agreement_title}" deleted`,
+        firm: {
+          fn: CampusPlacementService.deleteFirm,
+          refetch: fetchFirmData,
+          msg: `Firm "${item.firm_name}" deleted`,
         },
         placement: {
-          fn: OJTService.deletePlacement,
+          fn: CampusPlacementService.deletePlacement,
           refetch: fetchPlacementData,
           msg: `Placement for "${item.trainee_name}" deleted`,
         },
@@ -440,7 +450,7 @@ const OnJobTrainingIndex = () => {
       const service = services[type];
       await service.fn(item.id, access_token);
       toast.success(service.msg);
-      await service.refetch(type === "placement" ? undefined : instituteId);
+      await service.refetch(instituteId);
       setDialogState((prev) => ({
         ...prev,
         delete: { open: false, item: null, type: "" },
@@ -453,19 +463,23 @@ const OnJobTrainingIndex = () => {
   // ===== FORM SUBMISSIONS =====
   const submitForm = async (
     values,
-    service,
+    serviceFn,
     payloadFn,
     successMsg,
     refetchFn,
     resetForm,
+    isEdit = false,
+    id = null,
   ) => {
     setLoading(true);
     try {
       const payload = payloadFn(values);
-      const response = await service(payload, access_token);
+      const response = isEdit
+        ? await serviceFn({ id, ...payload }, access_token)
+        : await serviceFn(payload, access_token);
       if (response.status === 200 || response.status === 201) {
         toast.success(successMsg);
-        await refetchFn();
+        await refetchFn(instituteId);
         resetForm();
         return true;
       }
@@ -477,68 +491,61 @@ const OnJobTrainingIndex = () => {
     return false;
   };
 
-  const handleOjtSubmit = async (values, { resetForm, setFieldError }) => {
+  const handleSessionSubmit = async (values, { resetForm }) => {
     const documents = await Promise.all(values.files.map(fileToBase64));
     const payload = (v) => ({
-      companyId: v.firmId,
-      agreementTitle: v.agreementTitle,
-      agreementDate: v.agreementDate,
-      startDate: v.startDate,
-      endDate: v.endDate,
-      totalTraineeNo: v.numberOfTrainees,
-      superVisorName: v.supervisorName,
-      supervisorContactNo: v.supervisorContact,
+      sessionName: v.sessionName,
+      sessionDate: v.sessionDate,
+      sessionTime: v.sessionTime,
+      venue: v.venue,
       description: v.description,
-      documents,
       instituteId: instituteId || null,
       createdBy: actionId,
-      statusId: 55,
-      serviceId: 26,
-      assignedRoleId: 21,
+      statusId: 70,
+      documents,
     });
     const success = await submitForm(
       values,
-      OJTService.submitOJTAgrement,
+      CampusPlacementService.submitPlacementSession,
       payload,
-      "OJT Agreement submitted!",
-      () => fetchOjtData(instituteId),
+      selected.session ? "Session updated!" : "Session created!",
+      fetchSessionData,
       resetForm,
+      !!selected.session,
+      selected.session?.id,
     );
     if (success) {
-      setDuplicateError("");
       setDialogState((prev) => ({
         ...prev,
-        ojt: { ...prev.ojt, open: false },
+        session: { open: false, edit: false, view: false },
       }));
+      setSelected((prev) => ({ ...prev, session: null }));
     }
   };
 
   const handleFirmSubmit = async (values, { resetForm }) => {
     const payload = (v) => ({
       registrationNo: v.registrationNo,
-      companyName: v.firmName,
-      contactPersonName: v.contactPerson,
-      contactPersonMobileNo: v.contactPhone,
-      contactPersonEmail: v.contactEmail,
+      firmName: v.firmName,
+      contactPerson: v.contactPerson,
+      contactPhone: v.contactPhone,
+      contactEmail: v.contactEmail,
       dzongkhagId: v.dzongkhag,
       address: v.address,
       description: v.description,
+      sessionId: v.placementSession,
       instituteId: instituteId || null,
       createdBy: actionId,
     });
-    const service = selected.firm
-      ? OJTService.updateFirm
-      : OJTService.submitOJTCompany;
-    const payloadData = selected.firm
-      ? { id: selected.firm.id, ...payload(values) }
-      : payload(values);
     const success = await submitForm(
       values,
-      service,
-      () => payloadData,
+      CampusPlacementService.submitFirm,
+      payload,
       selected.firm ? "Firm updated!" : "Firm added!",
-      () => fetchFirmData(instituteId),
+      fetchFirmData,
       resetForm,
+      !!selected.firm,
+      selected.firm?.id,
     );
     if (success) {
       setDialogState((prev) => ({
@@ -551,7 +558,7 @@ const OnJobTrainingIndex = () => {
 
   const handlePlacementSubmit = async (values, { resetForm }) => {
     const payload = (v) => ({
-      ojtAgreementId: v.ojtAgreementId,
+      firmId: v.firmId,
       traineeCid: v.traineeCid,
       traineeName: v.traineeName,
       courseId: v.courseId,
@@ -561,13 +568,13 @@ const OnJobTrainingIndex = () => {
       remarks: v.remarks,
       instituteId: instituteId || null,
       createdBy: actionId,
-      statusId: 65,
+      statusId: 72,
       placementDate: new Date().toISOString().split("T")[0],
       startDate: new Date().toISOString().split("T")[0],
     });
     const success = await submitForm(
       values,
-      OJTService.submitOJTTrainee,
+      CampusPlacementService.submitPlacementTrainee,
       payload,
       "Placement recorded!",
       fetchPlacementData,
@@ -579,41 +586,36 @@ const OnJobTrainingIndex = () => {
   };
 
   // ===== VALIDATION SCHEMAS =====
-  const ojtSchema = Yup.object({
-    firmId: Yup.string().required("Firm is required"),
-    agreementTitle: Yup.string().required("Title is required"),
-    agreementDate: Yup.date().required("Date is required"),
-    startDate: Yup.date().required("Start date is required"),
-    endDate: Yup.date()
-      .required("End date is required")
-      .min(Yup.ref("startDate"), "End date must be after start date"),
-    numberOfTrainees: Yup.number().required().min(1, "At least 1 trainee"),
-    supervisorName: Yup.string().required("Supervisor name is required"),
-    supervisorContact: Yup.string().required("Contact is required"),
+  const sessionSchema = Yup.object({
+    sessionName: Yup.string().required("Session name is required"),
+    sessionDate: Yup.date().required("Session date is required"),
+    sessionTime: Yup.string().required("Session time is required"),
+    venue: Yup.string().required("Venue is required"),
     description: Yup.string(),
     files: Yup.array(),
   });
 
   const firmSchema = Yup.object({
-    registrationNo: Yup.string().required("Registration is required"),
+    registrationNo: Yup.string().required("Registration number is required"),
     firmName: Yup.string().required("Firm name is required"),
     contactPerson: Yup.string().required("Contact person is required"),
-    contactPhone: Yup.string().required("Phone is required"),
+    contactPhone: Yup.string().required("Contact phone is required"),
     contactEmail: Yup.string()
       .email("Invalid email")
-      .required("Email is required"),
-    dzongkhag: Yup.string().required("Dzongkhag is required"),
+      .required("Contact email is required"),
+    dzongkhag: Yup.string().required("Location Dzongkhag is required"),
     address: Yup.string().required("Address is required"),
     description: Yup.string(),
+    placementSession: Yup.string().required("Placement session is required"),
   });
 
   const placementSchema = Yup.object({
-    ojtAgreementId: Yup.string().required("Agreement is required"),
-    traineeCid: Yup.string().required("CID is required"),
-    traineeName: Yup.string().required("Name is required"),
+    firmId: Yup.string().required("Company is required"),
+    traineeCid: Yup.string().required("Trainee CID is required"),
+    traineeName: Yup.string().required("Trainee Name is required"),
     courseId: Yup.string().required("Course is required"),
     position: Yup.string().required("Position is required"),
-    employmentStatus: Yup.string().required("Status is required"),
+    employmentStatus: Yup.string().required("Employment status is required"),
     salary: Yup.number().min(0, "Salary must be positive"),
     remarks: Yup.string(),
   });
@@ -621,35 +623,32 @@ const OnJobTrainingIndex = () => {
   // ===== INITIAL VALUES =====
   const getInitialValues = (type, data = null) => {
     const maps = {
-      ojt: {
-        firmId: data?.company_id || "",
-        agreementTitle: data?.agreement_title || "",
-        agreementDate: data?.agreement_date || "",
-        startDate: data?.start_date || "",
-        endDate: data?.end_date || "",
-        numberOfTrainees: data?.total_trainee_no || "",
-        supervisorName: data?.super_visor_name || "",
-        supervisorContact: data?.supervisor_contact_no || "",
+      session: {
+        sessionName: data?.session_name || "",
+        sessionDate: data?.session_date || "",
+        sessionTime: data?.session_time || "",
+        venue: data?.venue || "",
         description: data?.description || "",
         files: [],
       },
       firm: {
         registrationNo: data?.registration_no || "",
-        firmName: data?.company_name || "",
-        contactPerson: data?.contact_person_name || "",
-        contactPhone: data?.contact_person_mobile_no || "",
-        contactEmail: data?.contact_person_email || "",
+        firmName: data?.firm_name || "",
+        contactPerson: data?.contact_person || "",
+        contactPhone: data?.contact_phone || "",
+        contactEmail: data?.contact_email || "",
         dzongkhag: data?.dzongkhag_id || "",
         address: data?.address || "",
         description: data?.description || "",
+        placementSession: data?.session_id || "",
       },
       placement: {
-        ojtAgreementId: data?.agreement_id || "",
+        firmId: data?.firm_id || "",
         traineeCid: data?.trainee_cid || "",
         traineeName: data?.trainee_name || "",
         courseId: data?.course_id || "",
         position: data?.position || "",
-        employmentStatus: data?.employment_status_id || "",
+        employmentStatus: data?.employment_status || "",
         salary: data?.salary || "",
         remarks: data?.remarks || "",
       },
@@ -668,21 +667,13 @@ const OnJobTrainingIndex = () => {
   };
 
   const filtered = {
-    ojt: filterData(ojtData, [
-      "agreement_title",
-      "super_visor_name",
-      "description",
-    ]),
-    firm: filterData(firmData, [
-      "company_name",
-      "contact_person_name",
-      "dzongkhag_id",
-    ]),
+    session: filterData(sessionData, ["session_name", "venue"]),
+    firm: filterData(firmData, ["firm_name", "contact_person", "dzongkhag"]),
     placement: filterData(placementData, [
       "trainee_name",
       "trainee_cid",
-      "agreement_id",
       "position",
+      "firm_name",
     ]),
   };
 
@@ -701,10 +692,10 @@ const OnJobTrainingIndex = () => {
                 ...prev,
                 firm: { ...prev.firm, open: true },
               }));
-            else if (type === "ojt")
+            else if (type === "session")
               setDialogState((prev) => ({
                 ...prev,
-                ojt: { ...prev.ojt, open: true },
+                session: { ...prev.session, open: true },
               }));
             else
               setDialogState((prev) => ({
@@ -713,12 +704,11 @@ const OnJobTrainingIndex = () => {
               }));
           }}
         >
-          Add{" "}
           {type === "firm"
-            ? "Firm"
-            : type === "ojt"
-              ? "OJT Agreement"
-              : "Placement"}
+            ? "Add Firm"
+            : type === "session"
+              ? "Create Session"
+              : "Record Placement"}
         </Button>
       </Box>
       <ReusableTable
@@ -732,11 +722,10 @@ const OnJobTrainingIndex = () => {
     </>
   );
 
-  // ===== DIALOG HELPERS =====
   const renderDialog = (
     type,
     title,
-    form,
+    FormComponent,
     initialValues,
     schema,
     onSubmit,
@@ -749,10 +738,10 @@ const OnJobTrainingIndex = () => {
           ...prev,
           firm: { open: false, edit: false },
         }));
-      else if (type === "ojt")
+      else if (type === "session")
         setDialogState((prev) => ({
           ...prev,
-          ojt: { open: false, edit: false },
+          session: { open: false, edit: false },
         }));
       else setDialogState((prev) => ({ ...prev, placement: { open: false } }));
       setSelected((prev) => ({ ...prev, [type]: null }));
@@ -769,7 +758,9 @@ const OnJobTrainingIndex = () => {
         >
           {(formik) => (
             <Form>
-              <DialogContent dividers>{form}</DialogContent>
+              <DialogContent dividers>
+                <FormComponent formik={formik} />
+              </DialogContent>
               <DialogActions>
                 <Button
                   size="small"
@@ -801,28 +792,15 @@ const OnJobTrainingIndex = () => {
   };
 
   // ===== FORM COMPONENTS =====
-  const OjtForm = ({ formik }) => (
+  const SessionForm = ({ formik }) => (
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="firmId"
-          label="Firm/Company"
-          select
-          options={firmData}
-          formik={formik}
-        />
+        <FormField name="sessionName" label="Session Name" formik={formik} />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
         <FormField
-          name="agreementTitle"
-          label="Agreement Title"
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="agreementDate"
-          label="Agreement Date"
+          name="sessionDate"
+          label="Session Date"
           type="date"
           formik={formik}
           InputLabelProps={{ shrink: true }}
@@ -830,48 +808,20 @@ const OnJobTrainingIndex = () => {
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
         <FormField
-          name="startDate"
-          label="Start Date"
-          type="date"
+          name="sessionTime"
+          label="Session Time"
+          type="time"
           formik={formik}
           InputLabelProps={{ shrink: true }}
         />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="endDate"
-          label="End Date"
-          type="date"
-          formik={formik}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="numberOfTrainees"
-          label="Number of Trainees"
-          type="number"
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="supervisorName"
-          label="Supervisor Name"
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="supervisorContact"
-          label="Supervisor Contact"
-          formik={formik}
-        />
+        <FormField name="venue" label="Venue" formik={formik} />
       </Grid>
       <Grid size={{ xs: 12 }}>
         <FormField
           name="description"
-          label="Description/Remarks"
+          label="Description"
           multiline
           rows={3}
           formik={formik}
@@ -886,6 +836,7 @@ const OnJobTrainingIndex = () => {
     </Grid>
   );
 
+  // FirmForm with placement session dropdown
   const FirmForm = ({ formik }) => (
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, md: 6 }}>
@@ -929,6 +880,15 @@ const OnJobTrainingIndex = () => {
           formik={formik}
         />
       </Grid>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <FormField
+          name="placementSession"
+          label="Placement Session"
+          select
+          options={sessionData}
+          formik={formik}
+        />
+      </Grid>
       <Grid size={{ xs: 12 }}>
         <FormField
           name="address"
@@ -950,14 +910,15 @@ const OnJobTrainingIndex = () => {
     </Grid>
   );
 
+  // PlacementForm without session dropdown
   const PlacementForm = ({ formik }) => (
     <Grid container spacing={2}>
       <Grid size={{ xs: 12, md: 6 }}>
         <FormField
-          name="ojtAgreementId"
-          label="OJT Agreement"
+          name="firmId"
+          label="Company"
           select
-          options={ojtData.map((o) => ({ ...o, name: o.agreement_title }))}
+          options={firmData}
           formik={formik}
         />
       </Grid>
@@ -1014,57 +975,16 @@ const OnJobTrainingIndex = () => {
   );
 
   // ===== TABLE COLUMNS =====
-  const firmColumns = [
-    { label: "Registration No", field: "registration_no" },
-    { label: "Firm Name", field: "company_name" },
-    { label: "Contact Person", field: "contact_person_name" },
-    { label: "Phone", field: "contact_person_mobile_no" },
-    { label: "Email", field: "contact_person_email" },
-    { label: "Dzongkhag", render: (i) => getDzongkhagName(i.dzongkhag_id) },
-    { label: "Address", field: "address" },
-  ];
-
-  const ojtColumns = [
-    { label: "Agreement Title", field: "agreement_title" },
-    { label: "Company Name", render: (i) => getCompanyName(i.company_id) },
-    { label: "Trainees", field: "total_trainee_no" },
-    { label: "Supervisor", field: "super_visor_name" },
+  const sessionColumns = [
+    { label: "Session Name", field: "session_name" },
     {
-      label: "Period",
+      label: "Date & Time",
       render: (i) =>
-        i.start_date && i.end_date
-          ? `${new Date(i.start_date).toLocaleDateString()} - ${new Date(i.end_date).toLocaleDateString()}`
+        i.session_date && i.session_time
+          ? `${new Date(i.session_date).toLocaleDateString()} - ${i.session_time}`
           : "N/A",
     },
-    {
-      label: "Documents",
-      render: (i) => {
-        const docs = getDocumentLinks(i.documents);
-        return docs.length
-          ? docs.map((d, idx) => (
-              <div
-                key={d.id || idx}
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <Link
-                  component="button"
-                  variant="body2"
-                  onClick={() => handleDownload(d)}
-                >
-                  {d.name}
-                </Link>
-                <IconButton
-                  size="small"
-                  onClick={() => handleDownload(d)}
-                  disabled={downloading}
-                >
-                  <LaunchIcon fontSize="small" />
-                </IconButton>
-              </div>
-            ))
-          : "N/A";
-      },
-    },
+    { label: "Venue", field: "venue" },
     {
       label: "Status",
       render: (i) => (
@@ -1077,22 +997,37 @@ const OnJobTrainingIndex = () => {
     },
   ];
 
+  const firmColumns = [
+    { label: "Registration No", field: "registration_no" },
+    { label: "Firm Name", field: "firm_name" },
+    { label: "Contact Person", field: "contact_person" },
+    { label: "Phone", field: "contact_phone" },
+    { label: "Email", field: "contact_email" },
+    { label: "Dzongkhag", render: (i) => getDzongkhagName(i.dzongkhag_id) },
+    { label: "Address", field: "address" },
+    { 
+      label: "Placement Session", 
+      render: (i) => {
+        const session = sessionData.find(s => s.id === i.session_id);
+        return session ? session.session_name : "N/A";
+      }
+    },
+  ];
+
   const placementColumns = [
     { label: "Trainee CID", field: "trainee_cid" },
     { label: "Trainee Name", field: "trainee_name" },
-    { label: "Agreement", render: (i) => getAgreementTitle(i.agreement_id) },
+    { label: "Company", field: "firm_name" },
     { label: "Position", field: "position" },
     {
       label: "Employment Status",
       render: (i) => {
-        const name = getEmploymentStatusName(i.employment_status_id);
+        const name = getEmploymentStatusName(i.employment_status);
         return (
           <Chip
             label={name}
             color={
-              i.employment_status_id
-                ? getEmploymentStatusColor(name)
-                : "default"
+              i.employment_status ? getEmploymentStatusColor(name) : "default"
             }
             size="small"
           />
@@ -1102,10 +1037,44 @@ const OnJobTrainingIndex = () => {
     { label: "Salary", field: "salary" },
   ];
 
+  const sessionActions = [
+    {
+      icon: <LaunchIcon />,
+      tooltip: "View",
+      color: "info",
+      onClick: (i) => {
+        setSelected((prev) => ({ ...prev, session: i }));
+        setDialogState((prev) => ({
+          ...prev,
+          session: { ...prev.session, view: true },
+        }));
+      },
+    },
+    {
+      icon: <EditIcon />,
+      tooltip: "Edit",
+      color: "primary",
+      onClick: (i) => {
+        setSelected((prev) => ({ ...prev, session: i }));
+        setDialogState((prev) => ({
+          ...prev,
+          session: { ...prev.session, edit: true },
+        }));
+      },
+    },
+    {
+      icon: <DeleteIcon />,
+      tooltip: "Delete",
+      color: "error",
+      onClick: (i) => handleDelete(i, "session"),
+    },
+  ];
+
   const firmActions = [
     {
       icon: <EditIcon />,
       tooltip: "Edit",
+      color: "primary",
       onClick: (i) => {
         setSelected((prev) => ({ ...prev, firm: i }));
         setDialogState((prev) => ({
@@ -1119,40 +1088,6 @@ const OnJobTrainingIndex = () => {
       tooltip: "Delete",
       color: "error",
       onClick: (i) => handleDelete(i, "firm"),
-    },
-  ];
-
-  const ojtActions = [
-    {
-      icon: <LaunchIcon />,
-      tooltip: "View",
-      color: "info",
-      onClick: (i) => {
-        setSelected((prev) => ({ ...prev, ojt: i }));
-        setDialogState((prev) => ({
-          ...prev,
-          ojt: { ...prev.ojt, view: true },
-        }));
-      },
-    },
-    {
-      icon: <EditIcon />,
-      tooltip: "Edit",
-      disabled: (i) => [57, 58].includes(parseInt(i.status_id)),
-      onClick: (i) => {
-        setSelected((prev) => ({ ...prev, ojt: i }));
-        setDialogState((prev) => ({
-          ...prev,
-          ojt: { ...prev.ojt, edit: true },
-        }));
-      },
-    },
-    {
-      icon: <DeleteIcon />,
-      tooltip: "Delete",
-      color: "error",
-      disabled: (i) => [57, 58].includes(parseInt(i.status_id)),
-      onClick: (i) => handleDelete(i, "ojt"),
     },
   ];
 
@@ -1178,15 +1113,12 @@ const OnJobTrainingIndex = () => {
   return (
     <Paper elevation={3} sx={{ p: 2, m: 1 }}>
       <Typography variant="h5" gutterBottom>
-        On-Job Training Management
+        On-Campus Job Placement Management
       </Typography>
 
       <Tabs
         value={tabValue}
-        onChange={(_, v) => {
-          setTabValue(v);
-          setPage(0);
-        }}
+        onChange={handleTabChange}
         sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
       >
         {tabs.map((tab, i) => (
@@ -1205,26 +1137,6 @@ const OnJobTrainingIndex = () => {
             sx={{ "& .MuiOutlinedInput-root": { height: 36 } }}
           />
         </Grid>
-        {tabValue === 1 && (
-          <Grid size={{ xs: 12, md: 2 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                label="Status"
-                sx={{ height: 36 }}
-              >
-                <MenuItem value="">All Status</MenuItem>
-                {dropdownData.map((s) => (
-                  <MenuItem key={s.id} value={s.id.toString()}>
-                    {s.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        )}
         <Grid size={{ xs: 12, md: 1 }}>
           <Button
             variant="outlined"
@@ -1241,9 +1153,14 @@ const OnJobTrainingIndex = () => {
       </Grid>
 
       {tabValue === 0 &&
-        renderTable("firm", firmColumns, firmActions, filtered.firm)}
+        renderTable(
+          "session",
+          sessionColumns,
+          sessionActions,
+          filtered.session,
+        )}
       {tabValue === 1 &&
-        renderTable("ojt", ojtColumns, ojtActions, filtered.ojt)}
+        renderTable("firm", firmColumns, firmActions, filtered.firm)}
       {tabValue === 2 &&
         renderTable(
           "placement",
@@ -1257,18 +1174,15 @@ const OnJobTrainingIndex = () => {
         component="div"
         count={
           [
+            filtered.session.length,
             filtered.firm.length,
-            filtered.ojt.length,
             filtered.placement.length,
           ][tabValue]
         }
         rowsPerPage={rowsPerPage}
         page={page}
-        onPageChange={(_, p) => setPage(p)}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(+e.target.value);
-          setPage(0);
-        }}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
       />
 
       {/* Delete Dialog */}
@@ -1284,16 +1198,16 @@ const OnJobTrainingIndex = () => {
         <DialogTitle sx={{ color: "error.main" }}>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
+            {dialogState.delete.type === "session" && (
+              <>
+                Delete session "
+                <strong>{dialogState.delete.item?.session_name}</strong>"?
+              </>
+            )}
             {dialogState.delete.type === "firm" && (
               <>
                 Delete firm "
-                <strong>{dialogState.delete.item?.company_name}</strong>"?
-              </>
-            )}
-            {dialogState.delete.type === "ojt" && (
-              <>
-                Delete OJT agreement "
-                <strong>{dialogState.delete.item?.agreement_title}</strong>"?
+                <strong>{dialogState.delete.item?.firm_name}</strong>"?
               </>
             )}
             {dialogState.delete.type === "placement" && (
@@ -1329,80 +1243,44 @@ const OnJobTrainingIndex = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Firm Dialogs */}
-      {renderDialog(
-        "firm",
-        selected.firm ? "Edit Firm" : "Add New Firm",
-        <FirmForm />,
-        getInitialValues("firm", selected.firm),
-        firmSchema,
-        handleFirmSubmit,
-      )}
-
-      {/* OJT Dialogs */}
-      {renderDialog(
-        "ojt",
-        selected.ojt ? "Edit OJT Agreement" : "New OJT Agreement",
-        <OjtForm />,
-        getInitialValues("ojt", selected.ojt),
-        ojtSchema,
-        handleOjtSubmit,
-        "lg",
-      )}
-
-      {/* View OJT Dialog */}
+      {/* View Session Dialog */}
       <Dialog
-        open={dialogState.ojt.view}
+        open={dialogState.session.view}
         onClose={() =>
           setDialogState((prev) => ({
             ...prev,
-            ojt: { ...prev.ojt, view: false },
+            session: { ...prev.session, view: false },
           }))
         }
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>OJT Agreement Details</DialogTitle>
+        <DialogTitle>Session Details</DialogTitle>
         <DialogContent dividers>
-          {selected.ojt && (
+          {selected.session && (
             <Grid container spacing={2}>
               {[
+                { label: "Session Name", value: selected.session.session_name },
                 {
-                  label: "Agreement Title",
-                  value: selected.ojt.agreement_title,
-                },
-                {
-                  label: "Company Name",
-                  value: getCompanyName(selected.ojt.company_id),
-                },
-                { label: "Trainees", value: selected.ojt.total_trainee_no },
-                { label: "Supervisor", value: selected.ojt.super_visor_name },
-                {
-                  label: "Supervisor Contact",
-                  value: selected.ojt.supervisor_contact_no,
-                },
-                {
-                  label: "Start Date",
-                  value: selected.ojt.start_date
-                    ? new Date(selected.ojt.start_date).toLocaleDateString()
+                  label: "Date",
+                  value: selected.session.session_date
+                    ? new Date(
+                        selected.session.session_date,
+                      ).toLocaleDateString()
                     : "N/A",
                 },
-                {
-                  label: "End Date",
-                  value: selected.ojt.end_date
-                    ? new Date(selected.ojt.end_date).toLocaleDateString()
-                    : "N/A",
-                },
+                { label: "Time", value: selected.session.session_time },
+                { label: "Venue", value: selected.session.venue },
                 {
                   label: "Status",
-                  value: getStatusName(selected.ojt.status_id),
+                  value: getStatusName(selected.session.status_id),
                 },
-              ].map((f, i) => (
+              ].map((field, i) => (
                 <Grid key={i} size={{ xs: 12, md: i < 4 ? 6 : 12 }}>
                   <TextField
                     fullWidth
-                    label={f.label}
-                    value={f.value || "N/A"}
+                    label={field.label}
+                    value={field.value || "N/A"}
                     size="small"
                     slotProps={{ input: { readOnly: true } }}
                   />
@@ -1412,7 +1290,7 @@ const OnJobTrainingIndex = () => {
                 <TextField
                   fullWidth
                   label="Description"
-                  value={selected.ojt.description || "N/A"}
+                  value={selected.session.description || "N/A"}
                   multiline
                   rows={2}
                   size="small"
@@ -1427,7 +1305,7 @@ const OnJobTrainingIndex = () => {
             onClick={() =>
               setDialogState((prev) => ({
                 ...prev,
-                ojt: { ...prev.ojt, view: false },
+                session: { ...prev.session, view: false },
               }))
             }
             variant="contained"
@@ -1437,130 +1315,105 @@ const OnJobTrainingIndex = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Placement Dialogs */}
+      {/* View Placement Dialog */}
       <Dialog
-        open={dialogState.placement.open}
-        onClose={() =>
-          setDialogState((prev) => ({ ...prev, placement: { open: false } }))
-        }
+        open={dialogState.placement.open && selected.placement}
+        onClose={() => {
+          setDialogState((prev) => ({ ...prev, placement: { open: false } }));
+          setSelected((prev) => ({ ...prev, placement: null }));
+        }}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
-          {selected.placement
-            ? "Placement Details"
-            : "Record Trainee Placement"}
-        </DialogTitle>
-        {selected.placement ? (
-          <>
-            <DialogContent dividers>
-              <Grid container spacing={2}>
-                {[
-                  {
-                    label: "Trainee CID",
-                    value: selected.placement.trainee_cid,
-                  },
-                  {
-                    label: "Trainee Name",
-                    value: selected.placement.trainee_name,
-                  },
-                  {
-                    label: "Agreement",
-                    value: getAgreementTitle(selected.placement.agreement_id),
-                  },
-                  { label: "Position", value: selected.placement.position },
-                  {
-                    label: "Employment Status",
-                    value: getEmploymentStatusName(
-                      selected.placement.employment_status_id,
-                    ),
-                  },
-                  {
-                    label: "Salary",
-                    value: selected.placement.salary || "N/A",
-                  },
-                ].map((f, i) => (
-                  <Grid key={i} size={{ xs: 12, md: i < 4 ? 6 : 12 }}>
-                    <TextField
-                      fullWidth
-                      label={f.label}
-                      value={f.value || "N/A"}
-                      size="small"
-                      slotProps={{ input: { readOnly: true } }}
-                    />
-                  </Grid>
-                ))}
-                <Grid size={{ xs: 12 }}>
+        <DialogTitle>Placement Details</DialogTitle>
+        <DialogContent dividers>
+          {selected.placement && (
+            <Grid container spacing={2}>
+              {[
+                { label: "Trainee CID", value: selected.placement.trainee_cid },
+                {
+                  label: "Trainee Name",
+                  value: selected.placement.trainee_name,
+                },
+                { label: "Company", value: selected.placement.firm_name },
+                { label: "Position", value: selected.placement.position },
+                {
+                  label: "Employment Status",
+                  value: getEmploymentStatusName(
+                    selected.placement.employment_status,
+                  ),
+                },
+                { label: "Salary", value: selected.placement.salary || "N/A" },
+              ].map((field, i) => (
+                <Grid key={i} size={{ xs: 12, md: i < 4 ? 6 : 12 }}>
                   <TextField
                     fullWidth
-                    label="Remarks"
-                    value={selected.placement.remarks || "N/A"}
-                    multiline
-                    rows={2}
+                    label={field.label}
+                    value={field.value || "N/A"}
                     size="small"
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
+              ))}
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Remarks"
+                  value={selected.placement.remarks || "N/A"}
+                  multiline
+                  rows={2}
+                  size="small"
+                  slotProps={{ input: { readOnly: true } }}
+                />
               </Grid>
-            </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={() => {
-                  setDialogState((prev) => ({
-                    ...prev,
-                    placement: { open: false },
-                  }));
-                  setSelected((prev) => ({ ...prev, placement: null }));
-                }}
-                variant="contained"
-              >
-                Close
-              </Button>
-            </DialogActions>
-          </>
-        ) : (
-          <Formik
-            initialValues={getInitialValues("placement")}
-            validationSchema={placementSchema}
-            onSubmit={handlePlacementSubmit}
-            enableReinitialize
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setDialogState((prev) => ({
+                ...prev,
+                placement: { open: false },
+              }));
+              setSelected((prev) => ({ ...prev, placement: null }));
+            }}
+            variant="contained"
           >
-            {(formik) => (
-              <Form>
-                <DialogContent dividers>
-                  <PlacementForm formik={formik} />
-                </DialogContent>
-                <DialogActions>
-                  <Button
-                    onClick={() =>
-                      setDialogState((prev) => ({
-                        ...prev,
-                        placement: { open: false },
-                      }))
-                    }
-                    size="small"
-                    variant="contained"
-                    color="error"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="small"
-                    variant="contained"
-                    color="primary"
-                    disabled={loading}
-                  >
-                    {loading ? "Saving..." : "Record Placement"}
-                  </Button>
-                </DialogActions>
-              </Form>
-            )}
-          </Formik>
-        )}
+            Close
+          </Button>
+        </DialogActions>
       </Dialog>
+
+      {/* Render Dialogs */}
+      {renderDialog(
+        "session",
+        selected.session ? "Edit Session" : "Create Session",
+        SessionForm,
+        getInitialValues("session", selected.session),
+        sessionSchema,
+        handleSessionSubmit,
+        "lg",
+      )}
+      {renderDialog(
+        "firm",
+        selected.firm ? "Edit Firm" : "Add New Firm",
+        FirmForm,
+        getInitialValues("firm", selected.firm),
+        firmSchema,
+        handleFirmSubmit,
+      )}
+      {!selected.placement &&
+        renderDialog(
+          "placement",
+          "Record Trainee Placement",
+          PlacementForm,
+          getInitialValues("placement"),
+          placementSchema,
+          handlePlacementSubmit,
+        )}
     </Paper>
   );
 };
 
-export default OnJobTrainingIndex;
+export default OnCampusJobPlacement;

@@ -31,7 +31,6 @@ import ReceiptIcon from "@mui/icons-material/Receipt";
 import PrintIcon from "@mui/icons-material/Print";
 import DownloadIcon from "@mui/icons-material/Download";
 import FilterListIcon from "@mui/icons-material/FilterList";
-import PaymentIcon from "@mui/icons-material/Payment";
 import CancelIcon from "@mui/icons-material/Cancel";
 import CloseIcon from "@mui/icons-material/Close";
 import { useSelector } from "react-redux";
@@ -40,6 +39,8 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import PublicPageService from "../../../api/services/internal/public/PublicPageService";
 import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 import { exportToExcel } from "@/utils/exportExcel";
+import PaymentsIcon from '@mui/icons-material/Payments';
+
 
 const BirmsAgencyPaymentIndex = () => {
   const [search, setSearch] = useState("");
@@ -266,7 +267,7 @@ const BirmsAgencyPaymentIndex = () => {
     const data = filteredPayments.map((item, index) => ({
       "Sl No": index + 1,
       "Payment Advice No": item.payment_no || "N/A",
-      "Invoice/Ref No": item.invoice_no || "N/A",
+      "Reference No": item.invoice_no || "N/A",
       Institute: item.institute_name || "N/A",
       Course: item.course_name || "N/A",
       "Tax Payer": item.tax_payer_name || "N/A",
@@ -748,8 +749,8 @@ const BirmsAgencyPaymentIndex = () => {
           <TableHead>
             <TableRow>
               <TableCell>#</TableCell>
-              <TableCell>PA No</TableCell>
-              <TableCell>Invoice/Ref No</TableCell>
+              <TableCell>Payment Advice No.</TableCell>
+              <TableCell>Reference No</TableCell>
               <TableCell>Institute</TableCell>
               <TableCell>Course</TableCell>
               <TableCell>Tax Payer</TableCell>
@@ -871,7 +872,7 @@ const BirmsAgencyPaymentIndex = () => {
                                 onClick={() =>
                                   window.open(payment.redirect_url, "_blank")
                                 }
-                                startIcon={<PaymentIcon />}
+                                startIcon={<PaymentsIcon />}
                                 sx={{
                                   textTransform: "none",
                                   fontSize: "0.65rem",
