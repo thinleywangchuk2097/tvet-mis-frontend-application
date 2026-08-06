@@ -103,6 +103,12 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   // Check if service_id is 39 for Viva assessments
   const isServiceId39 = courseDetails?.service_id === "39";
 
+  // Helper function to check if certification level requires numeric input (only 111 and 112)
+  const isNumericCertificationLevel = () => {
+    const levelId = courseDetails?.certification_level_id;
+    return levelId === "111" || levelId === "112";
+  };
+
   // Check if payment is paid
   const isPaymentPaid =
     paymentStatusDetails?.paymentStatus?.toLowerCase() === "paid";
@@ -302,6 +308,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     try {
       const response =
         await CommonService.getCourseAnnouncementByApplicationNo(applicationNo);
+        console.log("course details : ", response.data)
+        
       const courseData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
@@ -488,7 +496,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
 
     // Check if moving would exceed total seats
-    const totalSeats = courseDetails?.total_no_trainees || 0;
+    const totalSeats = courseDetails?.enrollment_capacity || 0;
     if (selectedTrainees.length + selectedPendingRows.length > totalSeats) {
       toast.error(
         `Cannot select more than ${totalSeats} trainees. Only ${totalSeats - selectedTrainees.length} seats available.`,
@@ -659,10 +667,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       if (hasCADates) {
         traineeInternalAssessmentsList = selectedTrainees.map((trainee) => ({
           traineeId: parseInt(trainee.id),
-          internalAssessment:
-            courseDetails?.certification_level_id === "36"
-              ? parseInt(traineeInternalAssessments[trainee.id])
-              : traineeInternalAssessments[trainee.id],
+          internalAssessment: isNumericCertificationLevel()
+            ? parseInt(traineeInternalAssessments[trainee.id])
+            : traineeInternalAssessments[trainee.id],
         }));
       }
 
@@ -685,18 +692,16 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         // For other services: Prepare theory and practical assessments
         traineeMarksList = selectedTrainees.map((trainee) => ({
           traineeId: parseInt(trainee.id),
-          theoryAssessment:
-            courseDetails?.certification_level_id === "36"
-              ? traineeTheoryAssessments[trainee.id]
-                ? parseInt(traineeTheoryAssessments[trainee.id])
-                : null
-              : traineeTheoryAssessments[trainee.id] || null,
-          practicalAssessment:
-            courseDetails?.certification_level_id === "36"
-              ? traineePracticalAssessments[trainee.id]
-                ? parseInt(traineePracticalAssessments[trainee.id])
-                : null
-              : traineePracticalAssessments[trainee.id] || null,
+          theoryAssessment: isNumericCertificationLevel()
+            ? traineeTheoryAssessments[trainee.id]
+              ? parseInt(traineeTheoryAssessments[trainee.id])
+              : null
+            : traineeTheoryAssessments[trainee.id] || null,
+          practicalAssessment: isNumericCertificationLevel()
+            ? traineePracticalAssessments[trainee.id]
+              ? parseInt(traineePracticalAssessments[trainee.id])
+              : null
+            : traineePracticalAssessments[trainee.id] || null,
         }));
       }
 
@@ -717,7 +722,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         serviceId: courseDetails?.service_id
           ? parseInt(courseDetails.service_id)
           : null,
-        assignedRoleId: 7,
+        assignedRoleId: 9,
       };
 
       // Only add traineeIds if CA dates DO NOT exist
@@ -863,7 +868,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         <>
           {/* Viva Assessment Column */}
           <TableCell>
-            {courseDetails?.certification_level_id === "36" ? (
+            {isNumericCertificationLevel() ? (
               <TextField
                 type="number"
                 size="small"
@@ -902,7 +907,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
 
           {/* Practical Assessment Column for service_id 39 */}
           <TableCell>
-            {courseDetails?.certification_level_id === "36" ? (
+            {isNumericCertificationLevel() ? (
               <TextField
                 type="number"
                 size="small"
@@ -946,7 +951,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         <>
           {/* Theory Assessment Column */}
           <TableCell>
-            {courseDetails?.certification_level_id === "36" ? (
+            {isNumericCertificationLevel() ? (
               <TextField
                 type="number"
                 size="small"
@@ -985,7 +990,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
 
           {/* Practical Assessment Column for other services */}
           <TableCell>
-            {courseDetails?.certification_level_id === "36" ? (
+            {isNumericCertificationLevel() ? (
               <TextField
                 type="number"
                 size="small"
@@ -1160,7 +1165,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                   Total Seats:
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.total_no_trainees}
+                  {courseDetails.enrollment_capacity}
                 </Typography>
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
@@ -1173,10 +1178,10 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Course Fee:
+                  Fees Per Trainee 
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
-                  Nu. {courseDetails.course_fee}
+                  Nu. {courseDetails.fees_per_trainee}
                 </Typography>
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
@@ -1184,7 +1189,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                   Available Seats:
                 </Typography>
                 <Typography variant="body1" fontWeight="bold" color="primary">
-                  {(courseDetails.total_no_trainees || 0) -
+                  {(courseDetails.enrollment_capacity || 0) -
                     selectedTrainees.length}
                 </Typography>
               </Grid>
@@ -1345,8 +1350,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                           {/* Only show CA Mark/Competency input if CA dates exist */}
                           {hasCADates && (
                             <TableCell>
-                              {courseDetails?.certification_level_id ===
-                              "36" ? (
+                              {isNumericCertificationLevel() ? (
                                 <TextField
                                   type="number"
                                   size="small"

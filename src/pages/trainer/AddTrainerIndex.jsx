@@ -65,8 +65,7 @@ const TABLE_STYLE = {
     verticalAlign: "middle",
   },
   "& th": {
-    fontWeight: 600,
-    backgroundColor: "#fafafa",
+    fontWeight: 600
   },
 };
 

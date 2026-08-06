@@ -157,7 +157,6 @@ const NAV_MENU = [
         icon: <VerifiedIcon sx={{ fontSize: 16 }} />,
         path: "/reports/accreditor",
       },
-      //{ label: "Assessment Centre Accreditation", icon: <ApartmentIcon sx={{ fontSize: 16 }} />, path: "/reports/assessment-centre" },
       {
         label: "Trainer",
         icon: <EngineeringIcon sx={{ fontSize: 16 }} />,
@@ -248,9 +247,6 @@ const HoverMenu = ({ item, onItemClick, navBtnSx, activeBtnSx }) => {
         slots={{ transition: Fade }}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
-        // ── Critical for hover menus: backdrop must NOT block the cursor
-        //    from re-entering the button, but the paper itself must capture
-        //    mouse events so the user can hover into the items.
         sx={{ pointerEvents: "none" }}
         slotProps={{
           paper: {

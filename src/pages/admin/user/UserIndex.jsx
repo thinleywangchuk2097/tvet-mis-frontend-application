@@ -87,6 +87,13 @@ const updateUserSchema = Yup.object().shape({
   email_id: Yup.string().email("Invalid email").required("Email is required"),
 });
 
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
+
 const UserIndex = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const [users, setUsers] = useState([]);
@@ -725,10 +732,15 @@ const UserIndex = () => {
           </DialogTitle>
           <form onSubmit={formik.handleSubmit}>
             <DialogContent dividers sx={{ pt: 2 }}>
+              {/* User ID - Required */}
               <TextField
                 fullWidth
                 margin="normal"
-                label="User ID"
+                label={
+                  <>
+                    User ID <RequiredStar />
+                  </>
+                }
                 name="user_id"
                 size="small"
                 value={formik.values.user_id}
@@ -738,11 +750,15 @@ const UserIndex = () => {
                 helperText={formik.touched.user_id && formik.errors.user_id}
                 disabled={editMode || loading}
               />
+
+              {/* Current Role - Required */}
               <FormControl fullWidth margin="normal">
-                <InputLabel>Current Role</InputLabel>
+                <InputLabel>
+                  Current Role <RequiredStar />
+                </InputLabel>
                 <Select
                   name="current_role"
-                  label="Current Role"
+                  label="Current Role *"
                   size="small"
                   value={formik.values.current_role}
                   onChange={handleCurrentRoleChange}
@@ -765,15 +781,19 @@ const UserIndex = () => {
                   </FormHelperText>
                 )}
               </FormControl>
+
+              {/* Roles - Required */}
               <FormControl
                 fullWidth
                 margin="normal"
                 error={formik.touched.roles && Boolean(formik.errors.roles)}
               >
-                <InputLabel>Roles</InputLabel>
+                <InputLabel>
+                  Roles <RequiredStar />
+                </InputLabel>
                 <Select
                   name="roles"
-                  label="Roles"
+                  label="Roles *"
                   size="small"
                   multiple
                   value={formik.values.roles || []}
@@ -817,10 +837,16 @@ const UserIndex = () => {
                   <FormHelperText error>{formik.errors.roles}</FormHelperText>
                 )}
               </FormControl>
+
+              {/* First Name - Required */}
               <TextField
                 fullWidth
                 margin="normal"
-                label="First Name"
+                label={
+                  <>
+                    First Name <RequiredStar />
+                  </>
+                }
                 name="first_name"
                 size="small"
                 value={formik.values.first_name}
@@ -834,6 +860,8 @@ const UserIndex = () => {
                 }
                 disabled={loading}
               />
+
+              {/* Middle Name - Optional */}
               <TextField
                 fullWidth
                 margin="normal"
@@ -852,10 +880,16 @@ const UserIndex = () => {
                 }
                 disabled={loading}
               />
+
+              {/* Last Name - Required */}
               <TextField
                 fullWidth
                 margin="normal"
-                label="Last Name"
+                label={
+                  <>
+                    Last Name <RequiredStar />
+                  </>
+                }
                 name="last_name"
                 size="small"
                 value={formik.values.last_name}
@@ -867,11 +901,15 @@ const UserIndex = () => {
                 helperText={formik.touched.last_name && formik.errors.last_name}
                 disabled={loading}
               />
+
+              {/* Location - Required */}
               <FormControl fullWidth margin="normal">
-                <InputLabel>Location</InputLabel>
+                <InputLabel>
+                  Location <RequiredStar />
+                </InputLabel>
                 <Select
                   name="location_id"
-                  label="Location"
+                  label="Location *"
                   size="small"
                   value={formik.values.location_id}
                   onChange={formik.handleChange}
@@ -894,10 +932,16 @@ const UserIndex = () => {
                   </FormHelperText>
                 )}
               </FormControl>
+
+              {/* Mobile Number - Required */}
               <TextField
                 fullWidth
                 margin="normal"
-                label="Mobile Number"
+                label={
+                  <>
+                    Mobile Number <RequiredStar />
+                  </>
+                }
                 name="mobile_no"
                 size="small"
                 value={formik.values.mobile_no}
@@ -909,10 +953,16 @@ const UserIndex = () => {
                 helperText={formik.touched.mobile_no && formik.errors.mobile_no}
                 disabled={loading}
               />
+
+              {/* Email - Required */}
               <TextField
                 fullWidth
                 margin="normal"
-                label="Email"
+                label={
+                  <>
+                    Email <RequiredStar />
+                  </>
+                }
                 name="email_id"
                 type="email"
                 size="small"
@@ -925,12 +975,18 @@ const UserIndex = () => {
                 helperText={formik.touched.email_id && formik.errors.email_id}
                 disabled={loading}
               />
+
+              {/* Password - Required (only in create mode) */}
               {!editMode && (
                 <>
                   <TextField
                     fullWidth
                     margin="normal"
-                    label="Password"
+                    label={
+                      <>
+                        Password <RequiredStar />
+                      </>
+                    }
                     name="password"
                     size="small"
                     type={showPassword ? "text" : "password"}
@@ -961,7 +1017,11 @@ const UserIndex = () => {
                   <TextField
                     fullWidth
                     margin="normal"
-                    label="Confirm Password"
+                    label={
+                      <>
+                        Confirm Password <RequiredStar />
+                      </>
+                    }
                     name="confirmPassword"
                     size="small"
                     type={showConfirmPassword ? "text" : "password"}
@@ -1022,6 +1082,7 @@ const UserIndex = () => {
             </DialogActions>
           </form>
         </Dialog>
+
         {/* Delete Confirmation Dialog */}
         <Dialog
           open={deleteDialogOpen}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// OnCampusJobPlacement.jsx
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -18,12 +19,8 @@ import {
   DialogContentText,
   DialogActions,
   MenuItem,
-  Link,
   IconButton,
   Tooltip,
-  FormControl,
-  InputLabel,
-  Select,
   Chip,
   Tab,
   Tabs,
@@ -46,7 +43,40 @@ import CampusPlacementService from "../../../api/services/internal/ojt/CampusPla
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
-// ==================== HELPERS ====================
+// ==================== CONSTANTS ====================
+const TABLE_STYLE = {
+  border: "1px solid",
+  borderColor: "divider",
+  "& th, & td": { border: "1px solid", borderColor: "divider" },
+};
+
+const TABS = [
+  { label: "Placement Sessions", icon: <EventIcon />, type: "session" },
+  { label: "Firms/Companies", icon: <BusinessIcon />, type: "firm" },
+  { label: "Trainee Placements", icon: <PersonAddIcon />, type: "placement" },
+];
+
+const STATUS_COLORS = {
+  approved: "success",
+  complete: "success",
+  placed: "success",
+  confirmed: "success",
+  reject: "error",
+  canceled: "error",
+  pending: "warning",
+  scheduled: "warning",
+};
+
+const EMPLOYMENT_COLORS = {
+  Employed: "success",
+  Unemployed: "error",
+  Student: "info",
+  Intern: "info",
+  Contract: "warning",
+  Probation: "secondary",
+};
+
+// ==================== UTILITY FUNCTIONS ====================
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -69,7 +99,198 @@ const requiredLabel = (label) => (
   </>
 );
 
-// ==================== REUSABLE TABLE ====================
+const getStatusName = (id, dropdownData) =>
+  dropdownData.find((s) => s.id === parseInt(id))?.name || "Pending";
+
+const getStatusColor = (id, dropdownData) => {
+  const name = getStatusName(id, dropdownData)?.toLowerCase() || "";
+  for (const [key, color] of Object.entries(STATUS_COLORS)) {
+    if (name.includes(key)) return color;
+  }
+  return "default";
+};
+
+const getEmploymentStatusName = (id, employmentStatuses) =>
+  employmentStatuses.find((s) => String(s.id) === String(id))?.name ||
+  "Not Set";
+
+const getEmploymentStatusColor = (name) => EMPLOYMENT_COLORS[name] || "default";
+
+const getDzongkhagName = (id, dzongkhags) =>
+  dzongkhags.find((d) => String(d.id) === String(id))?.dzonkhagName || "N/A";
+
+// ==================== CUSTOM HOOKS ====================
+const useApiFetch = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchData = useCallback(async (serviceFn, params, errorMsg) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await serviceFn(...params);
+      return response.data || [];
+    } catch (err) {
+      console.error(errorMsg, err);
+      setError(err);
+      toast.error(errorMsg);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { loading, error, fetchData };
+};
+
+const useDialogState = () => {
+  const [dialogState, setDialogState] = useState({
+    session: { open: false, edit: false, view: false },
+    firm: { open: false, edit: false },
+    placement: { open: false },
+    delete: { open: false, item: null, type: "" },
+  });
+
+  const openDialog = useCallback((type, options = {}) => {
+    setDialogState((prev) => ({
+      ...prev,
+      [type]: { ...prev[type], ...options, open: true },
+    }));
+  }, []);
+
+  const closeDialog = useCallback((type) => {
+    setDialogState((prev) => ({
+      ...prev,
+      [type]: { ...prev[type], open: false },
+    }));
+  }, []);
+
+  const openDeleteDialog = useCallback((item, type) => {
+    setDialogState((prev) => ({
+      ...prev,
+      delete: { open: true, item, type },
+    }));
+  }, []);
+
+  const closeDeleteDialog = useCallback(() => {
+    setDialogState((prev) => ({
+      ...prev,
+      delete: { open: false, item: null, type: "" },
+    }));
+  }, []);
+
+  return {
+    dialogState,
+    openDialog,
+    closeDialog,
+    openDeleteDialog,
+    closeDeleteDialog,
+  };
+};
+
+const useSelectedItem = () => {
+  const [selected, setSelected] = useState({
+    session: null,
+    firm: null,
+    placement: null,
+  });
+
+  const selectItem = useCallback((type, item) => {
+    setSelected((prev) => ({ ...prev, [type]: item }));
+  }, []);
+
+  const clearSelected = useCallback((type) => {
+    setSelected((prev) => ({ ...prev, [type]: null }));
+  }, []);
+
+  return { selected, selectItem, clearSelected };
+};
+
+const usePagination = () => {
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (e) => {
+    setRowsPerPage(+e.target.value);
+    setPage(0);
+  };
+
+  return {
+    page,
+    rowsPerPage,
+    handleChangePage,
+    handleChangeRowsPerPage,
+  };
+};
+
+// ==================== REUSABLE COMPONENTS ====================
+const StatusChip = ({ id, dropdownData }) => (
+  <Chip
+    label={getStatusName(id, dropdownData)}
+    color={getStatusColor(id, dropdownData)}
+    size="small"
+  />
+);
+
+const EmploymentStatusChip = ({ id, employmentStatuses }) => {
+  const name = getEmploymentStatusName(id, employmentStatuses);
+  return (
+    <Chip
+      label={name}
+      color={id ? getEmploymentStatusColor(name) : "default"}
+      size="small"
+    />
+  );
+};
+
+const FormField = ({
+  formik,
+  name,
+  label,
+  type = "text",
+  required = true,
+  select = false,
+  options = [],
+  optionLabelKey = "name",
+  ...props
+}) => {
+  const fieldProps = {
+    fullWidth: true,
+    select,
+    type,
+    label: required ? requiredLabel(label) : label,
+    name,
+    size: "small",
+    value: formik.values[name] || "",
+    onChange: formik.handleChange,
+    onBlur: formik.handleBlur,
+    error: formik.touched[name] && Boolean(formik.errors[name]),
+    helperText: formik.touched[name] && formik.errors[name],
+    ...props,
+  };
+
+  if (select) {
+    return (
+      <TextField {...fieldProps}>
+        <MenuItem value="">-select-</MenuItem>
+        {options.map((opt) => (
+          <MenuItem key={opt.id} value={opt.id.toString()}>
+            {opt[optionLabelKey] ||
+              opt.name ||
+              opt.firm_name ||
+              opt.session_name ||
+              opt.course_name ||
+              opt.dzonkhagName}
+          </MenuItem>
+        ))}
+      </TextField>
+    );
+  }
+
+  return <TextField {...fieldProps} />;
+};
+
 const ReusableTable = ({
   columns,
   data,
@@ -80,12 +301,12 @@ const ReusableTable = ({
   emptyMessage = "No data found",
 }) => (
   <TableContainer component={Paper} elevation={1}>
-    <Table size="small" sx={tableStyle}>
+    <Table size="small" sx={TABLE_STYLE}>
       <TableHead>
         <TableRow>
           <TableCell>#</TableCell>
-          {columns.map((col, i) => (
-            <TableCell key={i}>{col.label}</TableCell>
+          {columns.map((col) => (
+            <TableCell key={col.id}>{col.label}</TableCell>
           ))}
           {actions && <TableCell>Actions</TableCell>}
         </TableRow>
@@ -97,15 +318,15 @@ const ReusableTable = ({
             .map((item, index) => (
               <TableRow key={item.id}>
                 <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
-                {columns.map((col, i) => (
-                  <TableCell key={i}>
+                {columns.map((col) => (
+                  <TableCell key={col.id}>
                     {col.render ? col.render(item) : item[col.field] || "N/A"}
                   </TableCell>
                 ))}
                 {actions && (
                   <TableCell>
-                    {actions.map((action, i) => (
-                      <Tooltip key={i} title={action.tooltip}>
+                    {actions.map((action) => (
+                      <Tooltip key={action.id} title={action.tooltip}>
                         <span>
                           <IconButton
                             size="small"
@@ -139,65 +360,590 @@ const ReusableTable = ({
   </TableContainer>
 );
 
-const tableStyle = {
-  border: "1px solid",
-  borderColor: "divider",
-  "& th, & td": { border: "1px solid", borderColor: "divider" },
+const DeleteConfirmationDialog = ({ open, item, type, onClose, onConfirm }) => {
+  const messages = {
+    session: `Delete session "<strong>${item?.session_name}</strong>"?`,
+    firm: `Delete firm "<strong>${item?.firm_name}</strong>"?`,
+    placement: `Delete placement for "<strong>${item?.trainee_name}</strong>"?`,
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle sx={{ color: "error.main" }}>Confirm Delete</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          <span
+            dangerouslySetInnerHTML={{
+              __html: messages[type] || "Delete this record?",
+            }}
+          />
+          <br />
+          This action cannot be undone.
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} size="small" variant="outlined">
+          Cancel
+        </Button>
+        <Button
+          onClick={onConfirm}
+          size="small"
+          color="error"
+          variant="contained"
+        >
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 };
 
-// ==================== REUSABLE FORM FIELDS ====================
-const FormField = ({
-  name,
-  label,
-  type = "text",
-  required = true,
-  formik,
-  select = false,
-  options = [],
-  ...props
-}) => {
-  const field = (
-    <TextField
-      fullWidth
-      select={select}
-      type={type}
-      label={required ? requiredLabel(label) : label}
-      name={name}
+const ViewDialog = ({ open, title, fields, onClose }) => (
+  <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <DialogTitle>{title}</DialogTitle>
+    <DialogContent dividers>
+      <Grid container spacing={2}>
+        {fields.map((field, i) => (
+          <Grid key={i} size={{ xs: 12, md: i < 4 ? 6 : 12 }}>
+            <TextField
+              fullWidth
+              label={field.label}
+              value={field.value || "N/A"}
+              size="small"
+              slotProps={{ input: { readOnly: true } }}
+              multiline={field.multiline}
+              rows={field.rows || 1}
+            />
+          </Grid>
+        ))}
+      </Grid>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose} variant="contained">
+        Close
+      </Button>
+    </DialogActions>
+  </Dialog>
+);
+
+const AddButton = ({ onClick, label }) => (
+  <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+    <Button
+      variant="contained"
+      color="primary"
       size="small"
-      value={formik.values[name] || ""}
-      onChange={formik.handleChange}
-      onBlur={formik.handleBlur}
-      error={formik.touched[name] && Boolean(formik.errors[name])}
-      helperText={formik.touched[name] && formik.errors[name]}
-      {...props}
+      startIcon={<AddIcon />}
+      onClick={onClick}
     >
-      {select && [
-        <MenuItem key="select-placeholder" value="">
-          -select-
-        </MenuItem>,
-        ...options.map((opt) => (
-          <MenuItem key={opt.id} value={opt.id.toString()}>
-            {opt.name || opt.firm_name || opt.session_name || opt.course_name || opt.dzonkhagName}
-          </MenuItem>
-        ))
-      ]}
-    </TextField>
-  );
-  return field;
+      {label}
+    </Button>
+  </Box>
+);
+
+// ==================== ENTITY CONFIGURATION ====================
+const ENTITY_CONFIG = {
+  session: {
+    label: "Session",
+    addLabel: "Create Session",
+    editLabel: "Edit Session",
+    emptyMessage: "No sessions found",
+    tabIndex: 0,
+    statusKey: "status_id",
+    getInitialValues: (item) => ({
+      sessionName: item?.session_name || "",
+      sessionDate: item?.session_date || "",
+      sessionTime: item?.session_time || "",
+      venue: item?.venue || "",
+      description: item?.description || "",
+      files: [],
+    }),
+    schema: Yup.object({
+      sessionName: Yup.string().required("Session name is required"),
+      sessionDate: Yup.date().required("Session date is required"),
+      sessionTime: Yup.string().required("Session time is required"),
+      venue: Yup.string().required("Venue is required"),
+      description: Yup.string(),
+      files: Yup.array(),
+    }),
+    service: {
+      submit: CampusPlacementService.submitPlacementSession,
+      delete: CampusPlacementService.deleteSession,
+    },
+    payloadFn: (values, context) => ({
+      sessionName: values.sessionName,
+      sessionDate: values.sessionDate,
+      sessionTime: values.sessionTime,
+      venue: values.venue,
+      description: values.description,
+      instituteId: context.instituteId || null,
+      createdBy: context.actionId,
+      statusId: 70,
+    }),
+    viewFields: (item, context) => [
+      { label: "Session Name", value: item.session_name },
+      {
+        label: "Date",
+        value: item.session_date
+          ? new Date(item.session_date).toLocaleDateString()
+          : "N/A",
+      },
+      { label: "Time", value: item.session_time },
+      { label: "Venue", value: item.venue },
+      {
+        label: "Status",
+        value: getStatusName(item.status_id, context.dropdownData),
+      },
+      {
+        label: "Description",
+        value: item.description || "N/A",
+        multiline: true,
+        rows: 2,
+      },
+    ],
+    columns: (context) => [
+      { id: "sessionName", label: "Session Name", field: "session_name" },
+      {
+        id: "dateTime",
+        label: "Date & Time",
+        render: (i) =>
+          i.session_date && i.session_time
+            ? `${new Date(i.session_date).toLocaleDateString()} - ${i.session_time}`
+            : "N/A",
+      },
+      { id: "venue", label: "Venue", field: "venue" },
+      {
+        id: "status",
+        label: "Status",
+        render: (i) => (
+          <StatusChip id={i.status_id} dropdownData={context.dropdownData} />
+        ),
+      },
+    ],
+    actions: (context) => [
+      {
+        id: "view",
+        icon: <LaunchIcon />,
+        tooltip: "View",
+        color: "info",
+        onClick: (i) => {
+          context.selectItem("session", i);
+          context.openDialog("session", { view: true });
+        },
+      },
+      {
+        id: "edit",
+        icon: <EditIcon />,
+        tooltip: "Edit",
+        color: "primary",
+        onClick: (i) => {
+          context.selectItem("session", i);
+          context.openDialog("session", { edit: true });
+        },
+      },
+      {
+        id: "delete",
+        icon: <DeleteIcon />,
+        tooltip: "Delete",
+        color: "error",
+        onClick: (i) => context.handleDelete(i, "session"),
+      },
+    ],
+    FormComponent: ({ formik, context }) => (
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField formik={formik} name="sessionName" label="Session Name" />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="sessionDate"
+            label="Session Date"
+            type="date"
+            InputLabelProps={{ shrink: true }}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="sessionTime"
+            label="Session Time"
+            type="time"
+            InputLabelProps={{ shrink: true }}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField formik={formik} name="venue" label="Venue" />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <FormField
+            formik={formik}
+            name="description"
+            label="Description"
+            multiline
+            rows={3}
+          />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <FileUpload
+            files={formik.values.files}
+            onFilesChange={(f) => formik.setFieldValue("files", f)}
+          />
+        </Grid>
+      </Grid>
+    ),
+  },
+  firm: {
+    label: "Firm",
+    addLabel: "Add Firm",
+    editLabel: "Edit Firm",
+    emptyMessage: "No firms found",
+    tabIndex: 1,
+    statusKey: null,
+    getInitialValues: (item) => ({
+      registrationNo: item?.registration_no || "",
+      firmName: item?.firm_name || "",
+      contactPerson: item?.contact_person || "",
+      contactPhone: item?.contact_phone || "",
+      contactEmail: item?.contact_email || "",
+      dzongkhag: item?.dzongkhag_id || "",
+      address: item?.address || "",
+      description: item?.description || "",
+      placementSession: item?.session_id || "",
+    }),
+    schema: Yup.object({
+      registrationNo: Yup.string().required("Registration number is required"),
+      firmName: Yup.string().required("Firm name is required"),
+      contactPerson: Yup.string().required("Contact person is required"),
+      contactPhone: Yup.string().required("Contact phone is required"),
+      contactEmail: Yup.string()
+        .email("Invalid email")
+        .required("Contact email is required"),
+      dzongkhag: Yup.string().required("Location Dzongkhag is required"),
+      address: Yup.string().required("Address is required"),
+      description: Yup.string(),
+      placementSession: Yup.string().required("Placement session is required"),
+    }),
+    service: {
+      submit: CampusPlacementService.submitFirm,
+      delete: CampusPlacementService.deleteFirm,
+    },
+    payloadFn: (values, context) => ({
+      registrationNo: values.registrationNo,
+      firmName: values.firmName,
+      contactPerson: values.contactPerson,
+      contactPhone: values.contactPhone,
+      contactEmail: values.contactEmail,
+      dzongkhagId: values.dzongkhag,
+      address: values.address,
+      description: values.description,
+      sessionId: values.placementSession,
+      instituteId: context.instituteId || null,
+      createdBy: context.actionId,
+    }),
+    columns: (context) => [
+      { id: "regNo", label: "Registration No", field: "registration_no" },
+      { id: "firmName", label: "Firm Name", field: "firm_name" },
+      { id: "contactPerson", label: "Contact Person", field: "contact_person" },
+      { id: "phone", label: "Phone", field: "contact_phone" },
+      { id: "email", label: "Email", field: "contact_email" },
+      {
+        id: "dzongkhag",
+        label: "Dzongkhag",
+        render: (i) => getDzongkhagName(i.dzongkhag_id, context.dzongkhags),
+      },
+      { id: "address", label: "Address", field: "address" },
+      {
+        id: "session",
+        label: "Placement Session",
+        render: (i) => {
+          const session = context.sessionData.find(
+            (s) => s.id === i.session_id,
+          );
+          return session ? session.session_name : "N/A";
+        },
+      },
+    ],
+    actions: (context) => [
+      {
+        id: "edit",
+        icon: <EditIcon />,
+        tooltip: "Edit",
+        color: "primary",
+        onClick: (i) => {
+          context.selectItem("firm", i);
+          context.openDialog("firm", { edit: true });
+        },
+      },
+      {
+        id: "delete",
+        icon: <DeleteIcon />,
+        tooltip: "Delete",
+        color: "error",
+        onClick: (i) => context.handleDelete(i, "firm"),
+      },
+    ],
+    FormComponent: ({ formik, context }) => (
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="registrationNo"
+            label="Registration No"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField formik={formik} name="firmName" label="Firm Name" />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="contactPerson"
+            label="Contact Person Name"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="contactPhone"
+            label="Contact Person Mobile No"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="contactEmail"
+            label="Contact Person Email"
+            type="email"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="dzongkhag"
+            label="Location Dzongkhag"
+            select
+            options={context.dzongkhags}
+            optionLabelKey="dzonkhagName"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="placementSession"
+            label="Placement Session"
+            select
+            options={context.sessionData}
+            optionLabelKey="session_name"
+          />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <FormField
+            formik={formik}
+            name="address"
+            label="Address"
+            multiline
+            rows={2}
+          />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <FormField
+            formik={formik}
+            name="description"
+            label="Description"
+            multiline
+            rows={2}
+          />
+        </Grid>
+      </Grid>
+    ),
+  },
+  placement: {
+    label: "Placement",
+    addLabel: "Record Placement",
+    editLabel: "Placement Details",
+    emptyMessage: "No placements found",
+    tabIndex: 2,
+    statusKey: "employment_status",
+    getInitialValues: () => ({
+      firmId: "",
+      traineeCid: "",
+      traineeName: "",
+      courseId: "",
+      position: "",
+      employmentStatus: "",
+      salary: "",
+      remarks: "",
+    }),
+    schema: Yup.object({
+      firmId: Yup.string().required("Company is required"),
+      traineeCid: Yup.string().required("Trainee CID is required"),
+      traineeName: Yup.string().required("Trainee Name is required"),
+      courseId: Yup.string().required("Course is required"),
+      position: Yup.string().required("Position is required"),
+      employmentStatus: Yup.string().required("Employment status is required"),
+      salary: Yup.number().min(0, "Salary must be positive"),
+      remarks: Yup.string(),
+    }),
+    service: {
+      submit: CampusPlacementService.submitPlacementTrainee,
+      delete: CampusPlacementService.deletePlacement,
+    },
+    payloadFn: (values, context) => ({
+      firmId: values.firmId,
+      traineeCid: values.traineeCid,
+      traineeName: values.traineeName,
+      courseId: values.courseId,
+      position: values.position,
+      employmentStatus: values.employmentStatus,
+      salary: values.salary,
+      remarks: values.remarks,
+      instituteId: context.instituteId || null,
+      createdBy: context.actionId,
+      statusId: 72,
+      placementDate: new Date().toISOString().split("T")[0],
+      startDate: new Date().toISOString().split("T")[0],
+    }),
+    viewFields: (item, context) => [
+      { label: "Trainee CID", value: item.trainee_cid },
+      { label: "Trainee Name", value: item.trainee_name },
+      { label: "Company", value: item.firm_name },
+      { label: "Position", value: item.position },
+      {
+        label: "Employment Status",
+        value: getEmploymentStatusName(
+          item.employment_status,
+          context.employmentStatuses,
+        ),
+      },
+      { label: "Salary", value: item.salary || "N/A" },
+      {
+        label: "Remarks",
+        value: item.remarks || "N/A",
+        multiline: true,
+        rows: 2,
+      },
+    ],
+    columns: (context) => [
+      { id: "cid", label: "Trainee CID", field: "trainee_cid" },
+      { id: "name", label: "Trainee Name", field: "trainee_name" },
+      { id: "company", label: "Company", field: "firm_name" },
+      { id: "position", label: "Position", field: "position" },
+      {
+        id: "employmentStatus",
+        label: "Employment Status",
+        render: (i) => (
+          <EmploymentStatusChip
+            id={i.employment_status}
+            employmentStatuses={context.employmentStatuses}
+          />
+        ),
+      },
+      { id: "salary", label: "Salary", field: "salary" },
+    ],
+    actions: (context) => [
+      {
+        id: "view",
+        icon: <LaunchIcon />,
+        tooltip: "View",
+        color: "info",
+        onClick: (i) => {
+          context.selectItem("placement", i);
+          context.openDialog("placement", { open: true });
+        },
+      },
+      {
+        id: "delete",
+        icon: <DeleteIcon />,
+        tooltip: "Delete",
+        color: "error",
+        onClick: (i) => context.handleDelete(i, "placement"),
+      },
+    ],
+    FormComponent: ({ formik, context }) => (
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="firmId"
+            label="Company"
+            select
+            options={context.firmData}
+            optionLabelKey="firm_name"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="traineeCid"
+            label="Trainee CID"
+            placeholder="e.g., 1234567890123"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField formik={formik} name="traineeName" label="Trainee Name" />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="courseId"
+            label="Course"
+            select
+            options={context.courses}
+            optionLabelKey="course_name"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField formik={formik} name="position" label="Position" />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="employmentStatus"
+            label="Employment Status"
+            select
+            options={context.employmentStatuses}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <FormField
+            formik={formik}
+            name="salary"
+            label="Salary (if applicable)"
+            type="number"
+          />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <FormField
+            formik={formik}
+            name="remarks"
+            label="Remarks"
+            multiline
+            rows={2}
+          />
+        </Grid>
+      </Grid>
+    ),
+  },
 };
 
 // ==================== MAIN COMPONENT ====================
 const OnCampusJobPlacement = () => {
-  // ===== STATE =====
+  // ===== HOOKS =====
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
   const [tabValue, setTabValue] = useState(0);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
 
-  // Data states
+  const apiFetch = useApiFetch();
+  const dialog = useDialogState();
+  const selected = useSelectedItem();
+  const pagination = usePagination();
+
+  // ===== REDUX =====
+  const access_token = useSelector((state) => state.auth.accessToken);
+  const actionId = useSelector((state) => state.auth.id);
+  const registration_no = useSelector((state) => state.auth.userId);
+
+  // ===== STATE =====
   const [sessionData, setSessionData] = useState([]);
   const [firmData, setFirmData] = useState([]);
   const [placementData, setPlacementData] = useState([]);
@@ -207,104 +953,35 @@ const OnCampusJobPlacement = () => {
   const [dzongkhags, setDzongkhags] = useState([]);
   const [instituteId, setInstituteId] = useState(null);
 
-  // Dialog states
-  const [dialogState, setDialogState] = useState({
-    session: { open: false, edit: false, view: false },
-    firm: { open: false, edit: false },
-    placement: { open: false },
-    delete: { open: false, item: null, type: "" },
-  });
-  const [selected, setSelected] = useState({
-    session: null,
-    firm: null,
-    placement: null,
-  });
-
-  // Redux
-  const access_token = useSelector((state) => state.auth.accessToken);
-  const actionId = useSelector((state) => state.auth.id);
-  const registration_no = useSelector((state) => state.auth.userId);
-
-  // ===== TABS =====
-  const tabs = [
-    { label: "Placement Sessions", icon: <EventIcon /> },
-    { label: "Firms/Companies", icon: <BusinessIcon /> },
-    { label: "Trainee Placements", icon: <PersonAddIcon /> },
-  ];
-
-  // ===== EFFECTS =====
-  useEffect(() => {
-    const loadIndependent = async () => {
-      try {
-        await Promise.all([
-          fetchDropdownData(),
-          fetchInstituteDetails(),
-          fetchDzongkhags(),
-          fetchEmploymentStatus(),
-        ]);
-      } catch (error) {
-        console.error("Error loading data:", error);
-      }
-    };
-    loadIndependent();
-  }, []);
-
-  useEffect(() => {
-    if (instituteId && access_token) {
-      const loadDependent = async () => {
-        try {
-          await Promise.all([
-            fetchSessionData(instituteId),
-            fetchFirmData(instituteId),
-            fetchPlacementData(instituteId),
-            fetchCourses(instituteId, access_token),
-          ]);
-        } catch (error) {
-          console.error("Error loading dependent data:", error);
-        }
-      };
-      loadDependent();
-    }
-  }, [instituteId, access_token]);
-
-  // ===== API CALLS =====
-  const fetchApi = async (serviceFn, params, setter, errorMsg) => {
-    try {
-      setLoading(true);
-      const response = await serviceFn(...params);
-      setter(response.data || []);
-      return response;
-    } catch (error) {
-      console.error(errorMsg, error);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDropdownData = () =>
-    fetchApi(
+  // ===== DATA FETCHING =====
+  const fetchDropdownData = useCallback(async () => {
+    const data = await apiFetch.fetchData(
       CommonService.getByParentId,
       [4],
-      setDropdownData,
       "Failed to load dropdown",
     );
-  const fetchEmploymentStatus = () =>
-    fetchApi(
+    setDropdownData(data);
+  }, [apiFetch]);
+
+  const fetchEmploymentStatuses = useCallback(async () => {
+    const data = await apiFetch.fetchData(
       CommonService.getByParentId,
       [17],
-      setEmploymentStatuses,
       "Failed to load employment statuses",
     );
-  const fetchDzongkhags = () =>
-    fetchApi(
+    setEmploymentStatuses(data);
+  }, [apiFetch]);
+
+  const fetchDzongkhags = useCallback(async () => {
+    const data = await apiFetch.fetchData(
       CommonService.getAllDzongkhags,
       [],
-      setDzongkhags,
       "Failed to load dzongkhags",
     );
+    setDzongkhags(data);
+  }, [apiFetch]);
 
-  const fetchInstituteDetails = async () => {
+  const fetchInstituteDetails = useCallback(async () => {
     try {
       const response =
         await InstituteRegistrationService.getInstituteDetails(registration_no);
@@ -312,175 +989,168 @@ const OnCampusJobPlacement = () => {
     } catch (error) {
       toast.error("Failed to load institute details");
     }
-  };
+  }, [registration_no]);
 
-  const fetchCourses = (id, token) =>
-    fetchApi(
+  const fetchCourses = useCallback(async () => {
+    const data = await apiFetch.fetchData(
       ApplyAccreditedCourseService.getAccreditedCourseByInstituteId,
-      [id, token],
-      setCourses,
+      [instituteId, access_token],
       "Failed to load courses",
     );
-  const fetchSessionData = (id) =>
-    fetchApi(
+    setCourses(data);
+  }, [instituteId, access_token, apiFetch]);
+
+  const fetchSessionData = useCallback(async () => {
+    const data = await apiFetch.fetchData(
       CampusPlacementService.getPlacementSessionByInstituteId,
-      [id, access_token],
-      setSessionData,
+      [instituteId, access_token],
       "Failed to load sessions",
     );
-  const fetchFirmData = (id) =>
-    fetchApi(
+    setSessionData(data);
+  }, [instituteId, access_token, apiFetch]);
+
+  const fetchFirmData = useCallback(async () => {
+    const data = await apiFetch.fetchData(
       CampusPlacementService.getFirmByInstituteId,
-      [id, access_token],
-      setFirmData,
+      [instituteId, access_token],
       "Failed to load firms",
     );
-  const fetchPlacementData = (id) =>
-    fetchApi(
+    setFirmData(data);
+  }, [instituteId, access_token, apiFetch]);
+
+  const fetchPlacementData = useCallback(async () => {
+    const data = await apiFetch.fetchData(
       CampusPlacementService.getTraineeByInstituteId,
-      [id, access_token],
-      setPlacementData,
+      [instituteId, access_token],
       "Failed to load placements",
     );
+    setPlacementData(data);
+  }, [instituteId, access_token, apiFetch]);
+
+  const fetchAllData = useCallback(async () => {
+    await Promise.all([
+      fetchSessionData(),
+      fetchFirmData(),
+      fetchPlacementData(),
+      fetchCourses(),
+    ]);
+  }, [fetchSessionData, fetchFirmData, fetchPlacementData, fetchCourses]);
+
+  // ===== EFFECTS =====
+  useEffect(() => {
+    const loadIndependent = async () => {
+      await Promise.all([
+        fetchDropdownData(),
+        fetchInstituteDetails(),
+        fetchDzongkhags(),
+        fetchEmploymentStatuses(),
+      ]);
+    };
+    loadIndependent();
+  }, [
+    fetchDropdownData,
+    fetchInstituteDetails,
+    fetchDzongkhags,
+    fetchEmploymentStatuses,
+  ]);
+
+  useEffect(() => {
+    if (instituteId && access_token) {
+      fetchAllData();
+    }
+  }, [instituteId, access_token, fetchAllData]);
 
   // ===== HELPERS =====
-  const getStatusName = (id) =>
-    dropdownData.find((s) => s.id === parseInt(id))?.name || "Pending";
-  const getStatusColor = (id) => {
-    const name = getStatusName(id)?.toLowerCase() || "";
-    if (
-      name.includes("approve") ||
-      name.includes("complete") ||
-      name.includes("placed") ||
-      name.includes("confirmed")
-    )
-      return "success";
-    if (name.includes("reject") || name.includes("cancel")) return "error";
-    if (name.includes("pending") || name.includes("scheduled"))
-      return "warning";
-    return "default";
-  };
-  const getEmploymentStatusName = (id) =>
-    employmentStatuses.find((s) => String(s.id) === String(id))?.name ||
-    "Not Set";
-  const getEmploymentStatusColor = (name) => {
-    const colors = {
-      Employed: "success",
-      Unemployed: "error",
-      Student: "info",
-      Intern: "info",
-      Contract: "warning",
-      Probation: "secondary",
-    };
-    return colors[name] || "default";
-  };
-  const getDzongkhagName = (id) =>
-    dzongkhags.find((d) => String(d.id) === String(id))?.dzonkhagName || "N/A";
-  const getDocumentLinks = (str) => {
-    try {
-      return str
-        ? JSON.parse(str).map((d) => ({
-            id: d.id,
-            name: d.documentName,
-            url: d.url,
-          }))
-        : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const handleDownload = async (file) => {
-    if (!file.url) return toast.error("File URL not found");
-    setDownloading(true);
-    try {
-      const response = await CommonService.fetchDocument(file.name, file.url);
-      const blob = new Blob([response.data], {
-        type: response.headers["content-type"],
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.name;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.success("File downloaded!");
-    } catch (error) {
-      toast.error("Failed to download file");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
   const handleTabChange = (_, newValue) => {
     setTabValue(newValue);
-    setPage(0);
+    pagination.handleChangePage(null, 0);
   };
-  const handleChangePage = (_, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (e) => {
-    setRowsPerPage(+e.target.value);
-    setPage(0);
-  };
+
+  const handleSearchClear = () => setSearch("");
+
+  const filterData = useCallback(
+    (data, fields) => {
+      if (!data || !search) return data;
+      return data.filter((item) =>
+        fields.some((f) =>
+          item[f]?.toString().toLowerCase().includes(search.toLowerCase()),
+        ),
+      );
+    },
+    [search],
+  );
+
+  const filteredData = useMemo(
+    () => ({
+      session: filterData(sessionData, ["session_name", "venue"]),
+      firm: filterData(firmData, ["firm_name", "contact_person", "dzongkhag"]),
+      placement: filterData(placementData, [
+        "trainee_name",
+        "trainee_cid",
+        "position",
+        "firm_name",
+      ]),
+    }),
+    [sessionData, firmData, placementData, filterData],
+  );
 
   // ===== CRUD OPERATIONS =====
-  const handleDelete = (item, type) => {
-    setDialogState((prev) => ({ ...prev, delete: { open: true, item, type } }));
-  };
+  const handleDelete = (item, type) => dialog.openDeleteDialog(item, type);
 
   const handleDeleteConfirm = async () => {
-    const { item, type } = dialogState.delete;
+    const { item, type } = dialog.dialogState.delete;
+    const deleteServices = {
+      session: {
+        fn: CampusPlacementService.deleteSession,
+        refetch: fetchSessionData,
+        msg: `Session "${item.session_name}" deleted`,
+      },
+      firm: {
+        fn: CampusPlacementService.deleteFirm,
+        refetch: fetchFirmData,
+        msg: `Firm "${item.firm_name}" deleted`,
+      },
+      placement: {
+        fn: CampusPlacementService.deletePlacement,
+        refetch: fetchPlacementData,
+        msg: `Placement for "${item.trainee_name}" deleted`,
+      },
+    };
+
+    const service = deleteServices[type];
+    if (!service) return;
+
     try {
-      const services = {
-        session: {
-          fn: CampusPlacementService.deleteSession,
-          refetch: fetchSessionData,
-          msg: `Session "${item.session_name}" deleted`,
-        },
-        firm: {
-          fn: CampusPlacementService.deleteFirm,
-          refetch: fetchFirmData,
-          msg: `Firm "${item.firm_name}" deleted`,
-        },
-        placement: {
-          fn: CampusPlacementService.deletePlacement,
-          refetch: fetchPlacementData,
-          msg: `Placement for "${item.trainee_name}" deleted`,
-        },
-      };
-      const service = services[type];
       await service.fn(item.id, access_token);
       toast.success(service.msg);
-      await service.refetch(instituteId);
-      setDialogState((prev) => ({
-        ...prev,
-        delete: { open: false, item: null, type: "" },
-      }));
+      await service.refetch();
+      dialog.closeDeleteDialog();
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to delete");
     }
   };
 
   // ===== FORM SUBMISSIONS =====
-  const submitForm = async (
-    values,
-    serviceFn,
-    payloadFn,
-    successMsg,
-    refetchFn,
-    resetForm,
-    isEdit = false,
-    id = null,
-  ) => {
+  const submitForm = async (values, config, isEdit = false, id = null) => {
     setLoading(true);
     try {
-      const payload = payloadFn(values);
+      const context = { instituteId, actionId };
+      const documents = values.files
+        ? await Promise.all(values.files.map(fileToBase64))
+        : [];
+      const payload = config.payloadFn(values, context);
+      if (documents.length > 0) payload.documents = documents;
+
+      const serviceFn = config.service.submit;
       const response = isEdit
         ? await serviceFn({ id, ...payload }, access_token)
         : await serviceFn(payload, access_token);
+
       if (response.status === 200 || response.status === 201) {
-        toast.success(successMsg);
-        await refetchFn(instituteId);
-        resetForm();
+        toast.success(
+          isEdit ? `${config.label} updated!` : `${config.label} created!`,
+        );
+        await config.refetchFn();
         return true;
       }
     } catch (error) {
@@ -491,282 +1161,149 @@ const OnCampusJobPlacement = () => {
     return false;
   };
 
-  const handleSessionSubmit = async (values, { resetForm }) => {
-    const documents = await Promise.all(values.files.map(fileToBase64));
-    const payload = (v) => ({
-      sessionName: v.sessionName,
-      sessionDate: v.sessionDate,
-      sessionTime: v.sessionTime,
-      venue: v.venue,
-      description: v.description,
-      instituteId: instituteId || null,
-      createdBy: actionId,
-      statusId: 70,
-      documents,
-    });
-    const success = await submitForm(
-      values,
-      CampusPlacementService.submitPlacementSession,
-      payload,
-      selected.session ? "Session updated!" : "Session created!",
-      fetchSessionData,
-      resetForm,
-      !!selected.session,
-      selected.session?.id,
-    );
-    if (success) {
-      setDialogState((prev) => ({
-        ...prev,
-        session: { open: false, edit: false, view: false },
-      }));
-      setSelected((prev) => ({ ...prev, session: null }));
-    }
-  };
-
-  const handleFirmSubmit = async (values, { resetForm }) => {
-    const payload = (v) => ({
-      registrationNo: v.registrationNo,
-      firmName: v.firmName,
-      contactPerson: v.contactPerson,
-      contactPhone: v.contactPhone,
-      contactEmail: v.contactEmail,
-      dzongkhagId: v.dzongkhag,
-      address: v.address,
-      description: v.description,
-      sessionId: v.placementSession,
-      instituteId: instituteId || null,
-      createdBy: actionId,
-    });
-    const success = await submitForm(
-      values,
-      CampusPlacementService.submitFirm,
-      payload,
-      selected.firm ? "Firm updated!" : "Firm added!",
-      fetchFirmData,
-      resetForm,
-      !!selected.firm,
-      selected.firm?.id,
-    );
-    if (success) {
-      setDialogState((prev) => ({
-        ...prev,
-        firm: { open: false, edit: false },
-      }));
-      setSelected((prev) => ({ ...prev, firm: null }));
-    }
-  };
-
-  const handlePlacementSubmit = async (values, { resetForm }) => {
-    const payload = (v) => ({
-      firmId: v.firmId,
-      traineeCid: v.traineeCid,
-      traineeName: v.traineeName,
-      courseId: v.courseId,
-      position: v.position,
-      employmentStatus: v.employmentStatus,
-      salary: v.salary,
-      remarks: v.remarks,
-      instituteId: instituteId || null,
-      createdBy: actionId,
-      statusId: 72,
-      placementDate: new Date().toISOString().split("T")[0],
-      startDate: new Date().toISOString().split("T")[0],
-    });
-    const success = await submitForm(
-      values,
-      CampusPlacementService.submitPlacementTrainee,
-      payload,
-      "Placement recorded!",
-      fetchPlacementData,
-      resetForm,
-    );
-    if (success) {
-      setDialogState((prev) => ({ ...prev, placement: { open: false } }));
-    }
-  };
-
-  // ===== VALIDATION SCHEMAS =====
-  const sessionSchema = Yup.object({
-    sessionName: Yup.string().required("Session name is required"),
-    sessionDate: Yup.date().required("Session date is required"),
-    sessionTime: Yup.string().required("Session time is required"),
-    venue: Yup.string().required("Venue is required"),
-    description: Yup.string(),
-    files: Yup.array(),
-  });
-
-  const firmSchema = Yup.object({
-    registrationNo: Yup.string().required("Registration number is required"),
-    firmName: Yup.string().required("Firm name is required"),
-    contactPerson: Yup.string().required("Contact person is required"),
-    contactPhone: Yup.string().required("Contact phone is required"),
-    contactEmail: Yup.string()
-      .email("Invalid email")
-      .required("Contact email is required"),
-    dzongkhag: Yup.string().required("Location Dzongkhag is required"),
-    address: Yup.string().required("Address is required"),
-    description: Yup.string(),
-    placementSession: Yup.string().required("Placement session is required"),
-  });
-
-  const placementSchema = Yup.object({
-    firmId: Yup.string().required("Company is required"),
-    traineeCid: Yup.string().required("Trainee CID is required"),
-    traineeName: Yup.string().required("Trainee Name is required"),
-    courseId: Yup.string().required("Course is required"),
-    position: Yup.string().required("Position is required"),
-    employmentStatus: Yup.string().required("Employment status is required"),
-    salary: Yup.number().min(0, "Salary must be positive"),
-    remarks: Yup.string(),
-  });
-
-  // ===== INITIAL VALUES =====
-  const getInitialValues = (type, data = null) => {
-    const maps = {
-      session: {
-        sessionName: data?.session_name || "",
-        sessionDate: data?.session_date || "",
-        sessionTime: data?.session_time || "",
-        venue: data?.venue || "",
-        description: data?.description || "",
-        files: [],
-      },
-      firm: {
-        registrationNo: data?.registration_no || "",
-        firmName: data?.firm_name || "",
-        contactPerson: data?.contact_person || "",
-        contactPhone: data?.contact_phone || "",
-        contactEmail: data?.contact_email || "",
-        dzongkhag: data?.dzongkhag_id || "",
-        address: data?.address || "",
-        description: data?.description || "",
-        placementSession: data?.session_id || "",
-      },
-      placement: {
-        firmId: data?.firm_id || "",
-        traineeCid: data?.trainee_cid || "",
-        traineeName: data?.trainee_name || "",
-        courseId: data?.course_id || "",
-        position: data?.position || "",
-        employmentStatus: data?.employment_status || "",
-        salary: data?.salary || "",
-        remarks: data?.remarks || "",
-      },
+  // ===== RENDER HELPERS =====
+  const renderTable = (type, data) => {
+    const context = {
+      selected,
+      openDialog: dialog.openDialog,
+      handleDelete,
+      selectItem: selected.selectItem,
+      dropdownData,
+      employmentStatuses,
+      dzongkhags,
+      sessionData,
+      firmData,
+      courses,
     };
-    return maps[type] || {};
-  };
 
-  // ===== FILTER =====
-  const filterData = (data, fields) => {
-    if (!data) return [];
-    return data.filter((item) =>
-      fields.some((f) =>
-        item[f]?.toString().toLowerCase().includes(search.toLowerCase()),
-      ),
-    );
-  };
-
-  const filtered = {
-    session: filterData(sessionData, ["session_name", "venue"]),
-    firm: filterData(firmData, ["firm_name", "contact_person", "dzongkhag"]),
-    placement: filterData(placementData, [
-      "trainee_name",
-      "trainee_cid",
-      "position",
-      "firm_name",
-    ]),
-  };
-
-  // ===== RENDER FUNCTIONS =====
-  const renderTable = (type, columns, actions, data) => (
-    <>
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-        <Button
-          variant="contained"
-          color="primary"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            if (type === "firm")
-              setDialogState((prev) => ({
-                ...prev,
-                firm: { ...prev.firm, open: true },
-              }));
-            else if (type === "session")
-              setDialogState((prev) => ({
-                ...prev,
-                session: { ...prev.session, open: true },
-              }));
-            else
-              setDialogState((prev) => ({
-                ...prev,
-                placement: { ...prev.placement, open: true },
-              }));
-          }}
-        >
-          {type === "firm"
-            ? "Add Firm"
-            : type === "session"
-              ? "Create Session"
-              : "Record Placement"}
-        </Button>
-      </Box>
-      <ReusableTable
-        columns={columns}
-        data={data}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        loading={loading}
-        actions={actions}
-      />
-    </>
-  );
-
-  const renderDialog = (
-    type,
-    title,
-    FormComponent,
-    initialValues,
-    schema,
-    onSubmit,
-    maxWidth = "md",
-  ) => {
-    const isOpen = dialogState[type]?.open || dialogState[type]?.edit;
-    const onClose = () => {
-      if (type === "firm")
-        setDialogState((prev) => ({
-          ...prev,
-          firm: { open: false, edit: false },
-        }));
-      else if (type === "session")
-        setDialogState((prev) => ({
-          ...prev,
-          session: { open: false, edit: false },
-        }));
-      else setDialogState((prev) => ({ ...prev, placement: { open: false } }));
-      setSelected((prev) => ({ ...prev, [type]: null }));
+    const config = ENTITY_CONFIG[type];
+    const columns =
+      typeof config.columns === "function"
+        ? config.columns(context)
+        : config.columns;
+    const actions =
+      typeof config.actions === "function"
+        ? config.actions(context)
+        : config.actions;
+    const labels = {
+      session: { add: "Create Session" },
+      firm: { add: "Add Firm" },
+      placement: { add: "Record Placement" },
     };
 
     return (
-      <Dialog open={isOpen} onClose={onClose} maxWidth={maxWidth} fullWidth>
+      <>
+        <AddButton
+          onClick={() => {
+            selected.clearSelected(type);
+            dialog.openDialog(type, { open: true });
+          }}
+          label={labels[type].add}
+        />
+        <ReusableTable
+          columns={columns}
+          data={data}
+          page={pagination.page}
+          rowsPerPage={pagination.rowsPerPage}
+          loading={loading}
+          actions={actions}
+          emptyMessage={config.emptyMessage}
+        />
+      </>
+    );
+  };
+
+  const renderDialog = (type) => {
+    const isEdit = dialog.dialogState[type]?.edit;
+    const isView = dialog.dialogState[type]?.view;
+    const isOpen = dialog.dialogState[type]?.open || isEdit || isView;
+    const item = selected.selected[type];
+
+    const context = {
+      selected,
+      openDialog: dialog.openDialog,
+      handleDelete,
+      selectItem: selected.selectItem,
+      dropdownData,
+      employmentStatuses,
+      dzongkhags,
+      sessionData,
+      firmData,
+      courses,
+      instituteId,
+      actionId,
+    };
+
+    const config = ENTITY_CONFIG[type];
+    const FormComponent = config.FormComponent;
+
+    // View Dialog
+    if (isView && (type === "session" || type === "placement")) {
+      const fields =
+        typeof config.viewFields === "function"
+          ? config.viewFields(item, context)
+          : [];
+      return (
+        <ViewDialog
+          open={isOpen}
+          title={type === "session" ? "Session Details" : "Placement Details"}
+          onClose={() => {
+            dialog.closeDialog(type);
+            selected.clearSelected(type);
+          }}
+          fields={fields}
+        />
+      );
+    }
+
+    // Add/Edit Dialog
+    const title = isEdit ? config.editLabel : config.addLabel;
+
+    const handleSubmit = async (values, helpers) => {
+      const refetchMap = {
+        session: fetchSessionData,
+        firm: fetchFirmData,
+        placement: fetchPlacementData,
+      };
+      const configWithRefetch = { ...config, refetchFn: refetchMap[type] };
+      const success = await submitForm(
+        values,
+        configWithRefetch,
+        isEdit,
+        item?.id,
+      );
+      if (success) {
+        dialog.closeDialog(type);
+        selected.clearSelected(type);
+        helpers.resetForm();
+      }
+    };
+
+    return (
+      <Dialog
+        open={isOpen}
+        onClose={() => dialog.closeDialog(type)}
+        maxWidth={type === "session" ? "lg" : "md"}
+        fullWidth
+      >
         <DialogTitle>{title}</DialogTitle>
         <Formik
-          initialValues={initialValues}
-          validationSchema={schema}
-          onSubmit={onSubmit}
+          initialValues={config.getInitialValues(item)}
+          validationSchema={config.schema}
+          onSubmit={handleSubmit}
           enableReinitialize
         >
           {(formik) => (
             <Form>
               <DialogContent dividers>
-                <FormComponent formik={formik} />
+                <FormComponent formik={formik} context={context} />
               </DialogContent>
               <DialogActions>
                 <Button
                   size="small"
                   variant="contained"
                   color="error"
-                  onClick={onClose}
+                  onClick={() => dialog.closeDialog(type)}
                 >
                   Cancel
                 </Button>
@@ -777,11 +1314,7 @@ const OnCampusJobPlacement = () => {
                   color="primary"
                   disabled={loading}
                 >
-                  {loading
-                    ? "Saving..."
-                    : dialogState[type]?.edit
-                      ? "Update"
-                      : "Submit"}
+                  {loading ? "Saving..." : isEdit ? "Update" : "Submit"}
                 </Button>
               </DialogActions>
             </Form>
@@ -791,325 +1324,10 @@ const OnCampusJobPlacement = () => {
     );
   };
 
-  // ===== FORM COMPONENTS =====
-  const SessionForm = ({ formik }) => (
-    <Grid container spacing={2}>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField name="sessionName" label="Session Name" formik={formik} />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="sessionDate"
-          label="Session Date"
-          type="date"
-          formik={formik}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="sessionTime"
-          label="Session Time"
-          type="time"
-          formik={formik}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField name="venue" label="Venue" formik={formik} />
-      </Grid>
-      <Grid size={{ xs: 12 }}>
-        <FormField
-          name="description"
-          label="Description"
-          multiline
-          rows={3}
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12 }}>
-        <FileUpload
-          files={formik.values.files}
-          onFilesChange={(f) => formik.setFieldValue("files", f)}
-        />
-      </Grid>
-    </Grid>
-  );
-
-  // FirmForm with placement session dropdown
-  const FirmForm = ({ formik }) => (
-    <Grid container spacing={2}>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="registrationNo"
-          label="Registration No"
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField name="firmName" label="Firm Name" formik={formik} />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="contactPerson"
-          label="Contact Person Name"
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="contactPhone"
-          label="Contact Person Mobile No"
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="contactEmail"
-          label="Contact Person Email"
-          type="email"
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="dzongkhag"
-          label="Location Dzongkhag"
-          select
-          options={dzongkhags}
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="placementSession"
-          label="Placement Session"
-          select
-          options={sessionData}
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12 }}>
-        <FormField
-          name="address"
-          label="Address"
-          multiline
-          rows={2}
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12 }}>
-        <FormField
-          name="description"
-          label="Description"
-          multiline
-          rows={2}
-          formik={formik}
-        />
-      </Grid>
-    </Grid>
-  );
-
-  // PlacementForm without session dropdown
-  const PlacementForm = ({ formik }) => (
-    <Grid container spacing={2}>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="firmId"
-          label="Company"
-          select
-          options={firmData}
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="traineeCid"
-          label="Trainee CID"
-          formik={formik}
-          placeholder="e.g., 1234567890123"
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField name="traineeName" label="Trainee Name" formik={formik} />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="courseId"
-          label="Course"
-          select
-          options={courses}
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField name="position" label="Position" formik={formik} />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="employmentStatus"
-          label="Employment Status"
-          select
-          options={employmentStatuses}
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <FormField
-          name="salary"
-          label="Salary (if applicable)"
-          type="number"
-          formik={formik}
-        />
-      </Grid>
-      <Grid size={{ xs: 12 }}>
-        <FormField
-          name="remarks"
-          label="Remarks"
-          multiline
-          rows={2}
-          formik={formik}
-        />
-      </Grid>
-    </Grid>
-  );
-
-  // ===== TABLE COLUMNS =====
-  const sessionColumns = [
-    { label: "Session Name", field: "session_name" },
-    {
-      label: "Date & Time",
-      render: (i) =>
-        i.session_date && i.session_time
-          ? `${new Date(i.session_date).toLocaleDateString()} - ${i.session_time}`
-          : "N/A",
-    },
-    { label: "Venue", field: "venue" },
-    {
-      label: "Status",
-      render: (i) => (
-        <Chip
-          label={getStatusName(i.status_id)}
-          color={getStatusColor(i.status_id)}
-          size="small"
-        />
-      ),
-    },
-  ];
-
-  const firmColumns = [
-    { label: "Registration No", field: "registration_no" },
-    { label: "Firm Name", field: "firm_name" },
-    { label: "Contact Person", field: "contact_person" },
-    { label: "Phone", field: "contact_phone" },
-    { label: "Email", field: "contact_email" },
-    { label: "Dzongkhag", render: (i) => getDzongkhagName(i.dzongkhag_id) },
-    { label: "Address", field: "address" },
-    { 
-      label: "Placement Session", 
-      render: (i) => {
-        const session = sessionData.find(s => s.id === i.session_id);
-        return session ? session.session_name : "N/A";
-      }
-    },
-  ];
-
-  const placementColumns = [
-    { label: "Trainee CID", field: "trainee_cid" },
-    { label: "Trainee Name", field: "trainee_name" },
-    { label: "Company", field: "firm_name" },
-    { label: "Position", field: "position" },
-    {
-      label: "Employment Status",
-      render: (i) => {
-        const name = getEmploymentStatusName(i.employment_status);
-        return (
-          <Chip
-            label={name}
-            color={
-              i.employment_status ? getEmploymentStatusColor(name) : "default"
-            }
-            size="small"
-          />
-        );
-      },
-    },
-    { label: "Salary", field: "salary" },
-  ];
-
-  const sessionActions = [
-    {
-      icon: <LaunchIcon />,
-      tooltip: "View",
-      color: "info",
-      onClick: (i) => {
-        setSelected((prev) => ({ ...prev, session: i }));
-        setDialogState((prev) => ({
-          ...prev,
-          session: { ...prev.session, view: true },
-        }));
-      },
-    },
-    {
-      icon: <EditIcon />,
-      tooltip: "Edit",
-      color: "primary",
-      onClick: (i) => {
-        setSelected((prev) => ({ ...prev, session: i }));
-        setDialogState((prev) => ({
-          ...prev,
-          session: { ...prev.session, edit: true },
-        }));
-      },
-    },
-    {
-      icon: <DeleteIcon />,
-      tooltip: "Delete",
-      color: "error",
-      onClick: (i) => handleDelete(i, "session"),
-    },
-  ];
-
-  const firmActions = [
-    {
-      icon: <EditIcon />,
-      tooltip: "Edit",
-      color: "primary",
-      onClick: (i) => {
-        setSelected((prev) => ({ ...prev, firm: i }));
-        setDialogState((prev) => ({
-          ...prev,
-          firm: { ...prev.firm, edit: true },
-        }));
-      },
-    },
-    {
-      icon: <DeleteIcon />,
-      tooltip: "Delete",
-      color: "error",
-      onClick: (i) => handleDelete(i, "firm"),
-    },
-  ];
-
-  const placementActions = [
-    {
-      icon: <LaunchIcon />,
-      tooltip: "View",
-      color: "info",
-      onClick: (i) => {
-        setSelected((prev) => ({ ...prev, placement: i }));
-        setDialogState((prev) => ({ ...prev, placement: { open: true } }));
-      },
-    },
-    {
-      icon: <DeleteIcon />,
-      tooltip: "Delete",
-      color: "error",
-      onClick: (i) => handleDelete(i, "placement"),
-    },
-  ];
-
   // ===== MAIN RENDER =====
+  const currentType = TABS[tabValue].type;
+  const currentData = filteredData[currentType];
+
   return (
     <Paper elevation={3} sx={{ p: 2, m: 1 }}>
       <Typography variant="h5" gutterBottom>
@@ -1121,7 +1339,7 @@ const OnCampusJobPlacement = () => {
         onChange={handleTabChange}
         sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
       >
-        {tabs.map((tab, i) => (
+        {TABS.map((tab, i) => (
           <Tab key={i} label={tab.label} icon={tab.icon} iconPosition="start" />
         ))}
       </Tabs>
@@ -1141,10 +1359,7 @@ const OnCampusJobPlacement = () => {
           <Button
             variant="outlined"
             size="small"
-            onClick={() => {
-              setSearch("");
-              setStatusFilter("");
-            }}
+            onClick={handleSearchClear}
             sx={{ height: 36, width: "100%" }}
           >
             Clear
@@ -1152,266 +1367,31 @@ const OnCampusJobPlacement = () => {
         </Grid>
       </Grid>
 
-      {tabValue === 0 &&
-        renderTable(
-          "session",
-          sessionColumns,
-          sessionActions,
-          filtered.session,
-        )}
-      {tabValue === 1 &&
-        renderTable("firm", firmColumns, firmActions, filtered.firm)}
-      {tabValue === 2 &&
-        renderTable(
-          "placement",
-          placementColumns,
-          placementActions,
-          filtered.placement,
-        )}
+      {renderTable(currentType, currentData)}
 
       <TablePagination
         rowsPerPageOptions={[5, 10, 25]}
         component="div"
-        count={
-          [
-            filtered.session.length,
-            filtered.firm.length,
-            filtered.placement.length,
-          ][tabValue]
-        }
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
+        count={currentData.length}
+        rowsPerPage={pagination.rowsPerPage}
+        page={pagination.page}
+        onPageChange={pagination.handleChangePage}
+        onRowsPerPageChange={pagination.handleChangeRowsPerPage}
       />
 
       {/* Delete Dialog */}
-      <Dialog
-        open={dialogState.delete.open}
-        onClose={() =>
-          setDialogState((prev) => ({
-            ...prev,
-            delete: { ...prev.delete, open: false },
-          }))
-        }
-      >
-        <DialogTitle sx={{ color: "error.main" }}>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {dialogState.delete.type === "session" && (
-              <>
-                Delete session "
-                <strong>{dialogState.delete.item?.session_name}</strong>"?
-              </>
-            )}
-            {dialogState.delete.type === "firm" && (
-              <>
-                Delete firm "
-                <strong>{dialogState.delete.item?.firm_name}</strong>"?
-              </>
-            )}
-            {dialogState.delete.type === "placement" && (
-              <>
-                Delete placement for "
-                <strong>{dialogState.delete.item?.trainee_name}</strong>"?
-              </>
-            )}
-            This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() =>
-              setDialogState((prev) => ({
-                ...prev,
-                delete: { ...prev.delete, open: false },
-              }))
-            }
-            size="small"
-            variant="outlined"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteConfirm}
-            size="small"
-            color="error"
-            variant="contained"
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DeleteConfirmationDialog
+        open={dialog.dialogState.delete.open}
+        item={dialog.dialogState.delete.item}
+        type={dialog.dialogState.delete.type}
+        onClose={dialog.closeDeleteDialog}
+        onConfirm={handleDeleteConfirm}
+      />
 
-      {/* View Session Dialog */}
-      <Dialog
-        open={dialogState.session.view}
-        onClose={() =>
-          setDialogState((prev) => ({
-            ...prev,
-            session: { ...prev.session, view: false },
-          }))
-        }
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Session Details</DialogTitle>
-        <DialogContent dividers>
-          {selected.session && (
-            <Grid container spacing={2}>
-              {[
-                { label: "Session Name", value: selected.session.session_name },
-                {
-                  label: "Date",
-                  value: selected.session.session_date
-                    ? new Date(
-                        selected.session.session_date,
-                      ).toLocaleDateString()
-                    : "N/A",
-                },
-                { label: "Time", value: selected.session.session_time },
-                { label: "Venue", value: selected.session.venue },
-                {
-                  label: "Status",
-                  value: getStatusName(selected.session.status_id),
-                },
-              ].map((field, i) => (
-                <Grid key={i} size={{ xs: 12, md: i < 4 ? 6 : 12 }}>
-                  <TextField
-                    fullWidth
-                    label={field.label}
-                    value={field.value || "N/A"}
-                    size="small"
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
-              ))}
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  value={selected.session.description || "N/A"}
-                  multiline
-                  rows={2}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-            </Grid>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() =>
-              setDialogState((prev) => ({
-                ...prev,
-                session: { ...prev.session, view: false },
-              }))
-            }
-            variant="contained"
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* View Placement Dialog */}
-      <Dialog
-        open={dialogState.placement.open && selected.placement}
-        onClose={() => {
-          setDialogState((prev) => ({ ...prev, placement: { open: false } }));
-          setSelected((prev) => ({ ...prev, placement: null }));
-        }}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Placement Details</DialogTitle>
-        <DialogContent dividers>
-          {selected.placement && (
-            <Grid container spacing={2}>
-              {[
-                { label: "Trainee CID", value: selected.placement.trainee_cid },
-                {
-                  label: "Trainee Name",
-                  value: selected.placement.trainee_name,
-                },
-                { label: "Company", value: selected.placement.firm_name },
-                { label: "Position", value: selected.placement.position },
-                {
-                  label: "Employment Status",
-                  value: getEmploymentStatusName(
-                    selected.placement.employment_status,
-                  ),
-                },
-                { label: "Salary", value: selected.placement.salary || "N/A" },
-              ].map((field, i) => (
-                <Grid key={i} size={{ xs: 12, md: i < 4 ? 6 : 12 }}>
-                  <TextField
-                    fullWidth
-                    label={field.label}
-                    value={field.value || "N/A"}
-                    size="small"
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
-              ))}
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Remarks"
-                  value={selected.placement.remarks || "N/A"}
-                  multiline
-                  rows={2}
-                  size="small"
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-            </Grid>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setDialogState((prev) => ({
-                ...prev,
-                placement: { open: false },
-              }));
-              setSelected((prev) => ({ ...prev, placement: null }));
-            }}
-            variant="contained"
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Render Dialogs */}
-      {renderDialog(
-        "session",
-        selected.session ? "Edit Session" : "Create Session",
-        SessionForm,
-        getInitialValues("session", selected.session),
-        sessionSchema,
-        handleSessionSubmit,
-        "lg",
-      )}
-      {renderDialog(
-        "firm",
-        selected.firm ? "Edit Firm" : "Add New Firm",
-        FirmForm,
-        getInitialValues("firm", selected.firm),
-        firmSchema,
-        handleFirmSubmit,
-      )}
-      {!selected.placement &&
-        renderDialog(
-          "placement",
-          "Record Trainee Placement",
-          PlacementForm,
-          getInitialValues("placement"),
-          placementSchema,
-          handlePlacementSubmit,
-        )}
+      {/* Entity Dialogs */}
+      {renderDialog("session")}
+      {renderDialog("firm")}
+      {!selected.selected.placement && renderDialog("placement")}
     </Paper>
   );
 };

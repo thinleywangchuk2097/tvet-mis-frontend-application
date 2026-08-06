@@ -262,7 +262,7 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
   const getCourseName = (id) => {
     if (!id) return "";
     const course = courses.find((c) => c.id.toString() === id.toString());
-    return course ? (course.occupationName || course.name) : id;
+    return course ? course.occupationName || course.name : id;
   };
 
   const getActivityLevelName = (id) => {
@@ -325,7 +325,7 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
         access_token,
       );
       toast.success(
-          `Proposal ${currentAction == 57 ? "Approved" : "Rejected"} successfully`,
+        `Proposal ${currentAction == 57 ? "Approved" : "Rejected"} successfully`,
       );
       navigate(-1);
       closeDialog();
@@ -439,7 +439,10 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={handleGoBack}
-          sx={{ mt: 2 }}
+          sx={{
+            mt: 2,
+            textTransform: "none",
+          }}
         >
           Go Back
         </Button>
@@ -635,7 +638,13 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
 
             {proposalData.ownership_type_id === "3" && partners.length > 0 && (
               <Grid item size={{ xs: 12, md: 12 }}>
-                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 500 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    mb: 2,
+                    fontWeight: 500,
+                  }}
+                >
                   Partners
                 </Typography>
                 {partners.map((partner, index) => (
@@ -983,8 +992,8 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
                   {!editableData.sector_id
                     ? "Select sector first"
                     : courses.length === 0
-                    ? "No courses available"
-                    : "Select Course"}
+                      ? "No courses available"
+                      : "Select Course"}
                 </MenuItem>
                 {courses.map((course) => (
                   <MenuItem key={course.id} value={course.id}>
@@ -1111,6 +1120,7 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
             size="small"
             onClick={closeDialog}
             disabled={actionLoading}
+            sx={{ textTransform: "none" }}
           >
             Cancel
           </Button>
@@ -1122,6 +1132,7 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
             disabled={
               actionLoading || (currentAction === 58 && !remarks.trim())
             }
+            sx={{ textTransform: "none" }}
           >
             {getConfirmButtonText()}
           </Button>

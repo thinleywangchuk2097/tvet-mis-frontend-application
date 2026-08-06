@@ -156,13 +156,22 @@ const TvetCardsIndex = () => {
         }}
       >
         <Typography
-          sx={{ color: "error.main", fontWeight: 600, fontSize: "0.8rem" }}
+          sx={{
+            color: "error.main",
+            fontWeight: 600,
+            fontSize: "0.8rem",
+          }}
         >
           No data available
         </Typography>
         <Typography
           variant="caption"
-          sx={{ color: "#666", mt: 0.5, display: "block", fontSize: "0.7rem" }}
+          sx={{
+            color: "#666",
+            mt: 0.5,
+            display: "block",
+            fontSize: "0.7rem",
+          }}
         >
           No TVET statistics found
         </Typography>

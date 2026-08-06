@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Paper,
   Typography,
@@ -23,20 +23,29 @@ import {
   Box,
   Chip,
   CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import FileUpload from "../../../components/file/FileUpload";
 import CommonService from "../../../api/services/internal/common/CommonService";
-import CurriculumEndorsementIndexService from "../../../api/services/internal/course/CurriculumIndexService";
+import CurriculumIndexService from "../../../api/services/internal/course/CurriculumIndexService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
+
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) =>
@@ -100,11 +109,27 @@ const AccreditedCourseRegistration = () => {
   const [loadingOccupations, setLoadingOccupations] = useState(false);
   const [loadingCurriculumTypes, setLoadingCurriculumTypes] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [certificateLevels, setCertificateLevels] = useState([]);
   const [statusList, setStatusList] = useState([]);
+  const [selectedCurriculumDetails, setSelectedCurriculumDetails] =
+    useState(null);
 
   // Quality Standards State
   const [qualityData, setQualityData] = useState([]);
   const [qualitySelections, setQualitySelections] = useState({});
+
+  // Formik ref for auto-fill functionality
+  const formikRef = useRef(null);
+
+  // Helper function to check if form should be read-only (only for view mode)
+  const isReadOnly = () => {
+    return dialogMode === "view";
+  };
+
+  // Helper function to check if basic info should be read-only (view or renewal mode)
+  const isBasicInfoReadOnly = () => {
+    return dialogMode === "view" || dialogMode === "renewal";
+  };
 
   useEffect(() => {
     fetchCurriculumTypes();
@@ -113,6 +138,7 @@ const AccreditedCourseRegistration = () => {
     fetchAppliedCourses();
     fetchStatusList();
     fetchQualityStandards();
+    fetchCertificateLevels();
   }, []);
 
   // Fetch occupations when sector changes
@@ -123,6 +149,55 @@ const AccreditedCourseRegistration = () => {
       setOccupations([]);
     }
   }, [selectedSectorId]);
+
+  // Update form values when curriculum details change in view mode
+  useEffect(() => {
+    if (
+      (dialogMode === "view" || dialogMode === "renewal") &&
+      selectedCourse?.curriculumId &&
+      curriculumTypes.length > 0
+    ) {
+      // Find the curriculum details
+      const selectedCurriculum = curriculumTypes.find(
+        (curriculum) => curriculum.id == selectedCourse.curriculumId,
+      );
+      if (selectedCurriculum) {
+        const details = {
+          totalProgramDuration: selectedCurriculum.total_program_duration || "",
+          totalTheoryDuration: selectedCurriculum.total_theory_duration || "",
+          totalPracticalDuration:
+            selectedCurriculum.total_practical_duration || "",
+          totalOjtDuration: selectedCurriculum.total_ojt_duration || "",
+          certificateLevelId: selectedCurriculum.certificate_level_id || "",
+        };
+        setSelectedCurriculumDetails(details);
+
+        // Update form values if formik is available
+        if (formikRef.current) {
+          formikRef.current.setFieldValue(
+            "totalProgramDuration",
+            details.totalProgramDuration,
+          );
+          formikRef.current.setFieldValue(
+            "totalTheoryDuration",
+            details.totalTheoryDuration,
+          );
+          formikRef.current.setFieldValue(
+            "totalPracticalDuration",
+            details.totalPracticalDuration,
+          );
+          formikRef.current.setFieldValue(
+            "totalOjtDuration",
+            details.totalOjtDuration,
+          );
+          formikRef.current.setFieldValue(
+            "certificateLevel",
+            details.certificateLevelId,
+          );
+        }
+      }
+    }
+  }, [curriculumTypes, dialogMode, selectedCourse?.curriculumId]);
 
   const fetchQualityStandards = async () => {
     try {
@@ -160,6 +235,16 @@ const AccreditedCourseRegistration = () => {
     }
   };
 
+  const fetchCertificateLevels = async () => {
+    try {
+      const response = await CommonService.getByParentId(27);
+      setCertificateLevels(response.data);
+      console.log("Certificate Levels:", response.data);
+    } catch (error) {
+      console.error("Error fetching certificate levels:", error);
+    }
+  };
+
   const getStatusName = (statusId) => {
     const status = statusList.find((s) => s.id == statusId);
     return status ? status.name : "Pending";
@@ -168,6 +253,11 @@ const AccreditedCourseRegistration = () => {
   const getSectorName = (sector_id) => {
     const sector = sectors.find((s) => s.id == sector_id);
     return sector ? sector.sectorName : sector_id;
+  };
+
+  const getCertificateLevelName = (certificateLevelId) => {
+    const level = certificateLevels.find((l) => l.id == certificateLevelId);
+    return level ? level.name : "";
   };
 
   const fetchInstituteDetails = async () => {
@@ -199,7 +289,6 @@ const AccreditedCourseRegistration = () => {
           courseId: course.course_id,
           course_name: course.course_name,
           sectorId: course.sector_id,
-          courseFee: course.course_fee,
           statusId: course.status_id,
           curriculumId: course.curriculum_id,
           curriculum_name: course.curriculum_name,
@@ -210,6 +299,8 @@ const AccreditedCourseRegistration = () => {
           validity_date: course.validity_date,
           created_by: course.created_by,
           created_at: course.created_at,
+          feesPerTrainee: course.fees_per_trainee || "",
+          enrolmentCapacity: course.enrolment_capacity || "",
           // Parse quality standards if it's a string
           qualityStandards: course.quality_standard_responses
             ? typeof course.quality_standard_responses === "string"
@@ -261,7 +352,7 @@ const AccreditedCourseRegistration = () => {
     setLoadingCurriculumTypes(true);
     try {
       const response =
-        await CurriculumEndorsementIndexService.getApprovedCurriculumDataByUserId(
+        await CurriculumIndexService.getApprovedCurriculumDataByUserId(
           registration_no,
           41,
           access_token,
@@ -301,6 +392,56 @@ const AccreditedCourseRegistration = () => {
       await fetchOccupationsBySector(course.sectorId);
     }
 
+    // Set curriculum details for view mode
+    if (course.curriculumId) {
+      const selectedCurriculum = curriculumTypes.find(
+        (curriculum) => curriculum.id == course.curriculumId,
+      );
+      if (selectedCurriculum) {
+        setSelectedCurriculumDetails({
+          totalProgramDuration: selectedCurriculum.total_program_duration || "",
+          totalTheoryDuration: selectedCurriculum.total_theory_duration || "",
+          totalPracticalDuration:
+            selectedCurriculum.total_practical_duration || "",
+          totalOjtDuration: selectedCurriculum.total_ojt_duration || "",
+          certificateLevelId: selectedCurriculum.certificate_level_id || "",
+        });
+      }
+    }
+
+    setOpenDialog(true);
+    if (course.qualityStandards && course.qualityStandards.length > 0) {
+      populateQualitySelections(course.qualityStandards);
+    }
+  };
+
+  const handleRenewal = async (course) => {
+    setSelectedCourse(course);
+    setDialogMode("renewal");
+    setSelectedSectorId(course.sectorId);
+
+    // Fetch occupations for the sector to display course name properly
+    if (course.sectorId) {
+      await fetchOccupationsBySector(course.sectorId);
+    }
+
+    // Set curriculum details for renewal mode
+    if (course.curriculumId) {
+      const selectedCurriculum = curriculumTypes.find(
+        (curriculum) => curriculum.id == course.curriculumId,
+      );
+      if (selectedCurriculum) {
+        setSelectedCurriculumDetails({
+          totalProgramDuration: selectedCurriculum.total_program_duration || "",
+          totalTheoryDuration: selectedCurriculum.total_theory_duration || "",
+          totalPracticalDuration:
+            selectedCurriculum.total_practical_duration || "",
+          totalOjtDuration: selectedCurriculum.total_ojt_duration || "",
+          certificateLevelId: selectedCurriculum.certificate_level_id || "",
+        });
+      }
+    }
+
     setOpenDialog(true);
     if (course.qualityStandards && course.qualityStandards.length > 0) {
       populateQualitySelections(course.qualityStandards);
@@ -313,6 +454,7 @@ const AccreditedCourseRegistration = () => {
     setSelectedSectorId("");
     setOccupations([]);
     setQualitySelections({});
+    setSelectedCurriculumDetails(null);
     setOpenDialog(true);
   };
 
@@ -354,7 +496,7 @@ const AccreditedCourseRegistration = () => {
     return qualityStandardsList;
   };
 
-  const areAllQualityStandardsYes = () => {
+  const areAllQualityStandardsYes = useMemo(() => {
     if (qualityData.length === 0) return false;
 
     let totalRows = 0;
@@ -378,7 +520,7 @@ const AccreditedCourseRegistration = () => {
     );
 
     return allAnswered && allYes;
-  };
+  }, [qualitySelections, qualityData]);
 
   const handleRadioChange = (standardId, rowId, value) => {
     setQualitySelections((prev) => ({
@@ -391,6 +533,9 @@ const AccreditedCourseRegistration = () => {
   };
 
   const renderChecklist = (standard) => {
+    // Disable radio buttons only in view mode
+    const isReadOnlyMode = dialogMode === "view";
+
     return (
       <Grid item xs={12} key={standard.id} sx={{ width: "100%" }}>
         <Paper
@@ -402,7 +547,7 @@ const AccreditedCourseRegistration = () => {
           }}
         >
           <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
-            {standard.title}
+            {standard.title} <RequiredStar />
           </Typography>
           <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
             <Table
@@ -413,7 +558,7 @@ const AccreditedCourseRegistration = () => {
                 <TableRow>
                   <TableCell width="60">Sl. No</TableCell>
                   <TableCell>
-                    Quality Indicator <span style={{ color: "red" }}>*</span>
+                    Quality Indicator <RequiredStar />
                   </TableCell>
                   <TableCell align="center" width="100">
                     YES
@@ -439,7 +584,7 @@ const AccreditedCourseRegistration = () => {
                           onChange={() =>
                             handleRadioChange(standard.id, row.id, "Y")
                           }
-                          disabled={dialogMode === "view"}
+                          disabled={isReadOnlyMode}
                         />
                       </TableCell>
                       <TableCell align="center">
@@ -450,7 +595,7 @@ const AccreditedCourseRegistration = () => {
                           onChange={() =>
                             handleRadioChange(standard.id, row.id, "N")
                           }
-                          disabled={dialogMode === "view"}
+                          disabled={isReadOnlyMode}
                         />
                       </TableCell>
                     </TableRow>
@@ -466,7 +611,26 @@ const AccreditedCourseRegistration = () => {
 
   // Get initial values based on mode
   const getInitialValues = () => {
-    if (dialogMode === "view" && selectedCourse) {
+    if ((dialogMode === "view" || dialogMode === "renewal") && selectedCourse) {
+      // Find the curriculum to get duration details
+      let curriculumDetails = {};
+      if (selectedCourse.curriculumId) {
+        const selectedCurriculum = curriculumTypes.find(
+          (curriculum) => curriculum.id == selectedCourse.curriculumId,
+        );
+        if (selectedCurriculum) {
+          curriculumDetails = {
+            totalProgramDuration:
+              selectedCurriculum.total_program_duration || "",
+            totalTheoryDuration: selectedCurriculum.total_theory_duration || "",
+            totalPracticalDuration:
+              selectedCurriculum.total_practical_duration || "",
+            totalOjtDuration: selectedCurriculum.total_ojt_duration || "",
+            certificateLevelId: selectedCurriculum.certificate_level_id || "",
+          };
+        }
+      }
+
       return {
         registrationNo:
           selectedCourse.registration_no ||
@@ -482,7 +646,13 @@ const AccreditedCourseRegistration = () => {
         sectorId: selectedCourse.sectorId || "",
         courseId: selectedCourse.courseId || "",
         courseName: selectedCourse.course_name || "",
-        courseFee: selectedCourse.courseFee || "",
+        feesPerTrainee: selectedCourse.feesPerTrainee || "",
+        enrolmentCapacity: selectedCourse.enrolmentCapacity || "",
+        totalProgramDuration: curriculumDetails.totalProgramDuration || "",
+        totalTheoryDuration: curriculumDetails.totalTheoryDuration || "",
+        totalPracticalDuration: curriculumDetails.totalPracticalDuration || "",
+        totalOjtDuration: curriculumDetails.totalOjtDuration || "",
+        certificateLevel: curriculumDetails.certificateLevelId || "",
         files: [],
       };
     }
@@ -495,7 +665,13 @@ const AccreditedCourseRegistration = () => {
       sectorId: "",
       courseId: "",
       courseName: "",
-      courseFee: "",
+      feesPerTrainee: "",
+      enrolmentCapacity: "",
+      totalProgramDuration: "",
+      totalTheoryDuration: "",
+      totalPracticalDuration: "",
+      totalOjtDuration: "",
+      certificateLevel: "",
       files: [],
     };
   };
@@ -504,10 +680,14 @@ const AccreditedCourseRegistration = () => {
     curriculumId: Yup.string().required("Curriculum is required"),
     sectorId: Yup.string().required("Sector is required"),
     courseId: Yup.string().required("Course Title is required"),
-    courseFee: Yup.number()
-      .required("Course Fee is required")
-      .positive("Course Fee must be a positive number")
-      .typeError("Course Fee must be a valid number"),
+    feesPerTrainee: Yup.number()
+      .required("Fees per trainee is required")
+      .positive("Fees per trainee must be a positive number")
+      .typeError("Fees per trainee must be a valid number"),
+    enrolmentCapacity: Yup.number()
+      .required("Enrollment capacity per batch is required")
+      .positive("Enrollment capacity must be a positive number")
+      .typeError("Enrollment capacity must be a valid number"),
     files: Yup.array().min(1, "Upload at least one document"),
   });
 
@@ -526,9 +706,11 @@ const AccreditedCourseRegistration = () => {
           instituteId: values.instituteId,
           applicantName: values.instituteName,
           courseId: values.courseId,
-          courseFee: values.courseFee,
+          feesPerTrainee: values.feesPerTrainee,
+          enrolmentCapacity: values.enrolmentCapacity,
           curriculumId: values.curriculumId,
           sectorId: values.sectorId,
+          certificateLevel: values.certificateLevel,
           registration_date: new Date().toISOString(),
           validity_date: null,
           createdBy: actionId,
@@ -552,9 +734,57 @@ const AccreditedCourseRegistration = () => {
           await fetchAppliedCourses();
           resetForm();
           setQualitySelections({});
+          setSelectedCurriculumDetails(null);
           setOpenDialog(false);
         } else {
           toast.error(response.message || "Failed to submit application");
+        }
+      } else if (dialogMode === "renewal") {
+        // Handle renewal submission
+        const documents = await Promise.all(
+          values.files.map((file) => fileToBase64(file)),
+        );
+
+        const qualityStandardsList =
+          transformQualityStandards(qualitySelections);
+
+        const renewalData = {
+          id: selectedCourse.id,
+          applicationNo: selectedCourse.applicationNo,
+          instituteId: values.instituteId,
+          applicantName: values.instituteName,
+          courseId: values.courseId,
+          feesPerTrainee: values.feesPerTrainee,
+          enrolmentCapacity: values.enrolmentCapacity,
+          curriculumId: values.curriculumId,
+          sectorId: values.sectorId,
+          certificateLevel: values.certificateLevel,
+          registration_date: new Date().toISOString(),
+          validity_date: null,
+          createdBy: actionId,
+          serviceId: 54,
+          assignedRoleId: 7,
+          statusId: 115,
+          documents: documents,
+          qualityStandards: qualityStandardsList,
+          isRenewal: true,
+        };
+       
+        const response =
+          await ApplyAccreditedCourseService.verifyAccreditedCourse(
+            renewalData,
+            access_token,
+          );
+
+        if (response.status === 200 || response.status === 201) {
+          toast.success("Course accreditation renewed successfully!");
+          await fetchAppliedCourses();
+          resetForm();
+          setQualitySelections({});
+          setSelectedCurriculumDetails(null);
+          setOpenDialog(false);
+        } else {
+          toast.error(response.message || "Failed to renew accreditation");
         }
       }
     } catch (error) {
@@ -568,6 +798,15 @@ const AccreditedCourseRegistration = () => {
 
   const handleReset = () => {
     setQualitySelections({});
+    setSelectedCurriculumDetails(null);
+  };
+
+  // Check if renewal should be allowed based on status
+  const canRenew = (course) => {
+    // Allow renewal for approved courses
+    // You can add more conditions like checking validity date, etc.
+    const approvedStatusIds = [56, 57]; // Add all status IDs that represent "Approved"
+    return approvedStatusIds.includes(parseInt(course.statusId));
   };
 
   return (
@@ -621,7 +860,6 @@ const AccreditedCourseRegistration = () => {
               <TableCell>Application No</TableCell>
               <TableCell>Course Title</TableCell>
               <TableCell>Sector</TableCell>
-              <TableCell>Course Fee (Nu.)</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Action</TableCell>
             </TableRow>
@@ -640,13 +878,16 @@ const AccreditedCourseRegistration = () => {
                       <TableCell>{course.applicationNo}</TableCell>
                       <TableCell>{course.course_name}</TableCell>
                       <TableCell>{sectorName}</TableCell>
-                      <TableCell>Nu. {course.courseFee}</TableCell>
                       <TableCell>
                         <Chip
                           label={statusName}
                           size="small"
                           sx={{
-                            backgroundColor: "#2196f3",
+                            backgroundColor:
+                              parseInt(course.statusId) === 56 ||
+                              parseInt(course.statusId) === 57
+                                ? "#4caf50"
+                                : "#2196f3",
                             color: "white",
                             fontWeight: "medium",
                             minWidth: "100px",
@@ -658,21 +899,58 @@ const AccreditedCourseRegistration = () => {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton
-                          color="primary"
-                          size="small"
-                          onClick={() => handleView(course)}
-                          title="View Details"
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            gap: 0.5,
+                            minWidth: "80px",
+                            minHeight: "40px",
+                          }}
                         >
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
+                          <Tooltip
+                            title="View Course Details"
+                            arrow
+                            placement="top"
+                          >
+                            <IconButton
+                              color="primary"
+                              size="small"
+                              onClick={() => handleView(course)}
+                              sx={{ p: 0.5 }}
+                            >
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {/* Renewal button - show for approved courses */}
+                          {canRenew(course) ? (
+                            <Tooltip
+                              title="Renew Course Accreditation"
+                              arrow
+                              placement="top"
+                            >
+                              <IconButton
+                                color="success"
+                                size="small"
+                                onClick={() => handleRenewal(course)}
+                                sx={{ p: 0.5 }}
+                              >
+                                <RefreshIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            // Placeholder to maintain width when renewal button is not shown
+                            <Box sx={{ width: "32px", height: "32px" }} />
+                          )}
+                        </Box>
                       </TableCell>
                     </TableRow>
                   );
                 })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={6} align="center">
                   No data available in table
                 </TableCell>
               </TableRow>
@@ -703,16 +981,19 @@ const AccreditedCourseRegistration = () => {
         <DialogTitle>
           {dialogMode === "add"
             ? "Apply for Course Accreditation"
-            : "Accreditation Application Details"}
+            : dialogMode === "renewal"
+              ? "Renew Course Accreditation"
+              : "Accreditation Application Details"}
         </DialogTitle>
         <Formik
+          innerRef={formikRef}
           key={
             dialogMode +
             (selectedCourse?.id || "") +
             (instituteDetails?.registration_no || "")
           }
           initialValues={getInitialValues()}
-          validationSchema={dialogMode === "add" ? validationSchema : null}
+          validationSchema={dialogMode !== "view" ? validationSchema : null}
           onSubmit={handleSubmit}
           enableReinitialize={true}
         >
@@ -765,11 +1046,70 @@ const AccreditedCourseRegistration = () => {
                       <TextField
                         select
                         fullWidth
-                        label="Curriculum"
+                        label={
+                          <>
+                            Curriculum <RequiredStar />
+                          </>
+                        }
                         name="curriculumId"
                         size="small"
                         value={formik.values.curriculumId}
-                        onChange={formik.handleChange}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          formik.handleChange(e);
+
+                          if (selectedId && !isBasicInfoReadOnly()) {
+                            const selectedCurriculum = curriculumTypes.find(
+                              (curriculum) => curriculum.id == selectedId,
+                            );
+                            if (selectedCurriculum) {
+                              const details = {
+                                totalProgramDuration:
+                                  selectedCurriculum.total_program_duration ||
+                                  0,
+                                totalTheoryDuration:
+                                  selectedCurriculum.total_theory_duration || 0,
+                                totalPracticalDuration:
+                                  selectedCurriculum.total_practical_duration ||
+                                  0,
+                                totalOjtDuration:
+                                  selectedCurriculum.total_ojt_duration || 0,
+                                certificateLevelId:
+                                  selectedCurriculum.certificate_level_id || "",
+                              };
+                              setSelectedCurriculumDetails(details);
+
+                              // Set form values
+                              formik.setFieldValue(
+                                "totalProgramDuration",
+                                details.totalProgramDuration,
+                              );
+                              formik.setFieldValue(
+                                "totalTheoryDuration",
+                                details.totalTheoryDuration,
+                              );
+                              formik.setFieldValue(
+                                "totalPracticalDuration",
+                                details.totalPracticalDuration,
+                              );
+                              formik.setFieldValue(
+                                "totalOjtDuration",
+                                details.totalOjtDuration,
+                              );
+                              formik.setFieldValue(
+                                "certificateLevel",
+                                details.certificateLevelId,
+                              );
+                            }
+                          } else if (!selectedId && !isBasicInfoReadOnly()) {
+                            setSelectedCurriculumDetails(null);
+                            formik.setFieldValue("totalProgramDuration", "");
+                            formik.setFieldValue("totalTheoryDuration", "");
+                            formik.setFieldValue("totalPracticalDuration", "");
+                            formik.setFieldValue("totalOjtDuration", "");
+                            formik.setFieldValue("certificateLevel", "");
+                          }
+                        }}
                         onBlur={formik.handleBlur}
                         error={
                           formik.touched.curriculumId &&
@@ -781,7 +1121,7 @@ const AccreditedCourseRegistration = () => {
                         }
                         slotProps={{
                           input: {
-                            readOnly: dialogMode === "view",
+                            readOnly: isBasicInfoReadOnly(),
                           },
                         }}
                       >
@@ -799,17 +1139,104 @@ const AccreditedCourseRegistration = () => {
                         )}
                       </TextField>
                     </Grid>
+
+                    {/* Curriculum Details Fields - Only show when curriculum is selected */}
+                    {selectedCurriculumDetails && (
+                      <>
+                        <Grid item size={{ xs: 12, md: 3 }}>
+                          <TextField
+                            fullWidth
+                            label="Total Program Duration (Hours)"
+                            name="totalProgramDuration"
+                            type="number"
+                            size="small"
+                            value={formik.values.totalProgramDuration}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 3 }}>
+                          <TextField
+                            fullWidth
+                            label="Theory Duration (Hours)"
+                            name="totalTheoryDuration"
+                            type="number"
+                            size="small"
+                            value={formik.values.totalTheoryDuration}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 3 }}>
+                          <TextField
+                            fullWidth
+                            label="Practical Duration (Hours)"
+                            name="totalPracticalDuration"
+                            type="number"
+                            size="small"
+                            value={formik.values.totalPracticalDuration}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 3 }}>
+                          <TextField
+                            fullWidth
+                            label="OJT Duration (Hours)"
+                            name="totalOjtDuration"
+                            type="number"
+                            size="small"
+                            value={formik.values.totalOjtDuration}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            label="Certificate Level"
+                            name="certificateLevel"
+                            size="small"
+                            value={getCertificateLevelName(
+                              formik.values.certificateLevel,
+                            )}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                      </>
+                    )}
+
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         select
                         fullWidth
-                        label="Sector"
+                        label={
+                          <>
+                            Sector <RequiredStar />
+                          </>
+                        }
                         name="sectorId"
                         size="small"
                         value={formik.values.sectorId}
                         onChange={(e) => {
                           formik.handleChange(e);
-                          if (dialogMode !== "view") {
+                          if (!isBasicInfoReadOnly()) {
                             setSelectedSectorId(e.target.value);
                           }
                         }}
@@ -821,10 +1248,9 @@ const AccreditedCourseRegistration = () => {
                         helperText={
                           formik.touched.sectorId && formik.errors.sectorId
                         }
-                        //disabled={dialogMode === "view"}
                         slotProps={{
                           input: {
-                            readOnly: dialogMode === "view",
+                            readOnly: isBasicInfoReadOnly(),
                           },
                         }}
                       >
@@ -837,7 +1263,7 @@ const AccreditedCourseRegistration = () => {
                       </TextField>
                     </Grid>
                     <Grid item size={{ xs: 12, md: 4 }}>
-                      {dialogMode === "view" ? (
+                      {isBasicInfoReadOnly() ? (
                         <TextField
                           fullWidth
                           label="Course"
@@ -854,7 +1280,11 @@ const AccreditedCourseRegistration = () => {
                         <TextField
                           select
                           fullWidth
-                          label="Course"
+                          label={
+                            <>
+                              Course <RequiredStar />
+                            </>
+                          }
                           name="courseId"
                           size="small"
                           value={formik.values.courseId}
@@ -901,26 +1331,62 @@ const AccreditedCourseRegistration = () => {
                         </TextField>
                       )}
                     </Grid>
+                    {/* New Fields: Fees per trainee and Enrollment capacity */}
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
-                        label="Course Fee (Nu.)"
-                        name="courseFee"
+                        label={
+                          <>
+                            Fees per trainee (Nu.) <RequiredStar />
+                          </>
+                        }
+                        name="feesPerTrainee"
                         type="number"
                         size="small"
-                        value={formik.values.courseFee}
+                        value={formik.values.feesPerTrainee}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.courseFee &&
-                          Boolean(formik.errors.courseFee)
+                          formik.touched.feesPerTrainee &&
+                          Boolean(formik.errors.feesPerTrainee)
                         }
                         helperText={
-                          formik.touched.courseFee && formik.errors.courseFee
+                          formik.touched.feesPerTrainee &&
+                          formik.errors.feesPerTrainee
                         }
                         slotProps={{
                           input: {
-                            readOnly: dialogMode === "view",
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
+                        inputProps={{ min: 1 }}
+                      />
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        label={
+                          <>
+                            Enrollment capacity per batch <RequiredStar />
+                          </>
+                        }
+                        name="enrolmentCapacity"
+                        type="number"
+                        size="small"
+                        value={formik.values.enrolmentCapacity}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.enrolmentCapacity &&
+                          Boolean(formik.errors.enrolmentCapacity)
+                        }
+                        helperText={
+                          formik.touched.enrolmentCapacity &&
+                          formik.errors.enrolmentCapacity
+                        }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
                           },
                         }}
                         inputProps={{ min: 1 }}
@@ -940,7 +1406,7 @@ const AccreditedCourseRegistration = () => {
                   }}
                 >
                   <Typography fontWeight={600} gutterBottom>
-                    Quality Standards
+                    Quality Standards <RequiredStar />
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Typography
@@ -960,7 +1426,7 @@ const AccreditedCourseRegistration = () => {
                   sx={{ p: 3, border: "1px solid", borderColor: "divider" }}
                 >
                   <Typography fontWeight={600} gutterBottom>
-                    Supporting Documents
+                    Supporting Documents <RequiredStar />
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Box
@@ -983,7 +1449,7 @@ const AccreditedCourseRegistration = () => {
                     onFilesChange={(files) =>
                       formik.setFieldValue("files", files)
                     }
-                    disabled={dialogMode === "view"}
+                    disabled={isReadOnly()}
                     error={formik.touched.files && Boolean(formik.errors.files)}
                     helperText={formik.touched.files && formik.errors.files}
                   />
@@ -1002,7 +1468,7 @@ const AccreditedCourseRegistration = () => {
                 >
                   Cancel
                 </Button>
-                {dialogMode === "add" && (
+                {!isReadOnly() && (
                   <>
                     <Button
                       size="small"
@@ -1021,15 +1487,19 @@ const AccreditedCourseRegistration = () => {
                       color="primary"
                       disabled={
                         loading ||
-                        !areAllQualityStandardsYes() ||
+                        !areAllQualityStandardsYes ||
                         formik.values.files.length === 0
                       }
                     >
-                      {loading ? "Submitting..." : "Submit"}
+                      {loading
+                        ? "Submitting..."
+                        : dialogMode === "renewal"
+                          ? "Renew"
+                          : "Submit"}
                     </Button>
                   </>
                 )}
-                {dialogMode === "view" && (
+                {isReadOnly() && (
                   <Button
                     size="small"
                     variant="contained"

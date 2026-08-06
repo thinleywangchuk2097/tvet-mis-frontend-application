@@ -41,6 +41,13 @@ import DropdownManagementService from "../../../api/services/internal/dropdown/D
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
+
 // Validation schema
 const dropdownSchema = Yup.object().shape({
   dropdownName: Yup.string().required("Dropdown type is required"),
@@ -58,8 +65,8 @@ const dropdownSchema = Yup.object().shape({
 
 const DropdownIndex = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
   const access_token = useSelector((state) => state.auth.accessToken);
   const [dropdowns, setDropdowns] = useState([]);
@@ -312,25 +319,39 @@ const DropdownIndex = () => {
 
   // Render mobile card view
   const renderMobileCard = (dropdown) => (
-    <Card 
-      key={dropdown.id} 
-      sx={{ 
-        mb: 1.5, 
+    <Card
+      key={dropdown.id}
+      sx={{
+        mb: 1.5,
         borderRadius: 1.5,
         boxShadow: 1,
-        '&:hover': {
+        "&:hover": {
           boxShadow: 2,
-        }
+        },
       }}
     >
-      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+      <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
         <Stack spacing={1}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+            }}
+          >
             <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontSize: "0.65rem" }}
+              >
                 ID: {dropdown.id}
               </Typography>
-              <Typography variant="body2" fontWeight={600} sx={{ fontSize: '0.85rem' }}>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{ fontSize: "0.85rem" }}
+              >
                 {dropdown.dropdownName}
               </Typography>
             </Box>
@@ -357,20 +378,28 @@ const DropdownIndex = () => {
               </Tooltip>
             </Stack>
           </Box>
-          
+
           <Divider sx={{ my: 0.5 }} />
-          
+
           <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontSize: "0.6rem" }}
+            >
               Description
             </Typography>
-            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+            <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
               {dropdown.description}
             </Typography>
           </Box>
-          
+
           <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontSize: "0.6rem" }}
+            >
               Child Options: {dropdown.dropdownChild?.length || 0}
             </Typography>
           </Box>
@@ -381,16 +410,16 @@ const DropdownIndex = () => {
 
   // Render table view (compact desktop)
   const renderTable = () => (
-    <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-      <Table 
-        sx={{ 
-          borderCollapse: "collapse", 
+    <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+      <Table
+        sx={{
+          borderCollapse: "collapse",
           minWidth: 500,
-          '& .MuiTableCell-root': {
+          "& .MuiTableCell-root": {
             py: 0.75,
             px: 1,
-            fontSize: '0.8rem',
-          }
+            fontSize: "0.8rem",
+          },
         }}
         size="small"
       >
@@ -400,21 +429,24 @@ const DropdownIndex = () => {
               "& .MuiTableCell-root": {
                 textAlign: "center",
                 fontWeight: 600,
-                fontSize: '0.75rem',
+                fontSize: "0.75rem",
                 py: 0.5,
               },
             }}
           >
-            <TableCell sx={{ border: "1px solid #e0e0e0", width: '8%' }}>
+            <TableCell sx={{ border: "1px solid #e0e0e0", width: "8%" }}>
               ID
             </TableCell>
-            <TableCell sx={{ border: "1px solid #e0e0e0", width: '20%' }}>
+            <TableCell sx={{ border: "1px solid #e0e0e0", width: "20%" }}>
               Dropdown Name
             </TableCell>
-            <TableCell sx={{ border: "1px solid #e0e0e0", width: '40%' }}>
+            <TableCell sx={{ border: "1px solid #e0e0e0", width: "40%" }}>
               Description
             </TableCell>
-            <TableCell sx={{ border: "1px solid #e0e0e0", width: '32%' }} align="center">
+            <TableCell
+              sx={{ border: "1px solid #e0e0e0", width: "32%" }}
+              align="center"
+            >
               Actions
             </TableCell>
           </TableRow>
@@ -424,22 +456,32 @@ const DropdownIndex = () => {
             filteredDropdowns
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((dropdown) => (
-                <TableRow 
-                  key={dropdown.id} 
+                <TableRow
+                  key={dropdown.id}
                   hover
                   sx={{
-                    '&:hover': {
-                      backgroundColor: 'action.hover',
-                    }
+                    "&:hover": {
+                      backgroundColor: "action.hover",
+                    },
                   }}
                 >
-                  <TableCell sx={{ border: "1px solid #e0e0e0", textAlign: 'center', fontSize: '0.75rem' }}>
+                  <TableCell
+                    sx={{
+                      border: "1px solid #e0e0e0",
+                      textAlign: "center",
+                      fontSize: "0.75rem",
+                    }}
+                  >
                     {dropdown.id}
                   </TableCell>
-                  <TableCell sx={{ border: "1px solid #e0e0e0", fontSize: '0.8rem' }}>
+                  <TableCell
+                    sx={{ border: "1px solid #e0e0e0", fontSize: "0.8rem" }}
+                  >
                     {dropdown.dropdownName}
                   </TableCell>
-                  <TableCell sx={{ border: "1px solid #e0e0e0", fontSize: '0.8rem' }}>
+                  <TableCell
+                    sx={{ border: "1px solid #e0e0e0", fontSize: "0.8rem" }}
+                  >
                     {dropdown.description}
                   </TableCell>
                   <TableCell
@@ -479,8 +521,16 @@ const DropdownIndex = () => {
               ))
           ) : (
             <TableRow>
-              <TableCell colSpan={4} align="center" sx={{ py: 2, fontSize: '0.85rem' }}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+              <TableCell
+                colSpan={4}
+                align="center"
+                sx={{ py: 2, fontSize: "0.85rem" }}
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ fontSize: "0.8rem" }}
+                >
                   {searchTerm
                     ? "No dropdowns found matching your search."
                     : "No dropdowns available."}
@@ -500,11 +550,12 @@ const DropdownIndex = () => {
         onPageChange={handleChangePage}
         onRowsPerPageChange={handleChangeRowsPerPage}
         sx={{
-          '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-            fontSize: '0.75rem',
-          },
-          '& .MuiTablePagination-select': {
-            fontSize: '0.75rem',
+          "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+            {
+              fontSize: "0.75rem",
+            },
+          "& .MuiTablePagination-select": {
+            fontSize: "0.75rem",
           },
           minHeight: 40,
         }}
@@ -517,27 +568,27 @@ const DropdownIndex = () => {
       <Box sx={{ my: { xs: 1, sm: 1.5, md: 2 } }}>
         {/* Header - Compact */}
         <Stack
-          direction={{ xs: 'column', sm: 'row' }}
+          direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
-          alignItems={{ xs: 'stretch', sm: 'center' }}
+          alignItems={{ xs: "stretch", sm: "center" }}
           spacing={1.5}
           mb={2}
         >
-          <Typography 
-            variant={isMobile ? "subtitle1" : "h6"} 
+          <Typography
+            variant={isMobile ? "subtitle1" : "h6"}
             component="h1"
-            sx={{ 
-              textAlign: { xs: 'center', sm: 'left' },
-              fontSize: { xs: '1rem', sm: '1.1rem', md: '1.25rem' }
+            sx={{
+              textAlign: { xs: "center", sm: "left" },
+              fontSize: { xs: "1rem", sm: "1.1rem", md: "1.25rem" },
             }}
           >
             Dropdown Management
           </Typography>
-          
-          <Stack 
-            direction={{ xs: 'column', sm: 'row' }} 
-            spacing={1.5} 
-            alignItems={{ xs: 'stretch', sm: 'center' }}
+
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            alignItems={{ xs: "stretch", sm: "center" }}
           >
             <TextField
               placeholder="Search..."
@@ -548,18 +599,21 @@ const DropdownIndex = () => {
               slotProps={{
                 input: {
                   startAdornment: (
-                    <InputAdornment position="start" sx={{ '& .MuiSvgIcon-root': { fontSize: 18 } }}>
+                    <InputAdornment
+                      position="start"
+                      sx={{ "& .MuiSvgIcon-root": { fontSize: 18 } }}
+                    >
                       <SearchIcon />
                     </InputAdornment>
                   ),
-                  sx: { py: 0.25, fontSize: '0.8rem' }
+                  sx: { py: 0.25, fontSize: "0.8rem" },
                 },
               }}
-              sx={{ 
-                width: { xs: '100%', sm: 180, md: 220 },
-                '& .MuiInputBase-root': {
-                  fontSize: { xs: '0.8rem', sm: '0.85rem' }
-                }
+              sx={{
+                width: { xs: "100%", sm: 180, md: 220 },
+                "& .MuiInputBase-root": {
+                  fontSize: { xs: "0.8rem", sm: "0.85rem" },
+                },
               }}
             />
             <Button
@@ -569,10 +623,10 @@ const DropdownIndex = () => {
               fullWidth={isMobile}
               size="small"
               sx={{
-                minWidth: { xs: '100%', sm: 'auto' },
+                minWidth: { xs: "100%", sm: "auto" },
                 py: { xs: 0.75, sm: 0.5 },
-                fontSize: '0.8rem',
-                textTransform: 'none',
+                fontSize: "0.8rem",
+                textTransform: "none",
               }}
             >
               Add Dropdown
@@ -589,15 +643,19 @@ const DropdownIndex = () => {
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((dropdown) => renderMobileCard(dropdown))
             ) : (
-              <Paper sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+              <Paper sx={{ p: 2, textAlign: "center" }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ fontSize: "0.8rem" }}
+                >
                   {searchTerm
                     ? "No dropdowns found matching your search."
                     : "No dropdowns available."}
                 </Typography>
               </Paper>
             )}
-            
+
             {/* Mobile Pagination */}
             {filteredDropdowns.length > 0 && (
               <TablePagination
@@ -609,11 +667,12 @@ const DropdownIndex = () => {
                 onPageChange={handleChangePage}
                 onRowsPerPageChange={handleChangeRowsPerPage}
                 sx={{
-                  '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                    fontSize: '0.7rem'
-                  },
-                  '& .MuiTablePagination-select': {
-                    fontSize: '0.7rem',
+                  "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                    {
+                      fontSize: "0.7rem",
+                    },
+                  "& .MuiTablePagination-select": {
+                    fontSize: "0.7rem",
                   },
                   minHeight: 40,
                 }}
@@ -634,11 +693,13 @@ const DropdownIndex = () => {
           fullScreen={isMobile}
         >
           <form onSubmit={formik.handleSubmit}>
-            <DialogTitle sx={{ 
-              fontSize: { xs: '1rem', sm: '1.1rem' },
-              pr: { xs: 6, sm: 8 },
-              py: 1.5
-            }}>
+            <DialogTitle
+              sx={{
+                fontSize: { xs: "1rem", sm: "1.1rem" },
+                pr: { xs: 6, sm: 8 },
+                py: 1.5,
+              }}
+            >
               {editMode ? "Edit Dropdown" : "Add New Dropdown"}
               <IconButton
                 sx={{ position: "absolute", right: 8, top: 8 }}
@@ -649,10 +710,15 @@ const DropdownIndex = () => {
               </IconButton>
             </DialogTitle>
             <DialogContent dividers sx={{ pt: 1.5, pb: 1 }}>
+              {/* Parent Dropdown - Required */}
               <TextField
                 fullWidth
                 margin="dense"
-                label="Parent Dropdown"
+                label={
+                  <>
+                    Parent Dropdown <RequiredStar />
+                  </>
+                }
                 name="dropdownName"
                 size="small"
                 value={formik.values.dropdownName}
@@ -665,12 +731,18 @@ const DropdownIndex = () => {
                 helperText={
                   formik.touched.dropdownName && formik.errors.dropdownName
                 }
-                sx={{ '& .MuiFormHelperText-root': { fontSize: '0.7rem' } }}
+                sx={{ "& .MuiFormHelperText-root": { fontSize: "0.7rem" } }}
               />
+
+              {/* Description - Required */}
               <TextField
                 fullWidth
                 margin="dense"
-                label="Description"
+                label={
+                  <>
+                    Description <RequiredStar />
+                  </>
+                }
                 name="description"
                 size="small"
                 value={formik.values.description}
@@ -685,28 +757,33 @@ const DropdownIndex = () => {
                 }
                 multiline
                 rows={isMobile ? 2 : 2}
-                sx={{ '& .MuiFormHelperText-root': { fontSize: '0.7rem' } }}
+                sx={{ "& .MuiFormHelperText-root": { fontSize: "0.7rem" } }}
               />
 
-              <Typography variant="subtitle2" gutterBottom sx={{ mt: 1, fontSize: '0.85rem' }}>
-                Child Dropdown
+              {/* Child Dropdown - Required */}
+              <Typography
+                variant="subtitle2"
+                gutterBottom
+                sx={{ mt: 1, fontSize: "0.85rem" }}
+              >
+                Child Dropdown <RequiredStar />
               </Typography>
               {formik.touched.dropdownChild &&
                 formik.errors.dropdownChild &&
                 formik.values.dropdownChild.length === 0 && (
-                  <FormHelperText error sx={{ fontSize: '0.7rem' }}>
+                  <FormHelperText error sx={{ fontSize: "0.7rem" }}>
                     {formik.errors.dropdownChild}
                   </FormHelperText>
                 )}
 
               <Box
-                sx={{ 
-                  display: "flex", 
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  alignItems: { xs: 'stretch', sm: 'center' }, 
-                  gap: 1, 
+                sx={{
+                  display: "flex",
+                  flexDirection: { xs: "column", sm: "row" },
+                  alignItems: { xs: "stretch", sm: "center" },
+                  gap: 1,
                   mb: 1.5,
-                  mt: 0.5
+                  mt: 0.5,
                 }}
               >
                 <TextField
@@ -730,7 +807,7 @@ const DropdownIndex = () => {
                       handleAddOption();
                     }
                   }}
-                  sx={{ '& .MuiFormHelperText-root': { fontSize: '0.7rem' } }}
+                  sx={{ "& .MuiFormHelperText-root": { fontSize: "0.7rem" } }}
                 />
                 <Button
                   variant="contained"
@@ -738,11 +815,11 @@ const DropdownIndex = () => {
                   disabled={formik.values.newOption.trim() === ""}
                   fullWidth={isMobile}
                   size="small"
-                  sx={{ 
-                    minWidth: { xs: '100%', sm: 80 },
+                  sx={{
+                    minWidth: { xs: "100%", sm: 80 },
                     py: { xs: 0.75, sm: 0.5 },
-                    fontSize: '0.75rem',
-                    textTransform: 'none',
+                    fontSize: "0.75rem",
+                    textTransform: "none",
                   }}
                 >
                   Add
@@ -760,7 +837,11 @@ const DropdownIndex = () => {
                 }}
               >
                 {formik.values.dropdownChild.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ fontSize: "0.8rem" }}
+                  >
                     No child options added yet
                   </Typography>
                 ) : (
@@ -771,11 +852,11 @@ const DropdownIndex = () => {
                         label={`${option.id}: ${option.designation}`}
                         onDelete={() => handleRemoveOption(option.id)}
                         size="small"
-                        sx={{ 
+                        sx={{
                           mb: 0.5,
                           height: 22,
-                          '& .MuiChip-label': { fontSize: '0.7rem', px: 0.75 },
-                          '& .MuiChip-deleteIcon': { fontSize: 14 }
+                          "& .MuiChip-label": { fontSize: "0.7rem", px: 0.75 },
+                          "& .MuiChip-deleteIcon": { fontSize: 14 },
                         }}
                       />
                     ))}
@@ -783,18 +864,20 @@ const DropdownIndex = () => {
                 )}
               </Box>
             </DialogContent>
-            <DialogActions sx={{ 
-              flexDirection: { xs: 'column-reverse', sm: 'row' },
-              gap: { xs: 0.5, sm: 0 },
-              p: { xs: 1.5, sm: 1.5 }
-            }}>
+            <DialogActions
+              sx={{
+                flexDirection: { xs: "column-reverse", sm: "row" },
+                gap: { xs: 0.5, sm: 0 },
+                p: { xs: 1.5, sm: 1.5 },
+              }}
+            >
               <Button
                 color="error"
                 size="small"
                 variant="contained"
                 onClick={() => setOpen(false)}
                 fullWidth={isMobile}
-                sx={{ fontSize: '0.8rem', textTransform: 'none' }}
+                sx={{ fontSize: "0.8rem", textTransform: "none" }}
               >
                 Cancel
               </Button>
@@ -804,7 +887,7 @@ const DropdownIndex = () => {
                 variant="contained"
                 disabled={!isFormValid()}
                 fullWidth={isMobile}
-                sx={{ fontSize: '0.8rem', textTransform: 'none' }}
+                sx={{ fontSize: "0.8rem", textTransform: "none" }}
               >
                 {editMode ? "Update" : "Save"}
               </Button>
@@ -820,7 +903,7 @@ const DropdownIndex = () => {
           fullWidth
           fullScreen={isMobile}
         >
-          <DialogTitle sx={{ py: 1.5, fontSize: '1rem' }}>
+          <DialogTitle sx={{ py: 1.5, fontSize: "1rem" }}>
             Confirm Delete
             {isMobile && (
               <IconButton
@@ -833,25 +916,31 @@ const DropdownIndex = () => {
             )}
           </DialogTitle>
           <DialogContent sx={{ py: 1 }}>
-            <Typography sx={{ fontSize: '0.85rem' }}>
+            <Typography sx={{ fontSize: "0.85rem" }}>
               Are you sure you want to delete this dropdown?
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mt: 0.5, fontSize: "0.75rem" }}
+            >
               This action cannot be undone.
             </Typography>
           </DialogContent>
-          <DialogActions sx={{ 
-            flexDirection: { xs: 'column-reverse', sm: 'row' },
-            gap: { xs: 0.5, sm: 0 },
-            p: { xs: 1.5, sm: 1.5 }
-          }}>
+          <DialogActions
+            sx={{
+              flexDirection: { xs: "column-reverse", sm: "row" },
+              gap: { xs: 0.5, sm: 0 },
+              p: { xs: 1.5, sm: 1.5 },
+            }}
+          >
             <Button
               variant="contained"
               size="small"
               color="secondary"
               onClick={handleCancelDelete}
               fullWidth={isMobile}
-              sx={{ fontSize: '0.8rem', textTransform: 'none' }}
+              sx={{ fontSize: "0.8rem", textTransform: "none" }}
             >
               Cancel
             </Button>
@@ -861,7 +950,7 @@ const DropdownIndex = () => {
               size="small"
               variant="contained"
               fullWidth={isMobile}
-              sx={{ fontSize: '0.8rem', textTransform: 'none' }}
+              sx={{ fontSize: "0.8rem", textTransform: "none" }}
             >
               Delete
             </Button>

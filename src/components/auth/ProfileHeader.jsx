@@ -289,7 +289,9 @@ const ProfileHeader = () => {
                       <Typography
                         variant="caption"
                         color="primary"
-                        sx={{ cursor: "pointer" }}
+                        sx={{
+                          cursor: "pointer",
+                        }}
                         onClick={markAllAsRead}
                       >
                         Mark all as read

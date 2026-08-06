@@ -45,6 +45,13 @@ import {
   Search as SearchIcon,
 } from "@mui/icons-material";
 
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
+
 const RoleIndex = () => {
   const [roles, setRoles] = useState([]);
   const [filteredRoles, setFilteredRoles] = useState([]);
@@ -365,7 +372,7 @@ const RoleIndex = () => {
     return `Privilege ${id}`;
   };
 
-  // ✅ FIXED: Added comparator function to sort()
+  // FIXED: Added comparator function to sort()
   const hasChanges = () => {
     if (!editMode) {
       return (
@@ -377,7 +384,7 @@ const RoleIndex = () => {
       const nameChanged = formData.roleName !== currentRole.roleName;
       const descChanged = formData.description !== currentRole.description;
 
-      // ✅ Fixed: Added compare function (a, b) => a - b for numeric sorting
+      // Fixed: Added compare function (a, b) => a - b for numeric sorting
       const currentPrivileges = [...formData.assignedPrivilegeId]
         .sort((a, b) => a - b)
         .join(",");
@@ -557,20 +564,31 @@ const RoleIndex = () => {
             </IconButton>
           </DialogTitle>
           <DialogContent dividers sx={{ pt: 2 }}>
+            {/* Role Name - Required */}
             <TextField
               fullWidth
               margin="normal"
-              label="Role Name"
+              label={
+                <>
+                  Role Name <RequiredStar />
+                </>
+              }
               name="roleName"
               size="small"
               value={formData.roleName}
               onChange={handleInputChange}
               sx={{ mb: 3 }}
             />
+
+            {/* Description - Required */}
             <TextField
               fullWidth
               margin="normal"
-              label="Description"
+              label={
+                <>
+                  Description <RequiredStar />
+                </>
+              }
               name="description"
               size="small"
               value={formData.description}
@@ -579,8 +597,10 @@ const RoleIndex = () => {
               rows={2}
               sx={{ mb: 3 }}
             />
+
+            {/* Privileges - Required */}
             <Typography variant="subtitle1" gutterBottom>
-              Privileges
+              Privileges <RequiredStar />
             </Typography>
             <List sx={{ width: "100%", bgcolor: "background.paper" }}>
               {assignedPrivilegeId.map((parent) => (

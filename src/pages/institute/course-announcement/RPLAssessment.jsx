@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// RPLAssessment.jsx
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -32,9 +33,8 @@ import InstituteRegistrationService from "../../../api/services/internal/registr
 import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
-import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
-// Helper function to convert file to base64
+// ==================== UTILITY FUNCTIONS ====================
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -48,130 +48,398 @@ const fileToBase64 = (file) =>
     reader.onerror = reject;
   });
 
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
+
+// ==================== CONSTANTS ====================
+const TABLE_STYLE = {
+  border: "1px solid",
+  borderColor: "divider",
+  "& th, & td": {
+    border: "1px solid",
+    borderColor: "divider",
+  },
+};
+
+const RPL_SERVICE_ID = 39;
+const INITIAL_STATUS_ID = 55;
+
+// ==================== CUSTOM HOOKS ====================
+const useRPLData = (registration_no, access_token) => {
+  const [rplApplications, setRplApplications] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [instituteDetails, setInstituteDetails] = useState([]);
+
+  const fetchInstituteDetails = useCallback(async () => {
+    try {
+      const response =
+        await InstituteRegistrationService.getInstituteDetails(registration_no);
+      setInstituteDetails(response.data);
+    } catch (error) {
+      console.error("Error fetching institute data:", error);
+    }
+  }, [registration_no]);
+
+  const fetchRPLApplications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response =
+        await CourseEnrollmentService.getCourseDetailsAnnouncementByUserId(
+          registration_no,
+          RPL_SERVICE_ID,
+          access_token,
+        );
+      setRplApplications(response.data);
+    } catch (error) {
+      console.error("Error fetching RPL applications:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [registration_no, access_token]);
+
+  const submitRPLApplication = useCallback(
+    async (values, resetForm) => {
+      setLoading(true);
+      try {
+        const documents = await Promise.all(values.files.map(fileToBase64));
+        const payload = {
+          instituteId: values.instituteId,
+          courseId: values.courseId,
+          feesPerTrainee: values.feesPerTrainee,
+          enrollmentCapacity: values.enrollmentCapacity,
+          applicationStartDate: values.applicationStartDate,
+          applicationEndDate: values.applicationEndDate,
+          courseStartDate: values.courseStartDate,
+          courseEndDate: values.courseEndDate,
+          certificationLevelId: values.certificationLevelId,
+          fundingSourceId: values.fundingSourceId,
+          trainingLocationId: values.trainingLocationId,
+          courseDescription: values.courseDescription,
+          createdBy: values.createdBy,
+          serviceId: RPL_SERVICE_ID,
+          statusId: INITIAL_STATUS_ID,
+          remarks: "RPL Assessment Application",
+          documents: documents,
+          assessmentType: "RPL",
+        };
+
+        const response = await CourseEnrollmentService.submitCourseAnnouncement(
+          payload,
+          access_token,
+        );
+
+        if (response.status === 200 || response.status === 201) {
+          toast.success("RPL Assessment submitted successfully!");
+          await fetchRPLApplications();
+          resetForm();
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error("Error submitting RPL assessment:", error);
+        toast.error(
+          error.response?.data?.message ||
+            error.message ||
+            "Failed to submit RPL assessment",
+        );
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [access_token, fetchRPLApplications],
+  );
+
+  return {
+    rplApplications,
+    instituteDetails,
+    loading,
+    fetchInstituteDetails,
+    fetchRPLApplications,
+    submitRPLApplication,
+  };
+};
+
+const useDropdownData = () => {
+  const [certificationLevels, setCertificationLevels] = useState([]);
+  const [fundingSources, setFundingSources] = useState([]);
+  const [dzongkhags, setDzongkhags] = useState([]);
+  const [approvedCourses, setApprovedCourses] = useState([]);
+  const [statusList, setStatusList] = useState([]);
+
+  const fetchDropdownData = useCallback(async () => {
+    try {
+      const [
+        levelsResponse,
+        fundingResponse,
+        statusResponse,
+        dzongkhagResponse,
+        coursesResponse,
+      ] = await Promise.all([
+        CommonService.getByParentId(27),
+        CommonService.getByParentId(16),
+        CommonService.getByParentId(4),
+        CommonService.getAllDzongkhags(),
+        CommonService.getAllOccupations(),
+      ]);
+
+      setCertificationLevels(levelsResponse.data || []);
+      setFundingSources(fundingResponse.data || []);
+      setStatusList(statusResponse.data || []);
+      setDzongkhags(dzongkhagResponse.data || []);
+
+      const activeCourses = (coursesResponse.data || []).filter(
+        (course) => course.isActive === "Y",
+      );
+      setApprovedCourses(activeCourses);
+    } catch (error) {
+      console.error("Error fetching dropdown data:", error);
+    }
+  }, []);
+
+  return {
+    certificationLevels,
+    fundingSources,
+    dzongkhags,
+    approvedCourses,
+    statusList,
+    fetchDropdownData,
+  };
+};
+
+// ==================== REUSABLE COMPONENTS ====================
+const SearchBar = ({ value, onChange }) => (
+  <TextField
+    label="Search by Course or Application No"
+    variant="outlined"
+    size="small"
+    fullWidth
+    value={value}
+    onChange={onChange}
+    sx={{
+      "& .MuiOutlinedInput-root": {
+        height: "36px",
+        "& input": { padding: "8px 12px" },
+        "& fieldset": { borderRadius: "4px" },
+      },
+    }}
+  />
+);
+
+const AddButton = ({ onClick }) => (
+  <Button
+    variant="contained"
+    color="primary"
+    size="small"
+    startIcon={<AddIcon />}
+    onClick={onClick}
+    sx={{ height: "36px" }}
+  >
+    Apply for RPL
+  </Button>
+);
+
+const StatusChip = ({ statusId, statusList }) => {
+  const getStatusName = useCallback(
+    (id) => {
+      if (!id) return "Pending";
+      const status = statusList.find((s) => parseInt(s.id) === parseInt(id));
+      return status ? status.name : "Pending";
+    },
+    [statusList],
+  );
+
+  const getStatusColor = useCallback(
+    (id) => {
+      const statusName = getStatusName(id);
+      switch (statusName.toLowerCase()) {
+        case "approved":
+          return "#4caf50";
+        case "rejected":
+          return "#f44336";
+        default:
+          return "#ff9800";
+      }
+    },
+    [getStatusName],
+  );
+
+  return (
+    <Chip
+      label={getStatusName(statusId)}
+      size="small"
+      sx={{
+        backgroundColor: getStatusColor(statusId),
+        color: "white",
+        fontWeight: "medium",
+        minWidth: "80px",
+        "& .MuiChip-label": { px: 1.5, py: 0.5 },
+      }}
+    />
+  );
+};
+
+const FormTextField = ({
+  formik,
+  name,
+  label,
+  type = "text",
+  select = false,
+  options = [],
+  optionLabelKey = "name",
+  optionValueKey = "id",
+  ...props
+}) => {
+  const fieldProps = {
+    fullWidth: true,
+    label: label,
+    name: name,
+    size: "small",
+    value: formik.values[name] || "",
+    onChange: formik.handleChange,
+    onBlur: formik.handleBlur,
+    error: formik.touched[name] && Boolean(formik.errors[name]),
+    helperText: formik.touched[name] && formik.errors[name],
+    ...props,
+  };
+
+  if (select) {
+    return (
+      <TextField select {...fieldProps}>
+        <MenuItem value="">-select-</MenuItem>
+        {options.map((option) => (
+          <MenuItem key={option[optionValueKey]} value={option[optionValueKey]}>
+            {option[optionLabelKey]}
+          </MenuItem>
+        ))}
+      </TextField>
+    );
+  }
+
+  return <TextField {...fieldProps} type={type} />;
+};
+
+const FormDateField = ({ formik, name, label }) => (
+  <TextField
+    type="date"
+    fullWidth
+    label={label}
+    name={name}
+    size="small"
+    value={formik.values[name] || ""}
+    onChange={formik.handleChange}
+    onBlur={formik.handleBlur}
+    InputLabelProps={{ shrink: true }}
+    error={formik.touched[name] && Boolean(formik.errors[name])}
+    helperText={formik.touched[name] && formik.errors[name]}
+  />
+);
+
+// ==================== MAIN COMPONENT ====================
 const RPLAssessment = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [openDialog, setOpenDialog] = useState(false);
-  const [rplApplications, setRplApplications] = useState([]);
-  const [instituteDetails, setInstituteDetails] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [certificationLevels, setCertificationLevels] = useState([]);
-  const [fundingSources, setFundingSources] = useState([]);
-  const [dzongkhags, setDzongkhags] = useState([]);
-  const [approvedCourses, setApprovedCourses] = useState([]);
-  const [statusList, setStatusList] = useState([]);
+
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
 
-  // Fetch data on component mount
+  // Custom hooks
+  const rplData = useRPLData(registration_no, access_token);
+  const dropdownData = useDropdownData();
+
+  // Fetch all data on mount
   useEffect(() => {
-    fetchInstituteDetails();
-    fetchRPLApplications();
-    fetchStatusList();
-    fetchDzongkhags();
-    fetchDropdownData();
-    fetchApprovedCourses();
+    rplData.fetchInstituteDetails();
+    rplData.fetchRPLApplications();
+    dropdownData.fetchDropdownData();
   }, []);
 
-  const fetchInstituteDetails = async () => {
-    try {
-      const response =
-        await InstituteRegistrationService.getInstituteDetails(registration_no);
-      setInstituteDetails(response.data);
-      console.log("Institute Details:", response.data);
-    } catch (error) {
-      console.error("Error fetching institute data:", error);
-    }
-  };
+  // Get institute details
+  const institute = useMemo(
+    () => rplData.instituteDetails[0] || {},
+    [rplData.instituteDetails],
+  );
 
-  const fetchRPLApplications = async () => {
-    try {
-      const response =
-        await CourseEnrollmentService.getCourseDetailsAnnouncementByUserId(
-          registration_no,
-          39, // Service ID for RPL assessment
-          access_token,
-        );
-      setRplApplications(response.data);
-    } catch (error) {
-      console.error("Error fetching RPL applications:", error);
-    }
-  };
-
-  const fetchStatusList = async () => {
-    try {
-      const statusResponse = await CommonService.getByParentId(4);
-      setStatusList(statusResponse.data);
-      console.log("Status List:", statusResponse.data);
-    } catch (error) {
-      console.error("Error fetching status list:", error);
-    }
-  };
-
-  const fetchDzongkhags = async () => {
-    try {
-      const dzongkhagLists = await CommonService.getAllDzongkhags();
-      setDzongkhags(dzongkhagLists.data);
-      console.log("Dzongkhags:", dzongkhagLists.data);
-    } catch (error) {
-      console.error("Error fetching dzongkhags:", error);
-    }
-  };
-
-  const fetchApprovedCourses = async () => {
-    try {
-      const approvedCourses = await CommonService.getAllOccupations();
-      // Filter only active courses if needed
-      const activeCourses = approvedCourses.data.filter(
-        (course) => course.isActive === "Y",
-      );
-      setApprovedCourses(activeCourses);
-      console.log("Approved Courses:", activeCourses);
-    } catch (error) {
-      console.error("Error fetching approved courses:", error);
-    }
-  };
-
-  const fetchDropdownData = async () => {
-    try {
-      // Fetch certification levels
-      const levelsResponse = await CommonService.getByParentId(10);
-      setCertificationLevels(levelsResponse.data);
-
-      // Fetch funding sources
-      const fundingResponse = await CommonService.getByParentId(16);
-      setFundingSources(fundingResponse.data);
-    } catch (error) {
-      console.error("Error fetching dropdown data:", error);
-    }
-  };
-
-  const institute = instituteDetails[0] || {};
-
+  // Handlers
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(+event.target.value);
     setPage(0);
   };
-  // Handle view details navigation
+
   const handleViewDetails = (applicationNo) => {
     navigate(`/announcement/course-trainee-selection/${applicationNo}`);
   };
 
-  const filteredApplications = rplApplications.filter(
-    (app) =>
-      (app.course_name?.toLowerCase() || "").includes(search.toLowerCase()) ||
-      (app.application_no?.toLowerCase() || "").includes(search.toLowerCase()),
+  // Filter applications
+  const filteredApplications = useMemo(() => {
+    return rplData.rplApplications.filter(
+      (app) =>
+        (app.course_name?.toLowerCase() || "").includes(search.toLowerCase()) ||
+        (app.application_no?.toLowerCase() || "").includes(
+          search.toLowerCase(),
+        ),
+    );
+  }, [rplData.rplApplications, search]);
+
+  // Helper functions for display
+  const getDzongkhagName = useCallback(
+    (locationId) => {
+      if (!locationId) return "N/A";
+      const dzongkhag = dropdownData.dzongkhags.find(
+        (dz) => dz.id === parseInt(locationId),
+      );
+      return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
+    },
+    [dropdownData.dzongkhags],
   );
 
+  const getCourseName = useCallback(
+    (courseId) => {
+      if (!courseId) return "N/A";
+      const course = dropdownData.approvedCourses.find(
+        (c) => c.id === parseInt(courseId),
+      );
+      return course ? course.occupationName : courseId;
+    },
+    [dropdownData.approvedCourses],
+  );
+
+  const getCertificationLevelName = useCallback(
+    (levelId) => {
+      if (!levelId) return "N/A";
+      const level = dropdownData.certificationLevels.find(
+        (l) => l.id === parseInt(levelId),
+      );
+      return level ? level.name : levelId;
+    },
+    [dropdownData.certificationLevels],
+  );
+
+  const getFundingSourceName = useCallback(
+    (sourceId) => {
+      if (!sourceId) return "N/A";
+      const source = dropdownData.fundingSources.find(
+        (s) => s.id === parseInt(sourceId),
+      );
+      return source ? source.name : sourceId;
+    },
+    [dropdownData.fundingSources],
+  );
+
+  // Form initial values
   const initialValues = {
     instituteId: institute.institute_id || "",
     courseId: "",
-    courseFee: "",
-    totalNoTrainees: "",
+    feesPerTrainee: "",
+    enrollmentCapacity: "",
     applicationStartDate: "",
     applicationEndDate: "",
     courseStartDate: "",
@@ -181,14 +449,16 @@ const RPLAssessment = () => {
     trainingLocationId: "",
     courseDescription: "",
     files: [],
+    createdBy: actionId,
   };
 
+  // Form validation schema
   const validationSchema = Yup.object().shape({
     courseId: Yup.string().required("Course Name is required"),
-    courseFee: Yup.number()
+    feesPerTrainee: Yup.number()
       .typeError("Must be a number")
       .required("Course Fee is required"),
-    totalNoTrainees: Yup.number()
+    enrollmentCapacity: Yup.number()
       .typeError("Must be a number")
       .required("Total number of trainees required"),
     applicationStartDate: Yup.date()
@@ -203,10 +473,10 @@ const RPLAssessment = () => {
       ),
     courseStartDate: Yup.date()
       .typeError("Invalid date")
-      .required("Course Start Date required")
+      .required("Assessment Start Date required")
       .test(
         "is-after-application-end",
-        "Course start date must be after application end date",
+        "Assessment start date must be after application end date",
         function (value) {
           const { applicationEndDate } = this.parent;
           if (!value || !applicationEndDate) return true;
@@ -215,137 +485,100 @@ const RPLAssessment = () => {
       ),
     courseEndDate: Yup.date()
       .typeError("Invalid date")
-      .required("Course End Date required")
+      .required("Assessment End Date required")
       .min(
         Yup.ref("courseStartDate"),
-        "Course end date cannot be before course start date",
+        "Assessment end date cannot be before assessment start date",
       ),
     certificationLevelId: Yup.string().required(
       "Certification Level is required",
     ),
     fundingSourceId: Yup.string().required("Funding Source is required"),
-    trainingLocationId: Yup.string().required("Training Location is required"),
-    courseDescription: Yup.string().required("Course Description is required"),
+    trainingLocationId: Yup.string().required(
+      "Assessment Location is required",
+    ),
+    courseDescription: Yup.string().required(
+      "Course/Assessment Description is required",
+    ),
     files: Yup.array()
       .min(1, "Please upload required documents")
       .max(5, "Maximum 5 files allowed"),
   });
 
+  // Handle form submission
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
-    setLoading(true);
-    try {
-      const documents = await Promise.all(
-        values.files.map((file) => fileToBase64(file)),
-      );
-
-      const payload = {
-        instituteId: values.instituteId,
-        courseId: values.courseId,
-        courseFee: values.courseFee,
-        totalNoTrainees: values.totalNoTrainees,
-        applicationStartDate: values.applicationStartDate,
-        applicationEndDate: values.applicationEndDate,
-        courseStartDate: values.courseStartDate,
-        courseEndDate: values.courseEndDate,
-        certificationLevelId: values.certificationLevelId,
-        fundingSourceId: values.fundingSourceId,
-        trainingLocationId: values.trainingLocationId,
-        courseDescription: values.courseDescription,
-        createdBy: actionId,
-        serviceId: 39, // Service ID for RPL assessment
-        statusId: 55, // Initial status (Pending)
-        remarks: "RPL Assessment Application",
-        documents: documents,
-        assessmentType: "RPL",
-      };
-
-      console.log("Submitting RPL payload:", payload);
-
-      const response = await CourseEnrollmentService.submitCourseAnnouncement(
-        payload,
-        access_token,
-      );
-
-      if (response.status === 200 || response.status === 201) {
-        toast.success("RPL Assessment submitted successfully!");
-        await fetchRPLApplications();
-        resetForm();
-        setOpenDialog(false);
-      }
-    } catch (error) {
-      console.error("Error submitting RPL assessment:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to submit RPL assessment",
-      );
-    } finally {
-      setLoading(false);
-      setSubmitting(false);
+    const success = await rplData.submitRPLApplication(values, resetForm);
+    if (success) {
+      setOpenDialog(false);
     }
+    setSubmitting(false);
   };
 
-  // Helper function to get status name
-  const getStatusName = (statusId) => {
-    if (!statusId) return "Pending";
-    const status = statusList.find(
-      (s) => parseInt(s.id) === parseInt(statusId),
-    );
-    return status ? status.name : "Pending";
-  };
-
-  // Helper function to get status color
-  const getStatusColor = (statusId) => {
-    const statusName = getStatusName(statusId);
-    switch (statusName.toLowerCase()) {
-      case "approved":
-        return "#4caf50";
-      case "rejected":
-        return "#f44336";
-      case "pending":
-      default:
-        return "#ff9800";
-    }
-  };
-
-  // Helper function to get dzongkhag name by ID
-  const getDzongkhagName = (locationId) => {
-    if (!locationId) return "N/A";
-    const dzongkhag = dzongkhags.find(
-      (dzong) => dzong.id === parseInt(locationId),
-    );
-    return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
-  };
-
-  // Helper function to get course name by ID - UPDATED for occupationName
-  const getCourseName = (courseId) => {
-    if (!courseId) return "N/A";
-    const course = approvedCourses.find((c) => c.id === parseInt(courseId));
-    return course ? course.occupationName : courseId;
-  };
-
-  // Helper function to get certification level name by ID
-  const getCertificationLevelName = (levelId) => {
-    if (!levelId) return "N/A";
-    const level = certificationLevels.find((l) => l.id === parseInt(levelId));
-    return level ? level.name : levelId;
-  };
-
-  // Helper function to get funding source name by ID
-  const getFundingSourceName = (sourceId) => {
-    if (!sourceId) return "N/A";
-    const source = fundingSources.find((s) => s.id === parseInt(sourceId));
-    return source ? source.name : sourceId;
-  };
-
-  const tableStyle = {
-    border: "1px solid",
-    borderColor: "divider",
-    "& th, & td": {
-      border: "1px solid",
-      borderColor: "divider",
+  // Table columns configuration
+  const tableColumns = [
+    { id: "#", render: (_, index) => index + 1 + page * rowsPerPage },
+    { id: "Application No", render: (app) => app.application_no || "N/A" },
+    { id: "Course", render: (app) => getCourseName(app.course_id) },
+    {
+      id: "Certification Level",
+      render: (app) => getCertificationLevelName(app.certification_level_id),
     },
-  };
+    {
+      id: "Fees per Trainee (Nu.)",
+      render: (app) =>
+        `Nu. ${app.fees_per_trainee || app.feesPerTrainee || "N/A"}`,
+    },
+    {
+      id: "Enrollment Capacity",
+      render: (app) =>
+        app.enrollment_capacity || app.enrollmentCapacity || "N/A",
+    },
+    {
+      id: "Application Period",
+      render: (app) =>
+        app.application_start_date && app.application_end_date
+          ? `${new Date(app.application_start_date).toLocaleDateString()} - ${new Date(app.application_end_date).toLocaleDateString()}`
+          : "N/A",
+    },
+    {
+      id: "Assessment Period",
+      render: (app) =>
+        app.course_start_date && app.course_end_date
+          ? `${new Date(app.course_start_date).toLocaleDateString()} - ${new Date(app.course_end_date).toLocaleDateString()}`
+          : "N/A",
+    },
+    {
+      id: "Assessment Location",
+      render: (app) => getDzongkhagName(app.training_location_id),
+    },
+    {
+      id: "Funding Source",
+      render: (app) => getFundingSourceName(app.funding_source_id),
+    },
+    {
+      id: "Status",
+      render: (app) => (
+        <StatusChip
+          statusId={app.status_id}
+          statusList={dropdownData.statusList}
+        />
+      ),
+    },
+    {
+      id: "Action",
+      align: "center",
+      render: (app) => (
+        <IconButton
+          color="primary"
+          size="small"
+          onClick={() => handleViewDetails(app.application_no)}
+          title="View Details"
+        >
+          <RemoveRedEyeIcon fontSize="small" />
+        </IconButton>
+      ),
+    },
+  ];
 
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
@@ -361,53 +594,26 @@ const RPLAssessment = () => {
         sx={{ justifyContent: "flex-end", mb: 2 }}
       >
         <Grid item size={{ xs: 12, md: 4 }}>
-          <TextField
-            label="Search by Course or Application No"
-            variant="outlined"
-            size="small"
-            fullWidth
+          <SearchBar
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                height: "36px",
-                "& input": { padding: "8px 12px" },
-                "& fieldset": { borderRadius: "4px" },
-              },
-            }}
           />
         </Grid>
         <Grid item size={{ xs: 12, md: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenDialog(true)}
-            sx={{ height: "36px" }}
-          >
-            Apply for RPL
-          </Button>
+          <AddButton onClick={() => setOpenDialog(true)} />
         </Grid>
       </Grid>
 
       {/* Table */}
       <TableContainer component={Paper} elevation={1}>
-        <Table size="small" sx={tableStyle}>
+        <Table size="small" sx={TABLE_STYLE}>
           <TableHead>
             <TableRow>
-              <TableCell>#</TableCell>
-              <TableCell>Application No</TableCell>
-              <TableCell>Course</TableCell>
-              <TableCell>Certification Level</TableCell>
-              <TableCell>Course Fee</TableCell>
-              <TableCell>Total Trainees</TableCell>
-              <TableCell>Application Period</TableCell>
-              <TableCell>Course Period</TableCell>
-              <TableCell>Training Location</TableCell>
-              <TableCell>Funding Source</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="center">Action</TableCell>
+              {tableColumns.map((col) => (
+                <TableCell key={col.id} align={col.align || "left"}>
+                  {col.id}
+                </TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -416,61 +622,16 @@ const RPLAssessment = () => {
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((app, index) => (
                   <TableRow key={app.id || index}>
-                    <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
-                    <TableCell>{app.application_no || "N/A"}</TableCell>
-                    <TableCell>{getCourseName(app.course_id)}</TableCell>
-                    <TableCell>
-                      {getCertificationLevelName(app.certification_level_id)}
-                    </TableCell>
-                    <TableCell>Nu. {app.course_fee}</TableCell>
-                    <TableCell>{app.total_no_trainees || "N/A"}</TableCell>
-                    <TableCell>
-                      {app.application_start_date && app.application_end_date
-                        ? `${new Date(app.application_start_date).toLocaleDateString()} - ${new Date(app.application_end_date).toLocaleDateString()}`
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      {app.course_start_date && app.course_end_date
-                        ? `${new Date(app.course_start_date).toLocaleDateString()} - ${new Date(app.course_end_date).toLocaleDateString()}`
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      {getDzongkhagName(app.training_location_id)}
-                    </TableCell>
-                    <TableCell>
-                      {getFundingSourceName(app.funding_source_id)}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getStatusName(app.status_id)}
-                        size="small"
-                        sx={{
-                          backgroundColor: getStatusColor(app.status_id),
-                          color: "white",
-                          fontWeight: "medium",
-                          minWidth: "80px",
-                          "& .MuiChip-label": {
-                            px: 1.5,
-                            py: 0.5,
-                          },
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <IconButton
-                        color="primary"
-                        size="small"
-                        onClick={() => handleViewDetails(app.application_no)}
-                        title="View Details"
-                      >
-                        <RemoveRedEyeIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
+                    {tableColumns.map((col) => (
+                      <TableCell key={col.id} align={col.align || "left"}>
+                        {col.render(app, index)}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))
             ) : (
               <TableRow>
-                <TableCell colSpan={12} align="center">
+                <TableCell colSpan={tableColumns.length} align="center">
                   No RPL assessment applications found
                 </TableCell>
               </TableRow>
@@ -501,287 +662,166 @@ const RPLAssessment = () => {
           validationSchema={validationSchema}
           onSubmit={handleSubmit}
           enableReinitialize={true}
-          validateOnBlur={true}
-          validateOnChange={true}
-          validateOnMount={false}
         >
           {(formik) => (
             <Form>
               <DialogContent dividers>
                 <Grid container spacing={2}>
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="Course Name"
+                    <FormTextField
+                      formik={formik}
                       name="courseId"
-                      size="small"
-                      value={formik.values.courseId}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.courseId &&
-                        Boolean(formik.errors.courseId)
+                      label={
+                        <>
+                          <RequiredStar /> Course Name
+                        </>
                       }
-                      helperText={
-                        formik.touched.courseId && formik.errors.courseId
-                      }
-                    >
-                      <MenuItem value="">-select-</MenuItem>
-                      {approvedCourses.map((course) => (
-                        <MenuItem key={course.id} value={course.id}>
-                          {course.occupationName}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      label="Course Fee"
-                      name="courseFee"
-                      size="small"
-                      type="number"
-                      value={formik.values.courseFee}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.courseFee &&
-                        Boolean(formik.errors.courseFee)
-                      }
-                      helperText={
-                        formik.touched.courseFee && formik.errors.courseFee
-                      }
+                      select
+                      options={dropdownData.approvedCourses}
+                      optionLabelKey="occupationName"
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="Certification Level"
+                    <FormTextField
+                      formik={formik}
+                      name="feesPerTrainee"
+                      label={
+                        <>
+                          <RequiredStar /> Fees per Trainee (Nu.)
+                        </>
+                      }
+                      type="number"
+                    />
+                  </Grid>
+
+                  <Grid item size={{ xs: 12, md: 6 }}>
+                    <FormTextField
+                      formik={formik}
                       name="certificationLevelId"
-                      size="small"
-                      value={formik.values.certificationLevelId}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.certificationLevelId &&
-                        Boolean(formik.errors.certificationLevelId)
+                      label={
+                        <>
+                          <RequiredStar /> Certification Level
+                        </>
                       }
-                      helperText={
-                        formik.touched.certificationLevelId &&
-                        formik.errors.certificationLevelId
-                      }
-                    >
-                      <MenuItem value="">-select-</MenuItem>
-                      {certificationLevels.map((level) => (
-                        <MenuItem key={level.id} value={level.id}>
-                          {level.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                      select
+                      options={dropdownData.certificationLevels}
+                    />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      label="Total No of Candidates"
-                      name="totalNoTrainees"
-                      size="small"
+                    <FormTextField
+                      formik={formik}
+                      name="enrollmentCapacity"
+                      label={
+                        <>
+                          <RequiredStar /> Enrollment Capacity per Batch
+                        </>
+                      }
                       type="number"
-                      value={formik.values.totalNoTrainees}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.totalNoTrainees &&
-                        Boolean(formik.errors.totalNoTrainees)
-                      }
-                      helperText={
-                        formik.touched.totalNoTrainees &&
-                        formik.errors.totalNoTrainees
-                      }
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      type="date"
-                      fullWidth
-                      label="Application Start Date"
+                    <FormDateField
+                      formik={formik}
                       name="applicationStartDate"
-                      size="small"
-                      value={formik.values.applicationStartDate}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
-                      error={
-                        formik.touched.applicationStartDate &&
-                        Boolean(formik.errors.applicationStartDate)
-                      }
-                      helperText={
-                        formik.touched.applicationStartDate &&
-                        formik.errors.applicationStartDate
+                      label={
+                        <>
+                          <RequiredStar /> Application Start Date
+                        </>
                       }
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      type="date"
-                      fullWidth
-                      label="Application End Date"
+                    <FormDateField
+                      formik={formik}
                       name="applicationEndDate"
-                      size="small"
-                      value={formik.values.applicationEndDate}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
-                      error={
-                        formik.touched.applicationEndDate &&
-                        Boolean(formik.errors.applicationEndDate)
-                      }
-                      helperText={
-                        formik.touched.applicationEndDate &&
-                        formik.errors.applicationEndDate
+                      label={
+                        <>
+                          <RequiredStar /> Application End Date
+                        </>
                       }
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      type="date"
-                      fullWidth
-                      label="Assessment Start Date"
+                    <FormDateField
+                      formik={formik}
                       name="courseStartDate"
-                      size="small"
-                      value={formik.values.courseStartDate}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
-                      error={
-                        formik.touched.courseStartDate &&
-                        Boolean(formik.errors.courseStartDate)
-                      }
-                      helperText={
-                        formik.touched.courseStartDate &&
-                        formik.errors.courseStartDate
+                      label={
+                        <>
+                          <RequiredStar /> Assessment Start Date
+                        </>
                       }
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      type="date"
-                      fullWidth
-                      label="Assessment End Date"
+                    <FormDateField
+                      formik={formik}
                       name="courseEndDate"
-                      size="small"
-                      value={formik.values.courseEndDate}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
-                      error={
-                        formik.touched.courseEndDate &&
-                        Boolean(formik.errors.courseEndDate)
-                      }
-                      helperText={
-                        formik.touched.courseEndDate &&
-                        formik.errors.courseEndDate
+                      label={
+                        <>
+                          <RequiredStar /> Assessment End Date
+                        </>
                       }
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="Funding Source"
+                    <FormTextField
+                      formik={formik}
                       name="fundingSourceId"
-                      size="small"
-                      value={formik.values.fundingSourceId}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.fundingSourceId &&
-                        Boolean(formik.errors.fundingSourceId)
+                      label={
+                        <>
+                          <RequiredStar /> Funding Source
+                        </>
                       }
-                      helperText={
-                        formik.touched.fundingSourceId &&
-                        formik.errors.fundingSourceId
-                      }
-                    >
-                      <MenuItem value="">-select-</MenuItem>
-                      {fundingSources.map((source) => (
-                        <MenuItem key={source.id} value={source.id}>
-                          {source.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                      select
+                      options={dropdownData.fundingSources}
+                    />
                   </Grid>
 
                   <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="Assessment Location (Dzongkhag)"
+                    <FormTextField
+                      formik={formik}
                       name="trainingLocationId"
-                      size="small"
-                      value={formik.values.trainingLocationId}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.trainingLocationId &&
-                        Boolean(formik.errors.trainingLocationId)
+                      label={
+                        <>
+                          <RequiredStar /> Assessment Location (Dzongkhag)
+                        </>
                       }
-                      helperText={
-                        formik.touched.trainingLocationId &&
-                        formik.errors.trainingLocationId
-                      }
-                    >
-                      <MenuItem value="">-select-</MenuItem>
-                      {dzongkhags.map((dzongkhag) => (
-                        <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
-                          {dzongkhag.dzonkhagName}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                      select
+                      options={dropdownData.dzongkhags}
+                      optionLabelKey="dzonkhagName"
+                    />
                   </Grid>
 
                   <Grid item size={{ xs: 12 }}>
-                    <TextField
-                      fullWidth
+                    <FormTextField
+                      formik={formik}
+                      name="courseDescription"
+                      label={
+                        <>
+                          <RequiredStar /> Course/Assessment Description
+                        </>
+                      }
                       multiline
                       rows={3}
-                      label="Course/Assessment Description"
-                      name="courseDescription"
-                      size="small"
-                      value={formik.values.courseDescription}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.courseDescription &&
-                        Boolean(formik.errors.courseDescription)
-                      }
-                      helperText={
-                        formik.touched.courseDescription &&
-                        formik.errors.courseDescription
-                      }
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12 }}>
                     <Typography variant="subtitle2" gutterBottom>
-                      Required Documents for RPL Assessment:
+                      Required Documents for RPL Assessment <RequiredStar />
                     </Typography>
                     <FileUpload
                       files={formik.values.files}
                       onFilesChange={(files) => {
                         formik.setFieldValue("files", files);
-                        setTimeout(() => {
-                          formik.validateField("files");
-                        }, 100);
+                        setTimeout(() => formik.validateField("files"), 100);
                       }}
                       error={
                         formik.touched.files && Boolean(formik.errors.files)
@@ -803,7 +843,7 @@ const RPLAssessment = () => {
                   variant="contained"
                   color="error"
                   onClick={() => setOpenDialog(false)}
-                  disabled={loading}
+                  disabled={rplData.loading}
                 >
                   Cancel
                 </Button>
@@ -812,9 +852,9 @@ const RPLAssessment = () => {
                   type="submit"
                   variant="contained"
                   color="primary"
-                  disabled={loading}
+                  disabled={rplData.loading}
                 >
-                  {loading ? "Submitting..." : "Submit"}
+                  {rplData.loading ? "Submitting..." : "Submit"}
                 </Button>
               </DialogActions>
             </Form>

@@ -37,6 +37,13 @@ import InstituteRegistrationService from "../../api/services/internal/registrati
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
+
 // Helper function to convert file to base64
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
@@ -80,7 +87,6 @@ const CurriculumIndex = () => {
     useState(false);
   const [ncsData, setNcsData] = useState([]);
   const access_token = useSelector((state) => state.auth.accessToken);
-  const currentRoleId = useSelector((state) => state.auth.current_roleId);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
   const [dropdownData, setDropdownData] = useState([]);
@@ -172,6 +178,7 @@ const CurriculumIndex = () => {
   const fetchCourseTypes = async () => {
     try {
       const response = await CommonService.getByParentId(13);
+      console.log("Course Types Response:", response.data);
       setCourseTypes(response.data);
     } catch (error) {
       console.error("Error fetching course types:", error);
@@ -206,6 +213,7 @@ const CurriculumIndex = () => {
       }
 
       const response = await CommonService.getByParentId(parentId);
+      console.log("Certificate Levels Response:", response.data);
       setCertificateLevels(response.data);
     } catch (error) {
       console.error("Error fetching BQF levels:", error);
@@ -398,32 +406,158 @@ const CurriculumIndex = () => {
     };
   };
 
-  const validationSchema = Yup.object().shape({
-    curriculumTypeId: Yup.string().required("Curriculum Type is required"),
-    courseTypeId: Yup.string().required("Course Type is required"),
-    curriculumName: Yup.string().required("Curriculum Name is required"),
-    description: Yup.string().required("Curriculum Description is required"),
-    ncsId: Yup.string().required("NCS Title is required"),
-    certificateLevelId: Yup.string().required("Certificate Level is required"),
-    entryRequirement: Yup.string().required("Entry Requirement is required"),
-    totalTheoryDuration: Yup.string().required(
-      "Total Theory Duration is required",
-    ),
-    totalPracticalDuration: Yup.string().required(
-      "Total Practical Duration is required",
-    ),
-    totalOjtDuration: Yup.string().required("Total OJT Duration is required"),
-    files: Yup.array(),
-    totalProgramDuration: Yup.string().test(
-      "min-duration",
-      "Curriculum development must be at least 140 hours",
-      function (value) {
-        if (!value) return false;
-        const numericValue = extractNumericValue(value);
-        return numericValue >= 140;
-      },
-    ),
-  });
+  // Custom validation function that checks if BQF Course rules should apply
+  const validateDurationDistribution = (values) => {
+    // Only apply rules for BQF Course (id: 41)
+    if (parseInt(values.courseTypeId) !== 41) {
+      return null;
+    }
+
+    const theoryNum = extractNumericValue(values.totalTheoryDuration);
+    const practicalNum = extractNumericValue(values.totalPracticalDuration);
+    const ojtNum = extractNumericValue(values.totalOjtDuration);
+    const totalNum = theoryNum + practicalNum + ojtNum;
+
+    if (totalNum === 0 || !values.certificateLevelId) {
+      return null;
+    }
+
+    const theoryPercentage = (theoryNum / totalNum) * 100;
+    const practicalOjtPercentage = ((practicalNum + ojtNum) / totalNum) * 100;
+
+    const certificateLevel = certificateLevels.find(
+      (level) => level.id === parseInt(values.certificateLevelId),
+    );
+
+    if (!certificateLevel) {
+      return null;
+    }
+
+    const levelName = certificateLevel.name.toLowerCase();
+    const isDiploma = levelName.includes("diploma");
+    const requiredTheoryPercentage = isDiploma ? 40 : 20;
+    const requiredPracticalOjtPercentage = isDiploma ? 60 : 80;
+
+    if (theoryPercentage < requiredTheoryPercentage) {
+      return `Theory duration (${theoryPercentage.toFixed(1)}%) must be at least ${requiredTheoryPercentage}% of total program duration for ${certificateLevel.name}`;
+    }
+
+    if (practicalOjtPercentage > requiredPracticalOjtPercentage) {
+      return `Practical + OJT duration (${practicalOjtPercentage.toFixed(1)}%) must not exceed ${requiredPracticalOjtPercentage}% of total program duration for ${certificateLevel.name}`;
+    }
+
+    return null;
+  };
+
+  // Create validation schema dynamically with certificateLevels
+  const getValidationSchema = () => {
+    return Yup.object().shape({
+      curriculumTypeId: Yup.string().required("Curriculum Type is required"),
+      courseTypeId: Yup.string().required("Course Type is required"),
+      curriculumName: Yup.string().required("Curriculum Name is required"),
+      description: Yup.string().required("Curriculum Description is required"),
+      ncsId: Yup.string().required("NCS Title is required"),
+      certificateLevelId: Yup.string().required(
+        "Certificate Level is required",
+      ),
+      entryRequirement: Yup.string().required("Entry Requirement is required"),
+      totalTheoryDuration: Yup.string()
+        .required("Total Theory Duration is required")
+        .test(
+          "valid-duration",
+          "Please enter a valid duration (e.g., 120 hours)",
+          function (value) {
+            if (!value) return false;
+            return extractNumericValue(value) > 0;
+          },
+        ),
+      totalPracticalDuration: Yup.string()
+        .required("Total Practical Duration is required")
+        .test(
+          "valid-duration",
+          "Please enter a valid duration (e.g., 80 hours)",
+          function (value) {
+            if (!value) return false;
+            return extractNumericValue(value) > 0;
+          },
+        ),
+      totalOjtDuration: Yup.string()
+        .required("Total OJT Duration is required")
+        .test(
+          "valid-duration",
+          "Please enter a valid duration (e.g., 40 hours)",
+          function (value) {
+            if (!value) return false;
+            return extractNumericValue(value) > 0;
+          },
+        ),
+      files: Yup.array(),
+      totalProgramDuration: Yup.string()
+        .required("Total program duration is required")
+        .test(
+          "min-duration",
+          "Curriculum development must be at least 140 hours",
+          function (value) {
+            if (!value) return false;
+            const numericValue = extractNumericValue(value);
+            return numericValue >= 140;
+          },
+        )
+        .test("duration-distribution", function (value) {
+          const {
+            totalTheoryDuration,
+            totalPracticalDuration,
+            totalOjtDuration,
+            certificateLevelId,
+            courseTypeId,
+          } = this.parent;
+
+          // Only apply rules for BQF Course (id: 41)
+          if (parseInt(courseTypeId) !== 41) {
+            return true;
+          }
+
+          if (!value || !certificateLevelId) return true;
+
+          const theoryNum = extractNumericValue(totalTheoryDuration);
+          const practicalNum = extractNumericValue(totalPracticalDuration);
+          const ojtNum = extractNumericValue(totalOjtDuration);
+          const totalNum = theoryNum + practicalNum + ojtNum;
+
+          if (totalNum === 0) return true;
+
+          const theoryPercentage = (theoryNum / totalNum) * 100;
+          const practicalOjtPercentage =
+            ((practicalNum + ojtNum) / totalNum) * 100;
+
+          // Use the certificateLevels from the component scope
+          const certificateLevel = certificateLevels.find(
+            (level) => level.id === parseInt(certificateLevelId),
+          );
+
+          if (!certificateLevel) return true;
+
+          const levelName = certificateLevel.name.toLowerCase();
+          const isDiploma = levelName.includes("diploma");
+          const requiredTheoryPercentage = isDiploma ? 40 : 20;
+          const requiredPracticalOjtPercentage = isDiploma ? 60 : 80;
+
+          if (theoryPercentage < requiredTheoryPercentage) {
+            return this.createError({
+              message: `Theory duration (${theoryPercentage.toFixed(1)}%) must be at least ${requiredTheoryPercentage}% of total program duration for ${certificateLevel.name}`,
+            });
+          }
+
+          if (practicalOjtPercentage > requiredPracticalOjtPercentage) {
+            return this.createError({
+              message: `Practical + OJT duration (${practicalOjtPercentage.toFixed(1)}%) must not exceed ${requiredPracticalOjtPercentage}% of total program duration for ${certificateLevel.name}`,
+            });
+          }
+
+          return true;
+        }),
+    });
+  };
 
   const calculateTotalDuration = (theory, practical, ojt, setFieldValue) => {
     const theoryNum = extractNumericValue(theory);
@@ -462,6 +596,14 @@ const CurriculumIndex = () => {
       toast.error(
         "Your curriculum development is less than 140 hours. Please ensure the total duration is at least 140 hours.",
       );
+      setSubmitting(false);
+      return;
+    }
+
+    // Check duration distribution (only for BQF Course)
+    const distributionError = validateDurationDistribution(values);
+    if (distributionError) {
+      toast.error(distributionError);
       setSubmitting(false);
       return;
     }
@@ -569,7 +711,7 @@ const CurriculumIndex = () => {
       const actionMessages = {
         add: "submit",
         endorse: "endorse",
-        revision: "revise",
+        revise: "revise",
       };
       toast.error(
         error.response?.data?.message ||
@@ -662,6 +804,9 @@ const CurriculumIndex = () => {
     // Determine if curriculum type should be readonly (true for all dialogs)
     const isCurriculumTypeReadOnly = true;
 
+    // Check if BQF Course is selected
+    const isBQFCourse = parseInt(formik.values.courseTypeId) === 41;
+
     return (
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
@@ -697,7 +842,11 @@ const CurriculumIndex = () => {
           <TextField
             select
             fullWidth
-            label="Curriculum Type"
+            label={
+              <>
+                Curriculum Type <RequiredStar />
+              </>
+            }
             name="curriculumTypeId"
             size="small"
             value={formik.values.curriculumTypeId}
@@ -745,7 +894,11 @@ const CurriculumIndex = () => {
             <TextField
               select
               fullWidth
-              label="Curriculum Name"
+              label={
+                <>
+                  Curriculum Name <RequiredStar />
+                </>
+              }
               name="curriculumName"
               size="small"
               value={formik.values.curriculumName}
@@ -773,7 +926,11 @@ const CurriculumIndex = () => {
           ) : (
             <TextField
               fullWidth
-              label="Curriculum Name"
+              label={
+                <>
+                  Curriculum Name <RequiredStar />
+                </>
+              }
               name="curriculumName"
               size="small"
               value={formik.values.curriculumName}
@@ -794,7 +951,11 @@ const CurriculumIndex = () => {
           <TextField
             select
             fullWidth
-            label="Course Type"
+            label={
+              <>
+                Course Type <RequiredStar />
+              </>
+            }
             name="courseTypeId"
             size="small"
             value={formik.values.courseTypeId}
@@ -823,17 +984,28 @@ const CurriculumIndex = () => {
               </MenuItem>
             ))}
           </TextField>
+          {isBQFCourse && (
+            <Typography variant="caption" color="info.main">
+              BQF Course selected - Duration distribution rules apply
+            </Typography>
+          )}
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             select
             fullWidth
-            label="Certificate Level"
+            label={
+              <>
+                Certificate Level <RequiredStar />
+              </>
+            }
             name="certificateLevelId"
             size="small"
             value={formik.values.certificateLevelId}
-            onChange={formik.handleChange}
+            onChange={(e) => {
+              formik.handleChange(e);
+            }}
             onBlur={formik.handleBlur}
             error={
               formik.touched.certificateLevelId &&
@@ -868,7 +1040,11 @@ const CurriculumIndex = () => {
           <TextField
             select
             fullWidth
-            label="NCS Title"
+            label={
+              <>
+                NCS Title <RequiredStar />
+              </>
+            }
             name="ncsId"
             size="small"
             value={formik.values.ncsId}
@@ -889,7 +1065,11 @@ const CurriculumIndex = () => {
         <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
-            label="Total Theory Duration"
+            label={
+              <>
+                Total Theory Duration <RequiredStar />
+              </>
+            }
             name="totalTheoryDuration"
             size="small"
             placeholder="e.g., 120 hours"
@@ -918,7 +1098,11 @@ const CurriculumIndex = () => {
         <Grid size={{ xs: 12, md: 3 }}>
           <TextField
             fullWidth
-            label="Total Practical Duration"
+            label={
+              <>
+                Total Practical Duration <RequiredStar />
+              </>
+            }
             name="totalPracticalDuration"
             size="small"
             placeholder="e.g., 80 hours"
@@ -947,7 +1131,11 @@ const CurriculumIndex = () => {
         <Grid size={{ xs: 12, md: 3 }}>
           <TextField
             fullWidth
-            label="Total OJT Duration"
+            label={
+              <>
+                Total OJT Duration <RequiredStar />
+              </>
+            }
             name="totalOjtDuration"
             size="small"
             placeholder="e.g., 40 hours"
@@ -1054,6 +1242,33 @@ const CurriculumIndex = () => {
                 </Typography>
               </Paper>
             )}
+
+          {/* Show duration distribution error from Formik - only for BQF Course */}
+          {isBQFCourse &&
+            formik.errors.totalProgramDuration &&
+            formik.errors.totalProgramDuration.includes("Theory duration") && (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  bgcolor: "#fff3e0",
+                  color: "#e65100",
+                  borderRadius: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  border: "1px solid #ffccbc",
+                  mt: 1,
+                }}
+              >
+                <Typography variant="body2" fontWeight="bold">
+                  Duration Distribution Error:
+                </Typography>
+                <Typography variant="body2">
+                  {formik.errors.totalProgramDuration}
+                </Typography>
+              </Paper>
+            )}
         </Grid>
 
         <Grid size={{ xs: 12, md: 12 }}>
@@ -1061,7 +1276,11 @@ const CurriculumIndex = () => {
             fullWidth
             multiline
             rows={2}
-            label="Entry Requirement"
+            label={
+              <>
+                Entry Requirement <RequiredStar />
+              </>
+            }
             name="entryRequirement"
             size="small"
             value={formik.values.entryRequirement}
@@ -1081,7 +1300,11 @@ const CurriculumIndex = () => {
             fullWidth
             multiline
             rows={3}
-            label="Curriculum Description"
+            label={
+              <>
+                Curriculum Description <RequiredStar />
+              </>
+            }
             name="description"
             size="small"
             value={formik.values.description}
@@ -1329,7 +1552,7 @@ const CurriculumIndex = () => {
         <DialogTitle>Curriculum Development</DialogTitle>
         <Formik
           initialValues={getInitialValues(null, false, true, false)}
-          validationSchema={validationSchema}
+          validationSchema={getValidationSchema()}
           onSubmit={(values, helpers) =>
             handleFormSubmit(values, helpers, "add")
           }
@@ -1363,9 +1586,9 @@ const CurriculumIndex = () => {
                   type="submit"
                   variant="contained"
                   color="primary"
-                  disabled={loading || isSubmitDisabled(formik.values)}
+                  disabled={loading || !formik.isValid || !formik.dirty}
                 >
-                  {loading ? "Saving..." : "Save"}
+                  {loading ? "Saving..." : "Submit"}
                 </Button>
               </DialogActions>
             </Form>
@@ -1386,7 +1609,7 @@ const CurriculumIndex = () => {
         <DialogTitle>Curriculum Endorsement</DialogTitle>
         <Formik
           initialValues={getInitialValues(null, true, false, false)}
-          validationSchema={validationSchema}
+          validationSchema={getValidationSchema()}
           onSubmit={(values, helpers) =>
             handleFormSubmit(values, helpers, "endorse")
           }
@@ -1420,9 +1643,9 @@ const CurriculumIndex = () => {
                   type="submit"
                   variant="contained"
                   color="success"
-                  disabled={endorseLoading || isSubmitDisabled(formik.values)}
+                  disabled={endorseLoading || !formik.isValid || !formik.dirty}
                 >
-                  {endorseLoading ? "Endorsing..." : "Endorse"}
+                  {endorseLoading ? "Endorsing..." : "Submit"}
                 </Button>
               </DialogActions>
             </Form>
@@ -1449,7 +1672,7 @@ const CurriculumIndex = () => {
             false,
             true,
           )}
-          validationSchema={validationSchema}
+          validationSchema={getValidationSchema()}
           onSubmit={(values, helpers) =>
             handleFormSubmit(values, helpers, "revision")
           }
@@ -1484,7 +1707,7 @@ const CurriculumIndex = () => {
                   type="submit"
                   variant="contained"
                   color="primary"
-                  disabled={editLoading || isSubmitDisabled(formik.values)}
+                  disabled={editLoading || !formik.isValid || !formik.dirty}
                 >
                   {editLoading ? "Revising..." : "Revise"}
                 </Button>
