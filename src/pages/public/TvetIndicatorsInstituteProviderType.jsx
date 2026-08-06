@@ -208,10 +208,42 @@ const tvetIndicators = [
       { name: "Certificate 3", pub: 5, pvt: 51 },
     ],
   },
-  { id: 14, name: "Certificate 2", pub: 1856, pvt: 2465, color: "#7b1fa2", isChild: true, parentId: 13 },
-  { id: 15, name: "Certificate 3", pub: 1325, pvt: 1662, color: "#8e24aa", isChild: true, parentId: 13 },
-  { id: 16, name: "Diploma", pub: 1024, pvt: 830, color: "#4527a0", isChild: true, parentId: 13 },
-  { id: 17, name: "Advance Diploma", pub: 412, pvt: 212, color: "#283593", isChild: true, parentId: 13 },
+  {
+    id: 14,
+    name: "Certificate 2",
+    pub: 1856,
+    pvt: 2465,
+    color: "#7b1fa2",
+    isChild: true,
+    parentId: 13,
+  },
+  {
+    id: 15,
+    name: "Certificate 3",
+    pub: 1325,
+    pvt: 1662,
+    color: "#8e24aa",
+    isChild: true,
+    parentId: 13,
+  },
+  {
+    id: 16,
+    name: "Diploma",
+    pub: 1024,
+    pvt: 830,
+    color: "#4527a0",
+    isChild: true,
+    parentId: 13,
+  },
+  {
+    id: 17,
+    name: "Advance Diploma",
+    pub: 412,
+    pvt: 212,
+    color: "#283593",
+    isChild: true,
+    parentId: 13,
+  },
 ].map((r) => ({ ...r, total: (r.pub || 0) + (r.pvt || 0) }));
 
 // ── Institute by Provider Type
@@ -230,7 +262,9 @@ const TS = {
     color: PD,
     whiteSpace: "nowrap",
   },
-  "& td": { fontSize: "0.8rem" },
+  "& td": {
+    fontSize: "0.8rem",
+  },
   "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
   "& tbody tr": {
     animation: `${fadeInUp} 0.4s ease-out`,
@@ -248,14 +282,14 @@ const TvetIndicatorsInstituteProviderType = () => {
   useEffect(() => {
     // Trigger animations after component mounts
     setTimeout(() => setAnimateValues(true), 300);
-    
+
     // Animate total count
     const duration = 2000;
     const stepTime = 20;
     const steps = duration / stepTime;
     const increment = providerTotal / steps;
     let current = 0;
-    
+
     const timer = setInterval(() => {
       current += increment;
       if (current >= providerTotal) {
@@ -265,7 +299,7 @@ const TvetIndicatorsInstituteProviderType = () => {
         setAnimatedTotal(Math.floor(current));
       }
     }, stepTime);
-    
+
     return () => clearInterval(timer);
   }, []);
 
@@ -340,7 +374,12 @@ const TvetIndicatorsInstituteProviderType = () => {
                 >
                   TVET Indicators Breakdown
                 </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "text.secondary",
+                  }}
+                >
                   Public vs Private vs Total
                 </Typography>
               </Box>
@@ -369,7 +408,11 @@ const TvetIndicatorsInstituteProviderType = () => {
                 </Typography>
                 <Typography
                   variant="caption"
-                  sx={{ color: "#666", mt: 1, display: "block" }}
+                  sx={{
+                    color: "#666",
+                    mt: 1,
+                    display: "block",
+                  }}
                 >
                   No TVET indicators found
                 </Typography>
@@ -385,7 +428,6 @@ const TvetIndicatorsInstituteProviderType = () => {
                         <TableCell align="center">Public</TableCell>
                         <TableCell align="center">Private</TableCell>
                         <TableCell align="center">Total</TableCell>
-
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -430,19 +472,28 @@ const TvetIndicatorsInstituteProviderType = () => {
                                 </Box>
                               </TableCell>
                               <TableCell
-                                sx={{ fontWeight: 600, color: "#0a1929" }}
+                                sx={{
+                                  fontWeight: 600,
+                                  color: "#0a1929",
+                                }}
                               >
                                 {row.name}
                               </TableCell>
                               <TableCell
                                 align="center"
-                                sx={{ color: "#1565c0", fontWeight: 600 }}
+                                sx={{
+                                  color: "#1565c0",
+                                  fontWeight: 600,
+                                }}
                               >
                                 {row.pub.toLocaleString()}
                               </TableCell>
                               <TableCell
                                 align="center"
-                                sx={{ color: "#2e7d32", fontWeight: 600 }}
+                                sx={{
+                                  color: "#2e7d32",
+                                  fontWeight: 600,
+                                }}
                               >
                                 {row.pvt.toLocaleString()}
                               </TableCell>
@@ -510,8 +561,8 @@ const TvetIndicatorsInstituteProviderType = () => {
                                     timeout="auto"
                                     unmountOnExit
                                   >
-                                    <Box 
-                                      sx={{ 
+                                    <Box
+                                      sx={{
                                         m: 1.5,
                                         animation: `${expandAnimation} 0.4s ease-out`,
                                       }}
@@ -520,16 +571,39 @@ const TvetIndicatorsInstituteProviderType = () => {
                                         <TableHead>
                                           <TableRow>
                                             <TableCell width={36}></TableCell>
-                                            <TableCell sx={{ fontWeight: 700, color: PD }}>
+                                            <TableCell
+                                              sx={{
+                                                fontWeight: 700,
+                                                color: PD,
+                                              }}
+                                            >
                                               Sub Indicator
                                             </TableCell>
-                                            <TableCell align="center" sx={{ fontWeight: 700, color: PD }}>
+                                            <TableCell
+                                              align="center"
+                                              sx={{
+                                                fontWeight: 700,
+                                                color: PD,
+                                              }}
+                                            >
                                               Public
                                             </TableCell>
-                                            <TableCell align="center" sx={{ fontWeight: 700, color: PD }}>
+                                            <TableCell
+                                              align="center"
+                                              sx={{
+                                                fontWeight: 700,
+                                                color: PD,
+                                              }}
+                                            >
                                               Private
                                             </TableCell>
-                                            <TableCell align="center" sx={{ fontWeight: 700, color: PD }}>
+                                            <TableCell
+                                              align="center"
+                                              sx={{
+                                                fontWeight: 700,
+                                                color: PD,
+                                              }}
+                                            >
                                               Total
                                             </TableCell>
                                             <TableCell width={50}></TableCell>
@@ -537,11 +611,13 @@ const TvetIndicatorsInstituteProviderType = () => {
                                         </TableHead>
                                         <TableBody>
                                           {row.subItems?.map((subItem, idx) => {
-                                            const subTotal = (subItem.pub || 0) + (subItem.pvt || 0);
+                                            const subTotal =
+                                              (subItem.pub || 0) +
+                                              (subItem.pvt || 0);
                                             return (
-                                              <TableRow 
-                                                key={idx} 
-                                                sx={{ 
+                                              <TableRow
+                                                key={idx}
+                                                sx={{
                                                   bgcolor: alpha(P, 0.02),
                                                   animation: `${fadeInUp} 0.3s ease-out ${idx * 0.05}s both`,
                                                 }}
@@ -552,11 +628,15 @@ const TvetIndicatorsInstituteProviderType = () => {
                                                       width: 18,
                                                       height: 18,
                                                       borderRadius: 0.5,
-                                                      bgcolor: alpha(row.color, 0.3),
+                                                      bgcolor: alpha(
+                                                        row.color,
+                                                        0.3,
+                                                      ),
                                                       display: "flex",
                                                       alignItems: "center",
                                                       justifyContent: "center",
-                                                      transition: "all 0.3s ease",
+                                                      transition:
+                                                        "all 0.3s ease",
                                                       "&:hover": {
                                                         transform: "scale(1.2)",
                                                       },
@@ -573,13 +653,28 @@ const TvetIndicatorsInstituteProviderType = () => {
                                                     </Typography>
                                                   </Box>
                                                 </TableCell>
-                                                <TableCell sx={{ pl: 3, fontSize: "0.75rem" }}>
+                                                <TableCell
+                                                  sx={{
+                                                    pl: 3,
+                                                    fontSize: "0.75rem",
+                                                  }}
+                                                >
                                                   {subItem.name}
                                                 </TableCell>
-                                                <TableCell align="center" sx={{ fontSize: "0.75rem" }}>
+                                                <TableCell
+                                                  align="center"
+                                                  sx={{
+                                                    fontSize: "0.75rem",
+                                                  }}
+                                                >
                                                   {subItem.pub.toLocaleString()}
                                                 </TableCell>
-                                                <TableCell align="center" sx={{ fontSize: "0.75rem" }}>
+                                                <TableCell
+                                                  align="center"
+                                                  sx={{
+                                                    fontSize: "0.75rem",
+                                                  }}
+                                                >
                                                   {subItem.pvt.toLocaleString()}
                                                 </TableCell>
                                                 <TableCell align="center">
@@ -589,12 +684,17 @@ const TvetIndicatorsInstituteProviderType = () => {
                                                       px: 1,
                                                       py: 0.2,
                                                       borderRadius: 1,
-                                                      bgcolor: alpha(row.color, 0.1),
+                                                      bgcolor: alpha(
+                                                        row.color,
+                                                        0.1,
+                                                      ),
                                                       border: `1px solid ${alpha(row.color, 0.25)}`,
                                                       minWidth: 50,
-                                                      transition: "all 0.3s ease",
+                                                      transition:
+                                                        "all 0.3s ease",
                                                       "&:hover": {
-                                                        transform: "scale(1.05)",
+                                                        transform:
+                                                          "scale(1.05)",
                                                       },
                                                     }}
                                                   >
@@ -703,7 +803,12 @@ const TvetIndicatorsInstituteProviderType = () => {
                 >
                   Institute by Provider Type
                 </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "text.secondary",
+                  }}
+                >
                   Public · Private
                 </Typography>
               </Box>
@@ -732,7 +837,11 @@ const TvetIndicatorsInstituteProviderType = () => {
                 </Typography>
                 <Typography
                   variant="caption"
-                  sx={{ color: "#666", mt: 1, display: "block" }}
+                  sx={{
+                    color: "#666",
+                    mt: 1,
+                    display: "block",
+                  }}
                 >
                   No provider type data found
                 </Typography>
@@ -783,8 +892,8 @@ const TvetIndicatorsInstituteProviderType = () => {
                     </Typography>
                   </Box>
                   <AccountBalanceIcon
-                    sx={{ 
-                      color: alpha(W, 0.8), 
+                    sx={{
+                      color: alpha(W, 0.8),
                       fontSize: 30,
                       animation: `${pulse} 2s ease-in-out infinite`,
                     }}
@@ -802,7 +911,12 @@ const TvetIndicatorsInstituteProviderType = () => {
                       100
                     ).toFixed(1);
                     return (
-                      <Box key={i} sx={{ animation: `${fadeInUp} 0.5s ease-out ${i * 0.2}s both` }}>
+                      <Box
+                        key={i}
+                        sx={{
+                          animation: `${fadeInUp} 0.5s ease-out ${i * 0.2}s both`,
+                        }}
+                      >
                         <Stack
                           direction="row"
                           justifyContent="space-between"
@@ -829,7 +943,10 @@ const TvetIndicatorsInstituteProviderType = () => {
                             />
                             <Typography
                               fontWeight={700}
-                              sx={{ fontSize: "0.78rem", color: "#0a1929" }}
+                              sx={{
+                                fontSize: "0.78rem",
+                                color: "#0a1929",
+                              }}
                             >
                               {item.name}
                             </Typography>
@@ -841,8 +958,8 @@ const TvetIndicatorsInstituteProviderType = () => {
                           >
                             <Typography
                               fontWeight={800}
-                              sx={{ 
-                                color: item.color, 
+                              sx={{
+                                color: item.color,
                                 fontSize: "0.9rem",
                                 transition: "all 0.3s ease",
                                 "&:hover": {
@@ -876,9 +993,12 @@ const TvetIndicatorsInstituteProviderType = () => {
                               height: "100%",
                               background: `linear-gradient(90deg, ${item.color} 0%, ${alpha(item.color, 0.65)} 100%)`,
                               borderRadius: 3,
-                              transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)",
+                              transition:
+                                "width 1s cubic-bezier(0.4, 0, 0.2, 1)",
                               boxShadow: `0 1px 2px ${alpha(item.color, 0.4)}`,
-                              animation: animateValues ? `${barExpand} 1s ease-out` : "none",
+                              animation: animateValues
+                                ? `${barExpand} 1s ease-out`
+                                : "none",
                             }}
                           />
                         </Box>

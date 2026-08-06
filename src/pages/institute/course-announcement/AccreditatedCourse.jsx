@@ -26,12 +26,19 @@ import * as Yup from "yup";
 import RemoveRedEyeIcon from "@mui/icons-material/RemoveRedEye";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
+
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) =>
@@ -48,7 +55,7 @@ const fileToBase64 = (file) =>
   });
 
 const AccreditatedCourse = () => {
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -60,7 +67,7 @@ const AccreditatedCourse = () => {
   const [fundingSources, setFundingSources] = useState([]);
   const [dzongkhags, setDzongkhags] = useState([]);
   const [approvedCourses, setApprovedCourses] = useState([]);
-  const [statusList, setStatusList] = useState([]); // Add status list state
+  const [statusList, setStatusList] = useState([]);
 
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -73,7 +80,7 @@ const AccreditatedCourse = () => {
     fetchDzongkhags();
     fetchApprovedCourses();
     fetchEnrolledCourses();
-    fetchStatusList(); // Fetch status list
+    fetchStatusList();
   }, []);
 
   const fetchInstituteDetails = async () => {
@@ -90,9 +97,9 @@ const AccreditatedCourse = () => {
   const fetchDropdownData = async () => {
     try {
       // Fetch certification levels (assuming parentId for certification levels)
-      const levelsResponse = await CommonService.getByParentId(10);
+      const levelsResponse = await CommonService.getByParentId(27);
       setCertificationLevels(levelsResponse.data);
-
+      console.log("CertificationLevels", levelsResponse.data);
       // Fetch funding sources (assuming parentId for funding sources)
       const fundingResponse = await CommonService.getByParentId(16);
       setFundingSources(fundingResponse.data);
@@ -173,8 +180,8 @@ const AccreditatedCourse = () => {
   const initialValues = {
     instituteId: institute.institute_id || "",
     courseId: "",
-    courseFee: "",
-    totalNoTrainees: "",
+    feesPerTrainee: "",
+    enrollmentCapacity: "",
     applicationStartDate: "",
     applicationEndDate: "",
     courseStartDate: "",
@@ -188,12 +195,12 @@ const AccreditatedCourse = () => {
 
   const validationSchema = Yup.object().shape({
     courseId: Yup.string().required("Course Name is required"),
-    courseFee: Yup.number()
+    feesPerTrainee: Yup.number()
       .typeError("Must be a number")
-      .required("Course Fee is required"),
-    totalNoTrainees: Yup.number()
+      .required("Fees per trainee is required"),
+    enrollmentCapacity: Yup.number()
       .typeError("Must be a number")
-      .required("Total number of trainees required"),
+      .required("Enrollment capacity per batch is required"),
     applicationStartDate: Yup.date()
       .typeError("Invalid date")
       .required("Application Start Date required"),
@@ -245,8 +252,8 @@ const AccreditatedCourse = () => {
       const payload = {
         instituteId: values.instituteId,
         courseId: values.courseId,
-        courseFee: values.courseFee,
-        totalNoTrainees: values.totalNoTrainees,
+        feesPerTrainee: values.feesPerTrainee,
+        enrollmentCapacity: values.enrollmentCapacity,
         applicationStartDate: values.applicationStartDate,
         applicationEndDate: values.applicationEndDate,
         courseStartDate: values.courseStartDate,
@@ -402,8 +409,8 @@ const AccreditatedCourse = () => {
               <TableCell>#</TableCell>
               <TableCell>Application No</TableCell>
               <TableCell>Course</TableCell>
-              <TableCell>Course Fee</TableCell>
-              <TableCell>Total Trainees</TableCell>
+              <TableCell>Fees per Trainee (Nu.)</TableCell>
+              <TableCell>Enrollment Capacity</TableCell>
               <TableCell>Certification Level</TableCell>
               <TableCell>Funding Source</TableCell>
               <TableCell>Application Period</TableCell>
@@ -422,8 +429,12 @@ const AccreditatedCourse = () => {
                     <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
                     <TableCell>{course.application_no || "N/A"}</TableCell>
                     <TableCell>{getCourseName(course.course_id)}</TableCell>
-                    <TableCell>Nu. {course.course_fee}</TableCell>
-                    <TableCell>{course.total_no_trainees}</TableCell>
+                    <TableCell>
+                      Nu. {course.fees_per_trainee || course.course_fee}
+                    </TableCell>
+                    <TableCell>
+                      {course.enrollment_capacity || course.total_no_trainees}
+                    </TableCell>
                     <TableCell>
                       {getCertificationLevelName(course.certification_level_id)}
                     </TableCell>
@@ -499,9 +510,7 @@ const AccreditatedCourse = () => {
         maxWidth="lg"
         fullWidth
       >
-        <DialogTitle>
-          Create Accredited Course 
-        </DialogTitle>
+        <DialogTitle>Create Accredited Course</DialogTitle>
         <Formik
           initialValues={initialValues}
           validationSchema={validationSchema}
@@ -511,317 +520,411 @@ const AccreditatedCourse = () => {
           validateOnChange={true}
           validateOnMount={false}
         >
-          {(formik) => (
-            <Form>
-              <DialogContent dividers>
-                <Grid container spacing={2}>
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      label="Course Name"
-                      name="courseId"
-                      size="small"
-                      select
-                      value={formik.values.courseId}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.courseId &&
-                        Boolean(formik.errors.courseId)
-                      }
-                      helperText={
-                        formik.touched.courseId && formik.errors.courseId
-                      }
-                    >
-                      <MenuItem value="">-select-</MenuItem>
-                      {approvedCourses.map((course) => (
-                        <MenuItem key={course.id} value={course.id}>
-                          {course.course_name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
+          {(formik) => {
+            // Handle course selection - auto-fill fields
+            const handleCourseChange = (event) => {
+              const courseId = event.target.value;
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      label="Course Fee"
-                      name="courseFee"
-                      size="small"
-                      type="number"
-                      value={formik.values.courseFee}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.courseFee &&
-                        Boolean(formik.errors.courseFee)
-                      }
-                      helperText={
-                        formik.touched.courseFee && formik.errors.courseFee
-                      }
-                    />
-                  </Grid>
+              if (courseId) {
+                // Find the selected course from approvedCourses
+                const selectedCourse = approvedCourses.find(
+                  (course) => course.id === courseId,
+                );
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="Certification Level"
-                      name="certificationLevelId"
-                      size="small"
-                      value={formik.values.certificationLevelId}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.certificationLevelId &&
-                        Boolean(formik.errors.certificationLevelId)
-                      }
-                      helperText={
-                        formik.touched.certificationLevelId &&
-                        formik.errors.certificationLevelId
-                      }
-                    >
-                      <MenuItem value="">-select-</MenuItem>
-                      {certificationLevels.map((level) => (
-                        <MenuItem key={level.id} value={level.id}>
-                          {level.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
+                if (selectedCourse) {
+                  // Set all fields at once without marking them as touched
+                  formik.setFieldValue("courseId", courseId, false);
+                  formik.setFieldValue(
+                    "feesPerTrainee",
+                    selectedCourse.fees_per_trainee || "",
+                    false,
+                  );
+                  formik.setFieldValue(
+                    "enrollmentCapacity",
+                    selectedCourse.enrolment_capacity || "",
+                    false,
+                  );
+                  formik.setFieldValue(
+                    "certificationLevelId",
+                    selectedCourse.certificate_level_id || "",
+                    false,
+                  );
+                }
+              } else {
+                // Clear fields if no course selected
+                formik.setFieldValue("courseId", "", false);
+                formik.setFieldValue("feesPerTrainee", "", false);
+                formik.setFieldValue("enrollmentCapacity", "", false);
+                formik.setFieldValue("certificationLevelId", "", false);
+              }
+            };
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      label="Total No of Trainees"
-                      name="totalNoTrainees"
-                      size="small"
-                      type="number"
-                      value={formik.values.totalNoTrainees}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.totalNoTrainees &&
-                        Boolean(formik.errors.totalNoTrainees)
-                      }
-                      helperText={
-                        formik.touched.totalNoTrainees &&
-                        formik.errors.totalNoTrainees
-                      }
-                    />
-                  </Grid>
+            return (
+              <Form>
+                <DialogContent dividers>
+                  <Grid container spacing={2}>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        fullWidth
+                        label={
+                          <>
+                            Course Name <RequiredStar />
+                          </>
+                        }
+                        name="courseId"
+                        size="small"
+                        select
+                        value={formik.values.courseId}
+                        onChange={handleCourseChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.courseId &&
+                          Boolean(formik.errors.courseId)
+                        }
+                        helperText={
+                          formik.touched.courseId && formik.errors.courseId
+                        }
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {approvedCourses.map((course) => (
+                          <MenuItem key={course.id} value={course.id}>
+                            {course.course_name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      type="date"
-                      fullWidth
-                      label="Application Start Date"
-                      name="applicationStartDate"
-                      size="small"
-                      value={formik.values.applicationStartDate}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
-                      error={
-                        formik.touched.applicationStartDate &&
-                        Boolean(formik.errors.applicationStartDate)
-                      }
-                      helperText={
-                        formik.touched.applicationStartDate &&
-                        formik.errors.applicationStartDate
-                      }
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        fullWidth
+                        label={
+                          <>
+                            Fees per Trainee (Nu.) <RequiredStar />
+                          </>
+                        }
+                        name="feesPerTrainee"
+                        size="small"
+                        type="number"
+                        value={formik.values.feesPerTrainee}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.feesPerTrainee &&
+                          Boolean(formik.errors.feesPerTrainee)
+                        }
+                        helperText={
+                          formik.touched.feesPerTrainee &&
+                          formik.errors.feesPerTrainee
+                        }
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      type="date"
-                      fullWidth
-                      label="Application End Date"
-                      name="applicationEndDate"
-                      size="small"
-                      value={formik.values.applicationEndDate}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
-                      error={
-                        formik.touched.applicationEndDate &&
-                        Boolean(formik.errors.applicationEndDate)
-                      }
-                      helperText={
-                        formik.touched.applicationEndDate &&
-                        formik.errors.applicationEndDate
-                      }
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={
+                          <>
+                            Certification Level <RequiredStar />
+                          </>
+                        }
+                        name="certificationLevelId"
+                        size="small"
+                        value={formik.values.certificationLevelId}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.certificationLevelId &&
+                          Boolean(formik.errors.certificationLevelId)
+                        }
+                        helperText={
+                          formik.touched.certificationLevelId &&
+                          formik.errors.certificationLevelId
+                        }
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {certificationLevels.map((level) => (
+                          <MenuItem key={level.id} value={level.id}>
+                            {level.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      type="date"
-                      fullWidth
-                      label="Course Start Date"
-                      name="courseStartDate"
-                      size="small"
-                      value={formik.values.courseStartDate}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
-                      error={
-                        formik.touched.courseStartDate &&
-                        Boolean(formik.errors.courseStartDate)
-                      }
-                      helperText={
-                        formik.touched.courseStartDate &&
-                        formik.errors.courseStartDate
-                      }
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        fullWidth
+                        label={
+                          <>
+                            Enrollment Capacity per Batch <RequiredStar />
+                          </>
+                        }
+                        name="enrollmentCapacity"
+                        size="small"
+                        type="number"
+                        value={formik.values.enrollmentCapacity}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.enrollmentCapacity &&
+                          Boolean(formik.errors.enrollmentCapacity)
+                        }
+                        helperText={
+                          formik.touched.enrollmentCapacity &&
+                          formik.errors.enrollmentCapacity
+                        }
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      type="date"
-                      fullWidth
-                      label="Course End Date"
-                      name="courseEndDate"
-                      size="small"
-                      value={formik.values.courseEndDate}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
-                      error={
-                        formik.touched.courseEndDate &&
-                        Boolean(formik.errors.courseEndDate)
-                      }
-                      helperText={
-                        formik.touched.courseEndDate &&
-                        formik.errors.courseEndDate
-                      }
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        type="date"
+                        fullWidth
+                        label={
+                          <>
+                            Application Start Date <RequiredStar />
+                          </>
+                        }
+                        name="applicationStartDate"
+                        size="small"
+                        value={formik.values.applicationStartDate}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        InputLabelProps={{ shrink: true }}
+                        error={
+                          formik.touched.applicationStartDate &&
+                          Boolean(formik.errors.applicationStartDate)
+                        }
+                        helperText={
+                          formik.touched.applicationStartDate &&
+                          formik.errors.applicationStartDate
+                        }
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="Funding Source"
-                      name="fundingSourceId"
-                      size="small"
-                      value={formik.values.fundingSourceId}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.fundingSourceId &&
-                        Boolean(formik.errors.fundingSourceId)
-                      }
-                      helperText={
-                        formik.touched.fundingSourceId &&
-                        formik.errors.fundingSourceId
-                      }
-                    >
-                      <MenuItem value="">-select-</MenuItem>
-                      {fundingSources.map((source) => (
-                        <MenuItem key={source.id} value={source.id}>
-                          {source.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        type="date"
+                        fullWidth
+                        label={
+                          <>
+                            Application End Date <RequiredStar />
+                          </>
+                        }
+                        name="applicationEndDate"
+                        size="small"
+                        value={formik.values.applicationEndDate}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        InputLabelProps={{ shrink: true }}
+                        error={
+                          formik.touched.applicationEndDate &&
+                          Boolean(formik.errors.applicationEndDate)
+                        }
+                        helperText={
+                          formik.touched.applicationEndDate &&
+                          formik.errors.applicationEndDate
+                        }
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="Training Location (Dzongkhag)"
-                      name="trainingLocationId"
-                      size="small"
-                      value={formik.values.trainingLocationId}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.trainingLocationId &&
-                        Boolean(formik.errors.trainingLocationId)
-                      }
-                      helperText={
-                        formik.touched.trainingLocationId &&
-                        formik.errors.trainingLocationId
-                      }
-                    >
-                      <MenuItem value="">-select-</MenuItem>
-                      {dzongkhags.map((dzongkhag) => (
-                        <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
-                          {dzongkhag.dzonkhagName}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        type="date"
+                        fullWidth
+                        label={
+                          <>
+                            Course Start Date <RequiredStar />
+                          </>
+                        }
+                        name="courseStartDate"
+                        size="small"
+                        value={formik.values.courseStartDate}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        InputLabelProps={{ shrink: true }}
+                        error={
+                          formik.touched.courseStartDate &&
+                          Boolean(formik.errors.courseStartDate)
+                        }
+                        helperText={
+                          formik.touched.courseStartDate &&
+                          formik.errors.courseStartDate
+                        }
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12 }}>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={3}
-                      label="Course Description"
-                      name="courseDescription"
-                      size="small"
-                      value={formik.values.courseDescription}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.courseDescription &&
-                        Boolean(formik.errors.courseDescription)
-                      }
-                      helperText={
-                        formik.touched.courseDescription &&
-                        formik.errors.courseDescription
-                      }
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        type="date"
+                        fullWidth
+                        label={
+                          <>
+                            Course End Date <RequiredStar />
+                          </>
+                        }
+                        name="courseEndDate"
+                        size="small"
+                        value={formik.values.courseEndDate}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        InputLabelProps={{ shrink: true }}
+                        error={
+                          formik.touched.courseEndDate &&
+                          Boolean(formik.errors.courseEndDate)
+                        }
+                        helperText={
+                          formik.touched.courseEndDate &&
+                          formik.errors.courseEndDate
+                        }
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12 }}>
-                    <FileUpload
-                      files={formik.values.files}
-                      onFilesChange={(files) => {
-                        formik.setFieldValue("files", files);
-                        setTimeout(() => {
-                          formik.validateField("files");
-                        }, 100);
-                      }}
-                      error={
-                        formik.touched.files && Boolean(formik.errors.files)
-                      }
-                      helperText={formik.touched.files && formik.errors.files}
-                    />
-                    {!formik.touched.files &&
-                      formik.values.files.length === 0 && (
-                        <Typography variant="caption" color="textSecondary">
-                          Please upload required documents (PDF, DOC, etc.)
-                        </Typography>
-                      )}
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={
+                          <>
+                            Funding Source <RequiredStar />
+                          </>
+                        }
+                        name="fundingSourceId"
+                        size="small"
+                        value={formik.values.fundingSourceId}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.fundingSourceId &&
+                          Boolean(formik.errors.fundingSourceId)
+                        }
+                        helperText={
+                          formik.touched.fundingSourceId &&
+                          formik.errors.fundingSourceId
+                        }
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {fundingSources.map((source) => (
+                          <MenuItem key={source.id} value={source.id}>
+                            {source.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={
+                          <>
+                            Training Location (Dzongkhag) <RequiredStar />
+                          </>
+                        }
+                        name="trainingLocationId"
+                        size="small"
+                        value={formik.values.trainingLocationId}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.trainingLocationId &&
+                          Boolean(formik.errors.trainingLocationId)
+                        }
+                        helperText={
+                          formik.touched.trainingLocationId &&
+                          formik.errors.trainingLocationId
+                        }
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {dzongkhags.map((dzongkhag) => (
+                          <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
+                            {dzongkhag.dzonkhagName}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item size={{ xs: 12 }}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label={
+                          <>
+                            Course Description <RequiredStar />
+                          </>
+                        }
+                        name="courseDescription"
+                        size="small"
+                        value={formik.values.courseDescription}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.courseDescription &&
+                          Boolean(formik.errors.courseDescription)
+                        }
+                        helperText={
+                          formik.touched.courseDescription &&
+                          formik.errors.courseDescription
+                        }
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12 }}>
+                      <FileUpload
+                        files={formik.values.files}
+                        onFilesChange={(files) => {
+                          formik.setFieldValue("files", files);
+                          setTimeout(() => {
+                            formik.validateField("files");
+                          }, 100);
+                        }}
+                        error={
+                          formik.touched.files && Boolean(formik.errors.files)
+                        }
+                        helperText={formik.touched.files && formik.errors.files}
+                      />
+                      {!formik.touched.files &&
+                        formik.values.files.length === 0 && (
+                          <Typography variant="caption" color="textSecondary">
+                            Please upload required documents (PDF, DOC, etc.)
+                          </Typography>
+                        )}
+                    </Grid>
                   </Grid>
-                </Grid>
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="error"
-                  onClick={() => setOpenDialog(false)}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="small"
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  disabled={loading}
-                >
-                  {loading ? "Saving..." : "Submit"}
-                </Button>
-              </DialogActions>
-            </Form>
-          )}
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    onClick={() => setOpenDialog(false)}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="small"
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    disabled={loading}
+                  >
+                    {loading ? "Saving..." : "Submit"}
+                  </Button>
+                </DialogActions>
+              </Form>
+            );
+          }}
         </Formik>
       </Dialog>
     </Paper>

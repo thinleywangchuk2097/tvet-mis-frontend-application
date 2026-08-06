@@ -1,7 +1,6 @@
 import apiClient from "../../../axios";
 
 class CurriculumIndexService {
-
   submitCurriculum(data, token) {
     return apiClient
       .post(`/api/v1/user/management/curriculum/submit`, data, {
@@ -29,15 +28,11 @@ class CurriculumIndexService {
 
   verifyCurriculumDevelopment(data, token) {
     return apiClient
-      .post(
-        `/api/v1/user/management/curriculum/verify-curriculum`,
-        data,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      .post(`/api/v1/user/management/curriculum/verify-curriculum`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      )
+      })
       .then((response) => response)
       .catch((error) => error);
   }
@@ -56,7 +51,21 @@ class CurriculumIndexService {
       .catch((error) => error);
   }
 
-   getApprovedCurriculumDataByUserId(user_id,curriculum_type, token) {
+  getCurriculumById(curriculum_id, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/curriculum/get-curriculums-by-id/${curriculum_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  getApprovedCurriculumDataByUserId(user_id, curriculum_type, token) {
     return apiClient
       .get(
         `/api/v1/user/management/curriculum/get-approved-curriculums/${user_id}/${curriculum_type}`,

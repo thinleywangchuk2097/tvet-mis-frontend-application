@@ -196,7 +196,11 @@ const Login = () => {
             <Typography
               component="h1"
               variant="h5"
-              sx={{ mb: 2, fontWeight: "bold", textTransform: "uppercase" }}
+              sx={{
+                mb: 2,
+                fontWeight: "bold",
+                textTransform: "uppercase",
+              }}
             >
               Sign In
             </Typography>
@@ -326,7 +330,11 @@ const Login = () => {
                 type="submit"
                 fullWidth
                 variant="contained"
-                sx={{ mt: authError ? 0.5 : 2, mb: 1.5, fontWeight: "bold" }}
+                sx={{
+                  mt: authError ? 0.5 : 2,
+                  mb: 1.5,
+                  fontWeight: "bold",
+                }}
                 disabled={formik.isSubmitting}
                 endIcon={
                   formik.isSubmitting ? (

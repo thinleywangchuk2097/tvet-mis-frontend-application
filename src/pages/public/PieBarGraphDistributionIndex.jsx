@@ -282,7 +282,7 @@ const PieBarGraphDistributionIndex = () => {
   // Custom animated bar shape with loading animation
   const AnimatedBar = (props) => {
     const { fill, x, y, width, height, index } = props;
-    
+
     if (isFirstLoad && !animateBars) {
       return (
         <rect
@@ -343,7 +343,14 @@ const PieBarGraphDistributionIndex = () => {
 
   // Compact Loading skeleton
   const LoadingSkeleton = () => (
-    <Box sx={{ width: "100%", height: 280, position: "relative", overflow: "hidden" }}>
+    <Box
+      sx={{
+        width: "100%",
+        height: 280,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
       <Box
         sx={{
           position: "absolute",
@@ -377,7 +384,12 @@ const PieBarGraphDistributionIndex = () => {
   if (loading) {
     return (
       <Box sx={{ textAlign: "center", py: 4 }}>
-        <Typography sx={{ color: "#666", fontSize: "0.85rem" }}>
+        <Typography
+          sx={{
+            color: "#666",
+            fontSize: "0.85rem",
+          }}
+        >
           Loading distribution data...
         </Typography>
       </Box>
@@ -404,7 +416,12 @@ const PieBarGraphDistributionIndex = () => {
           }}
         >
           <CardContent sx={{ p: 1.5 }}>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              sx={{ mb: 1.5 }}
+            >
               <Box
                 sx={{
                   width: 28,
@@ -433,7 +450,13 @@ const PieBarGraphDistributionIndex = () => {
                 >
                   Program By Sector
                 </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.65rem" }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "text.secondary",
+                    fontSize: "0.65rem",
+                  }}
+                >
                   Distribution by sector
                 </Typography>
               </Box>
@@ -441,7 +464,13 @@ const PieBarGraphDistributionIndex = () => {
 
             {courseBySectorData.length === 0 ? (
               <Box sx={{ textAlign: "center", py: 4 }}>
-                <Typography sx={{ color: "error.main", fontWeight: 600, fontSize: "0.8rem" }}>
+                <Typography
+                  sx={{
+                    color: "error.main",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                  }}
+                >
                   No data available
                 </Typography>
               </Box>
@@ -458,7 +487,9 @@ const PieBarGraphDistributionIndex = () => {
                         cy="50%"
                         outerRadius={65}
                         innerRadius={25}
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        label={({ percent }) =>
+                          `${(percent * 100).toFixed(0)}%`
+                        }
                         labelLine={{ stroke: "#ccc", strokeWidth: 0.5 }}
                         animationBegin={300}
                         animationDuration={800}
@@ -468,9 +499,16 @@ const PieBarGraphDistributionIndex = () => {
                           <Cell
                             key={`cell-${index}`}
                             fill={getSectorColor(index)}
-                            style={{ cursor: "pointer", transition: "transform 0.3s ease" }}
-                            onMouseEnter={(e) => { e.target.style.transform = "scale(1.03)"; }}
-                            onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }}
+                            style={{
+                              cursor: "pointer",
+                              transition: "transform 0.3s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.transform = "scale(1.03)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.transform = "scale(1)";
+                            }}
                           />
                         ))}
                       </Pie>
@@ -481,14 +519,20 @@ const PieBarGraphDistributionIndex = () => {
                           fontSize: "0.7rem",
                           padding: "4px 8px",
                         }}
-                        formatter={(value, name) => [`${value} Program(s)`, name]}
+                        formatter={(value, name) => [
+                          `${value} Program(s)`,
+                          name,
+                        ]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
                 </Box>
                 <Box sx={{ width: "45%", maxHeight: 200, overflowY: "auto" }}>
                   {courseBySectorData.slice(0, 8).map((item, index) => {
-                    const percentage = ((item.value / totalPrograms) * 100).toFixed(1);
+                    const percentage = (
+                      (item.value / totalPrograms) *
+                      100
+                    ).toFixed(1);
                     return (
                       <Box
                         key={index}
@@ -523,11 +567,26 @@ const PieBarGraphDistributionIndex = () => {
                         >
                           {item.name}
                         </Typography>
-                        <Stack direction="column" alignItems="flex-end" spacing={0}>
-                          <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: getSectorColor(index) }}>
+                        <Stack
+                          direction="column"
+                          alignItems="flex-end"
+                          spacing={0}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              color: getSectorColor(index),
+                            }}
+                          >
                             {item.value}
                           </Typography>
-                          <Typography sx={{ fontSize: "0.55rem", color: "#888" }}>
+                          <Typography
+                            sx={{
+                              fontSize: "0.55rem",
+                              color: "#888",
+                            }}
+                          >
                             ({percentage}%)
                           </Typography>
                         </Stack>
@@ -535,7 +594,14 @@ const PieBarGraphDistributionIndex = () => {
                     );
                   })}
                   <Box sx={{ mt: 1, pt: 0.5, borderTop: "1px solid #e0e8f0" }}>
-                    <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: P, textAlign: "right" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "0.65rem",
+                        fontWeight: 700,
+                        color: P,
+                        textAlign: "right",
+                      }}
+                    >
                       Total: {totalPrograms}
                     </Typography>
                   </Box>
@@ -564,7 +630,12 @@ const PieBarGraphDistributionIndex = () => {
           }}
         >
           <CardContent sx={{ p: 1.5 }}>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              sx={{ mb: 1.5 }}
+            >
               <Box
                 sx={{
                   width: 28,
@@ -593,7 +664,13 @@ const PieBarGraphDistributionIndex = () => {
                 >
                   Institute By Dzongkhag
                 </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.65rem" }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "text.secondary",
+                    fontSize: "0.65rem",
+                  }}
+                >
                   Across 20 Dzongkhags
                 </Typography>
               </Box>
@@ -604,7 +681,13 @@ const PieBarGraphDistributionIndex = () => {
             ) : dzongkhagInstituteData.length === 0 ||
               dzongkhagInstituteData.every((item) => item.value === 0) ? (
               <Box sx={{ textAlign: "center", py: 4 }}>
-                <Typography sx={{ color: "error.main", fontWeight: 600, fontSize: "0.8rem" }}>
+                <Typography
+                  sx={{
+                    color: "error.main",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                  }}
+                >
                   No data available
                 </Typography>
               </Box>
@@ -618,19 +701,28 @@ const PieBarGraphDistributionIndex = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#edf2f9" />
                     <XAxis
                       dataKey="name"
-                      tick={{ fontSize: 9, fill: "#555" }}
+                      tick={{
+                        fontSize: 9,
+                        fill: "#555",
+                      }}
                       angle={-40}
                       textAnchor="end"
                       interval={0}
                       height={55}
                     />
                     <YAxis
-                      tick={{ fontSize: 9, fill: "#666" }}
+                      tick={{
+                        fontSize: 9,
+                        fill: "#666",
+                      }}
                       label={{
                         value: "Institutes",
                         angle: -90,
                         position: "insideLeft",
-                        style: { fontSize: "9px", fill: "#666" },
+                        style: {
+                          fontSize: "9px",
+                          fill: "#666",
+                        },
                       }}
                     />
                     <RTooltip
@@ -656,7 +748,10 @@ const PieBarGraphDistributionIndex = () => {
                           key={`cell-${index}`}
                           fill={getDzongkhagBarColor(entry.value, index)}
                           opacity={entry.value > 0 ? 1 : 0.5}
-                          style={{ cursor: "pointer", transition: "all 0.3s ease" }}
+                          style={{
+                            cursor: "pointer",
+                            transition: "all 0.3s ease",
+                          }}
                           onMouseEnter={(e) => {
                             if (e.target) {
                               e.target.style.opacity = "0.8";
@@ -665,7 +760,8 @@ const PieBarGraphDistributionIndex = () => {
                           }}
                           onMouseLeave={(e) => {
                             if (e.target) {
-                              e.target.style.opacity = entry.value > 0 ? 1 : 0.5;
+                              e.target.style.opacity =
+                                entry.value > 0 ? 1 : 0.5;
                               e.target.style.animation = "none";
                             }
                           }}
@@ -675,10 +771,25 @@ const PieBarGraphDistributionIndex = () => {
                   </BarChart>
                 </ResponsiveContainer>
                 <Box sx={{ mt: 1, textAlign: "center" }}>
-                  <Typography variant="caption" sx={{ color: "#666", fontSize: "0.7rem" }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "#666",
+                      fontSize: "0.7rem",
+                    }}
+                  >
                     Total Institutes:{" "}
-                    <Box component="span" sx={{ fontWeight: "bold", color: TEAL }}>
-                      {dzongkhagInstituteData.reduce((sum, d) => sum + d.value, 0)}
+                    <Box
+                      component="span"
+                      sx={{
+                        fontWeight: "bold",
+                        color: TEAL,
+                      }}
+                    >
+                      {dzongkhagInstituteData.reduce(
+                        (sum, d) => sum + d.value,
+                        0,
+                      )}
                     </Box>
                   </Typography>
                 </Box>

@@ -1,7 +1,6 @@
 import apiClient from "../../../axios";
 
 class CommonService {
-  
   getAllDzongkhags() {
     return apiClient
       .get("/api/v1/common/get-dzongkhags")
@@ -71,6 +70,13 @@ class CommonService {
       .catch((error) => error);
   }
 
+  getAllCertificateLevels() {
+    return apiClient
+      .get("/api/v1/common/get-all-certificate-levels")
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getServiceNameCourseAnnouncement() {
     return apiClient
       .get("/api/v1/common/get-service-announcement")
@@ -93,11 +99,9 @@ class CommonService {
       .catch((error) => error);
   }
 
-   getInstituteNameByInstituteId(instituteId) {
+  getInstituteNameByInstituteId(instituteId) {
     return apiClient
-      .get(
-        `/api/v1/common/get-institute-name/${instituteId}`,
-      )
+      .get(`/api/v1/common/get-institute-name/${instituteId}`)
       .then((response) => response)
       .catch((error) => error);
   }

@@ -23,11 +23,14 @@ import {
   CircularProgress,
   Alert,
   FormHelperText,
+  Chip,
+  Tooltip,
 } from "@mui/material";
 import { toast } from "react-toastify";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import CloseIcon from "@mui/icons-material/Close";
 import ReplayIcon from "@mui/icons-material/Replay";
+import LockIcon from "@mui/icons-material/Lock";
 import MonitoringAssessmentService from "../../../api/services/internal/monitoring/MonitoringAssessmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
@@ -58,7 +61,8 @@ const InstituteMonitoringIndex = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
-const currentRoleId = useSelector((state) => state.auth.current_roleId);
+  const currentRoleId = useSelector((state) => state.auth.current_roleId);
+  
   // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -75,18 +79,18 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
   // Quality checklist state
   const [qualityResponses, setQualityResponses] = useState({});
   const [qualityRemarks, setQualityRemarks] = useState({});
-  const [instituteMonitoringDetails, setInstituteMonitoringDetails] = useState(
-    [],
-  );
+  const [instituteMonitoringDetails, setInstituteMonitoringDetails] = useState([]);
   const [dzongkhagList, setDzongkhagList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [qualityData, setQualityData] = useState([]);
   const [qualityStandardsLoading, setQualityStandardsLoading] = useState(false);
   const [qualityStandardsError, setQualityStandardsError] = useState(null);
+  const [statusList, setStatusList] = useState([]);
 
   useEffect(() => {
     fetchInstituteMonitoringAssessment();
     fetchDzongkhagLists();
+    fetchStatusList();
   }, []);
 
   // Effect to parse checklists when quality data is loaded
@@ -112,6 +116,16 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
     } catch (error) {
       console.error("Error fetching dzongkhag dropdown:", error);
       toast.error("Failed to load dzongkhags");
+    }
+  };
+
+  const fetchStatusList = async () => {
+    try {
+      const statusResponse = await CommonService.getByParentId(4);
+      setStatusList(statusResponse.data);
+      console.log("Status List:", statusResponse.data);
+    } catch (error) {
+      console.error("Error fetching status list:", error);
     }
   };
 
@@ -281,9 +295,6 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
             remarks[defaultCategoryId][item.standardId] = item.remarks || "";
           }
         });
-
-        console.log("Mapped responses:", responses);
-        console.log("Mapped remarks:", remarks);
         return { responses, remarks };
       } catch (error) {
         console.error("Error parsing checklist data:", error);
@@ -304,6 +315,48 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
     [dzongkhagList],
   );
 
+  // Get status name from ID
+  const getStatusName = useCallback(
+    (statusId) => {
+      if (!statusId) return "N/A";
+      const status = statusList.find((s) => s.id === parseInt(statusId));
+      return status ? status.name : statusId;
+    },
+    [statusList],
+  );
+
+  // Get status color for Chip
+  const getStatusColor = useCallback(
+    (statusId) => {
+      const statusName = getStatusName(statusId);
+      const statusColors = {
+        'submitted': 'info',
+        'Verified': 'primary',
+        'Approved': 'success',
+        'Rejected': 'error',
+        'Endorsed': 'warning',
+        'Forwarded QAS Level 1': 'secondary',
+        'Forwarded Level 2': 'secondary',
+        'verified2': 'primary',
+        'pending': 'warning',
+        'selected': 'success',
+        'passed': 'success',
+        'failed': 'error',
+        'resumitted': 'info',
+        'Forwarded TTTRC': 'secondary',
+        'Forwarded Head TTTRC': 'secondary',
+        'Revision': 'warning'
+      };
+      return statusColors[statusName] || 'default';
+    },
+    [getStatusName]
+  );
+
+  // Check if status is Approved (status_id = 57)
+  const isStatusApproved = useCallback((statusId) => {
+    return parseInt(statusId) === 57;
+  }, []);
+
   // Handle view checklist - Load data from API
   const handleViewChecklist = async (institute) => {
     setSelectedInstitute(institute);
@@ -312,13 +365,12 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
     // Reset previous data
     setQualityResponses({});
     setQualityRemarks({});
-    setDescription(institute.description || ""); // Set description if exists
+    setDescription(institute.description || "");
     setDescriptionError("");
 
     // Fetch quality standards using the service_id from the institute data
     if (institute.service_id) {
       await fetchQualityStandards(institute.service_id);
-      // The useEffect will handle parsing the checklists after qualityData is set
     } else {
       toast.error("Service ID not found for this institute");
       setQualityData([]);
@@ -335,6 +387,11 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
 
   // Handle quality response change
   const handleQualityResponseChange = (categoryId, questionId, value) => {
+    // Don't allow changes if status is Approved
+    if (selectedInstitute && isStatusApproved(selectedInstitute.status_id)) {
+      return;
+    }
+    
     setQualityResponses((prev) => {
       const newResponses = { ...prev };
 
@@ -356,6 +413,11 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
   };
 
   const handleQualityRemarkChange = (categoryId, questionId, value) => {
+    // Don't allow changes if status is Approved
+    if (selectedInstitute && isStatusApproved(selectedInstitute.status_id)) {
+      return;
+    }
+    
     setQualityRemarks((prev) => ({
       ...prev,
       [categoryId]: {
@@ -462,6 +524,12 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
 
   // Handle resubmit checklist
   const handleResubmit = async () => {
+    // Check if status is Approved (57)
+    if (isStatusApproved(selectedInstitute?.status_id)) {
+      toast.error("This checklist is approved and cannot be modified");
+      return;
+    }
+
     // Validate description before submission
     if (!description || description.trim() === "") {
       setDescriptionError("Description / Remarks is required");
@@ -487,15 +555,13 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
         monitoringDate: selectedInstitute?.monitoring_date,
         dzongkhagId: parseInt(selectedInstitute?.dzongkhag_id),
         exactLocation: selectedInstitute?.exact_location,
-        //service_id: parseInt(selectedInstitute?.service_id),
         serviceId: 47,
         applicationNo: selectedInstitute?.application_no,
         qualityStandards: qualityStandardsData,
         statusId: selectedInstitute?.status_id,
-        //statusId: 55,
         description: description.trim(),
         actionId: actionId,
-        assignedRoleId:currentRoleId
+        assignedRoleId: currentRoleId,
       };
 
       console.log("Resubmit Payload:", payload);
@@ -539,6 +605,7 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
     (standard) => {
       const categoryResponses = qualityResponses[standard.id] || {};
       const categoryRemarks = qualityRemarks[standard.id] || {};
+      const isApproved = selectedInstitute && isStatusApproved(selectedInstitute.status_id);
 
       return (
         <Grid item size={{ xs: 12, md: 12 }} key={standard.id}>
@@ -606,6 +673,7 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
                               },
                             }}
                             checked={isYes}
+                            disabled={isApproved}
                             onChange={() => {
                               const newValue = isYes ? undefined : "Y";
                               handleQualityResponseChange(
@@ -626,6 +694,7 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
                               },
                             }}
                             checked={isNo}
+                            disabled={isApproved}
                             onChange={() => {
                               const newValue = isNo ? undefined : "N";
                               handleQualityResponseChange(
@@ -642,6 +711,7 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
                             size="small"
                             placeholder="Remarks"
                             value={remark}
+                            disabled={isApproved}
                             onChange={(e) =>
                               handleQualityRemarkChange(
                                 standard.id,
@@ -674,7 +744,7 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
         </Grid>
       );
     },
-    [qualityResponses, qualityRemarks],
+    [qualityResponses, qualityRemarks, selectedInstitute, isStatusApproved],
   );
 
   // Paginated institutes
@@ -718,7 +788,6 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
             <TableHead>
               <TableRow
                 sx={{
-                  background: "#f5f5f5",
                   "& .MuiTableCell-root": {
                     fontWeight: "bold",
                   },
@@ -730,48 +799,78 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
                 <TableCell>Institute Name</TableCell>
                 <TableCell>Dzongkhag</TableCell>
                 <TableCell>Monitoring Date</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell align="center">View Checklist</TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
               {paginatedInstitutes.length > 0 ? (
-                paginatedInstitutes.map((institute, index) => (
-                  <TableRow key={institute.id} hover>
-                    <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="medium">
-                        {institute.application_no}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{institute.registration_no}</TableCell>
-                    <TableCell>{institute.institute_name}</TableCell>
-                    <TableCell>
-                      {getDzongkhagName(institute.dzongkhag_id)}
-                    </TableCell>
-                    <TableCell>{institute.monitoring_date}</TableCell>
-                    <TableCell align="center">
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => handleViewChecklist(institute)}
-                        sx={{
-                          textTransform: "none",
-                          backgroundColor: "#1976d2",
-                          "&:hover": {
-                            backgroundColor: "#1565c0",
-                          },
-                        }}
-                      >
-                        View Checklist
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                paginatedInstitutes.map((institute, index) => {
+                  const isApproved = isStatusApproved(institute.status_id);
+                  
+                  return (
+                    <TableRow key={institute.id} hover>
+                      <TableCell>{page * rowsPerPage + index + 1}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {institute.application_no}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{institute.registration_no}</TableCell>
+                      <TableCell>{institute.institute_name}</TableCell>
+                      <TableCell>
+                        {getDzongkhagName(institute.dzongkhag_id)}
+                      </TableCell>
+                      <TableCell>{institute.monitoring_date}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={getStatusName(institute.status_id)}
+                          color={getStatusColor(institute.status_id)}
+                          size="small"
+                          variant={isApproved ? "filled" : "outlined"}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip
+                          title={
+                            isApproved
+                              ? "This checklist is approved - View only"
+                              : "View and edit checklist"
+                          }
+                          placement="top"
+                        >
+                          <span>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              startIcon={
+                                isApproved ? <LockIcon /> : <VisibilityIcon />
+                              }
+                              onClick={() => handleViewChecklist(institute)}
+                              sx={{
+                                textTransform: "none",
+                                backgroundColor: isApproved ? "#9e9e9e" : "#1976d2",
+                                "&:hover": {
+                                  backgroundColor: isApproved ? "#9e9e9e" : "#1565c0",
+                                },
+                                "&.Mui-disabled": {
+                                  backgroundColor: "#e0e0e0",
+                                  color: "#9e9e9e",
+                                },
+                              }}
+                            >
+                              {isApproved ? "View Only" : "View Checklist"}
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                     No institutes found
                   </TableCell>
                 </TableRow>
@@ -840,6 +939,11 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
               {getDzongkhagName(selectedInstitute?.dzongkhag_id)} | Monitoring
               Date: {selectedInstitute?.monitoring_date}
             </Typography>
+            {selectedInstitute && isStatusApproved(selectedInstitute.status_id) && (
+              <Alert severity="info" icon={<LockIcon />} sx={{ mt: 1 }}>
+                <strong>Approved Status:</strong> This checklist is approved and is in <strong>View-Only</strong> mode. No modifications are allowed.
+              </Alert>
+            )}
           </Box>
 
           {qualityStandardsLoading ? (
@@ -866,14 +970,20 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
                 <Typography variant="caption" color="text.secondary">
                   {getProgressText()}
                 </Typography>
-                {!isAllQuestionsAnswered && (
+                {selectedInstitute && isStatusApproved(selectedInstitute.status_id) && (
+                  <Typography variant="caption" color="info.main">
+                    <LockIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
+                    View Only Mode
+                  </Typography>
+                )}
+                {!isAllQuestionsAnswered && !isStatusApproved(selectedInstitute?.status_id) && (
                   <Typography variant="caption" color="error">
                     * Please answer all questions
                   </Typography>
                 )}
-                {isAllQuestionsAnswered && (
+                {isAllQuestionsAnswered && !isStatusApproved(selectedInstitute?.status_id) && (
                   <Typography variant="caption" color="success.main">
-                    ✓ All questions must be answered yes
+                    ✓ All questions answered
                   </Typography>
                 )}
               </Box>
@@ -884,7 +994,10 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
               {/* Description Field - Below Quality Standards Table */}
               <Box sx={{ mt: 3 }}>
                 <Typography variant="subtitle1" gutterBottom>
-                  Description / Remarks <span style={{ color: "red" }}>*</span>
+                  Description / Remarks 
+                  {!isStatusApproved(selectedInstitute?.status_id) && (
+                    <span style={{ color: "red" }}>*</span>
+                  )}
                 </Typography>
                 <TextField
                   fullWidth
@@ -897,6 +1010,7 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
                   size="medium"
                   error={!!descriptionError}
                   helperText={descriptionError}
+                  disabled={selectedInstitute && isStatusApproved(selectedInstitute.status_id)}
                   sx={{
                     "& .MuiInputBase-root": {
                       fontSize: "0.875rem",
@@ -920,27 +1034,42 @@ const currentRoleId = useSelector((state) => state.auth.current_roleId);
             variant="outlined"
             disabled={submitting}
           >
-            Cancel
+            Close
           </Button>
-          <Button
-            onClick={handleResubmit}
-            variant="contained"
-            color="primary"
-            startIcon={
-              submitting ? <CircularProgress size={20} /> : <ReplayIcon />
-            }
-            disabled={submitting || !isFormValid}
-            sx={{
-              backgroundColor: "#ff9800",
-              "&:hover": { backgroundColor: "#f57c00" },
-              "&.Mui-disabled": {
-                backgroundColor: "#ffb74d",
-                opacity: 0.7,
-              },
-            }}
-          >
-            {submitting ? "Resubmitting..." : "Resubmit"}
-          </Button>
+          
+          {/* Only show Resubmit button if status is NOT Approved */}
+          {selectedInstitute && !isStatusApproved(selectedInstitute.status_id) && (
+            <Tooltip
+              title={
+                !isFormValid
+                  ? "Please answer all questions and fill in the description"
+                  : "Resubmit the checklist"
+              }
+              placement="top"
+            >
+              <span>
+                <Button
+                  onClick={handleResubmit}
+                  variant="contained"
+                  color="primary"
+                  startIcon={
+                    submitting ? <CircularProgress size={20} /> : <ReplayIcon />
+                  }
+                  disabled={submitting || !isFormValid}
+                  sx={{
+                    backgroundColor: "#ff9800",
+                    "&:hover": { backgroundColor: "#f57c00" },
+                    "&.Mui-disabled": {
+                      backgroundColor: "#ffb74d",
+                      opacity: 0.7,
+                    },
+                  }}
+                >
+                  {submitting ? "Resubmitting..." : "Resubmit"}
+                </Button>
+              </span>
+            </Tooltip>
+          )}
         </DialogActions>
       </Dialog>
     </>

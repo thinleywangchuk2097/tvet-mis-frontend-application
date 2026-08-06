@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import {
   Box,
   Button,
@@ -68,7 +74,9 @@ const TS = {
     color: "#0a2d6e",
     whiteSpace: "nowrap",
   },
-  "& td": { fontSize: "0.8rem" },
+  "& td": {
+    fontSize: "0.8rem",
+  },
   "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
   "& tbody tr": {
     animation: `${fadeInUp} 0.4s ease-out`,
@@ -87,8 +95,8 @@ const textFieldStyle = {
 
 // ── OPTIMIZED MOVING BANNER COMPONENT ──
 const MovingAnnouncementBanner = ({ announcements, navigate }) => {
-  // ✅ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURN
-  
+  //  ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURN
+
   // 1. All useRef hooks
   const containerRef = useRef(null);
   const contentRef = useRef(null);
@@ -134,7 +142,7 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
   useEffect(() => {
     const container = containerRef.current;
     const content = contentRef.current;
-    
+
     if (!container || !content || announcements.length === 0) return;
 
     // Check if content needs to scroll
@@ -142,7 +150,7 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
     const containerWidth = container.clientWidth;
 
     if (contentWidth <= containerWidth) {
-      content.style.transform = 'translateX(0)';
+      content.style.transform = "translateX(0)";
       return;
     }
 
@@ -182,8 +190,8 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
       startTimeRef.current = null;
     };
 
-    container.addEventListener('mouseenter', handleMouseEnter);
-    container.addEventListener('mouseleave', handleMouseLeave);
+    container.addEventListener("mouseenter", handleMouseEnter);
+    container.addEventListener("mouseleave", handleMouseLeave);
 
     animationRef.current = requestAnimationFrame(animate);
 
@@ -191,12 +199,12 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
-      container.removeEventListener('mouseenter', handleMouseEnter);
-      container.removeEventListener('mouseleave', handleMouseLeave);
+      container.removeEventListener("mouseenter", handleMouseEnter);
+      container.removeEventListener("mouseleave", handleMouseLeave);
     };
   }, [announcements]);
 
-  // 5. ✅ CONDITIONAL RETURN AFTER ALL HOOKS
+  // 5.  CONDITIONAL RETURN AFTER ALL HOOKS
   if (announcements.length === 0) return null;
 
   // 6. Render
@@ -304,7 +312,10 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
             {/* Institute */}
             <Box
               component="span"
-              sx={{ opacity: 0.8, fontSize: "0.85rem" }}
+              sx={{
+                opacity: 0.8,
+                fontSize: "0.85rem",
+              }}
             >
               @{" "}
               {announcement.instituteName.length > 20
@@ -324,7 +335,12 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
               <Box component="span" sx={{ fontSize: "0.9rem" }}>
                 📅
               </Box>
-              <Box component="span" sx={{ fontSize: "0.85rem" }}>
+              <Box
+                component="span"
+                sx={{
+                  fontSize: "0.85rem",
+                }}
+              >
                 {announcement.startDate} - {announcement.endDate}
               </Box>
             </Box>
@@ -408,7 +424,9 @@ const CourseTraineeAnnouncementsIndex = () => {
   const [searchText, setSearchText] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [courseDateFilter, setCourseDateFilter] = useState("");
-  const [courseAnnouncementDetails, setCourseAnnouncementDetails] = useState([]);
+  const [courseAnnouncementDetails, setCourseAnnouncementDetails] = useState(
+    [],
+  );
 
   // Dropdown states
   const [certificationLevels, setCertificationLevels] = useState([]);
@@ -424,6 +442,7 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchCourseAnnouncementDetails = async () => {
     try {
       const response = await CommonService.getAllCourseAnnouncement();
+      console.log("CourseAnnouncementDetails", response.data);
       setCourseAnnouncementDetails(response.data);
     } catch (error) {
       console.error("Error fetching course announcements:", error);
@@ -432,7 +451,7 @@ const CourseTraineeAnnouncementsIndex = () => {
 
   const fetchDropdownData = async () => {
     try {
-      const levelsResponse = await CommonService.getByParentId(10);
+      const levelsResponse = await CommonService.getAllCertificateLevels();
       setCertificationLevels(levelsResponse.data);
 
       const fundingResponse = await CommonService.getByParentId(16);
@@ -481,7 +500,7 @@ const CourseTraineeAnnouncementsIndex = () => {
   // Memoized helper functions with Map for O(1) lookups
   const getCertificationLevelName = useMemo(() => {
     const levelMap = new Map();
-    certificationLevels.forEach(level => {
+    certificationLevels.forEach((level) => {
       levelMap.set(parseInt(level.id), level.name);
     });
     return (levelId) => {
@@ -492,7 +511,7 @@ const CourseTraineeAnnouncementsIndex = () => {
 
   const getFundingSourceName = useMemo(() => {
     const sourceMap = new Map();
-    fundingSources.forEach(source => {
+    fundingSources.forEach((source) => {
       sourceMap.set(parseInt(source.id), source.name);
     });
     return (sourceId) => {
@@ -503,7 +522,7 @@ const CourseTraineeAnnouncementsIndex = () => {
 
   const getDzongkhagName = useMemo(() => {
     const dzongMap = new Map();
-    dzongkhags.forEach(dzong => {
+    dzongkhags.forEach((dzong) => {
       dzongMap.set(parseInt(dzong.id), dzong.dzonkhagName);
     });
     return (locationId) => {
@@ -549,9 +568,9 @@ const CourseTraineeAnnouncementsIndex = () => {
   return (
     <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
       {/* Moving Announcements Banner - OPTIMIZED */}
-      <MovingAnnouncementBanner 
-        announcements={movingAnnouncements} 
-        navigate={navigate} 
+      <MovingAnnouncementBanner
+        announcements={movingAnnouncements}
+        navigate={navigate}
       />
 
       {/* Header Section with Animation */}
@@ -740,11 +759,11 @@ const CourseTraineeAnnouncementsIndex = () => {
               <TableCell>Training Location</TableCell>
               <TableCell>Certification Level</TableCell>
               <TableCell>Funding Source</TableCell>
-              <TableCell>Course Fee</TableCell>
+              <TableCell>Fees Per Trainee</TableCell>
               <TableCell>Application Period</TableCell>
               <TableCell>Course Period</TableCell>
               <TableCell>Entry Requirement</TableCell>
-              <TableCell>Capacity</TableCell>
+              <TableCell>Enrollment Capacity</TableCell>
               <TableCell>Total Applied</TableCell>
               <TableCell>Action</TableCell>
             </TableRow>
@@ -810,7 +829,7 @@ const CourseTraineeAnnouncementsIndex = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      Nu. {app.course_fee?.toLocaleString()}
+                      Nu. {app.fees_per_trainee?.toLocaleString()}
                     </TableCell>
                     <TableCell sx={{ fontSize: "0.75rem" }}>
                       {app.application_start_date && app.application_end_date
@@ -839,12 +858,10 @@ const CourseTraineeAnnouncementsIndex = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Typography sx={{ fontWeight: 700, color: "#1565c0" }}>
-                        {app.total_no_trainees}
+                        {app.enrollment_capacity}
                       </Typography>
                     </TableCell>
-                    <TableCell>
-                      {app.total_applied}
-                    </TableCell>
+                    <TableCell>{app.total_applied}</TableCell>
                     <TableCell>
                       <Chip
                         icon={<ArrowUpwardIcon fontSize="small" />}

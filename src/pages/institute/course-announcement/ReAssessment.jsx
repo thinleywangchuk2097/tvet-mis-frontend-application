@@ -36,6 +36,13 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
+
 // Helper function to convert file to base64
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
@@ -97,7 +104,7 @@ const ReAssessment = () => {
 
   const fetchDropdownData = async () => {
     try {
-      const levelsResponse = await CommonService.getByParentId(10);
+      const levelsResponse = await CommonService.getByParentId(27);
       setCertificationLevels(levelsResponse.data);
 
       const fundingResponse = await CommonService.getByParentId(16);
@@ -169,7 +176,7 @@ const ReAssessment = () => {
       setCourses([]);
       return;
     }
-    
+
     try {
       const response =
         await CourseEnrollmentService.getCourseDetailsAnnouncementByUserId(
@@ -178,7 +185,12 @@ const ReAssessment = () => {
           access_token,
         );
       setCourses(response.data);
-      console.log("Enrolled Courses for type", reassessmentTypeId, ":", response.data);
+      console.log(
+        "Enrolled Courses for type",
+        reassessmentTypeId,
+        ":",
+        response.data,
+      );
     } catch (error) {
       console.error("Error fetching courses:", error);
       setCourses([]);
@@ -232,7 +244,9 @@ const ReAssessment = () => {
 
   const handleViewDetails = (applicationNo, courseId) => {
     // Navigate with both applicationNo and courseId as route parameters
-    navigate(`/announcement/reassessment-trainee-selection/${applicationNo}/${courseId}`);
+    navigate(
+      `/announcement/reassessment-trainee-selection/${applicationNo}/${courseId}`,
+    );
   };
 
   const getReassessmentTypeName = (serviceId) => {
@@ -243,9 +257,9 @@ const ReAssessment = () => {
 
   const getCourseName = (courseId, serviceId) => {
     if (!courseId) return "N/A";
-    
+
     let course = null;
-    
+
     if (serviceId === "41" || serviceId === 41) {
       course = rplCourses.find((c) => String(c.id) === String(courseId));
     } else if (serviceId === "42" || serviceId === 42) {
@@ -254,22 +268,22 @@ const ReAssessment = () => {
       course = approvedCourses.find((c) => String(c.id) === String(courseId));
       if (!course) {
         const originalCourse = courses.find(
-          (c) => String(c.course_id) === String(courseId)
+          (c) => String(c.course_id) === String(courseId),
         );
         return originalCourse ? originalCourse.course_name : courseId;
       }
     }
-    
+
     return course ? course.name : courseId;
   };
 
   const filteredCourses = courses.filter((course) => {
     const courseName = getCourseName(course.course_id, course.service_id);
-    
+
     const matchesSearch =
       courseName?.toLowerCase().includes(search.toLowerCase()) ||
       course.application_no?.toLowerCase().includes(search.toLowerCase());
-    
+
     return matchesSearch;
   });
 
@@ -277,8 +291,8 @@ const ReAssessment = () => {
     instituteId: institute.institute_id || "",
     reassessmentTypeId: "",
     courseId: "",
-    courseFee: "",
-    totalNoTrainees: "",
+    feesPerTrainee: "", // Changed from courseFee
+    enrollmentCapacity: "", // Changed from totalNoTrainees
     courseStartDate: "",
     courseEndDate: "",
     certificationLevelId: "",
@@ -291,10 +305,10 @@ const ReAssessment = () => {
   const validationSchema = Yup.object().shape({
     reassessmentTypeId: Yup.string().required("Reassessment Type is required"),
     courseId: Yup.string().required("Course Name is required"),
-    courseFee: Yup.number()
+    feesPerTrainee: Yup.number() // Changed from courseFee
       .typeError("Must be a number")
       .required("Course Fee is required"),
-    totalNoTrainees: Yup.number()
+    enrollmentCapacity: Yup.number() // Changed from totalNoTrainees
       .typeError("Must be a number")
       .required("Total number of trainees required"),
     courseStartDate: Yup.date()
@@ -329,8 +343,8 @@ const ReAssessment = () => {
         instituteId: values.instituteId,
         serviceId: values.reassessmentTypeId,
         courseId: values.courseId,
-        courseFee: values.courseFee,
-        totalNoTrainees: values.totalNoTrainees,
+        feesPerTrainee: values.feesPerTrainee, // Changed from courseFee
+        enrollmentCapacity: values.enrollmentCapacity, // Changed from totalNoTrainees
         courseStartDate: values.courseStartDate,
         courseEndDate: values.courseEndDate,
         certificationLevelId: values.certificationLevelId,
@@ -455,7 +469,7 @@ const ReAssessment = () => {
             </Select>
           </FormControl>
         </Grid>
-        
+
         {filterReassessmentType && (
           <Grid item size={{ xs: 12, md: 3 }}>
             <TextField
@@ -475,7 +489,7 @@ const ReAssessment = () => {
             />
           </Grid>
         )}
-        
+
         <Grid item size={{ xs: 12, md: filterReassessmentType ? 2 : 2 }}>
           <Button
             variant="contained"
@@ -498,8 +512,8 @@ const ReAssessment = () => {
               <TableCell>Application No</TableCell>
               <TableCell>Reassessment Type</TableCell>
               <TableCell>Course</TableCell>
-              <TableCell>Course Fee</TableCell>
-              <TableCell>Total Trainees</TableCell>
+              <TableCell>Fees per Trainee (Nu.)</TableCell>
+              <TableCell>Enrollment Capacity</TableCell>
               <TableCell>Certification Level</TableCell>
               <TableCell>Funding Source</TableCell>
               <TableCell>Course Period</TableCell>
@@ -528,8 +542,17 @@ const ReAssessment = () => {
                     <TableCell>
                       {getCourseName(course.course_id, course.service_id)}
                     </TableCell>
-                    <TableCell>Nu. {course.course_fee}</TableCell>
-                    <TableCell>{course.total_no_trainees}</TableCell>
+                    <TableCell>
+                      Nu.{" "}
+                      {course.fees_per_trainee ||
+                        course.feesPerTrainee ||
+                        "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {course.enrollment_capacity ||
+                        course.enrollmentCapacity ||
+                        "N/A"}
+                    </TableCell>
                     <TableCell>
                       {getCertificationLevelName(course.certification_level_id)}
                     </TableCell>
@@ -564,7 +587,12 @@ const ReAssessment = () => {
                       <IconButton
                         color="primary"
                         size="small"
-                        onClick={() => handleViewDetails(course.application_no, course.course_id)}
+                        onClick={() =>
+                          handleViewDetails(
+                            course.application_no,
+                            course.course_id,
+                          )
+                        }
                         title="View Details"
                       >
                         <RemoveRedEyeIcon fontSize="small" />
@@ -618,7 +646,11 @@ const ReAssessment = () => {
                     <TextField
                       select
                       fullWidth
-                      label="Reassessment Type"
+                      label={
+                        <>
+                          Reassessment Type <RequiredStar />
+                        </>
+                      }
                       name="reassessmentTypeId"
                       size="small"
                       value={formik.values.reassessmentTypeId}
@@ -654,7 +686,11 @@ const ReAssessment = () => {
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth
-                      label="Course Name"
+                      label={
+                        <>
+                          Course Name <RequiredStar />
+                        </>
+                      }
                       name="courseId"
                       size="small"
                       select
@@ -682,23 +718,27 @@ const ReAssessment = () => {
                     </TextField>
                   </Grid>
 
-                  {/* Rest of the form fields remain the same */}
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth
-                      label="Course Fee"
-                      name="courseFee"
+                      label={
+                        <>
+                          Fees per Trainee (Nu.) <RequiredStar />
+                        </>
+                      }
+                      name="feesPerTrainee" // Changed from courseFee
                       size="small"
                       type="number"
-                      value={formik.values.courseFee}
+                      value={formik.values.feesPerTrainee} // Changed from courseFee
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       error={
-                        formik.touched.courseFee &&
-                        Boolean(formik.errors.courseFee)
+                        formik.touched.feesPerTrainee && // Changed from courseFee
+                        Boolean(formik.errors.feesPerTrainee) // Changed from courseFee
                       }
                       helperText={
-                        formik.touched.courseFee && formik.errors.courseFee
+                        formik.touched.feesPerTrainee &&
+                        formik.errors.feesPerTrainee // Changed from courseFee
                       }
                     />
                   </Grid>
@@ -707,7 +747,11 @@ const ReAssessment = () => {
                     <TextField
                       select
                       fullWidth
-                      label="Certification Level"
+                      label={
+                        <>
+                          Certification Level <RequiredStar />
+                        </>
+                      }
                       name="certificationLevelId"
                       size="small"
                       value={formik.values.certificationLevelId}
@@ -734,20 +778,24 @@ const ReAssessment = () => {
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth
-                      label="Total No of Trainees"
-                      name="totalNoTrainees"
+                      label={
+                        <>
+                          Enrollment Capacity per Batch <RequiredStar />
+                        </>
+                      }
+                      name="enrollmentCapacity" // Changed from totalNoTrainees
                       size="small"
                       type="number"
-                      value={formik.values.totalNoTrainees}
+                      value={formik.values.enrollmentCapacity} // Changed from totalNoTrainees
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       error={
-                        formik.touched.totalNoTrainees &&
-                        Boolean(formik.errors.totalNoTrainees)
+                        formik.touched.enrollmentCapacity && // Changed from totalNoTrainees
+                        Boolean(formik.errors.enrollmentCapacity) // Changed from totalNoTrainees
                       }
                       helperText={
-                        formik.touched.totalNoTrainees &&
-                        formik.errors.totalNoTrainees
+                        formik.touched.enrollmentCapacity &&
+                        formik.errors.enrollmentCapacity // Changed from totalNoTrainees
                       }
                     />
                   </Grid>
@@ -756,7 +804,11 @@ const ReAssessment = () => {
                     <TextField
                       type="date"
                       fullWidth
-                      label="Course Start Date"
+                      label={
+                        <>
+                          Course Start Date <RequiredStar />
+                        </>
+                      }
                       name="courseStartDate"
                       size="small"
                       value={formik.values.courseStartDate}
@@ -778,7 +830,11 @@ const ReAssessment = () => {
                     <TextField
                       type="date"
                       fullWidth
-                      label="Course End Date"
+                      label={
+                        <>
+                          Course End Date <RequiredStar />
+                        </>
+                      }
                       name="courseEndDate"
                       size="small"
                       value={formik.values.courseEndDate}
@@ -800,7 +856,11 @@ const ReAssessment = () => {
                     <TextField
                       select
                       fullWidth
-                      label="Funding Source"
+                      label={
+                        <>
+                          Funding Source <RequiredStar />
+                        </>
+                      }
                       name="fundingSourceId"
                       size="small"
                       value={formik.values.fundingSourceId}
@@ -828,7 +888,11 @@ const ReAssessment = () => {
                     <TextField
                       select
                       fullWidth
-                      label="Training Location (Dzongkhag)"
+                      label={
+                        <>
+                          Training Location (Dzongkhag) <RequiredStar />
+                        </>
+                      }
                       name="trainingLocationId"
                       size="small"
                       value={formik.values.trainingLocationId}
@@ -857,7 +921,11 @@ const ReAssessment = () => {
                       fullWidth
                       multiline
                       rows={3}
-                      label="Course Description"
+                      label={
+                        <>
+                          Course Description <RequiredStar />
+                        </>
+                      }
                       name="courseDescription"
                       size="small"
                       value={formik.values.courseDescription}

@@ -1,7 +1,16 @@
 import { useState } from "react";
 import {
-  Box, Grid, Typography, Link, Stack, IconButton,
-  Dialog, DialogTitle, DialogContent, DialogActions, Button,
+  Box,
+  Grid,
+  Typography,
+  Link,
+  Stack,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import FacebookIcon from "@mui/icons-material/Facebook";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
@@ -25,27 +34,35 @@ import AccessibilityNewIcon from "@mui/icons-material/AccessibilityNew";
 import govtLogo from "../../assets/logo/govt-logo-sm.png";
 
 // ── Brand palette ────────────────────────────────────────────────────────────
-const PD = "#0a1f4d";   // deep navy (footer base)
-const PDX = "#061538";   // darkest navy (bottom bar)
-const P = "#1565c0";   // primary blue
-const PL = "#42a5f5";   // light blue (accents)
-const TEAL = "#26c6da";   // accent teal
+const PD = "#0a1f4d"; // deep navy (footer base)
+const PDX = "#061538"; // darkest navy (bottom bar)
+const P = "#1565c0"; // primary blue
+const PL = "#42a5f5"; // light blue (accents)
+const TEAL = "#26c6da"; // accent teal
 const W = "#ffffff";
-const TXT = "#a8bdde";   // body text
-const TXT_D = "#7891b8";   // dim text
-const TXT_DD = "#4a6189";   // dimmest text
+const TXT = "#a8bdde"; // body text
+const TXT_D = "#7891b8"; // dim text
+const TXT_DD = "#4a6189"; // dimmest text
 
 // ── Section heading
 const FooterHeading = ({ children }) => (
   <Typography
     sx={{
-      fontWeight: 700, color: W, mb: 2.2, fontSize: "0.82rem",
-      letterSpacing: "0.08em", textTransform: "uppercase",
-      position: "relative", display: "inline-block",
+      fontWeight: 700,
+      color: W,
+      mb: 2.2,
+      fontSize: "0.82rem",
+      letterSpacing: "0.08em",
+      textTransform: "uppercase",
+      position: "relative",
+      display: "inline-block",
       "&::after": {
-        content: '""', position: "absolute",
-        left: 0, bottom: -6,
-        width: 32, height: 2.5,
+        content: '""',
+        position: "absolute",
+        left: 0,
+        bottom: -6,
+        width: 32,
+        height: 2.5,
         background: `linear-gradient(90deg, ${P}, ${TEAL})`,
         borderRadius: 1,
       },
@@ -59,17 +76,31 @@ const FooterHeading = ({ children }) => (
 const FooterLink = ({ children, href = "#" }) => (
   <Box
     sx={{
-      display: "flex", alignItems: "center", gap: 0.6, mb: 1,
-      cursor: "pointer", transition: "transform 0.2s",
+      display: "flex",
+      alignItems: "center",
+      gap: 0.6,
+      mb: 1,
+      cursor: "pointer",
+      transition: "transform 0.2s",
       "&:hover": { transform: "translateX(3px)" },
       "&:hover .chev": { color: TEAL },
       "&:hover .lk": { color: W },
     }}
   >
-    <KeyboardArrowRightIcon className="chev"
-      sx={{ fontSize: 14, color: TXT_DD, transition: "color 0.2s" }} />
-    <Link href={href} underline="none" className="lk"
-      sx={{ color: TXT, fontSize: "0.78rem", transition: "color 0.2s" }}>
+    <KeyboardArrowRightIcon
+      className="chev"
+      sx={{ fontSize: 14, color: TXT_DD, transition: "color 0.2s" }}
+    />
+    <Link
+      href={href}
+      underline="none"
+      className="lk"
+      sx={{
+        color: TXT,
+        fontSize: "0.78rem",
+        transition: "color 0.2s",
+      }}
+    >
       {children}
     </Link>
   </Box>
@@ -80,15 +111,28 @@ const ContactItem = ({ icon, text, color = P }) => (
   <Stack direction="row" spacing={1.2} alignItems="flex-start" sx={{ mb: 1.4 }}>
     <Box
       sx={{
-        width: 28, height: 28, borderRadius: 1.2, flexShrink: 0,
-        bgcolor: `${color}22`, border: `1px solid ${color}55`,
+        width: 28,
+        height: 28,
+        borderRadius: 1.2,
+        flexShrink: 0,
+        bgcolor: `${color}22`,
+        border: `1px solid ${color}55`,
         color: color,
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
       {icon}
     </Box>
-    <Typography sx={{ color: TXT, fontSize: "0.77rem", lineHeight: 1.6, pt: 0.3 }}>
+    <Typography
+      sx={{
+        color: TXT,
+        fontSize: "0.77rem",
+        lineHeight: 1.6,
+        pt: 0.3,
+      }}
+    >
       {text}
     </Typography>
   </Stack>
@@ -164,7 +208,7 @@ const LEGAL_CONTENT = {
       },
       {
         heading: "7. Limitation of Liability",
-        body: "The portal is provided on an \"as is\" and \"as available\" basis. While we strive for accuracy and availability, the Ministry does not warrant that the service will be uninterrupted or error-free and shall not be liable for any indirect, incidental, or consequential damages arising from use of the portal.",
+        body: 'The portal is provided on an "as is" and "as available" basis. While we strive for accuracy and availability, the Ministry does not warrant that the service will be uninterrupted or error-free and shall not be liable for any indirect, incidental, or consequential damages arising from use of the portal.',
       },
       {
         heading: "8. Suspension and Termination",
@@ -216,26 +260,55 @@ const LEGAL_CONTENT = {
 const LegalDialog = ({ open, onClose, content }) => {
   if (!content) return null;
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth scroll="paper"
-      PaperProps={{ sx: { borderRadius: 2.5, maxHeight: "85vh" } }}>
-      <DialogTitle sx={{
-        background: `linear-gradient(135deg, ${PD} 0%, ${P} 100%)`,
-        color: W, py: 2, px: 3,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      scroll="paper"
+      PaperProps={{ sx: { borderRadius: 2.5, maxHeight: "85vh" } }}
+    >
+      <DialogTitle
+        sx={{
+          background: `linear-gradient(135deg, ${PD} 0%, ${P} 100%)`,
+          color: W,
+          py: 2,
+          px: 3,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box sx={{
-            width: 36, height: 36, borderRadius: "50%",
-            bgcolor: "rgba(255,255,255,0.18)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              bgcolor: "rgba(255,255,255,0.18)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             {content.icon}
           </Box>
           <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.2 }}>
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: "1rem",
+                lineHeight: 1.2,
+              }}
+            >
               {content.title}
             </Typography>
-            <Typography sx={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.75)" }}>
+            <Typography
+              sx={{
+                fontSize: "0.7rem",
+                color: "rgba(255,255,255,0.75)",
+              }}
+            >
               TVET MIS · Ministry of Education and Skills Development
             </Typography>
           </Box>
@@ -245,41 +318,74 @@ const LegalDialog = ({ open, onClose, content }) => {
         </IconButton>
       </DialogTitle>
 
-      <DialogContent dividers sx={{ p: { xs: 2.5, md: 3.5 }, bgcolor: "#fafcff" }}>
-        <Typography sx={{
-          fontSize: "0.72rem", color: "text.secondary",
-          fontStyle: "italic", mb: 2.5
-        }}>
-          Last updated: {new Date().toLocaleDateString("en-GB",
-            { year: "numeric", month: "long", day: "numeric" })}
+      <DialogContent
+        dividers
+        sx={{ p: { xs: 2.5, md: 3.5 }, bgcolor: "#fafcff" }}
+      >
+        <Typography
+          sx={{
+            fontSize: "0.72rem",
+            color: "text.secondary",
+            fontStyle: "italic",
+            mb: 2.5,
+          }}
+        >
+          Last updated:{" "}
+          {new Date().toLocaleDateString("en-GB", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
         </Typography>
 
         {content.sections.map((sec, i) => (
           <Box key={i} sx={{ mb: 2.5 }}>
-            <Typography sx={{
-              fontWeight: 700, fontSize: "0.88rem",
-              color: "#0a1929", mb: 0.8,
-              borderLeft: `3px solid ${P}`, pl: 1.2,
-            }}>
+            <Typography
+              sx={{
+                fontWeight: 700,
+                fontSize: "0.88rem",
+                color: "#0a1929",
+                mb: 0.8,
+                borderLeft: `3px solid ${P}`,
+                pl: 1.2,
+              }}
+            >
               {sec.heading}
             </Typography>
-            <Typography sx={{
-              fontSize: "0.82rem", lineHeight: 1.75,
-              color: "text.secondary", textAlign: "justify",
-            }}>
+            <Typography
+              sx={{
+                fontSize: "0.82rem",
+                lineHeight: 1.75,
+                color: "text.secondary",
+                textAlign: "justify",
+              }}
+            >
               {sec.body}
             </Typography>
           </Box>
         ))}
 
-        <Box sx={{
-          mt: 3, p: 2, borderRadius: 2,
-          bgcolor: "#e8f1fb",
-          border: "1px solid #c8d8ee",
-        }}>
-          <Typography sx={{ fontSize: "0.78rem", color: "#0a2d6e", fontWeight: 600 }}>
+        <Box
+          sx={{
+            mt: 3,
+            p: 2,
+            borderRadius: 2,
+            bgcolor: "#e8f1fb",
+            border: "1px solid #c8d8ee",
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: "0.78rem",
+              color: "#0a2d6e",
+              fontWeight: 600,
+            }}
+          >
             Questions or concerns? Contact us at{" "}
-            <Link href="mailto:tvet@moesc.gov.bt" sx={{ color: P, fontWeight: 700 }}>
+            <Link
+              href="mailto:tvet@moesc.gov.bt"
+              sx={{ color: P, fontWeight: 700 }}
+            >
               tvet@moesc.gov.bt
             </Link>{" "}
             or call +975-2-334155.
@@ -288,12 +394,18 @@ const LegalDialog = ({ open, onClose, content }) => {
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 1.5, bgcolor: "#f2f5fa" }}>
-        <Button onClick={onClose} variant="contained"
+        <Button
+          onClick={onClose}
+          variant="contained"
           sx={{
-            bgcolor: P, textTransform: "none", fontWeight: 700,
-            borderRadius: 1.5, px: 3,
+            bgcolor: P,
+            textTransform: "none",
+            fontWeight: 700,
+            borderRadius: 1.5,
+            px: 3,
             "&:hover": { bgcolor: "#0d47a1" },
-          }}>
+          }}
+        >
           Close
         </Button>
       </DialogActions>
@@ -303,72 +415,146 @@ const LegalDialog = ({ open, onClose, content }) => {
 
 const Footer = () => {
   const [legalKey, setLegalKey] = useState(null);
-  const openLegal = key => setLegalKey(key);
+  const openLegal = (key) => setLegalKey(key);
   const closeLegal = () => setLegalKey(null);
 
   return (
-    <Box component="footer" sx={{ bgcolor: PD, color: TXT, position: "relative" }}>
-
+    <Box
+      component="footer"
+      sx={{
+        bgcolor: PD,
+        color: TXT,
+        position: "relative",
+      }}
+    >
       {/* ── Top accent bar (gradient) ───────────────────────────────── */}
-      <Box sx={{
-        height: 3,
-        background: `linear-gradient(90deg, ${P} 0%, ${TEAL} 50%, ${P} 100%)`,
-      }} />
+      <Box
+        sx={{
+          height: 3,
+          background: `linear-gradient(90deg, ${P} 0%, ${TEAL} 50%, ${P} 100%)`,
+        }}
+      />
 
       {/* ── Main footer grid ────────────────────────────────────────── */}
       <Box sx={{ px: { xs: 2, md: 6 }, py: { xs: 4, md: 5 } }}>
         <Grid container spacing={4}>
-
           {/* Col 1 — Brand */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Stack direction="row" alignItems="center" spacing={1.4} sx={{ mb: 2 }}>
-              <Box sx={{
-                width: 52, height: 52, flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                //bgcolor: "rgba(255,255,255,0.06)",
-                //border: "1px solid rgba(255,255,255,0.10)",
-                borderRadius: 2, p: 0.6,
-              }}>
-                <Box component="img" src={govtLogo} alt="Royal Government of Bhutan"
-                  sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.4}
+              sx={{ mb: 2 }}
+            >
+              <Box
+                sx={{
+                  width: 52,
+                  height: 52,
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 2,
+                  p: 0.6,
+                }}
+              >
+                <Box
+                  component="img"
+                  src={govtLogo}
+                  alt="Royal Government of Bhutan"
+                  sx={{ width: "100%", height: "100%", objectFit: "contain" }}
+                />
               </Box>
               <Box>
-                <Typography sx={{ color: W, fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.1 }}>
+                <Typography
+                  sx={{
+                    color: W,
+                    fontWeight: 800,
+                    fontSize: "0.95rem",
+                    lineHeight: 1.1,
+                  }}
+                >
                   TVET MIS
                 </Typography>
-                <Typography sx={{ color: TXT_D, fontSize: "0.66rem", letterSpacing: 0.3 }}>
+                <Typography
+                  sx={{
+                    color: TXT_D,
+                    fontSize: "0.66rem",
+                    letterSpacing: 0.3,
+                  }}
+                >
                   Ministry of Education &amp; Skills Development
                 </Typography>
               </Box>
             </Stack>
 
-            <Typography sx={{ fontSize: "0.78rem", lineHeight: 1.8, mb: 2.5, color: TXT, textAlign: "justify" }}>
+            <Typography
+              sx={{
+                fontSize: "0.78rem",
+                lineHeight: 1.8,
+                mb: 2.5,
+                color: TXT,
+                textAlign: "justify",
+              }}
+            >
               The official TVET Management Information System of the Royal
-              Government of Bhutan — empowering training registration, certification
-              tracking and skills development across all 20 Dzongkhags.
+              Government of Bhutan — empowering training registration,
+              certification tracking and skills development across all 20
+              Dzongkhags.
             </Typography>
 
             {/* Trust badges */}
             <Stack direction="row" spacing={1} sx={{ mb: 2.5 }}>
-              <Box sx={{
-                display: "flex", alignItems: "center", gap: 0.6,
-                px: 1.2, py: 0.6, borderRadius: 1.2,
-                bgcolor: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-              }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.6,
+                  px: 1.2,
+                  py: 0.6,
+                  borderRadius: 1.2,
+                  bgcolor: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
                 <VerifiedUserIcon sx={{ fontSize: 13, color: TEAL }} />
-                <Typography sx={{ color: TXT, fontSize: "0.66rem", fontWeight: 600 }}>
+                <Typography
+                  sx={{
+                    color: TXT,
+                    fontSize: "0.66rem",
+                    fontWeight: 600,
+                  }}
+                >
                   Govt. Verified
                 </Typography>
               </Box>
-              <Box sx={{
-                display: "flex", alignItems: "center", gap: 0.6,
-                px: 1.2, py: 0.6, borderRadius: 1.2,
-                bgcolor: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-              }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#4caf50" }} />
-                <Typography sx={{ color: TXT, fontSize: "0.66rem", fontWeight: 600 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.6,
+                  px: 1.2,
+                  py: 0.6,
+                  borderRadius: 1.2,
+                  bgcolor: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    bgcolor: "#4caf50",
+                  }}
+                />
+                <Typography
+                  sx={{
+                    color: TXT,
+                    fontSize: "0.66rem",
+                    fontWeight: 600,
+                  }}
+                >
                   System Online
                 </Typography>
               </Box>
@@ -376,34 +562,55 @@ const Footer = () => {
 
             {/* Social — centered */}
             <Box sx={{ textAlign: "left", mt: 1 }}>
-              <Typography sx={{
-                color: TXT_DD, fontSize: "0.68rem", fontWeight: 700,
-                letterSpacing: 0.8, textTransform: "uppercase", mb: 1.2
-              }}>
+              <Typography
+                sx={{
+                  color: TXT_DD,
+                  fontSize: "0.68rem",
+                  fontWeight: 700,
+                  letterSpacing: 0.8,
+                  textTransform: "uppercase",
+                  mb: 1.2,
+                }}
+              >
                 Follow Us
               </Typography>
               <Stack direction="row" spacing={1} justifyContent="left">
                 {[
-                  { Icon: FacebookIcon, label: "Facebook", target: "_blank", href: "https://www.facebook.com/BQPCA" },
+                  {
+                    Icon: FacebookIcon,
+                    label: "Facebook",
+                    target: "_blank",
+                    href: "https://www.facebook.com/BQPCA",
+                  },
                   { Icon: XIcon, label: "X", href: "#" },
                   { Icon: LinkedInIcon, label: "LinkedIn", href: "#" },
                   { Icon: InstagramIcon, label: "Instagram", href: "#" },
                   { Icon: YouTubeIcon, label: "YouTube", href: "#" },
                 ].map(({ Icon, label, href }, i) => (
-                  <IconButton key={i} href={href} target="_blank" rel="noreferrer"
-                    size="small" aria-label={label}
+                  <IconButton
+                    key={i}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    size="small"
+                    aria-label={label}
                     sx={{
-                      width: 32, height: 32, borderRadius: 1.2,
+                      width: 32,
+                      height: 32,
+                      borderRadius: 1.2,
                       bgcolor: "rgba(255,255,255,0.05)",
                       border: "1px solid rgba(255,255,255,0.08)",
                       color: TXT,
                       transition: "all 0.2s",
                       "&:hover": {
-                        bgcolor: P, color: W, borderColor: P,
+                        bgcolor: P,
+                        color: W,
+                        borderColor: P,
                         transform: "translateY(-2px)",
                         boxShadow: `0 4px 12px ${P}55`,
                       },
-                    }}>
+                    }}
+                  >
                     <Icon sx={{ fontSize: 15 }} />
                   </IconButton>
                 ))}
@@ -415,10 +622,16 @@ const Footer = () => {
           <Grid size={{ xs: 12, md: 3 }}>
             <FooterHeading>Quick Links</FooterHeading>
             <FooterLink href="/">Home</FooterLink>
-            <FooterLink href="/result/assessment-result">Assessment Result</FooterLink>
+            <FooterLink href="/result/assessment-result">
+              Assessment Result
+            </FooterLink>
             <FooterLink href="/birms/payment-index">Online Payment</FooterLink>
-            <FooterLink href="https://www.blmis.gov.bt/tvet/ncs">NCS Standards</FooterLink>
-            <FooterLink href="https://www.blmis.gov.bt/tvet/curriculum">Curriculum</FooterLink>
+            <FooterLink href="https://www.blmis.gov.bt/tvet/ncs">
+              NCS Standards
+            </FooterLink>
+            <FooterLink href="https://www.blmis.gov.bt/tvet/curriculum">
+              Curriculum
+            </FooterLink>
             <FooterLink href="#">Downloads</FooterLink>
           </Grid>
 
@@ -443,31 +656,60 @@ const Footer = () => {
             />
 
             {/* Working hours card */}
-            <Box sx={{
-              mt: 2, p: 1, borderRadius: 2,
-              background: "linear-gradient(135deg, rgba(21,101,192,0.12) 0%, rgba(38,198,218,0.08) 100%)",
-              border: "1px solid rgba(66,165,245,0.18)",
-            }}>
+            <Box
+              sx={{
+                mt: 2,
+                p: 1,
+                borderRadius: 2,
+                background:
+                  "linear-gradient(135deg, rgba(21,101,192,0.12) 0%, rgba(38,198,218,0.08) 100%)",
+                border: "1px solid rgba(66,165,245,0.18)",
+              }}
+            >
               <Stack direction="row" spacing={1.2} alignItems="center">
-                <Box sx={{
-                  width: 32, height: 32, borderRadius: "50%",
-                  bgcolor: `${TEAL}25`, border: `1px solid ${TEAL}55`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
-                }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    bgcolor: `${TEAL}25`,
+                    border: `1px solid ${TEAL}55`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
                   <AccessTimeIcon sx={{ color: TEAL, fontSize: 16 }} />
                 </Box>
                 <Box sx={{ flex: 1 }}>
-                  <Typography sx={{
-                    color: TEAL, fontSize: "0.66rem",
-                    letterSpacing: 0.8, fontWeight: 700, textTransform: "uppercase"
-                  }}>
+                  <Typography
+                    sx={{
+                      color: TEAL,
+                      fontSize: "0.66rem",
+                      letterSpacing: 0.8,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
                     Working Hours
                   </Typography>
-                  <Typography sx={{ color: W, fontSize: "0.78rem", fontWeight: 600, lineHeight: 1.4 }}>
+                  <Typography
+                    sx={{
+                      color: W,
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      lineHeight: 1.4,
+                    }}
+                  >
                     Mon – Fri · 9:00 AM – 5:00 PM
                   </Typography>
-                  <Typography sx={{ color: TXT_D, fontSize: "0.71rem" }}>
+                  <Typography
+                    sx={{
+                      color: TXT_D,
+                      fontSize: "0.71rem",
+                    }}
+                  >
                     Weekends &amp; Public Holidays: Closed
                   </Typography>
                 </Box>
@@ -479,36 +721,54 @@ const Footer = () => {
 
       {/* ── Bottom bar ──────────────────────────────────────────────── */}
       <Box sx={{ bgcolor: PDX, px: { xs: 2, md: 6 }, py: 2 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between"
-          alignItems="center" spacing={1.5}>
-          <Typography sx={{
-            fontSize: "0.72rem", color: TXT_DD,
-            textAlign: { xs: "center", sm: "left" }
-          }}>
-            © {new Date().getFullYear()} <Box component="span" sx={{ color: TXT, fontWeight: 600 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems="center"
+          spacing={1.5}
+        >
+          <Typography
+            sx={{
+              fontSize: "0.72rem",
+              color: TXT_DD,
+              textAlign: { xs: "center", sm: "left" },
+            }}
+          >
+            © {new Date().getFullYear()}{" "}
+            <Box component="span" sx={{ color: TXT, fontWeight: 600 }}>
               Ministry of Education and Skills Development
-            </Box>, Royal Government of Bhutan. All rights reserved.
+            </Box>
+            , Royal Government of Bhutan. All rights reserved.
           </Typography>
-          <Stack direction="row" spacing={2.5} divider={
-            <Box sx={{ width: "1px", bgcolor: "rgba(255,255,255,0.1)" }} />
-          }>
+          <Stack
+            direction="row"
+            spacing={2.5}
+            divider={
+              <Box sx={{ width: "1px", bgcolor: "rgba(255,255,255,0.1)" }} />
+            }
+          >
             {[
               { label: "Privacy Policy", key: "privacy" },
               { label: "Terms of Use", key: "terms" },
               { label: "Accessibility", key: "accessibility" },
-            ].map(l => (
+            ].map((l) => (
               <Link
                 key={l.key}
                 component="button"
                 onClick={() => openLegal(l.key)}
                 underline="none"
                 sx={{
-                  fontSize: "0.72rem", color: TXT_D, fontWeight: 500,
-                  background: "none", border: "none", cursor: "pointer",
-                  fontFamily: "inherit", p: 0,
+                  fontSize: "0.72rem",
+                  color: TXT_D,
+                  fontWeight: 500,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  p: 0,
                   transition: "color 0.2s",
                   "&:hover": { color: W },
-                }}>
+                }}
+              >
                 {l.label}
               </Link>
             ))}
@@ -516,23 +776,35 @@ const Footer = () => {
         </Stack>
 
         {/* Developer credit — subtle */}
-        <Box sx={{
-          textAlign: "center", mt: 1.2,
-          pt: 1.2, borderTop: "1px solid rgba(255,255,255,0.05)",
-          display: "none"
-        }}>
-          <Typography sx={{
-            fontSize: "0.66rem", color: "rgba(255,255,255,0.22)",
-            letterSpacing: 0.3
-          }}>
+        <Box
+          sx={{
+            textAlign: "center",
+            mt: 1.2,
+            pt: 1.2,
+            borderTop: "1px solid rgba(255,255,255,0.05)",
+            display: "none",
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: "0.66rem",
+              color: "rgba(255,255,255,0.22)",
+              letterSpacing: 0.3,
+            }}
+          >
             Developed by{" "}
-            <Link href="https://sonaxit.com/" target="_blank" rel="noreferrer"
+            <Link
+              href="https://sonaxit.com/"
+              target="_blank"
+              rel="noreferrer"
               underline="none"
               sx={{
-                color: "rgba(255,255,255,0.35)", fontWeight: 600,
+                color: "rgba(255,255,255,0.35)",
+                fontWeight: 600,
                 transition: "color 0.2s",
                 "&:hover": { color: TEAL },
-              }}>
+              }}
+            >
               Sonax IT Consultancy
             </Link>
           </Typography>

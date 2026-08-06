@@ -152,6 +152,8 @@ const InstituteDashboard = () => {
     "& th, & td": {
       border: "1px solid",
       borderColor: "divider",
+      py: 0.5,
+      px: 1,
     },
   };
 
@@ -183,22 +185,26 @@ const InstituteDashboard = () => {
   ];
 
   return (
-    <Paper sx={{ p: 2, mt: 1 }}>
-      <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-         Dashboard
+    <Paper sx={{ p: 1.5, mt: 1 }}>
+      <Typography
+        variant="h6"
+        fontWeight={700}
+        sx={{ mb: 1.5, fontSize: "1.1rem" }}
+      >
+        Dashboard
       </Typography>
 
       {/* -------------------- Metric Cards -------------------- */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
+      <Grid container spacing={1.5} sx={{ mb: 2 }}>
         {metrics.map((metric, index) => (
           <Grid item size={{ xs: 6, sm: 6, md: 3 }} key={index}>
             <Paper
               sx={{
-                p: 2,
+                p: 1.5,
                 display: "flex",
                 alignItems: "center",
-                gap: 2,
-                borderRadius: 2,
+                gap: 1.5,
+                borderRadius: 1.5,
                 border: "1px solid",
                 borderColor: "divider",
               }}
@@ -207,13 +213,22 @@ const InstituteDashboard = () => {
                 sx={{
                   bgcolor: `${metric.color}.light`,
                   color: `${metric.color}.main`,
+                  width: 36,
+                  height: 36,
+                  "& svg": { fontSize: "1.1rem" },
                 }}
               >
                 {metric.icon}
               </Avatar>
               <Box>
-                <Typography fontWeight={700}>{metric.value}</Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography fontWeight={700} fontSize="1rem">
+                  {metric.value}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  fontSize="0.7rem"
+                >
                   {metric.title}
                 </Typography>
               </Box>
@@ -223,27 +238,30 @@ const InstituteDashboard = () => {
       </Grid>
 
       {/* -------------------- Charts -------------------- */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
+      <Grid container spacing={1.5} sx={{ mb: 2 }}>
         <Grid item size={{ xs: 12, sm: 6, md: 4 }}>
           <Paper
             sx={{
-              p: 2,
-              height: 300,
+              p: 1.5,
+              height: 240,
               border: "1px solid",
               borderColor: "divider",
             }}
           >
-            <Typography fontWeight={600}>Monthly Enrollments</Typography>
-            <ResponsiveContainer width="100%" height="90%">
+            <Typography fontWeight={600} fontSize="0.85rem" mb={0.5}>
+              Monthly Enrollments
+            </Typography>
+            <ResponsiveContainer width="100%" height="88%">
               <LineChart data={lineData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Line
                   type="monotone"
                   dataKey="trainees"
                   stroke={theme.palette.primary.main}
+                  strokeWidth={2}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -252,18 +270,24 @@ const InstituteDashboard = () => {
         <Grid item size={{ xs: 12, sm: 6, md: 4 }}>
           <Paper
             sx={{
-              p: 2,
-              height: 300,
+              p: 1.5,
+              height: 240,
               border: "1px solid",
               borderColor: "divider",
             }}
           >
-            <Typography fontWeight={600}>
-              Gender Distribution of Trainees
+            <Typography fontWeight={600} fontSize="0.85rem" mb={0.5}>
+              Gender Distribution
             </Typography>
-            <ResponsiveContainer width="100%" height="90%">
+            <ResponsiveContainer width="100%" height="88%">
               <PieChart>
-                <Pie data={pieData} dataKey="value" outerRadius={80} label>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  outerRadius={65}
+                  label={({ name, value }) => `${name}: ${value}`}
+                  fontSize={10}
+                >
                   {pieData.map((entry, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -276,21 +300,23 @@ const InstituteDashboard = () => {
         <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
           <Paper
             sx={{
-              p: 2,
-              height: 300,
+              p: 1.5,
+              height: 240,
               border: "1px solid",
               borderColor: "divider",
             }}
           >
-            <Typography fontWeight={600}>Courses per Month</Typography>
-            <ResponsiveContainer width="100%" height="90%">
+            <Typography fontWeight={600} fontSize="0.85rem" mb={0.5}>
+              Courses per Month
+            </Typography>
+            <ResponsiveContainer width="100%" height="88%">
               <BarChart data={barData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Bar
-                  barSize={40}
+                  barSize={28}
                   dataKey="courses"
                   fill={theme.palette.secondary.main}
                 />
@@ -301,11 +327,17 @@ const InstituteDashboard = () => {
       </Grid>
 
       {/* -------------------- Tables -------------------- */}
-      <Grid container spacing={2}>
+      <Grid container spacing={1.5}>
         {/* Institute Info */}
         <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
+          <Paper
+            sx={{
+              p: 1.5,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography fontWeight={600} sx={{ mb: 1 }} fontSize="0.85rem">
               Institute Information
             </Typography>
 
@@ -319,10 +351,15 @@ const InstituteDashboard = () => {
                     )
                     .map((row, index) => (
                       <TableRow key={index}>
-                        <TableCell sx={{ fontWeight: 600 }}>
+                        <TableCell
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: "0.75rem",
+                          }}
+                        >
                           {row.label}
                         </TableCell>
-                        <TableCell>{row.value}</TableCell>
+                        <TableCell fontSize="0.75rem">{row.value}</TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
@@ -340,25 +377,46 @@ const InstituteDashboard = () => {
                 setInfoPage(0);
               }}
               rowsPerPageOptions={[5, 10]}
+              sx={{
+                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                  { fontSize: "0.7rem" },
+              }}
             />
           </Paper>
         </Grid>
+
         {/* Applications */}
         <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Status of Recent Application
+          <Paper
+            sx={{
+              p: 1.5,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography fontWeight={600} sx={{ mb: 1 }} fontSize="0.85rem">
+              Recent Applications
             </Typography>
 
             <TableContainer>
               <Table size="small" sx={tableStyle}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Application ID</TableCell>
-                    <TableCell>Service</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Remarks</TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      App ID
+                    </TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      Service
+                    </TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      Date
+                    </TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      Status
+                    </TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      Remarks
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -369,17 +427,23 @@ const InstituteDashboard = () => {
                     )
                     .map((app) => (
                       <TableRow key={app.id}>
-                        <TableCell>{app.id}</TableCell>
-                        <TableCell>{app.service}</TableCell>
-                        <TableCell>{app.submissionDate}</TableCell>
+                        <TableCell fontSize="0.75rem">{app.id}</TableCell>
+                        <TableCell fontSize="0.75rem">{app.service}</TableCell>
+                        <TableCell fontSize="0.75rem">
+                          {app.submissionDate}
+                        </TableCell>
                         <TableCell>
                           <Chip
                             label={app.status}
                             size="small"
                             color={statusColors[app.status]}
+                            sx={{
+                              fontSize: "0.65rem",
+                              height: 20,
+                            }}
                           />
                         </TableCell>
-                        <TableCell>{app.remarks}</TableCell>
+                        <TableCell fontSize="0.75rem">{app.remarks}</TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
@@ -397,26 +461,46 @@ const InstituteDashboard = () => {
                 setAppPage(0);
               }}
               rowsPerPageOptions={[5, 10]}
+              sx={{
+                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                  { fontSize: "0.7rem" },
+              }}
             />
           </Paper>
         </Grid>
 
         {/* Courses */}
         <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Recent Ongoing Course Details
+          <Paper
+            sx={{
+              p: 1.5,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography fontWeight={600} sx={{ mb: 1 }} fontSize="0.85rem">
+              Ongoing Courses
             </Typography>
 
             <TableContainer>
               <Table size="small" sx={tableStyle}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Course</TableCell>
-                    <TableCell>Certification</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Application Date</TableCell>
-                    <TableCell>Course Date</TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      Course
+                    </TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      Certification
+                    </TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      Status
+                    </TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      App Date
+                    </TableCell>
+                    <TableCell fontSize="0.75rem" fontWeight={600}>
+                      Course Date
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -427,8 +511,12 @@ const InstituteDashboard = () => {
                     )
                     .map((course, index) => (
                       <TableRow key={index}>
-                        <TableCell>{course.course}</TableCell>
-                        <TableCell>{course.certification}</TableCell>
+                        <TableCell fontSize="0.75rem">
+                          {course.course}
+                        </TableCell>
+                        <TableCell fontSize="0.75rem">
+                          {course.certification}
+                        </TableCell>
                         <TableCell>
                           <Chip
                             label={course.status}
@@ -440,10 +528,18 @@ const InstituteDashboard = () => {
                                   ? "success"
                                   : "error"
                             }
+                            sx={{
+                              fontSize: "0.65rem",
+                              height: 20,
+                            }}
                           />
                         </TableCell>
-                        <TableCell>{course.applicationDate}</TableCell>
-                        <TableCell>{course.courseDate}</TableCell>
+                        <TableCell fontSize="0.75rem">
+                          {course.applicationDate}
+                        </TableCell>
+                        <TableCell fontSize="0.75rem">
+                          {course.courseDate}
+                        </TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
@@ -461,6 +557,10 @@ const InstituteDashboard = () => {
                 setCoursePage(0);
               }}
               rowsPerPageOptions={[5, 10]}
+              sx={{
+                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                  { fontSize: "0.7rem" },
+              }}
             />
           </Paper>
         </Grid>

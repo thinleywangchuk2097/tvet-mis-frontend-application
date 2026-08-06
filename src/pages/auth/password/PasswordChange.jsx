@@ -31,6 +31,18 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import BorderColorIcon from "@mui/icons-material/BorderColor";
 
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography
+    component="span"
+    sx={{
+      color: "red",
+    }}
+  >
+    *
+  </Typography>
+);
+
 const PasswordChange = ({ redirectOnSuccess = "/" }) => {
   const token = useSelector((state) => state.auth.accessToken);
   const navigate = useNavigate();
@@ -174,7 +186,9 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
             <Typography
               variant="body2"
               color="text.secondary"
-              sx={{ fontStyle: "italic" }}
+              sx={{
+                fontStyle: "italic",
+              }}
             >
               Secure your account with a new password
             </Typography>
@@ -183,7 +197,9 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
           <Collapse in={message.show}>
             <Alert
               severity={message.severity}
-              sx={{ borderRadius: 0 }}
+              sx={{
+                borderRadius: 0,
+              }}
               action={
                 <IconButton
                   size="small"
@@ -221,7 +237,11 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
                     variant="outlined"
                     size="small"
                     name={field}
-                    label={label}
+                    label={
+                      <>
+                        {label} <RequiredStar />
+                      </>
+                    }
                     type={showPassword[key] ? "text" : "password"}
                     value={formik.values[field]}
                     onChange={formik.handleChange}
@@ -286,7 +306,11 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
                   onClick={() => navigate(-1)}
                   disabled={formik.isSubmitting}
                   size="small"
-                  sx={{ py: 0.8, px: 1.5, minWidth: 120 }}
+                  sx={{
+                    py: 0.8,
+                    px: 1.5,
+                    minWidth: 120,
+                  }}
                 >
                   Back
                 </Button>
@@ -299,7 +323,11 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
                   startIcon={<BorderColorIcon />}
                   disabled={formik.isSubmitting || !formik.dirty}
                   size="small"
-                  sx={{ py: 0.8, px: 1.5, minWidth: 120 }}
+                  sx={{
+                    py: 0.8,
+                    px: 1.5,
+                    minWidth: 120,
+                  }}
                 >
                   {formik.isSubmitting ? "Updating..." : "Update Password"}
                 </Button>

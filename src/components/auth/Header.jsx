@@ -51,7 +51,9 @@ const Header = ({ onToggleSidebar }) => {
           <Typography
             variant="subtitle1"
             fontWeight={600}
-            sx={{ fontSize: "1rem" }} // slightly smaller
+            sx={{
+              fontSize: "1rem",
+            }}
           >
             TVET-MIS
           </Typography>
@@ -74,7 +76,7 @@ const Header = ({ onToggleSidebar }) => {
   );
 };
 
-// ✅ FIXED: Added PropTypes validation
+//Added PropTypes validation
 Header.propTypes = {
   onToggleSidebar: PropTypes.func.isRequired,
 };

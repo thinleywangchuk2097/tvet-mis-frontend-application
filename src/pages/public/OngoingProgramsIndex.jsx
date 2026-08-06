@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import {
   Box,
   Table,
@@ -51,7 +57,9 @@ const TS = {
     color: "#0a2d6e",
     whiteSpace: "nowrap",
   },
-  "& td": { fontSize: "0.8rem" },
+  "& td": {
+    fontSize: "0.8rem",
+  },
   "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
   "& tbody tr:hover td": { bgcolor: "#f5f9ff" },
 };
@@ -82,7 +90,12 @@ const MovingBanner = ({ announcements }) => {
   const contentRef = useRef(null);
 
   useEffect(() => {
-    if (!containerRef.current || !contentRef.current || announcements.length === 0) return;
+    if (
+      !containerRef.current ||
+      !contentRef.current ||
+      announcements.length === 0
+    )
+      return;
 
     const container = containerRef.current;
     const content = contentRef.current;
@@ -99,7 +112,7 @@ const MovingBanner = ({ announcements }) => {
 
     if (contentWidth <= containerWidth) {
       // No need to animate if content fits
-      content.style.transform = 'translateX(0)';
+      content.style.transform = "translateX(0)";
       return;
     }
 
@@ -114,7 +127,7 @@ const MovingBanner = ({ announcements }) => {
       startTime = timestamp;
 
       position -= speed * (delta / 16); // Normalize to 60fps
-      
+
       // Reset position when we've scrolled past half the content
       if (Math.abs(position) >= contentWidth) {
         position = 0;
@@ -133,8 +146,8 @@ const MovingBanner = ({ announcements }) => {
       startTime = null;
     };
 
-    container.addEventListener('mouseenter', handleMouseEnter);
-    container.addEventListener('mouseleave', handleMouseLeave);
+    container.addEventListener("mouseenter", handleMouseEnter);
+    container.addEventListener("mouseleave", handleMouseLeave);
 
     animationId = requestAnimationFrame(animate);
 
@@ -142,8 +155,8 @@ const MovingBanner = ({ announcements }) => {
       if (animationId) {
         cancelAnimationFrame(animationId);
       }
-      container.removeEventListener('mouseenter', handleMouseEnter);
-      container.removeEventListener('mouseleave', handleMouseLeave);
+      container.removeEventListener("mouseenter", handleMouseEnter);
+      container.removeEventListener("mouseleave", handleMouseLeave);
     };
   }, [announcements]);
 
@@ -215,13 +228,18 @@ const MovingBanner = ({ announcements }) => {
             >
               🎓 {announcement.courseName}
             </Box>
-            <Box component="span" sx={{ opacity: 0.8 }}>@</Box>
+            <Box component="span" sx={{ opacity: 0.8 }}>
+              @
+            </Box>
             <Box component="span" sx={{ fontSize: "0.85rem" }}>
               {announcement.instituteName}
             </Box>
-            <Box component="span" sx={{ mx: 0.5 }}>📅</Box>
+            <Box component="span" sx={{ mx: 0.5 }}>
+              📅
+            </Box>
             <Box component="span" sx={{ fontSize: "0.85rem" }}>
-              {formatDate(announcement.startDate)} - {formatDate(announcement.endDate)}
+              {formatDate(announcement.startDate)} -{" "}
+              {formatDate(announcement.endDate)}
             </Box>
             <Box
               component="span"
@@ -240,7 +258,9 @@ const MovingBanner = ({ announcements }) => {
                 animation: "none", // Remove blink animation for performance
               }}
             >
-              <Box component="span" sx={{ fontSize: "0.7rem" }}>●</Box>
+              <Box component="span" sx={{ fontSize: "0.7rem" }}>
+                ●
+              </Box>
               ACTIVE
             </Box>
           </Box>
@@ -270,7 +290,7 @@ const OngoingProgramsIndex = () => {
   // Memoized helper functions
   const getCertificationLevelName = useMemo(() => {
     const levelMap = new Map();
-    certificationLevels.forEach(level => {
+    certificationLevels.forEach((level) => {
       levelMap.set(parseInt(level.id), level.name);
     });
     return (levelId) => {
@@ -281,7 +301,7 @@ const OngoingProgramsIndex = () => {
 
   const getDzongkhagName = useMemo(() => {
     const dzongMap = new Map();
-    dzongkhags.forEach(dzong => {
+    dzongkhags.forEach((dzong) => {
       dzongMap.set(parseInt(dzong.id), dzong.dzonkhagName);
     });
     return (locationId) => {
@@ -313,7 +333,7 @@ const OngoingProgramsIndex = () => {
 
   const fetchDropdownData = async () => {
     try {
-      const levelsResponse = await CommonService.getByParentId(10);
+      const levelsResponse = await CommonService.getAllCertificateLevels();
       setCertificationLevels(
         Array.isArray(levelsResponse.data) ? levelsResponse.data : [],
       );
@@ -357,7 +377,8 @@ const OngoingProgramsIndex = () => {
         course.institute_name?.toLowerCase().includes(searchText.toLowerCase());
 
       const matchesCertificateLevel = certificateLevelFilter
-        ? parseInt(course.certification_level_id) === parseInt(certificateLevelFilter)
+        ? parseInt(course.certification_level_id) ===
+          parseInt(certificateLevelFilter)
         : true;
 
       const matchesLocation = locationFilter
@@ -389,13 +410,21 @@ const OngoingProgramsIndex = () => {
     return (
       <Box sx={{ textAlign: "center", py: 4 }}>
         <Typography
-          sx={{ color: "error.main", fontWeight: 600, fontSize: "0.9rem" }}
+          sx={{
+            color: "error.main",
+            fontWeight: 600,
+            fontSize: "0.9rem",
+          }}
         >
           Unable to connect to the server
         </Typography>
         <Typography
           variant="caption"
-          sx={{ color: "#666", mt: 1, display: "block" }}
+          sx={{
+            color: "#666",
+            mt: 1,
+            display: "block",
+          }}
         >
           Please try again later.
         </Typography>
@@ -404,7 +433,13 @@ const OngoingProgramsIndex = () => {
   }
 
   return (
-    <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+    <Paper
+      sx={{
+        p: 2,
+        border: "1px solid",
+        borderColor: "divider",
+      }}
+    >
       {/* Moving Course Announcements Banner - OPTIMIZED */}
       <MovingBanner announcements={movingAnnouncements} />
 
@@ -458,7 +493,9 @@ const OngoingProgramsIndex = () => {
             slotProps={{
               input: {
                 startAdornment: (
-                  <SearchIcon sx={{ color: "#90a4ae", fontSize: 16, mr: 0.5 }} />
+                  <SearchIcon
+                    sx={{ color: "#90a4ae", fontSize: 16, mr: 0.5 }}
+                  />
                 ),
               },
             }}
@@ -522,7 +559,9 @@ const OngoingProgramsIndex = () => {
             startIcon={<RestartAltIcon />}
             fullWidth
             onClick={handleReset}
-            sx={{ height: 40 }}
+            sx={{
+              height: 40,
+            }}
           >
             Reset
           </Button>
@@ -554,7 +593,12 @@ const OngoingProgramsIndex = () => {
                     <TableCell sx={{ fontWeight: 500 }}>
                       {course.institute_name || "N/A"}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#0a1929" }}>
+                    <TableCell
+                      sx={{
+                        fontWeight: 600,
+                        color: "#0a1929",
+                      }}
+                    >
                       {course.course_name || "N/A"}
                     </TableCell>
                     <TableCell>
@@ -591,7 +635,10 @@ const OngoingProgramsIndex = () => {
                 <TableCell
                   colSpan={7}
                   align="center"
-                  sx={{ color: "error.main", fontWeight: 600 }}
+                  sx={{
+                    color: "error.main",
+                    fontWeight: 600,
+                  }}
                 >
                   No data available
                 </TableCell>

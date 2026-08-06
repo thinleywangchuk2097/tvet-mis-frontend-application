@@ -31,6 +31,18 @@ import {
 } from "@mui/icons-material";
 import UserProfileService from "../../../api/services/internal/userprofile/UserProfileService";
 
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography
+    component="span"
+    sx={{
+      color: "red",
+    }}
+  >
+    *
+  </Typography>
+);
+
 const profileSchema = Yup.object().shape({
   username: Yup.string()
     .min(3, "Username must be at least 3 characters")
@@ -219,7 +231,7 @@ const UserProfile = () => {
         {/* Header */}
         <Box textAlign="center" mb={1}>
           <Typography variant="h6" fontWeight={700} color="text.primary">
-            User Profile Detail
+            User Profile
           </Typography>
         </Box>
 
@@ -327,13 +339,19 @@ const UserProfile = () => {
                     readOnly: true,
                   },
                 }}
-                sx={{ borderRadius: 2 }}
+                sx={{
+                  borderRadius: 2,
+                }}
               />
             </Grid>
             <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
               <TextField
                 fullWidth
-                label="Username"
+                label={
+                  <>
+                    Username <RequiredStar />
+                  </>
+                }
                 size="small"
                 name="username"
                 value={formik.values.username}
@@ -345,15 +363,22 @@ const UserProfile = () => {
                 helperText={formik.touched.username && formik.errors.username}
                 slotProps={{
                   input: {
-                    readOnly: !isEditing, // or disabled: !isEditing
+                    readOnly: !isEditing,
                   },
+                }}
+                sx={{
+                  borderRadius: 2,
                 }}
               />
             </Grid>
             <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
               <TextField
                 fullWidth
-                label="Email"
+                label={
+                  <>
+                    Email <RequiredStar />
+                  </>
+                }
                 size="small"
                 name="email"
                 value={formik.values.email}
@@ -366,12 +391,19 @@ const UserProfile = () => {
                     readOnly: !isEditing,
                   },
                 }}
+                sx={{
+                  borderRadius: 2,
+                }}
               />
             </Grid>
             <Grid item size={{ xs: 12, sm: 6, md: 6 }}>
               <TextField
                 fullWidth
-                label="Mobile Number"
+                label={
+                  <>
+                    Mobile Number <RequiredStar />
+                  </>
+                }
                 size="small"
                 name="mobile_no"
                 value={formik.values.mobile_no}
@@ -383,8 +415,11 @@ const UserProfile = () => {
                 helperText={formik.touched.mobile_no && formik.errors.mobile_no}
                 slotProps={{
                   input: {
-                    readOnly: !isEditing, 
+                    readOnly: !isEditing,
                   },
+                }}
+                sx={{
+                  borderRadius: 2,
                 }}
               />
             </Grid>
@@ -423,7 +458,10 @@ const UserProfile = () => {
                     startIcon={<Cancel />}
                     onClick={handleCancelEdit}
                     disabled={isSubmitting}
-                    sx={{ borderRadius: 2, textTransform: "none" }}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: "none",
+                    }}
                   >
                     Cancel
                   </Button>
@@ -437,7 +475,10 @@ const UserProfile = () => {
                     disabled={
                       isSubmitting || (!formik.dirty && !profilePicFile)
                     }
-                    sx={{ borderRadius: 2, textTransform: "none" }}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: "none",
+                    }}
                   >
                     {isSubmitting ? "Saving..." : "Save"}
                   </Button>
@@ -448,7 +489,10 @@ const UserProfile = () => {
                   color="primary"
                   startIcon={<Edit />}
                   onClick={handleEditToggle}
-                  sx={{ borderRadius: 2, textTransform: "none" }}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: "none",
+                  }}
                 >
                   Edit Profile
                 </Button>

@@ -28,7 +28,8 @@ import AnnualBudget from "../pages/institute/resource-management/AnnualBudget";
 import AnnualExpenditure from "../pages/institute/resource-management/AnnualExpenditure";
 import MonitoringReport from "../pages/institute/resource-management/MonitoringReport";
 import Notification from "../pages/institute/resource-management/Notification";
-
+//track application
+import TrackApplicationStatusIndex from "../pages/track/TrackApplicationStatusIndex";
 
 //registration
 import AccreditedCourseRegistration from "../pages/institute/registration/AccreditedCourseRegistration";
@@ -52,14 +53,13 @@ import ResponseTracerIndex from "../pages/dwps/tracer/ResponseTracerIndex";
 import ViewInstituteSesCentreAssessmentCentreProposal from "../pages/public/proposal/ViewInstituteSesCentreAssessmentCentreProposal";
 import ViewInstituteSesCentreAssessmentCentre from "../pages/public/registration/ViewInstituteSesCentreAssessmentCentre";
 import ViewAssessorAccreditorQMSAuditor from "../pages/public/registration/ViewAssessorAccreditorQMSAuditor";
-import InstituteRenewalIndex from "../pages/renewal/InstituteRenewalIndex";
+import InstituteSesCentreAssessmentCentreRenewal from "../pages/renewal/InstituteSesCentreAssessmentCentreRenewal";
+import ViewInstituteSesCentreAssessmentCentreRenewal from "../pages/renewal/ViewInstituteSesCentreAssessmentCentreRenewal";
+import ViewInstituteChange from "../pages/institute/registration/ViewInstituteChange";
 //tot
 import CreateTotIndex from "../pages/dwps/tot/CreateTotIndex";
 import ApplyTrainerToTProgram from "../pages/dwps/tot/ApplyTrainerToTProgram";
 import ViewApplyTrainerToTProgram from "../pages/dwps/tot/ViewApplyTrainerToTProgram";
-
-//track application status
-import TrackApplicationStatus from "../pages/report/TrackApplicationStatus";
 
 //Certificate
 import Assessment from "../pages/certificate/Assessment";
@@ -80,6 +80,9 @@ import TraineeReportIndex from "../pages/report/TraineeReportIndex";
 import MonitoringAssessmentIndex from "../pages/bqpca/monitoring/MonitoringAssessmentIndex";
 import InstituteMonitoringIndex from "../pages/bqpca/monitoring/InstituteMonitoringIndex";
 import ViewInstituteMonitoringIndex from "../pages/bqpca/monitoring/ViewInstituteMonitoringIndex";
+import ProgramMonitoringIndex from "../pages/bqpca/monitoring/ProgramMonitoringIndex";
+import InstituteProgramMonitoringIndex from "../pages/bqpca/monitoring/InstituteProgramMonitoringIndex";
+import ViewProgramMonitoringIndex from "../pages/bqpca/monitoring/ViewProgramMonitoringIndex";
 //ses centre
 import ChangeSesCentreIndex from "../pages/ses-centre/registration/ChangeSesCentreIndex";
 import SubjectIndex from "../pages/ses-centre/registration/SubjectIndex";
@@ -184,9 +187,21 @@ export const privateRoutes = [
         element: <ViewInstituteMonitoringIndex />,
       },
       {
+        path: "view-program-monitoring-index/:applicationNo",
+        element: <ViewProgramMonitoringIndex />,
+      },
+      {
         path: "view-apply-trainer-tot-program/:applicationNo",
         element: <ViewApplyTrainerToTProgram />,
-      }
+      },
+      {
+        path: "view-institute-ses-centre-renewal/:applicationNo",
+        element: <ViewInstituteSesCentreAssessmentCentreRenewal />,
+      },
+      {
+        path: "view-institute-change/:applicationNo",
+        element: <ViewInstituteChange />,
+      },
     ],
   },
   {
@@ -194,7 +209,7 @@ export const privateRoutes = [
     children: [
       {
         path: ":renewalType/:serviceId",
-        element: <InstituteRenewalIndex />,
+        element: <InstituteSesCentreAssessmentCentreRenewal />,
       },
     ],
   },
@@ -242,7 +257,7 @@ export const privateRoutes = [
       {
         path: "training-job-placement-report",
         element: <TrainingJobPlacementReportIndex />,
-      }
+      },
     ],
   },
   {
@@ -307,13 +322,21 @@ export const privateRoutes = [
         path: "institute-monitoring-index",
         element: <InstituteMonitoringIndex />,
       },
+      {
+        path: "program-monitoring-index",
+        element: <ProgramMonitoringIndex />,
+      },
+      {
+        path: "institute-program-monitoring-index",
+        element: <InstituteProgramMonitoringIndex />,
+      },
     ],
   },
   {
     path: "tot",
     children: [
       { path: "create-index", element: <CreateTotIndex /> },
-      { path: "apply-trainer-tot-index", element: <ApplyTrainerToTProgram /> }
+      { path: "apply-trainer-tot-index", element: <ApplyTrainerToTProgram /> },
     ],
   },
   {
@@ -322,7 +345,12 @@ export const privateRoutes = [
       { path: "institute-report-index", element: <InstituteReportIndex /> },
       { path: "course-report-index", element: <CourseReportIndex /> },
       { path: "trainee-report-index", element: <TraineeReportIndex /> },
-      { path: "track-application-status", element: <TrackApplicationStatus /> },
+    ],
+  },
+  {
+    path: "track",
+    children: [
+      { path: "application-status", element: <TrackApplicationStatusIndex /> },
     ],
   },
   {
@@ -333,7 +361,10 @@ export const privateRoutes = [
         element: <BirmsInstitutePaymentIndex />,
       },
       { path: "agency-payment-index", element: <BirmsAgencyPaymentIndex /> },
-      { path: "common-payment-index/:applicationNo/:serviceCode/:taxPayerNo/:taxPayerEmail/:taxPayerMobileNo/:taxPayerName/:instituteId", element: <CommonBirmsPayment /> }
+      {
+        path: "common-payment-index/:applicationNo/:serviceCode/:taxPayerNo/:taxPayerEmail/:taxPayerMobileNo/:taxPayerName/:instituteId",
+        element: <CommonBirmsPayment />,
+      },
     ],
   },
   {
@@ -350,5 +381,4 @@ export const privateRoutes = [
     path: "ncs",
     children: [{ path: "create-index", element: <CreateNcsIndex /> }],
   },
- 
 ];

@@ -60,6 +60,10 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import UserRoleManagementService from "../../../api/services/internal/userrole/UserRoleManagementService";
 import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
+import CurriculumIndexService from "../../../api/services/internal/course/CurriculumIndexService";
+
+// Constant service code
+const SERVICE_CODE = 100578;
 
 const TABLE_STYLE = {
   border: "1px solid",
@@ -87,13 +91,14 @@ const ViewAccreditedCourseRegistration = () => {
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
   const [instituteData, setInstituteData] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState(null);
-
+  const [curriculumTypes, setCurriculumTypes] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [courseData, setCourseData] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [newDocuments, setNewDocuments] = useState([]);
+  const [currentStatusId, setCurrentStatusId] = useState(null);
 
   // Master data states
   const [sectors, setSectors] = useState([]);
@@ -102,6 +107,7 @@ const ViewAccreditedCourseRegistration = () => {
   const [qualityResponses, setQualityResponses] = useState({});
   const [qualityRemarks, setQualityRemarks] = useState({});
   const [rawQualityStandards, setRawQualityStandards] = useState(null);
+  const [certificateLevels, setCertificateLevels] = useState([]);
 
   // REC assignment states
   const [recList, setRecList] = useState([]);
@@ -129,6 +135,15 @@ const ViewAccreditedCourseRegistration = () => {
   // Check if currentRoleId is 7 for REC tab
   const showRecTab = currentRoleId == 7;
   const showAccreditorTab = currentRoleId == 7;
+  const showGeneratePANumberTab = currentRoleId == 7;
+
+  // Check if user is role 23 (read-only mode for quality checklist and assignments)
+  const isRole23 = currentRoleId == 23;
+
+  // Helper function to check if payment is completed
+  const isPaymentCompleted = useCallback(() => {
+    return paymentStatus && paymentStatus.paymentStatus === "paid";
+  }, [paymentStatus]);
 
   useEffect(() => {
     if (applicationNo) {
@@ -141,7 +156,15 @@ const ViewAccreditedCourseRegistration = () => {
       }
     }
     fetchPaymentStatus();
+    fetchCertificateLevels();
   }, [applicationNo]);
+
+  // Fetch curriculum data when courseData is available
+  useEffect(() => {
+    if (courseData?.curriculum_id) {
+      fetchCurriculum(courseData.curriculum_id);
+    }
+  }, [courseData]);
 
   // Fetch institute data when courseData is available
   useEffect(() => {
@@ -173,6 +196,41 @@ const ViewAccreditedCourseRegistration = () => {
     }
   };
 
+  const fetchCertificateLevels = async () => {
+    try {
+      const response = await CommonService.getByParentId(27);
+      setCertificateLevels(response.data);
+      console.log("Certificate Levels:", response.data);
+    } catch (error) {
+      console.error("Error fetching certificate levels:", error);
+    }
+  };
+
+  const fetchCurriculum = async (curriculumId) => {
+    try {
+      const curriculumDtls = await CurriculumIndexService.getCurriculumById(
+        curriculumId,
+        access_token,
+      );
+      console.log("Curriculum data:", curriculumDtls.data);
+
+      // Handle both array and single object response
+      const curriculumData = Array.isArray(curriculumDtls.data)
+        ? curriculumDtls.data[0]
+        : curriculumDtls.data;
+
+      setCurriculumTypes(curriculumData);
+    } catch (error) {
+      console.error("Error fetching curriculum:", error);
+    }
+  };
+
+  const getCertificateLevelName = (certificateLevelId) => {
+    if (!certificateLevelId) return "N/A";
+    const level = certificateLevels.find((l) => l.id == certificateLevelId);
+    return level ? level.name : "N/A";
+  };
+
   const fetchInstituteData = async () => {
     try {
       if (!courseData?.registration_no) {
@@ -197,10 +255,8 @@ const ViewAccreditedCourseRegistration = () => {
 
   const fetchRecUsers = async () => {
     try {
-      console.log("Fetching REC users...");
       const response =
         await UserRoleManagementService.getActiveRecUsers(access_token);
-      console.log("REC users response:", response.data);
 
       const mappedRecList = response.data.map((user) => ({
         id: user.id,
@@ -222,7 +278,6 @@ const ViewAccreditedCourseRegistration = () => {
 
   const fetchAccreditorUsers = async () => {
     try {
-      console.log("Fetching Accreditor users...");
       const response =
         await UserRoleManagementService.getActiveAccreditorUsers(access_token);
       console.log("Accreditor users response:", response.data);
@@ -356,13 +411,15 @@ const ViewAccreditedCourseRegistration = () => {
           applicationNo,
           access_token,
         );
-
+      console.log("course response", response.data);
       let data = response.data;
       if (Array.isArray(data) && data.length > 0) {
         data = data[0];
       }
 
       setCourseData(data);
+      setCurrentStatusId(Number(data.status_id));
+      console.log("Current Status ID set to:", Number(data.status_id));
 
       // Parse documents JSON
       if (data.documents) {
@@ -434,6 +491,9 @@ const ViewAccreditedCourseRegistration = () => {
   );
 
   const handleQualityResponseChange = (categoryId, subQuestionId, value) => {
+    // If role is 23, don't allow changes
+    if (isRole23) return;
+
     setQualityResponses((prev) => {
       const newResponses = { ...prev };
 
@@ -455,6 +515,9 @@ const ViewAccreditedCourseRegistration = () => {
   };
 
   const handleQualityRemarkChange = (categoryId, subQuestionId, value) => {
+    // If role is 23, don't allow changes
+    if (isRole23) return;
+
     setQualityRemarks((prev) => ({
       ...prev,
       [categoryId]: {
@@ -487,6 +550,11 @@ const ViewAccreditedCourseRegistration = () => {
 
   // REC handlers
   const handleAddREC = () => {
+    if (isRole23) {
+      toast.warning("REC members are read-only for your role");
+      return;
+    }
+
     if (!selectedRec) {
       toast.error("Please select a REC member to add");
       return;
@@ -526,6 +594,10 @@ const ViewAccreditedCourseRegistration = () => {
   };
 
   const openDeleteRECDialog = (rec) => {
+    if (isRole23) {
+      toast.warning("REC members are read-only for your role");
+      return;
+    }
     setRecToDelete(rec);
     setDeleteDialogOpen(true);
   };
@@ -543,6 +615,11 @@ const ViewAccreditedCourseRegistration = () => {
 
   // Accreditor handlers
   const handleAddAccreditor = () => {
+    if (isRole23) {
+      toast.warning("Accreditors are read-only for your role");
+      return;
+    }
+
     if (!selectedAccreditor) {
       toast.error("Please select an Accreditor to add");
       return;
@@ -584,6 +661,10 @@ const ViewAccreditedCourseRegistration = () => {
   };
 
   const openDeleteAccreditorDialog = (acc) => {
+    if (isRole23) {
+      toast.warning("Accreditors are read-only for your role");
+      return;
+    }
     setAccreditorToDelete(acc);
     setDeleteDialogOpen(true);
   };
@@ -606,6 +687,10 @@ const ViewAccreditedCourseRegistration = () => {
   };
 
   const openActionDialog = (statusId) => {
+    if (isRole23 && statusId !== 59) {
+      toast.warning("Only Endorse action is available for your role");
+      return;
+    }
     setSelectedStatusId(statusId);
     setRemarks("");
     setRemarksError("");
@@ -620,15 +705,28 @@ const ViewAccreditedCourseRegistration = () => {
   };
 
   const validateAssignments = (statusId) => {
-    // Skip REC validation when rejecting (statusId === 58 or 60)
-    if (statusId !== 58 && statusId !== 60) {
+    // Get current status ID
+    const currentStatus = Number(currentStatusId);
+
+    // If current status is 115, skip all validations - allow submission without REC and Accreditor
+    if (currentStatus === 115) {
+      console.log("Status is 115 - skipping REC and Accreditor validations");
+      return true;
+    }
+
+    // For forwarding to Level 2 (status 127) or rejection, skip REC validation
+    if (statusId === 127 || statusId === 58 || statusId === 60) {
+      // Skip REC validation for these statuses
+      console.log("Skipping REC validation for status:", statusId);
+    } else {
+      // Validate REC for other statuses
       if (showRecTab && assignedRecs.length === 0) {
         toast.error("Please assign at least one REC member before proceeding");
         return false;
       }
     }
 
-    // Always validate Accreditor if tab is shown (including rejection)
+    // Validate Accreditor for all statuses except when current status is 115
     if (showAccreditorTab && assignedAccreditors.length === 0) {
       toast.error("Please assign at least one Accreditor before proceeding");
       return false;
@@ -664,10 +762,16 @@ const ViewAccreditedCourseRegistration = () => {
         userId: acc.userId,
       }));
 
+      // Determine serviceId based on status
+      // For forwarding to Level 2 (status 127) or renew (status 126), use serviceId 54
+      // For other actions, keep serviceId 26
+      const serviceId =
+        selectedStatusId === 127 || selectedStatusId === 126 ? 54 : 26;
+
       const payload = {
         applicationNo: applicationNo,
         statusId: selectedStatusId,
-        serviceId: 26,
+        serviceId: serviceId,
         assignedRoleId: currentRoleId,
         remarks: remarks || "Application processed",
         updatedBy: actionId,
@@ -676,6 +780,8 @@ const ViewAccreditedCourseRegistration = () => {
         assignedRecs: assignedRecsPayload,
         assignedAccreditors: assignedAccreditorsPayload,
       };
+
+      console.log("Payload being sent:", payload);
 
       const response =
         await ApplyAccreditedCourseService.verifyAccreditedCourse(
@@ -695,14 +801,17 @@ const ViewAccreditedCourseRegistration = () => {
           case 59:
             successMessage = "Course endorsed successfully";
             break;
+          case 126:
+            successMessage = "Course renewed successfully";
+            break;
           case 57:
             successMessage = "Course approved successfully";
             break;
           case 58:
             successMessage = "Course rejected successfully";
             break;
-          case 60:
-            successMessage = "Forwarded back to QAS Level 1 successfully";
+          case 127:
+            successMessage = "Forwarded to Level 2 successfully";
             break;
           default:
             successMessage = "Action completed successfully";
@@ -734,8 +843,10 @@ const ViewAccreditedCourseRegistration = () => {
         return "Approve Course Application";
       case 58:
         return "Reject Course Application";
-      case 60:
-        return "Forward Back to QAS Level 1";
+      case 126:
+        return "Renew Course Application";
+      case 127:
+        return "Forward to Level 2";
       default:
         return "Confirm Action";
     }
@@ -773,13 +884,42 @@ const ViewAccreditedCourseRegistration = () => {
           />
         </>
       );
+    } else if (selectedStatusId === 127) {
+      return (
+        <>
+          <DialogContentText sx={{ mb: 2 }}>
+            Are you sure you want to forward this accredited course application
+            to Level 2?
+            <br />
+            <strong>Application No: {applicationNo}</strong>
+            <br />
+            <strong>
+              Course Title: {getCourseName(courseData?.course_id)}
+            </strong>
+          </DialogContentText>
+          <TextField
+            margin="dense"
+            label="Remarks (Optional)"
+            fullWidth
+            multiline
+            rows={3}
+            value={remarks}
+            onChange={(e) => {
+              setRemarks(e.target.value);
+            }}
+            placeholder="Add any additional remarks for forwarding to Level 2"
+          />
+        </>
+      );
     } else {
       const actionText =
         selectedStatusId === 56 || selectedStatusId === 62
           ? "verify"
           : selectedStatusId === 59
             ? "endorse"
-            : "approve";
+            : selectedStatusId === 126
+              ? "renew"
+              : "approve";
 
       return (
         <DialogContentText>
@@ -806,6 +946,10 @@ const ViewAccreditedCourseRegistration = () => {
         return "primary";
       case 60:
         return "warning";
+      case 126:
+        return "primary";
+      case 127:
+        return "primary";
       default:
         return "primary";
     }
@@ -825,6 +969,10 @@ const ViewAccreditedCourseRegistration = () => {
       case 58:
       case 60:
         return "Confirm Reject";
+      case 126:
+        return "Confirm Renew";
+      case 127:
+        return "Confirm Forward";
       default:
         return "Confirm";
     }
@@ -847,11 +995,16 @@ const ViewAccreditedCourseRegistration = () => {
     const taxPayerEmail = institute?.email_id || "N/A";
     const taxPayerMobileNo = institute?.mobile_no || "N/A";
     const instituteId = institute?.institute_id || "N/A";
+
     // Prepare the data for BIRMS payment
     const applicationNo = courseData.application_no;
-    const serviceCode = 100578;
+
+    // Use the constant service code directly
+    const serviceCode = SERVICE_CODE;
+
     const taxPayerNo = courseData.registration_no || "N/A";
     const taxPayerName = courseData.proposed_institute_name || "N/A";
+
     // Navigate to BIRMS payment page
     navigate(
       `/birms/common-payment-index/${applicationNo}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId} `,
@@ -898,61 +1051,125 @@ const ViewAccreditedCourseRegistration = () => {
                     const isNo = selectedValue === "N";
                     const remark = qualityRemarks[standard.id]?.[row.id] || "";
 
+                    // If role is 23, radios should be disabled (read-only)
+                    const isReadOnly = isRole23;
+
                     return (
                       <TableRow key={row.id}>
                         <TableCell>{index + 1}</TableCell>
                         <TableCell>{row.value}</TableCell>
                         <TableCell align="center">
-                          <Radio
-                            size="small"
-                            sx={{ p: 0.25 }}
-                            checked={isYes}
-                            onChange={() => {
-                              const newValue = isYes ? undefined : "Y";
-                              handleQualityResponseChange(
-                                standard.id,
-                                row.id,
-                                newValue,
-                              );
-                            }}
-                          />
+                          {isReadOnly ? (
+                            <Tooltip
+                              title="Quality checklist is read-only"
+                              arrow
+                            >
+                              <span>
+                                <Radio
+                                  size="small"
+                                  sx={{ p: 0.25 }}
+                                  checked={isYes}
+                                  disabled={true}
+                                />
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <Radio
+                              size="small"
+                              sx={{ p: 0.25 }}
+                              checked={isYes}
+                              onChange={() => {
+                                const newValue = isYes ? undefined : "Y";
+                                handleQualityResponseChange(
+                                  standard.id,
+                                  row.id,
+                                  newValue,
+                                );
+                              }}
+                            />
+                          )}
                         </TableCell>
                         <TableCell align="center">
-                          <Radio
-                            size="small"
-                            sx={{ p: 0.25 }}
-                            checked={isNo}
-                            onChange={() => {
-                              const newValue = isNo ? undefined : "N";
-                              handleQualityResponseChange(
-                                standard.id,
-                                row.id,
-                                newValue,
-                              );
-                            }}
-                          />
+                          {isReadOnly ? (
+                            <Tooltip
+                              title="Quality checklist is read-only"
+                              arrow
+                            >
+                              <span>
+                                <Radio
+                                  size="small"
+                                  sx={{ p: 0.25 }}
+                                  checked={isNo}
+                                  disabled={true}
+                                />
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <Radio
+                              size="small"
+                              sx={{ p: 0.25 }}
+                              checked={isNo}
+                              onChange={() => {
+                                const newValue = isNo ? undefined : "N";
+                                handleQualityResponseChange(
+                                  standard.id,
+                                  row.id,
+                                  newValue,
+                                );
+                              }}
+                            />
+                          )}
                         </TableCell>
                         <TableCell>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            placeholder="Enter remarks"
-                            value={remark}
-                            onChange={(e) =>
-                              handleQualityRemarkChange(
-                                standard.id,
-                                row.id,
-                                e.target.value,
-                              )
-                            }
-                            slotProps={{
-                              input: {
-                                sx: { fontSize: "0.75rem" },
-                              },
-                            }}
-                            multiline
-                            rows={2}
-                          />
+                          {isReadOnly ? (
+                            <Tooltip
+                              title="Quality checklist is read-only"
+                              arrow
+                            >
+                              <span
+                                style={{
+                                  width: "100%",
+                                  display: "inline-block",
+                                }}
+                              >
+                                <TextField
+                                  fullWidth
+                                  size="small"
+                                  placeholder="Enter remarks"
+                                  value={remark}
+                                  disabled={true}
+                                  slotProps={{
+                                    input: {
+                                      sx: { fontSize: "0.75rem" },
+                                    },
+                                  }}
+                                  multiline
+                                  rows={2}
+                                />
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <TextField
+                              fullWidth
+                              size="small"
+                              placeholder="Enter remarks"
+                              value={remark}
+                              onChange={(e) =>
+                                handleQualityRemarkChange(
+                                  standard.id,
+                                  row.id,
+                                  e.target.value,
+                                )
+                              }
+                              slotProps={{
+                                input: {
+                                  sx: { fontSize: "0.75rem" },
+                                },
+                              }}
+                              multiline
+                              rows={2}
+                            />
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -964,43 +1181,50 @@ const ViewAccreditedCourseRegistration = () => {
         </Grid>
       );
     },
-    [qualityResponses, qualityRemarks],
+    [qualityResponses, qualityRemarks, isRole23],
   );
 
-  const getTabs = () => {
+  // Use useMemo to compute tabs based on currentStatusId
+  const tabs = useMemo(() => {
     const baseTabs = [
       { icon: <BusinessIcon />, label: "Course Information" },
       { icon: <VerifiedIcon />, label: "Quality Standards" },
       { icon: <FileOpenIcon />, label: "Supporting Documents" },
     ];
 
-    // Add Accreditor tab if currentRoleId is 7
-    if (showAccreditorTab) {
-      baseTabs.push({
-        icon: <GroupAddIcon />,
-        label: "Add Accreditors",
-      });
-    }
+    // Check if status is 115 or 127 - hide Accreditor and REC tabs
+    const shouldHideAssignTabs =
+      Number(currentStatusId) === 115 || Number(currentStatusId) === 127;
 
-    // Add REC tab if currentRoleId is 7
-    if (showRecTab) {
-      baseTabs.push({ icon: <EngineeringIcon />, label: "Assign REC" });
-    }
+    console.log("Current Status ID in tabs:", currentStatusId);
+    console.log("Should hide assign tabs:", shouldHideAssignTabs);
 
-    // Add Generate PA Number tab for role 22
-    if (currentRoleId == 22) {
+    // Add Generate PA Number tab for role 7 - ALWAYS show this tab regardless of status
+    if (showGeneratePANumberTab) {
       baseTabs.push({
         icon: <SettingsSuggestIcon />,
         label: "Generate PA Number",
       });
     }
 
+    // Add Accreditor tab if currentRoleId is 7 and status is not 115 or 127
+    if (showAccreditorTab && !shouldHideAssignTabs) {
+      baseTabs.push({
+        icon: <GroupAddIcon />,
+        label: "Add Accreditors",
+      });
+    }
+
+    // Add REC tab if currentRoleId is 7 and status is not 115 or 127
+    if (showRecTab && !shouldHideAssignTabs) {
+      baseTabs.push({ icon: <EngineeringIcon />, label: "Assign REC" });
+    }
+
     return baseTabs;
-  };
+  }, [currentStatusId, showGeneratePANumberTab, showAccreditorTab, showRecTab]);
 
   // Navigation handlers
   const handleNextTab = () => {
-    const tabs = getTabs();
     if (tabValue < tabs.length - 1) {
       setTabValue(tabValue + 1);
     }
@@ -1014,28 +1238,24 @@ const ViewAccreditedCourseRegistration = () => {
 
   // Helper functions for button visibility
   const isFirstTab = () => tabValue === 0;
-  const isLastTab = () => {
-    const tabs = getTabs();
-    return tabValue === tabs.length - 1;
-  };
+  const isLastTab = () => tabValue === tabs.length - 1;
 
   // Get tab indices
   const getTabIndices = () => {
-    const tabs = getTabs();
+    let paNumberIndex = -1;
     let accreditorIndex = -1;
     let recIndex = -1;
-    let paNumberIndex = -1;
 
     tabs.forEach((tab, index) => {
+      if (tab.label === "Generate PA Number") paNumberIndex = index;
       if (tab.label === "Add Accreditors") accreditorIndex = index;
       if (tab.label === "Assign REC") recIndex = index;
-      if (tab.label === "Generate PA Number") paNumberIndex = index;
     });
 
-    return { accreditorIndex, recIndex, paNumberIndex };
+    return { paNumberIndex, accreditorIndex, recIndex };
   };
 
-  const { accreditorIndex, recIndex, paNumberIndex } = getTabIndices();
+  const { paNumberIndex, accreditorIndex, recIndex } = getTabIndices();
 
   // Get available REC members (not yet assigned)
   const availableRecs = recList.filter(
@@ -1100,7 +1320,7 @@ const ViewAccreditedCourseRegistration = () => {
             "& .MuiTab-root": { textTransform: "none", fontWeight: 600 },
           }}
         >
-          {getTabs().map((tab, index) => (
+          {tabs.map((tab, index) => (
             <Tab key={index} icon={tab.icon} label={tab.label} />
           ))}
         </Tabs>
@@ -1131,8 +1351,19 @@ const ViewAccreditedCourseRegistration = () => {
                 <TextField
                   fullWidth
                   size="small"
-                  label="Curriculum Type"
-                  value={courseData.curriculum_name || "N/A"}
+                  label="Curriculum Name"
+                  value={curriculumTypes?.curriculumName || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Certificate Level"
+                  value={getCertificateLevelName(
+                    curriculumTypes?.certificateLevelId,
+                  )}
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
@@ -1158,8 +1389,17 @@ const ViewAccreditedCourseRegistration = () => {
                 <TextField
                   fullWidth
                   size="small"
-                  label="Course Fee (RM)"
-                  value={courseData.course_fee || "N/A"}
+                  label="Fees per trainee (Nu.)"
+                  value={courseData.fees_per_trainee || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Enrollment capacity per batch"
+                  value={courseData.enrolment_capacity || "N/A"}
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
@@ -1169,6 +1409,50 @@ const ViewAccreditedCourseRegistration = () => {
                   size="small"
                   label="Application No"
                   value={courseData.application_no || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+
+              {/* Curriculum Duration Fields */}
+              <Grid size={{ xs: 12 }}>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                  Curriculum Duration Details
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Total Program Duration (Hours)"
+                  value={curriculumTypes?.totalProgramDuration || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Theory Duration (Hours)"
+                  value={curriculumTypes?.totalTheoryDuration || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Practical Duration (Hours)"
+                  value={curriculumTypes?.totalPracticalDuration || "N/A"}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="OJT Duration (Hours)"
+                  value={curriculumTypes?.totalOjtDuration || "N/A"}
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Grid>
@@ -1201,476 +1485,15 @@ const ViewAccreditedCourseRegistration = () => {
                 <FileDownload
                   initialFiles={documents}
                   onFileUpload={handleFileUpload}
-                  allowUpload={true}
+                  allowUpload={!isRole23}
                 />
               </Paper>
             </Grid>
           </Grid>
         )}
 
-        {/* Add Accreditors Tab */}
-        {showAccreditorTab && tabValue === accreditorIndex && (
-          <Grid container spacing={3} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 12 }}>
-              <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
-                  <GroupAddIcon sx={{ mr: 1, color: "primary.main" }} />
-                  <Typography variant="h6" fontWeight={600}>
-                    Add Accreditors
-                  </Typography>
-                </Box>
-
-                <Card variant="outlined" sx={{ mb: 3 }}>
-                  <CardContent>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={600}
-                      gutterBottom
-                    >
-                      Add Accreditor Members
-                    </Typography>
-
-                    {assignedAccreditors.length > 0 && (
-                      <Box sx={{ mb: 3 }}>
-                        <Typography
-                          variant="subtitle2"
-                          color="text.secondary"
-                          gutterBottom
-                        >
-                          Assigned Accreditors ({assignedAccreditors.length}):
-                        </Typography>
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          flexWrap="wrap"
-                          useFlexGap
-                        >
-                          {assignedAccreditors.map((acc) => (
-                            <Chip
-                              key={acc.id}
-                              label={`${acc.name} (${acc.userId})`}
-                              color="success"
-                              onDelete={() => openDeleteAccreditorDialog(acc)}
-                              deleteIcon={
-                                <DeleteIcon sx={{ color: "#d32f2f" }} />
-                              }
-                              sx={{
-                                mb: 1,
-                                "& .MuiChip-deleteIcon": {
-                                  color: "#d32f2f",
-                                  "&:hover": { color: "#b71c1c" },
-                                },
-                              }}
-                            />
-                          ))}
-                        </Stack>
-                      </Box>
-                    )}
-
-                    <Grid container spacing={2} alignItems="center">
-                      <Grid size={{ xs: 12, md: 8 }}>
-                        <Autocomplete
-                          fullWidth
-                          size="small"
-                          options={availableAccreditors}
-                          getOptionLabel={(option) =>
-                            `${option.name} (${option.userId})`
-                          }
-                          value={selectedAccreditorDetails || null}
-                          onChange={(event, newValue) => {
-                            setSelectedAccreditor(newValue ? newValue.id : "");
-                          }}
-                          filterOptions={(options, state) => {
-                            const searchTerm = state.inputValue
-                              .toLowerCase()
-                              .trim();
-                            if (!searchTerm || searchTerm.length < 2) {
-                              return [];
-                            }
-
-                            return options.filter(
-                              (option) =>
-                                option.name
-                                  .toLowerCase()
-                                  .includes(searchTerm) ||
-                                option.userId
-                                  ?.toLowerCase()
-                                  .includes(searchTerm) ||
-                                option.email
-                                  ?.toLowerCase()
-                                  .includes(searchTerm) ||
-                                option.mobileNo?.includes(searchTerm),
-                            );
-                          }}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label="Search Accreditor by Name or User ID"
-                              placeholder="Type at least 2 characters to search..."
-                            />
-                          )}
-                          renderOption={(props, option) => (
-                            <li {...props}>
-                              <Box>
-                                <Typography variant="body2">
-                                  {option.name}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
-                                  User ID: {option.userId} | Email:{" "}
-                                  {option.email || "N/A"} | Mobile:{" "}
-                                  {option.mobileNo || "N/A"}
-                                </Typography>
-                              </Box>
-                            </li>
-                          )}
-                          noOptionsText="No Accreditors available"
-                          loadingText="Loading..."
-                          disabled={availableAccreditors.length === 0}
-                          openOnFocus={false}
-                        />
-                      </Grid>
-
-                      <Grid size={{ xs: 12, md: 4 }}>
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          size="medium"
-                          startIcon={<PersonAddIcon />}
-                          onClick={handleAddAccreditor}
-                          disabled={
-                            !selectedAccreditor ||
-                            availableAccreditors.length === 0
-                          }
-                          sx={{
-                            fontWeight: 600,
-                            textTransform: "none",
-                            width: "100%",
-                          }}
-                        >
-                          Add Accreditor
-                        </Button>
-                      </Grid>
-                    </Grid>
-
-                    {selectedAccreditor && selectedAccreditorDetails && (
-                      <Box
-                        sx={{
-                          mt: 2,
-                          p: 2,
-                          bgcolor: "action.hover",
-                          borderRadius: 1,
-                        }}
-                      >
-                        <Typography
-                          variant="subtitle2"
-                          fontWeight={600}
-                          gutterBottom
-                        >
-                          Selected Accreditor Details:
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Name
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedAccreditorDetails.name}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              User ID
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedAccreditorDetails.userId}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Email
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedAccreditorDetails.email || "N/A"}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Mobile No
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedAccreditorDetails.mobileNo || "N/A"}
-                            </Typography>
-                          </Grid>
-                        </Grid>
-                      </Box>
-                    )}
-
-                    {assignedAccreditors.length === 0 && (
-                      <Alert severity="info" sx={{ mt: 2 }}>
-                        No Accreditors have been assigned yet. Use the search
-                        above to add Accreditor members.
-                      </Alert>
-                    )}
-
-                    {accreditorList.length === 0 && (
-                      <Alert severity="warning" sx={{ mt: 2 }}>
-                        No Accreditor members found. Please check if there are
-                        active Accreditor users in the system.
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
-              </Paper>
-            </Grid>
-          </Grid>
-        )}
-
-        {/* Assign REC Tab */}
-        {showRecTab && tabValue === recIndex && (
-          <Grid container spacing={3} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 12 }}>
-              <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
-                  <EngineeringIcon sx={{ mr: 1, color: "primary.main" }} />
-                  <Typography variant="h6" fontWeight={600}>
-                    Assign Regulatory and Evaluation Committee (REC)
-                  </Typography>
-                </Box>
-
-                <Card variant="outlined" sx={{ mb: 3 }}>
-                  <CardContent>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={600}
-                      gutterBottom
-                    >
-                      Add REC Members
-                    </Typography>
-
-                    {assignedRecs.length > 0 && (
-                      <Box sx={{ mb: 3 }}>
-                        <Typography
-                          variant="subtitle2"
-                          color="text.secondary"
-                          gutterBottom
-                        >
-                          Assigned REC Members ({assignedRecs.length}):
-                        </Typography>
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          flexWrap="wrap"
-                          useFlexGap
-                        >
-                          {assignedRecs.map((rec) => (
-                            <Chip
-                              key={rec.id}
-                              label={`${rec.name} (${rec.userId})`}
-                              color="success"
-                              onDelete={() => openDeleteRECDialog(rec)}
-                              deleteIcon={
-                                <DeleteIcon sx={{ color: "#d32f2f" }} />
-                              }
-                              sx={{
-                                mb: 1,
-                                "& .MuiChip-deleteIcon": {
-                                  color: "#d32f2f",
-                                  "&:hover": { color: "#b71c1c" },
-                                },
-                              }}
-                            />
-                          ))}
-                        </Stack>
-                      </Box>
-                    )}
-
-                    <Grid container spacing={2} alignItems="center">
-                      <Grid size={{ xs: 12, md: 8 }}>
-                        <Autocomplete
-                          fullWidth
-                          size="small"
-                          options={availableRecs}
-                          getOptionLabel={(option) =>
-                            `${option.name} (${option.userId})`
-                          }
-                          value={selectedRecDetails || null}
-                          onChange={(event, newValue) => {
-                            setSelectedRec(newValue ? newValue.id : "");
-                          }}
-                          filterOptions={(options, state) => {
-                            const searchTerm = state.inputValue
-                              .toLowerCase()
-                              .trim();
-                            if (!searchTerm || searchTerm.length < 2) {
-                              return [];
-                            }
-
-                            return options.filter(
-                              (option) =>
-                                option.name
-                                  .toLowerCase()
-                                  .includes(searchTerm) ||
-                                option.userId
-                                  ?.toLowerCase()
-                                  .includes(searchTerm) ||
-                                option.email
-                                  ?.toLowerCase()
-                                  .includes(searchTerm) ||
-                                option.mobileNo?.includes(searchTerm),
-                            );
-                          }}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label="Search REC Member by Name or User ID"
-                              placeholder="Type at least 2 characters to search..."
-                            />
-                          )}
-                          renderOption={(props, option) => (
-                            <li {...props}>
-                              <Box>
-                                <Typography variant="body2">
-                                  {option.name}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
-                                  User ID: {option.userId} | Email:{" "}
-                                  {option.email || "N/A"} | Mobile:{" "}
-                                  {option.mobileNo || "N/A"}
-                                </Typography>
-                              </Box>
-                            </li>
-                          )}
-                          noOptionsText="No REC members available"
-                          loadingText="Loading..."
-                          disabled={availableRecs.length === 0}
-                          openOnFocus={false}
-                        />
-                      </Grid>
-
-                      <Grid size={{ xs: 12, md: 4 }}>
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          size="medium"
-                          startIcon={<PersonAddIcon />}
-                          onClick={handleAddREC}
-                          disabled={!selectedRec || availableRecs.length === 0}
-                          sx={{
-                            fontWeight: 600,
-                            textTransform: "none",
-                            width: "100%",
-                          }}
-                        >
-                          Add REC
-                        </Button>
-                      </Grid>
-                    </Grid>
-
-                    {selectedRec && selectedRecDetails && (
-                      <Box
-                        sx={{
-                          mt: 2,
-                          p: 2,
-                          bgcolor: "action.hover",
-                          borderRadius: 1,
-                        }}
-                      >
-                        <Typography
-                          variant="subtitle2"
-                          fontWeight={600}
-                          gutterBottom
-                        >
-                          Selected REC Details:
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Name
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedRecDetails.name}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              User ID
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedRecDetails.userId}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Email
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedRecDetails.email || "N/A"}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Mobile No
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedRecDetails.mobileNo || "N/A"}
-                            </Typography>
-                          </Grid>
-                        </Grid>
-                      </Box>
-                    )}
-
-                    {assignedRecs.length === 0 && (
-                      <Alert severity="info" sx={{ mt: 2 }}>
-                        No REC members have been assigned yet. Use the search
-                        above to add REC members.
-                      </Alert>
-                    )}
-
-                    {recList.length === 0 && (
-                      <Alert severity="warning" sx={{ mt: 2 }}>
-                        No REC members found. Please check if there are active
-                        REC users in the system.
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
-              </Paper>
-            </Grid>
-          </Grid>
-        )}
-
-        {/* Generate PA Number Tab - Only for role 22 */}
-        {currentRoleId == 22 && tabValue === paNumberIndex && (
+        {/* Generate PA Number Tab - Always shown for role 7 */}
+        {showGeneratePANumberTab && tabValue === paNumberIndex && (
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12 }}>
               <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
@@ -1903,6 +1726,60 @@ const ViewAccreditedCourseRegistration = () => {
                             </Typography>
                           </Box>
                         </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 70 }}
+                            >
+                              Service Code:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ fontSize: "0.75rem" }}
+                            >
+                              {SERVICE_CODE}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              py: 0.25,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ minWidth: 70 }}
+                            >
+                              Certificate Level:
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{ fontSize: "0.75rem" }}
+                            >
+                              {getCertificateLevelName(
+                                curriculumTypes?.certificateLevelId,
+                              )}
+                            </Typography>
+                          </Box>
+                        </Grid>
                       </Grid>
 
                       {paymentStatus.redirectUrl && (
@@ -2011,6 +1888,532 @@ const ViewAccreditedCourseRegistration = () => {
           </Grid>
         )}
 
+        {/* Add Accreditors Tab */}
+        {showAccreditorTab && tabValue === accreditorIndex && (
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid size={{ xs: 12 }}>
+              <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+                  <GroupAddIcon sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6" fontWeight={600}>
+                    Add Accreditors
+                  </Typography>
+                </Box>
+
+                <Card variant="outlined" sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={600}
+                      gutterBottom
+                    >
+                      Add Accreditor Members
+                    </Typography>
+
+                    {assignedAccreditors.length > 0 && (
+                      <Box sx={{ mb: 3 }}>
+                        <Typography
+                          variant="subtitle2"
+                          color="text.secondary"
+                          gutterBottom
+                        >
+                          Assigned Accreditors ({assignedAccreditors.length}):
+                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          flexWrap="wrap"
+                          useFlexGap
+                        >
+                          {assignedAccreditors.map((acc) => (
+                            <Tooltip
+                              key={acc.id}
+                              title={
+                                isRole23
+                                  ? "Accreditor Can Readonly"
+                                  : "Click to remove"
+                              }
+                              arrow
+                            >
+                              <span>
+                                <Chip
+                                  label={`${acc.name} (${acc.userId})`}
+                                  color="success"
+                                  onDelete={
+                                    isRole23
+                                      ? undefined
+                                      : () => openDeleteAccreditorDialog(acc)
+                                  }
+                                  deleteIcon={
+                                    isRole23 ? undefined : (
+                                      <DeleteIcon sx={{ color: "#d32f2f" }} />
+                                    )
+                                  }
+                                  sx={{
+                                    mb: 1,
+                                    "& .MuiChip-deleteIcon": {
+                                      color: "#d32f2f",
+                                      "&:hover": { color: "#b71c1c" },
+                                    },
+                                    ...(isRole23 && {
+                                      cursor: "default",
+                                      "& .MuiChip-deleteIcon": {
+                                        display: "none",
+                                      },
+                                    }),
+                                  }}
+                                />
+                              </span>
+                            </Tooltip>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid size={{ xs: 12, md: 8 }}>
+                        <Autocomplete
+                          fullWidth
+                          size="small"
+                          options={availableAccreditors}
+                          getOptionLabel={(option) =>
+                            `${option.name} (${option.userId})`
+                          }
+                          value={selectedAccreditorDetails || null}
+                          onChange={(event, newValue) => {
+                            if (isRole23) {
+                              toast.warning(
+                                "Accreditors are read-only for your role",
+                              );
+                              return;
+                            }
+                            setSelectedAccreditor(newValue ? newValue.id : "");
+                          }}
+                          filterOptions={(options, state) => {
+                            const searchTerm = state.inputValue
+                              .toLowerCase()
+                              .trim();
+                            if (!searchTerm || searchTerm.length < 2) {
+                              return [];
+                            }
+
+                            return options.filter(
+                              (option) =>
+                                option.name
+                                  .toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.userId
+                                  ?.toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.email
+                                  ?.toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.mobileNo?.includes(searchTerm),
+                            );
+                          }}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="Search Accreditor by Name or User ID"
+                              placeholder="Type at least 2 characters to search..."
+                            />
+                          )}
+                          renderOption={(props, option) => (
+                            <li {...props}>
+                              <Box>
+                                <Typography variant="body2">
+                                  {option.name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  User ID: {option.userId} | Email:{" "}
+                                  {option.email || "N/A"} | Mobile:{" "}
+                                  {option.mobileNo || "N/A"}
+                                </Typography>
+                              </Box>
+                            </li>
+                          )}
+                          noOptionsText="No Accreditors available"
+                          loadingText="Loading..."
+                          disabled={
+                            availableAccreditors.length === 0 || isRole23
+                          }
+                          openOnFocus={false}
+                        />
+                      </Grid>
+
+                      <Grid size={{ xs: 12, md: 4 }}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="medium"
+                          startIcon={<PersonAddIcon />}
+                          onClick={handleAddAccreditor}
+                          disabled={
+                            !selectedAccreditor ||
+                            availableAccreditors.length === 0 ||
+                            isRole23
+                          }
+                          sx={{
+                            fontWeight: 600,
+                            textTransform: "none",
+                            width: "100%",
+                          }}
+                        >
+                          Add Accreditor
+                        </Button>
+                      </Grid>
+                    </Grid>
+
+                    {selectedAccreditor && selectedAccreditorDetails && (
+                      <Box
+                        sx={{
+                          mt: 2,
+                          p: 2,
+                          bgcolor: "action.hover",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight={600}
+                          gutterBottom
+                        >
+                          Selected Accreditor Details:
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Name
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedAccreditorDetails.name}
+                            </Typography>
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              User ID
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedAccreditorDetails.userId}
+                            </Typography>
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Email
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedAccreditorDetails.email || "N/A"}
+                            </Typography>
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Mobile No
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedAccreditorDetails.mobileNo || "N/A"}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    )}
+
+                    {assignedAccreditors.length === 0 && (
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        No Accreditors have been assigned yet. Use the search
+                        above to add Accreditor members.
+                      </Alert>
+                    )}
+
+                    {accreditorList.length === 0 && (
+                      <Alert severity="warning" sx={{ mt: 2 }}>
+                        No Accreditor members found. Please check if there are
+                        active Accreditor users in the system.
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Assign REC Tab */}
+        {showRecTab && tabValue === recIndex && (
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid size={{ xs: 12 }}>
+              <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+                  <EngineeringIcon sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6" fontWeight={600}>
+                    Assign Regulatory and Evaluation Committee (REC)
+                  </Typography>
+                </Box>
+
+                <Card variant="outlined" sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={600}
+                      gutterBottom
+                    >
+                      Add REC Members
+                    </Typography>
+
+                    {assignedRecs.length > 0 && (
+                      <Box sx={{ mb: 3 }}>
+                        <Typography
+                          variant="subtitle2"
+                          color="text.secondary"
+                          gutterBottom
+                        >
+                          Assigned REC Members ({assignedRecs.length}):
+                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          flexWrap="wrap"
+                          useFlexGap
+                        >
+                          {assignedRecs.map((rec) => (
+                            <Tooltip
+                              key={rec.id}
+                              title={
+                                isRole23
+                                  ? "REC Member Can Readonly"
+                                  : "Click to remove"
+                              }
+                              arrow
+                            >
+                              <span>
+                                <Chip
+                                  label={`${rec.name} (${rec.userId})`}
+                                  color="success"
+                                  onDelete={
+                                    isRole23
+                                      ? undefined
+                                      : () => openDeleteRECDialog(rec)
+                                  }
+                                  deleteIcon={
+                                    isRole23 ? undefined : (
+                                      <DeleteIcon sx={{ color: "#d32f2f" }} />
+                                    )
+                                  }
+                                  sx={{
+                                    mb: 1,
+                                    "& .MuiChip-deleteIcon": {
+                                      color: "#d32f2f",
+                                      "&:hover": { color: "#b71c1c" },
+                                    },
+                                    ...(isRole23 && {
+                                      cursor: "default",
+                                      "& .MuiChip-deleteIcon": {
+                                        display: "none",
+                                      },
+                                    }),
+                                  }}
+                                />
+                              </span>
+                            </Tooltip>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid size={{ xs: 12, md: 8 }}>
+                        <Autocomplete
+                          fullWidth
+                          size="small"
+                          options={availableRecs}
+                          getOptionLabel={(option) =>
+                            `${option.name} (${option.userId})`
+                          }
+                          value={selectedRecDetails || null}
+                          onChange={(event, newValue) => {
+                            if (isRole23) {
+                              toast.warning(
+                                "REC members are read-only for your role",
+                              );
+                              return;
+                            }
+                            setSelectedRec(newValue ? newValue.id : "");
+                          }}
+                          filterOptions={(options, state) => {
+                            const searchTerm = state.inputValue
+                              .toLowerCase()
+                              .trim();
+                            if (!searchTerm || searchTerm.length < 2) {
+                              return [];
+                            }
+
+                            return options.filter(
+                              (option) =>
+                                option.name
+                                  .toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.userId
+                                  ?.toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.email
+                                  ?.toLowerCase()
+                                  .includes(searchTerm) ||
+                                option.mobileNo?.includes(searchTerm),
+                            );
+                          }}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="Search REC Member by Name or User ID"
+                              placeholder="Type at least 2 characters to search..."
+                            />
+                          )}
+                          renderOption={(props, option) => (
+                            <li {...props}>
+                              <Box>
+                                <Typography variant="body2">
+                                  {option.name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  User ID: {option.userId} | Email:{" "}
+                                  {option.email || "N/A"} | Mobile:{" "}
+                                  {option.mobileNo || "N/A"}
+                                </Typography>
+                              </Box>
+                            </li>
+                          )}
+                          noOptionsText="No REC members available"
+                          loadingText="Loading..."
+                          disabled={availableRecs.length === 0 || isRole23}
+                          openOnFocus={false}
+                        />
+                      </Grid>
+
+                      <Grid size={{ xs: 12, md: 4 }}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="medium"
+                          startIcon={<PersonAddIcon />}
+                          onClick={handleAddREC}
+                          disabled={
+                            !selectedRec ||
+                            availableRecs.length === 0 ||
+                            isRole23
+                          }
+                          sx={{
+                            fontWeight: 600,
+                            textTransform: "none",
+                            width: "100%",
+                          }}
+                        >
+                          Add REC
+                        </Button>
+                      </Grid>
+                    </Grid>
+
+                    {selectedRec && selectedRecDetails && (
+                      <Box
+                        sx={{
+                          mt: 2,
+                          p: 2,
+                          bgcolor: "action.hover",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight={600}
+                          gutterBottom
+                        >
+                          Selected REC Details:
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Name
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedRecDetails.name}
+                            </Typography>
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              User ID
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedRecDetails.userId}
+                            </Typography>
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Email
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedRecDetails.email || "N/A"}
+                            </Typography>
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 3 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Mobile No
+                            </Typography>
+                            <Typography variant="body2">
+                              {selectedRecDetails.mobileNo || "N/A"}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    )}
+
+                    {assignedRecs.length === 0 && (
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        No REC members have been assigned yet. Use the search
+                        above to add REC members.
+                      </Alert>
+                    )}
+
+                    {recList.length === 0 && (
+                      <Alert severity="warning" sx={{ mt: 2 }}>
+                        No REC members found. Please check if there are active
+                        REC users in the system.
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+
         {/* Navigation and Action Buttons */}
         <Box
           sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}
@@ -2044,56 +2447,113 @@ const ViewAccreditedCourseRegistration = () => {
             <>
               {roleId === "7" && (
                 <>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    size="small"
-                    startIcon={<CheckCircleIcon />}
-                    onClick={() => openActionDialog(56)}
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
-                  >
-                    Verify
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    startIcon={<CancelIcon />}
-                    onClick={() => openActionDialog(58)}
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
-                  >
-                    Reject
-                  </Button>
+                  {Number(currentStatusId) === 115 ||
+                  Number(currentStatusId) === 127 ? (
+                    <Tooltip
+                      title={
+                        !isPaymentCompleted()
+                          ? "Payment must be completed before forwarding to Level 2"
+                          : "Forward this application to Level 2"
+                      }
+                      arrow
+                    >
+                      <span>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          startIcon={<SkipNextIcon />}
+                          onClick={() => openActionDialog(127)}
+                          disabled={!isPaymentCompleted()}
+                          sx={{
+                            px: 3,
+                            py: 0.5,
+                            fontWeight: 600,
+                            textTransform: "none",
+                          }}
+                        >
+                          Forwarded LEVEL 2
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <>
+                      <Tooltip
+                        title={
+                          !isPaymentCompleted()
+                            ? "Payment must be completed before verification"
+                            : "Verify this accredited course application"
+                        }
+                        arrow
+                      >
+                        <span>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<CheckCircleIcon />}
+                            onClick={() => openActionDialog(56)}
+                            disabled={!isPaymentCompleted()}
+                            sx={{
+                              px: 3,
+                              py: 0.5,
+                              fontWeight: 600,
+                              textTransform: "none",
+                            }}
+                          >
+                            Verify
+                          </Button>
+                        </span>
+                      </Tooltip>
+                      <Button
+                        variant="contained"
+                        color="error"
+                        size="small"
+                        startIcon={<CancelIcon />}
+                        onClick={() => openActionDialog(58)}
+                        sx={{
+                          px: 3,
+                          py: 0.5,
+                          fontWeight: 600,
+                          textTransform: "none",
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
 
               {roleId === "10" && (
                 <>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    size="small"
-                    startIcon={<CheckCircleIcon />}
-                    onClick={() => openActionDialog(62)}
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
+                  <Tooltip
+                    title={
+                      !isPaymentCompleted()
+                        ? "Payment must be completed before verification"
+                        : "Verify this accredited course application"
+                    }
+                    arrow
                   >
-                    Verify
-                  </Button>
+                    <span>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="small"
+                        startIcon={<CheckIcon />}
+                        onClick={() => openActionDialog(62)}
+                        disabled={!isPaymentCompleted()}
+                        sx={{
+                          px: 3,
+                          py: 0.5,
+                          fontWeight: 600,
+                          textTransform: "none",
+                        }}
+                      >
+                        Verify
+                      </Button>
+                    </span>
+                  </Tooltip>
                   <Button
                     variant="contained"
                     color="error"
@@ -2113,40 +2573,22 @@ const ViewAccreditedCourseRegistration = () => {
               )}
 
               {roleId === "23" && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  startIcon={<VerifiedIcon />}
-                  onClick={() => openActionDialog(59)}
-                  sx={{
-                    px: 3,
-                    py: 0.5,
-                    fontWeight: 600,
-                    textTransform: "none",
-                  }}
-                >
-                  Endorse
-                </Button>
-              )}
-
-              {roleId === "22" && (
                 <Tooltip
                   title={
-                    !paymentStatus
-                      ? "Payment must be completed before approval"
-                      : ""
+                    !isPaymentCompleted()
+                      ? "Payment must be completed before endorsement"
+                      : "Endorse this accredited course application"
                   }
                   arrow
                 >
                   <span>
                     <Button
                       variant="contained"
-                      color="success"
+                      color="primary"
                       size="small"
-                      startIcon={<CheckCircleIcon />}
-                      onClick={() => openActionDialog(57)}
-                      disabled={!paymentStatus}
+                      startIcon={<VerifiedIcon />}
+                      onClick={() => openActionDialog(59)}
+                      disabled={!isPaymentCompleted()}
                       sx={{
                         px: 3,
                         py: 0.5,
@@ -2154,10 +2596,72 @@ const ViewAccreditedCourseRegistration = () => {
                         textTransform: "none",
                       }}
                     >
-                      Approve
+                      Endorse
                     </Button>
                   </span>
                 </Tooltip>
+              )}
+
+              {roleId === "22" && (
+                <>
+                  {Number(currentStatusId) === 127 ? (
+                    <Tooltip
+                      title={
+                        !isPaymentCompleted()
+                          ? "Payment must be completed before renewal"
+                          : "Renew this accredited course application"
+                      }
+                      arrow
+                    >
+                      <span>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          startIcon={<VerifiedIcon />}
+                          onClick={() => openActionDialog(126)}
+                          disabled={!isPaymentCompleted()}
+                          sx={{
+                            px: 3,
+                            py: 0.5,
+                            fontWeight: 600,
+                            textTransform: "none",
+                          }}
+                        >
+                          Renew
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip
+                      title={
+                        !isPaymentCompleted()
+                          ? "Payment must be completed before approval"
+                          : "Approve this accredited course application"
+                      }
+                      arrow
+                    >
+                      <span>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          size="small"
+                          startIcon={<CheckCircleIcon />}
+                          onClick={() => openActionDialog(57)}
+                          disabled={!isPaymentCompleted()}
+                          sx={{
+                            px: 3,
+                            py: 0.5,
+                            fontWeight: 600,
+                            textTransform: "none",
+                          }}
+                        >
+                          Approve
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
+                </>
               )}
             </>
           )}
