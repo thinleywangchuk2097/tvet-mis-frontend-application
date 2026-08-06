@@ -359,7 +359,7 @@ const transactionSchema = Yup.object().shape({
   status: Yup.string().required("Required"),
 });
 
-// Enhanced Stat Card Component
+// Enhanced Stat Card Component - Compact version
 const EnhancedStatCard = ({
   title,
   value,
@@ -389,7 +389,7 @@ const EnhancedStatCard = ({
       <Card
         elevation={0}
         sx={{
-          borderRadius: 3,
+          borderRadius: 2,
           height: "100%",
           border: "1px solid #e0e0e0",
           transition: "all 0.3s ease",
@@ -398,8 +398,8 @@ const EnhancedStatCard = ({
           overflow: "hidden",
           cursor: "pointer",
           "&:hover": {
-            transform: "translateY(-6px)",
-            boxShadow: `0 12px 32px ${alpha(mainColor, 0.15)}`,
+            transform: "translateY(-4px)",
+            boxShadow: `0 8px 24px ${alpha(mainColor, 0.12)}`,
             borderColor: mainColor,
           },
           "&::before": {
@@ -408,18 +408,18 @@ const EnhancedStatCard = ({
             top: 0,
             left: 0,
             right: 0,
-            height: "4px",
+            height: "3px",
             background: `linear-gradient(90deg, ${mainColor}, ${alpha(mainColor, 0.6)})`,
           },
         }}
       >
-        <CardContent sx={{ p: 3 }}>
+        <CardContent sx={{ p: 2 }}>
           <Box
             sx={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "flex-start",
-              mb: 2,
+              mb: 1,
             }}
           >
             <Box>
@@ -429,11 +429,20 @@ const EnhancedStatCard = ({
                   color: "#666",
                   textTransform: "uppercase",
                   fontWeight: 600,
+                  fontSize: "0.65rem",
                 }}
               >
                 {title}
               </Typography>
-              <Typography variant="h4" fontWeight={800} sx={{ mt: 1, mb: 0.5 }}>
+              <Typography
+                variant="h5"
+                fontWeight={800}
+                sx={{
+                  mt: 0.5,
+                  mb: 0,
+                  fontSize: "1.5rem",
+                }}
+              >
                 {typeof value === "number" && title.includes("Revenue")
                   ? `$${value.toLocaleString()}`
                   : typeof value === "number"
@@ -443,7 +452,11 @@ const EnhancedStatCard = ({
               {subtitle && (
                 <Typography
                   variant="caption"
-                  sx={{ color: "#666", display: "block" }}
+                  sx={{
+                    color: "#666",
+                    display: "block",
+                    fontSize: "0.6rem",
+                  }}
                 >
                   {subtitle}
                 </Typography>
@@ -453,8 +466,8 @@ const EnhancedStatCard = ({
               sx={{
                 bgcolor: alpha(mainColor, 0.1),
                 color: mainColor,
-                width: 56,
-                height: 56,
+                width: 40,
+                height: 40,
               }}
             >
               {icon}
@@ -466,15 +479,19 @@ const EnhancedStatCard = ({
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
-                mb: target ? 2 : 0,
+                gap: 0.5,
+                mb: target ? 1 : 0,
               }}
             >
               <Chip
                 label={`${trend.value > 0 ? "+" : ""}${trend.value}%`}
                 size="small"
                 icon={
-                  trend.value > 0 ? <TrendingUpIcon /> : <ArrowDownwardIcon />
+                  trend.value > 0 ? (
+                    <TrendingUpIcon sx={{ fontSize: 14 }} />
+                  ) : (
+                    <ArrowDownwardIcon sx={{ fontSize: 14 }} />
+                  )
                 }
                 sx={{
                   bgcolor:
@@ -483,30 +500,51 @@ const EnhancedStatCard = ({
                       : alpha(COLORS.error, 0.1),
                   color: trend.value > 0 ? COLORS.success : COLORS.error,
                   fontWeight: 600,
+                  height: 20,
+                  fontSize: "0.65rem",
+                  "& .MuiChip-label": {
+                    fontSize: "0.65rem",
+                    px: 1,
+                  },
                 }}
               />
-              <Typography variant="caption" color="text.secondary">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  fontSize: "0.6rem",
+                }}
+              >
                 vs last period
               </Typography>
             </Box>
           )}
 
           {target && (
-            <Box sx={{ mt: 1 }}>
+            <Box sx={{ mt: 0.5 }}>
               <Box
                 sx={{
                   display: "flex",
                   justifyContent: "space-between",
-                  mb: 0.5,
+                  mb: 0.25,
                 }}
               >
-                <Typography variant="caption" color="text.secondary">
-                  Progress to target
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    fontSize: "0.6rem",
+                  }}
+                >
+                  Progress
                 </Typography>
                 <Typography
                   variant="caption"
                   fontWeight={600}
                   color={mainColor}
+                  sx={{
+                    fontSize: "0.6rem",
+                  }}
                 >
                   {progress.toFixed(0)}%
                 </Typography>
@@ -515,19 +553,23 @@ const EnhancedStatCard = ({
                 variant="determinate"
                 value={Math.min(progress, 100)}
                 sx={{
-                  height: 6,
-                  borderRadius: 3,
+                  height: 4,
+                  borderRadius: 2,
                   bgcolor: alpha(mainColor, 0.1),
                   "& .MuiLinearProgress-bar": {
                     bgcolor: mainColor,
-                    borderRadius: 3,
+                    borderRadius: 2,
                   },
                 }}
               />
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ mt: 0.5, display: "block" }}
+                sx={{
+                  mt: 0.25,
+                  display: "block",
+                  fontSize: "0.55rem",
+                }}
               >
                 Target:{" "}
                 {typeof target === "number" && title.includes("Revenue")
@@ -562,7 +604,7 @@ const Level2Dashboard = () => {
       title: "Total Revenue",
       value: level2Data.kpis.totalRevenue.value,
       target: level2Data.kpis.totalRevenue.target,
-      icon: <MoneyIcon sx={{ fontSize: 32 }} />,
+      icon: <MoneyIcon sx={{ fontSize: 24 }} />,
       color: "primary",
       trend: { value: level2Data.kpis.totalRevenue.growth, label: "growth" },
       subtitle: "Year to date",
@@ -571,7 +613,7 @@ const Level2Dashboard = () => {
       title: "Active Users",
       value: level2Data.kpis.activeUsers.value,
       target: level2Data.kpis.activeUsers.target,
-      icon: <PeopleIcon sx={{ fontSize: 32 }} />,
+      icon: <PeopleIcon sx={{ fontSize: 24 }} />,
       color: "secondary",
       trend: { value: level2Data.kpis.activeUsers.growth, label: "increase" },
       subtitle: "Monthly active",
@@ -580,7 +622,7 @@ const Level2Dashboard = () => {
       title: "Conversion Rate",
       value: `${level2Data.kpis.conversionRate.value}%`,
       target: level2Data.kpis.conversionRate.target,
-      icon: <BarChartIcon sx={{ fontSize: 32 }} />,
+      icon: <BarChartIcon sx={{ fontSize: 24 }} />,
       color: "success",
       trend: {
         value: level2Data.kpis.conversionRate.growth,
@@ -592,7 +634,7 @@ const Level2Dashboard = () => {
       title: "Customer Satisfaction",
       value: level2Data.kpis.customerSatisfaction.value,
       target: level2Data.kpis.customerSatisfaction.target,
-      icon: <StarIcon sx={{ fontSize: 32 }} />,
+      icon: <StarIcon sx={{ fontSize: 24 }} />,
       color: "warning",
       trend: {
         value: level2Data.kpis.customerSatisfaction.growth * 10,
@@ -669,17 +711,17 @@ const Level2Dashboard = () => {
       completed: {
         label: "Completed",
         color: "success",
-        icon: <CheckCircleIcon sx={{ fontSize: 14 }} />,
+        icon: <CheckCircleIcon sx={{ fontSize: 12 }} />,
       },
       pending: {
         label: "Pending",
         color: "warning",
-        icon: <TimelineIcon sx={{ fontSize: 14 }} />,
+        icon: <TimelineIcon sx={{ fontSize: 12 }} />,
       },
       failed: {
         label: "Failed",
         color: "error",
-        icon: <WarningIcon sx={{ fontSize: 14 }} />,
+        icon: <WarningIcon sx={{ fontSize: 12 }} />,
       },
     };
     const { label, color, icon } = config[status] || config.pending;
@@ -690,21 +732,35 @@ const Level2Dashboard = () => {
         size="small"
         color={color}
         variant="outlined"
-        sx={{ fontWeight: 500 }}
+        sx={{
+          fontWeight: 500,
+          height: 24,
+          fontSize: "0.7rem",
+          "& .MuiChip-label": {
+            fontSize: "0.7rem",
+            px: 1,
+          },
+        }}
       />
     );
   };
 
   return (
-    <Paper sx={{ p: 2, mt: 1 }}>
+    <Paper sx={{ p: 1.5, mt: 1 }}>
       {/* Header Section */}
-
-      <Typography variant="h6" fontWeight={700} mb={3}>
+      <Typography
+        variant="h6"
+        fontWeight={700}
+        mb={2}
+        sx={{
+          fontSize: "1.1rem",
+        }}
+      >
         Level 2 Dashboard
       </Typography>
 
       {/* KPI Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         {kpiCards.map((kpi, index) => (
           <Grid item size={{ xs: 12, sm: 6, md: 3 }} key={index}>
             <EnhancedStatCard {...kpi} />
@@ -715,12 +771,20 @@ const Level2Dashboard = () => {
       {/* Tabs Navigation */}
       <Paper
         elevation={0}
-        sx={{ mb: 3, borderRadius: 2, border: "1px solid #e0e0e0" }}
+        sx={{ mb: 2, borderRadius: 2, border: "1px solid #e0e0e0" }}
       >
         <Tabs
           value={selectedTab}
           onChange={(e, v) => setSelectedTab(v)}
-          sx={{ px: 2 }}
+          sx={{
+            px: 1,
+            minHeight: 40,
+            "& .MuiTab-root": {
+              fontSize: "0.75rem",
+              minHeight: 40,
+              py: 0.5,
+            },
+          }}
         >
           <Tab label="Performance Overview" />
           <Tab label="Product Analytics" />
@@ -733,16 +797,16 @@ const Level2Dashboard = () => {
       {selectedTab === 0 && (
         <Fade in>
           <Box>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               {/* Revenue & Users Trend */}
               <Grid item size={{ xs: 12, sm: 12, md: 6 }}>
                 <Paper
                   elevation={0}
                   sx={{
-                    p: 3,
-                    borderRadius: 3,
+                    p: 2,
+                    borderRadius: 2,
                     border: "1px solid #e0e0e0",
-                    height: 400,
+                    height: 320,
                   }}
                 >
                   <Box
@@ -750,42 +814,54 @@ const Level2Dashboard = () => {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      mb: 2,
+                      mb: 1,
                     }}
                   >
-                    <Typography variant="h6" fontWeight={700}>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={700}
+                      sx={{
+                        fontSize: "0.9rem",
+                      }}
+                    >
                       Revenue & User Growth
                     </Typography>
                     <Tooltip title="Monthly performance trend">
                       <IconButton size="small">
-                        <ShowChartIcon />
+                        <ShowChartIcon sx={{ fontSize: 18 }} />
                       </IconButton>
                     </Tooltip>
                   </Box>
-                  <ResponsiveContainer width="100%" height="85%">
+                  <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={level2Data.performanceData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                      <XAxis dataKey="month" stroke="#666" />
-                      <YAxis yAxisId="left" stroke={COLORS.primary} />
+                      <XAxis dataKey="month" stroke="#666" fontSize={10} />
+                      <YAxis
+                        yAxisId="left"
+                        stroke={COLORS.primary}
+                        fontSize={10}
+                      />
                       <YAxis
                         yAxisId="right"
                         orientation="right"
                         stroke={COLORS.secondary}
+                        fontSize={10}
                       />
                       <RechartsTooltip
                         contentStyle={{
-                          borderRadius: 8,
+                          borderRadius: 6,
                           border: "1px solid #e0e0e0",
+                          fontSize: "0.7rem",
                         }}
                       />
-                      <Legend />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                       <Bar
                         yAxisId="left"
                         dataKey="revenue"
                         name="Revenue ($)"
                         fill={COLORS.primary}
-                        barSize={30}
-                        radius={[4, 4, 0, 0]}
+                        barSize={20}
+                        radius={[3, 3, 0, 0]}
                       />
                       <Line
                         yAxisId="right"
@@ -794,7 +870,7 @@ const Level2Dashboard = () => {
                         name="Active Users"
                         stroke={COLORS.secondary}
                         strokeWidth={2}
-                        dot={{ r: 4 }}
+                        dot={{ r: 3 }}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -806,28 +882,40 @@ const Level2Dashboard = () => {
                 <Paper
                   elevation={0}
                   sx={{
-                    p: 3,
-                    borderRadius: 3,
+                    p: 2,
+                    borderRadius: 2,
                     border: "1px solid #e0e0e0",
-                    height: 400,
+                    height: 320,
                   }}
                 >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    gutterBottom
+                    sx={{
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     Engagement Metrics
                   </Typography>
-                  <ResponsiveContainer width="100%" height="85%">
+                  <ResponsiveContainer width="100%" height="90%">
                     <LineChart data={level2Data.performanceData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                      <XAxis dataKey="month" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <RechartsTooltip />
-                      <Legend />
+                      <XAxis dataKey="month" stroke="#666" fontSize={10} />
+                      <YAxis stroke="#666" fontSize={10} />
+                      <RechartsTooltip
+                        contentStyle={{
+                          fontSize: "0.7rem",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                       <Line
                         type="monotone"
                         dataKey="engagement"
                         name="Engagement %"
                         stroke={COLORS.success}
                         strokeWidth={2}
+                        dot={{ r: 3 }}
                       />
                       <Line
                         type="monotone"
@@ -835,6 +923,7 @@ const Level2Dashboard = () => {
                         name="Satisfaction"
                         stroke={COLORS.warning}
                         strokeWidth={2}
+                        dot={{ r: 3 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -843,19 +932,26 @@ const Level2Dashboard = () => {
             </Grid>
 
             {/* Department Performance & Geographic Distribution */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item size={{ xs: 12, md: 6 }}>
                 <Paper
                   elevation={0}
                   sx={{
-                    p: 3,
-                    borderRadius: 3,
+                    p: 2,
+                    borderRadius: 2,
                     border: "1px solid #e0e0e0",
-                    height: 350,
+                    height: 280,
                   }}
                 >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
-                    Department Performance vs Target
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    gutterBottom
+                    sx={{
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    Department Performance
                   </Typography>
                   <ResponsiveContainer width="100%" height="85%">
                     <BarChart
@@ -863,21 +959,33 @@ const Level2Dashboard = () => {
                       layout="vertical"
                     >
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" stroke="#666" />
-                      <YAxis type="category" dataKey="name" stroke="#666" />
-                      <RechartsTooltip />
-                      <Legend />
+                      <XAxis type="number" stroke="#666" fontSize={10} />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        stroke="#666"
+                        fontSize={10}
+                        width={80}
+                      />
+                      <RechartsTooltip
+                        contentStyle={{
+                          fontSize: "0.7rem",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                       <Bar
                         dataKey="value"
                         name="Actual"
                         fill={COLORS.primary}
-                        radius={[0, 4, 4, 0]}
+                        radius={[0, 3, 3, 0]}
+                        barSize={16}
                       />
                       <Bar
                         dataKey="target"
                         name="Target"
                         fill={COLORS.secondary}
-                        radius={[0, 4, 4, 0]}
+                        radius={[0, 3, 3, 0]}
+                        barSize={16}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -888,13 +996,20 @@ const Level2Dashboard = () => {
                 <Paper
                   elevation={0}
                   sx={{
-                    p: 3,
-                    borderRadius: 3,
+                    p: 2,
+                    borderRadius: 2,
                     border: "1px solid #e0e0e0",
-                    height: 350,
+                    height: 280,
                   }}
                 >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    gutterBottom
+                    sx={{
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     Geographic Distribution
                   </Typography>
                   <ResponsiveContainer width="100%" height="85%">
@@ -903,18 +1018,22 @@ const Level2Dashboard = () => {
                         data={level2Data.regionData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
+                        innerRadius={50}
+                        outerRadius={80}
                         paddingAngle={3}
                         dataKey="value"
-                        label
+                        label={{ fontSize: 10 }}
                       >
                         {level2Data.regionData.map((entry, index) => (
                           <Cell key={index} fill={entry.color} />
                         ))}
                       </Pie>
-                      <RechartsTooltip />
-                      <Legend />
+                      <RechartsTooltip
+                        contentStyle={{
+                          fontSize: "0.7rem",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </Paper>
@@ -928,33 +1047,50 @@ const Level2Dashboard = () => {
       {selectedTab === 1 && (
         <Fade in>
           <Box>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item size={{ xs: 12, md: 12 }}>
                 <Paper
                   elevation={0}
-                  sx={{ p: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}
+                  sx={{ p: 2, borderRadius: 2, border: "1px solid #e0e0e0" }}
                 >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    gutterBottom
+                    sx={{
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     Product Performance Matrix
                   </Typography>
-                  <ResponsiveContainer width="100%" height={400}>
+                  <ResponsiveContainer width="100%" height={320}>
                     <BarChart data={level2Data.productData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" stroke="#666" />
-                      <YAxis yAxisId="left" stroke={COLORS.primary} />
+                      <XAxis dataKey="name" stroke="#666" fontSize={10} />
+                      <YAxis
+                        yAxisId="left"
+                        stroke={COLORS.primary}
+                        fontSize={10}
+                      />
                       <YAxis
                         yAxisId="right"
                         orientation="right"
                         stroke={COLORS.success}
+                        fontSize={10}
                       />
-                      <RechartsTooltip />
-                      <Legend />
+                      <RechartsTooltip
+                        contentStyle={{
+                          fontSize: "0.7rem",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                       <Bar
                         yAxisId="left"
                         dataKey="revenue"
                         name="Revenue ($)"
                         fill={COLORS.primary}
-                        radius={[4, 4, 0, 0]}
+                        radius={[3, 3, 0, 0]}
+                        barSize={30}
                       />
                       <Line
                         yAxisId="right"
@@ -963,6 +1099,7 @@ const Level2Dashboard = () => {
                         name="Rating"
                         stroke={COLORS.warning}
                         strokeWidth={2}
+                        dot={{ r: 3 }}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -970,26 +1107,38 @@ const Level2Dashboard = () => {
               </Grid>
             </Grid>
 
-            <Grid container spacing={3}>
+            <Grid container spacing={2}>
               <Grid item size={{ xs: 12, md: 6 }}>
                 <Paper
                   elevation={0}
-                  sx={{ p: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}
+                  sx={{ p: 2, borderRadius: 2, border: "1px solid #e0e0e0" }}
                 >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    gutterBottom
+                    sx={{
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     Product Growth Metrics
                   </Typography>
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={level2Data.productData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <RechartsTooltip />
+                      <XAxis dataKey="name" stroke="#666" fontSize={10} />
+                      <YAxis stroke="#666" fontSize={10} />
+                      <RechartsTooltip
+                        contentStyle={{
+                          fontSize: "0.7rem",
+                        }}
+                      />
                       <Bar
                         dataKey="growth"
                         name="Growth %"
                         fill={COLORS.success}
-                        radius={[4, 4, 0, 0]}
+                        radius={[3, 3, 0, 0]}
+                        barSize={30}
                       >
                         {level2Data.productData.map((entry, index) => (
                           <Cell
@@ -1008,20 +1157,27 @@ const Level2Dashboard = () => {
               <Grid item size={{ xs: 12, md: 6 }}>
                 <Paper
                   elevation={0}
-                  sx={{ p: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}
+                  sx={{ p: 2, borderRadius: 2, border: "1px solid #e0e0e0" }}
                 >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    gutterBottom
+                    sx={{
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     Units Sold by Product
                   </Typography>
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={250}>
                     <PieChart>
                       <Pie
                         data={level2Data.productData}
                         cx="50%"
                         cy="50%"
-                        outerRadius={90}
+                        outerRadius={80}
                         dataKey="units"
-                        label
+                        label={{ fontSize: 10 }}
                       >
                         {level2Data.productData.map((entry, index) => (
                           <Cell
@@ -1034,8 +1190,12 @@ const Level2Dashboard = () => {
                           />
                         ))}
                       </Pie>
-                      <RechartsTooltip />
-                      <Legend />
+                      <RechartsTooltip
+                        contentStyle={{
+                          fontSize: "0.7rem",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </Paper>
@@ -1049,18 +1209,25 @@ const Level2Dashboard = () => {
       {selectedTab === 2 && (
         <Fade in>
           <Box>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item size={{ xs: 12, sm: 6 }}>
                 <Paper
                   elevation={0}
                   sx={{
-                    p: 3,
-                    borderRadius: 3,
+                    p: 2,
+                    borderRadius: 2,
                     border: "1px solid #e0e0e0",
-                    height: 400,
+                    height: 320,
                   }}
                 >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    gutterBottom
+                    sx={{
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     Customer Segments
                   </Typography>
                   <ResponsiveContainer width="100%" height="85%">
@@ -1069,18 +1236,22 @@ const Level2Dashboard = () => {
                         data={level2Data.segmentData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
+                        innerRadius={50}
+                        outerRadius={80}
                         paddingAngle={5}
                         dataKey="value"
-                        label
+                        label={{ fontSize: 10 }}
                       >
                         {level2Data.segmentData.map((entry, index) => (
                           <Cell key={index} fill={entry.color} />
                         ))}
                       </Pie>
-                      <RechartsTooltip />
-                      <Legend />
+                      <RechartsTooltip
+                        contentStyle={{
+                          fontSize: "0.7rem",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </Paper>
@@ -1090,26 +1261,38 @@ const Level2Dashboard = () => {
                 <Paper
                   elevation={0}
                   sx={{
-                    p: 3,
-                    borderRadius: 3,
+                    p: 2,
+                    borderRadius: 2,
                     border: "1px solid #e0e0e0",
-                    height: 400,
+                    height: 320,
                   }}
                 >
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={700}
+                    gutterBottom
+                    sx={{
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     Revenue by Segment
                   </Typography>
                   <ResponsiveContainer width="100%" height="85%">
                     <BarChart data={level2Data.segmentData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" stroke="#666" />
-                      <YAxis stroke="#666" />
-                      <RechartsTooltip />
+                      <XAxis dataKey="name" stroke="#666" fontSize={10} />
+                      <YAxis stroke="#666" fontSize={10} />
+                      <RechartsTooltip
+                        contentStyle={{
+                          fontSize: "0.7rem",
+                        }}
+                      />
                       <Bar
                         dataKey="revenue"
                         name="Revenue ($)"
                         fill={COLORS.primary}
-                        radius={[4, 4, 0, 0]}
+                        radius={[3, 3, 0, 0]}
+                        barSize={30}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1120,25 +1303,36 @@ const Level2Dashboard = () => {
             {/* Recent Activities */}
             <Paper
               elevation={0}
-              sx={{ p: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}
+              sx={{ p: 2, borderRadius: 2, border: "1px solid #e0e0e0" }}
             >
-              <Typography variant="h6" fontWeight={700} gutterBottom>
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
+                gutterBottom
+                sx={{
+                  fontSize: "0.9rem",
+                }}
+              >
                 Recent Customer Activities
               </Typography>
-              <List>
+              <List dense>
                 {level2Data.activities.map((activity) => (
                   <ListItem
                     key={activity.id}
                     sx={{
                       borderBottom: "1px solid #e0e0e0",
                       "&:last-child": { borderBottom: 0 },
+                      py: 0.5,
                     }}
                   >
-                    <ListItemIcon>
+                    <ListItemIcon sx={{ minWidth: 36 }}>
                       <Avatar
                         sx={{
+                          width: 28,
+                          height: 28,
                           bgcolor: alpha(COLORS[activity.type], 0.1),
                           color: COLORS[activity.type],
+                          fontSize: "0.7rem",
                         }}
                       >
                         {activity.user.charAt(0)}
@@ -1147,9 +1341,21 @@ const Level2Dashboard = () => {
                     <ListItemText
                       primary={activity.user}
                       secondary={activity.action}
-                      primaryTypographyProps={{ fontWeight: 600 }}
+                      primaryTypographyProps={{
+                        fontWeight: 600,
+                        fontSize: "0.8rem",
+                      }}
+                      secondaryTypographyProps={{
+                        fontSize: "0.7rem",
+                      }}
                     />
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        fontSize: "0.65rem",
+                      }}
+                    >
                       {activity.time}
                     </Typography>
                   </ListItem>
@@ -1165,28 +1371,39 @@ const Level2Dashboard = () => {
         <Fade in>
           <Paper
             elevation={0}
-            sx={{ p: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}
+            sx={{ p: 2, borderRadius: 2, border: "1px solid #e0e0e0" }}
           >
             <Box
               sx={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                mb: 3,
+                mb: 2,
                 flexWrap: "wrap",
-                gap: 2,
+                gap: 1,
               }}
             >
-              <Typography variant="h6" fontWeight={700}>
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
+                sx={{
+                  fontSize: "0.9rem",
+                }}
+              >
                 Transaction History
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
+                size="small"
                 onClick={() => {
                   setEditingId(null);
                   setEditData(null);
                   setDrawerOpen(true);
+                }}
+                sx={{
+                  fontSize: "0.75rem",
+                  py: 0.5,
                 }}
               >
                 New Transaction
@@ -1194,60 +1411,80 @@ const Level2Dashboard = () => {
             </Box>
 
             <TableContainer>
-              <Table>
+              <Table size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: alpha(COLORS.primary, 0.05) }}>
-                    <TableCell>
-                      <strong>Transaction ID</strong>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <strong style={{ fontSize: "0.7rem" }}>ID</strong>
                     </TableCell>
-                    <TableCell>
-                      <strong>Customer</strong>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <strong style={{ fontSize: "0.7rem" }}>Customer</strong>
                     </TableCell>
-                    <TableCell align="right">
-                      <strong>Amount</strong>
+                    <TableCell align="right" sx={{ py: 0.5 }}>
+                      <strong style={{ fontSize: "0.7rem" }}>Amount</strong>
                     </TableCell>
-                    <TableCell>
-                      <strong>Status</strong>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <strong style={{ fontSize: "0.7rem" }}>Status</strong>
                     </TableCell>
-                    <TableCell>
-                      <strong>Type</strong>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <strong style={{ fontSize: "0.7rem" }}>Type</strong>
                     </TableCell>
-                    <TableCell>
-                      <strong>Date</strong>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <strong style={{ fontSize: "0.7rem" }}>Date</strong>
                     </TableCell>
-                    <TableCell align="center">
-                      <strong>Actions</strong>
+                    <TableCell align="center" sx={{ py: 0.5 }}>
+                      <strong style={{ fontSize: "0.7rem" }}>Actions</strong>
                     </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {transactions.map((transaction) => (
-                    <TableRow key={transaction.id} hover>
+                    <TableRow
+                      key={transaction.id}
+                      hover
+                      sx={{ "& td": { py: 0.5 } }}
+                    >
                       <TableCell>
-                        <Typography fontWeight={500}>
+                        <Typography
+                          fontWeight={500}
+                          sx={{
+                            fontSize: "0.75rem",
+                          }}
+                        >
                           {transaction.id}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
                         >
                           <Avatar
                             sx={{
-                              width: 32,
-                              height: 32,
+                              width: 24,
+                              height: 24,
                               bgcolor: alpha(COLORS.primary, 0.1),
                               color: COLORS.primary,
+                              fontSize: "0.65rem",
                             }}
                           >
                             {transaction.customer.charAt(0)}
                           </Avatar>
-                          {transaction.customer}
+                          <Typography sx={{ fontSize: "0.75rem" }}>
+                            {transaction.customer}
+                          </Typography>
                         </Box>
                       </TableCell>
                       <TableCell
                         align="right"
-                        sx={{ fontWeight: 600, color: COLORS.primary }}
+                        sx={{
+                          fontWeight: 600,
+                          color: COLORS.primary,
+                          fontSize: "0.75rem",
+                        }}
                       >
                         ${transaction.amount.toLocaleString()}
                       </TableCell>
@@ -1257,17 +1494,27 @@ const Level2Dashboard = () => {
                           label={transaction.type}
                           size="small"
                           variant="outlined"
+                          sx={{
+                            height: 20,
+                            fontSize: "0.6rem",
+                            "& .MuiChip-label": {
+                              fontSize: "0.6rem",
+                              px: 0.5,
+                            },
+                          }}
                         />
                       </TableCell>
-                      <TableCell>{transaction.date}</TableCell>
+                      <TableCell sx={{ fontSize: "0.75rem" }}>
+                        {transaction.date}
+                      </TableCell>
                       <TableCell align="center">
                         <Tooltip title="Edit">
                           <IconButton
                             size="small"
                             onClick={() => handleEdit(transaction)}
-                            sx={{ mr: 1, color: COLORS.primary }}
+                            sx={{ mr: 0.5, color: COLORS.primary }}
                           >
-                            <EditIcon fontSize="small" />
+                            <EditIcon fontSize="small" sx={{ fontSize: 16 }} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
@@ -1276,7 +1523,10 @@ const Level2Dashboard = () => {
                             onClick={() => handleDelete(transaction.id)}
                             color="error"
                           >
-                            <DeleteIcon fontSize="small" />
+                            <DeleteIcon
+                              fontSize="small"
+                              sx={{ fontSize: 16 }}
+                            />
                           </IconButton>
                         </Tooltip>
                       </TableCell>
@@ -1289,7 +1539,7 @@ const Level2Dashboard = () => {
         </Fade>
       )}
 
-      {/* Drawer Form */}
+      {/* Drawer Form - Keep as is */}
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -1308,7 +1558,13 @@ const Level2Dashboard = () => {
             mb: 3,
           }}
         >
-          <Typography variant="h6" fontWeight={700}>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            sx={{
+              fontSize: "1rem",
+            }}
+          >
             {editingId ? "Edit Transaction" : "Add New Transaction"}
           </Typography>
           <IconButton
@@ -1355,10 +1611,11 @@ const Level2Dashboard = () => {
             isSubmitting,
           }) => (
             <Form>
-              <Grid container spacing={3}>
+              <Grid container spacing={2}>
                 <Grid item size={{ xs: 12, sm: 12 }}>
                   <TextField
                     fullWidth
+                    size="small"
                     name="customerName"
                     label="Customer Name"
                     value={values.customerName}
@@ -1366,11 +1623,23 @@ const Level2Dashboard = () => {
                     onBlur={handleBlur}
                     error={touched.customerName && Boolean(errors.customerName)}
                     helperText={touched.customerName && errors.customerName}
+                    sx={{
+                      "& .MuiInputLabel-root": {
+                        fontSize: "0.8rem",
+                      },
+                      "& .MuiInputBase-root": {
+                        fontSize: "0.8rem",
+                      },
+                      "& .MuiFormHelperText-root": {
+                        fontSize: "0.7rem",
+                      },
+                    }}
                   />
                 </Grid>
                 <Grid item size={{ xs: 12, sm: 12 }}>
                   <TextField
                     fullWidth
+                    size="small"
                     name="email"
                     label="Email Address"
                     type="email"
@@ -1379,11 +1648,23 @@ const Level2Dashboard = () => {
                     onBlur={handleBlur}
                     error={touched.email && Boolean(errors.email)}
                     helperText={touched.email && errors.email}
+                    sx={{
+                      "& .MuiInputLabel-root": {
+                        fontSize: "0.8rem",
+                      },
+                      "& .MuiInputBase-root": {
+                        fontSize: "0.8rem",
+                      },
+                      "& .MuiFormHelperText-root": {
+                        fontSize: "0.7rem",
+                      },
+                    }}
                   />
                 </Grid>
                 <Grid item size={{ xs: 12, sm: 12 }}>
                   <TextField
                     fullWidth
+                    size="small"
                     name="amount"
                     label="Amount ($)"
                     type="number"
@@ -1392,12 +1673,24 @@ const Level2Dashboard = () => {
                     onBlur={handleBlur}
                     error={touched.amount && Boolean(errors.amount)}
                     helperText={touched.amount && errors.amount}
+                    sx={{
+                      "& .MuiInputLabel-root": {
+                        fontSize: "0.8rem",
+                      },
+                      "& .MuiInputBase-root": {
+                        fontSize: "0.8rem",
+                      },
+                      "& .MuiFormHelperText-root": {
+                        fontSize: "0.7rem",
+                      },
+                    }}
                   />
                 </Grid>
                 <Grid item size={{ xs: 12, sm: 12 }}>
                   <TextField
                     select
                     fullWidth
+                    size="small"
                     name="status"
                     label="Status"
                     value={values.status}
@@ -1406,6 +1699,17 @@ const Level2Dashboard = () => {
                     error={touched.status && Boolean(errors.status)}
                     helperText={touched.status && errors.status}
                     SelectProps={{ native: true }}
+                    sx={{
+                      "& .MuiInputLabel-root": {
+                        fontSize: "0.8rem",
+                      },
+                      "& .MuiInputBase-root": {
+                        fontSize: "0.8rem",
+                      },
+                      "& .MuiFormHelperText-root": {
+                        fontSize: "0.7rem",
+                      },
+                    }}
                   >
                     <option value="pending">Pending</option>
                     <option value="completed">Completed</option>
@@ -1419,6 +1723,10 @@ const Level2Dashboard = () => {
                     variant="contained"
                     disabled={isSubmitting}
                     startIcon={<SaveIcon />}
+                    sx={{
+                      fontSize: "0.8rem",
+                      py: 0.75,
+                    }}
                   >
                     {editingId ? "Update" : "Create"} Transaction
                   </Button>
@@ -1439,7 +1747,12 @@ const Level2Dashboard = () => {
         <Alert
           severity={snackbar.severity}
           variant="filled"
-          sx={{ width: "100%" }}
+          sx={{
+            width: "100%",
+            "& .MuiAlert-message": {
+              fontSize: "0.8rem",
+            },
+          }}
         >
           {snackbar.message}
         </Alert>

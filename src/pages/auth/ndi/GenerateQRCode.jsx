@@ -303,7 +303,6 @@ const GenerateQRCode = () => {
           padding: 3,
           borderRadius: 2,
           backgroundColor: "#F8F8F8",
-          fontFamily: "Inter",
           color: "#A1A0A0",
           overflowY: "auto",
           zIndex: 2,
@@ -336,7 +335,10 @@ const GenerateQRCode = () => {
                 variant="h4"
                 fontWeight="bold"
                 mb={1}
-                sx={{ fontSize: "18px", color: "#000000" }}
+                sx={{
+                  fontSize: "18px",
+                  color: "#000000",
+                }}
               >
                 Login with <span style={{ color: "#5AC994" }}>Bhutan NDI</span>{" "}
                 Wallet
@@ -376,7 +378,10 @@ const GenerateQRCode = () => {
               variant="h4"
               fontWeight="bold"
               mb={1}
-              sx={{ fontSize: "18px", color: "#000000" }}
+              sx={{
+                fontSize: "18px",
+                color: "#000000",
+              }}
             >
               Scan with <span style={{ color: "#5AC994" }}>Bhutan NDI </span>
               Wallet
@@ -589,7 +594,12 @@ const GenerateQRCode = () => {
                     style={{ width: "16px", height: "12px" }}
                   />
                 </IconButton>
-                <Typography variant="body2" sx={{ color: "black" }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "black",
+                  }}
+                >
                   ndifeedback@bhutanndi.bt
                 </Typography>
               </Stack>
@@ -602,7 +612,12 @@ const GenerateQRCode = () => {
                     style={{ width: "18px", height: "18px" }}
                   />
                 </IconButton>
-                <Typography variant="body2" sx={{ color: "black" }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "black",
+                  }}
+                >
                   1199
                 </Typography>
               </Stack>

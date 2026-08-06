@@ -113,14 +113,23 @@ const ForgotPasswordPage = () => {
             component="h1"
             variant="h5"
             align="center"
-            sx={{ mb: 2, fontWeight: "bold" }}
+            sx={{
+              mb: 2,
+              fontWeight: "bold",
+            }}
           >
             Forgot Password
           </Typography>
 
           {success ? (
             <>
-              <Alert severity="success" sx={{ width: "100%", mb: 3 }}>
+              <Alert
+                severity="success"
+                sx={{
+                  width: "100%",
+                  mb: 3,
+                }}
+              >
                 Password reset link sent successfully! Please check your email.
               </Alert>
               <Button
@@ -128,20 +137,34 @@ const ForgotPasswordPage = () => {
                 variant="contained"
                 color="primary"
                 onClick={() => navigate("/login")}
-                sx={{ mt: 2 }}
+                sx={{
+                  mt: 2,
+                }}
               >
                 Back to Login
               </Button>
             </>
           ) : (
             <>
-              <Typography variant="body1" align="center" sx={{ mb: 3 }}>
+              <Typography
+                variant="body1"
+                align="center"
+                sx={{
+                  mb: 3,
+                }}
+              >
                 Enter your email address below, and we'll send you a link to
                 reset your password.
               </Typography>
 
               {error && (
-                <Alert severity="error" sx={{ width: "100%", mb: 3 }}>
+                <Alert
+                  severity="error"
+                  sx={{
+                    width: "100%",
+                    mb: 3,
+                  }}
+                >
                   {error}
                 </Alert>
               )}
@@ -162,7 +185,9 @@ const ForgotPasswordPage = () => {
                   {...formik.getFieldProps("email")}
                   error={formik.touched.email && Boolean(formik.errors.email)}
                   helperText={formik.touched.email && formik.errors.email}
-                  sx={{ mb: 2 }}
+                  sx={{
+                    mb: 2,
+                  }}
                   disabled={loading}
                 />
                 <Button
@@ -171,7 +196,11 @@ const ForgotPasswordPage = () => {
                   variant="contained"
                   color="primary"
                   disabled={loading}
-                  sx={{ mt: 2, mb: 2, paddingY: 0.5 }}
+                  sx={{
+                    mt: 2,
+                    mb: 2,
+                    paddingY: 0.5,
+                  }}
                 >
                   {loading ? <CircularProgress size={24} /> : "Send Reset Link"}
                 </Button>
@@ -181,11 +210,11 @@ const ForgotPasswordPage = () => {
                     alignItems="center"
                     sx={{
                       cursor: "pointer",
-                      color: "primary.main", // normal color
+                      color: "primary.main",
                       transition: "color 0.2s ease, text-decoration 0.2s ease",
                       "&:hover": {
-                        color: "primary.dark", // darker on hover
-                        textDecoration: "underline", // underline on hover
+                        color: "primary.dark",
+                        textDecoration: "underline",
                       },
                     }}
                     onClick={() => navigate("/auth/login")}
@@ -198,7 +227,9 @@ const ForgotPasswordPage = () => {
                         transition: "color 0.2s ease",
                       }}
                     />
-                    <Typography variant="body2">Back to Login</Typography>
+                    <Typography variant="body2" sx={{}}>
+                      Back to Login
+                    </Typography>
                   </Box>
                 </Box>
               </Box>

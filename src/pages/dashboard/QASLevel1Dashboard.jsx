@@ -138,14 +138,21 @@ const QASLevel1Dashboard = () => {
   const [infoPage, setInfoPage] = useState(0);
   const [infoRowsPerPage, setInfoRowsPerPage] = useState(5);
   return (
-    <Paper elevation={2} sx={{ p: 4, mt: 1 }}>
-      <Typography variant="h6" fontWeight={700} mb={2}>
+    <Paper elevation={2} sx={{ p: 2, mt: 1 }}>
+      <Typography
+        variant="h6"
+        fontWeight={700}
+        mb={2}
+        sx={{
+          fontSize: "1.1rem",
+        }}
+      >
         QAS Level 1 Dashboard
       </Typography>
 
       {/* Filter Section */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
+      <Card sx={{ mb: 2 }}>
+        <CardContent sx={{ p: 2 }}>
           <Formik
             initialValues={{ fromDate: "", toDate: "", search: "" }}
             validationSchema={validationSchema}
@@ -155,7 +162,7 @@ const QASLevel1Dashboard = () => {
           >
             {({ values, handleChange, errors, touched }) => (
               <Form>
-                <Grid container spacing={2} alignItems="center">
+                <Grid container spacing={1.5} alignItems="center">
                   {/* Search Field */}
                   <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
                     <TextField
@@ -165,8 +172,13 @@ const QASLevel1Dashboard = () => {
                       size="small"
                       value={values.search}
                       onChange={handleChange}
+                      sx={{
+                        fontSize: "0.8rem",
+                      }}
                       InputProps={{
-                        startAdornment: <SearchIcon sx={{ mr: 1 }} />,
+                        startAdornment: (
+                          <SearchIcon sx={{ mr: 1, fontSize: 18 }} />
+                        ),
                       }}
                     />
                   </Grid>
@@ -182,6 +194,18 @@ const QASLevel1Dashboard = () => {
                       onChange={handleChange}
                       error={touched.fromDate && Boolean(errors.fromDate)}
                       helperText={touched.fromDate && errors.fromDate}
+                      sx={{
+                        fontSize: "0.8rem",
+                        "& .MuiInputLabel-root": {
+                          fontSize: "0.8rem",
+                        },
+                        "& .MuiInputBase-root": {
+                          fontSize: "0.8rem",
+                        },
+                        "& .MuiFormHelperText-root": {
+                          fontSize: "0.7rem",
+                        },
+                      }}
                     />
                   </Grid>
 
@@ -197,11 +221,31 @@ const QASLevel1Dashboard = () => {
                       onChange={handleChange}
                       error={touched.toDate && Boolean(errors.toDate)}
                       helperText={touched.toDate && errors.toDate}
+                      sx={{
+                        fontSize: "0.8rem",
+                        "& .MuiInputLabel-root": {
+                          fontSize: "0.8rem",
+                        },
+                        "& .MuiInputBase-root": {
+                          fontSize: "0.8rem",
+                        },
+                        "& .MuiFormHelperText-root": {
+                          fontSize: "0.7rem",
+                        },
+                      }}
                     />
                   </Grid>
 
                   <Grid item size={{ xs: 12, sm: 2, md: 2 }}>
-                    <Button type="submit" variant="contained" fullWidth>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      fullWidth
+                      sx={{
+                        fontSize: "0.8rem",
+                        py: 0.75,
+                      }}
+                    >
                       Apply Filter
                     </Button>
                   </Grid>
@@ -209,12 +253,18 @@ const QASLevel1Dashboard = () => {
                   <Grid item size={{ xs: 12, sm: 12, md: 12 }}>
                     <Paper
                       sx={{
-                        p: 2,
+                        p: 1.5,
                         border: "1px solid",
                         borderColor: "divider",
                       }}
                     >
-                      <Typography fontWeight={600} sx={{ mb: 2 }}>
+                      <Typography
+                        fontWeight={600}
+                        sx={{
+                          mb: 1.5,
+                          fontSize: "0.9rem",
+                        }}
+                      >
                         Application Information
                       </Typography>
 
@@ -222,17 +272,49 @@ const QASLevel1Dashboard = () => {
                         <Table size="small" sx={tableStyle}>
                           <TableHead>
                             <TableRow>
-                              <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
+                              <TableCell
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.75rem",
+                                  py: 0.5,
+                                }}
+                              >
+                                #
+                              </TableCell>
+                              <TableCell
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.75rem",
+                                  py: 0.5,
+                                }}
+                              >
                                 Application No.
                               </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
+                              <TableCell
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.75rem",
+                                  py: 0.5,
+                                }}
+                              >
                                 Name
                               </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
+                              <TableCell
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.75rem",
+                                  py: 0.5,
+                                }}
+                              >
                                 Service
                               </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
+                              <TableCell
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.75rem",
+                                  py: 0.5,
+                                }}
+                              >
                                 Total
                               </TableCell>
                             </TableRow>
@@ -246,11 +328,46 @@ const QASLevel1Dashboard = () => {
                               )
                               .map((row, index) => (
                                 <TableRow key={index}>
-                                  <TableCell>{row.id}</TableCell>
-                                  <TableCell>{row.applicationNo}</TableCell>
-                                  <TableCell>{row.name}</TableCell>
-                                  <TableCell>{row.service}</TableCell>
-                                  <TableCell>{row.total ?? 0}</TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontSize: "0.75rem",
+                                      py: 0.5,
+                                    }}
+                                  >
+                                    {row.id}
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontSize: "0.75rem",
+                                      py: 0.5,
+                                    }}
+                                  >
+                                    {row.applicationNo}
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontSize: "0.75rem",
+                                      py: 0.5,
+                                    }}
+                                  >
+                                    {row.name}
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontSize: "0.75rem",
+                                      py: 0.5,
+                                    }}
+                                  >
+                                    {row.service}
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontSize: "0.75rem",
+                                      py: 0.5,
+                                    }}
+                                  >
+                                    {row.total ?? 0}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                           </TableBody>
@@ -268,6 +385,20 @@ const QASLevel1Dashboard = () => {
                           setInfoPage(0);
                         }}
                         rowsPerPageOptions={[5, 10]}
+                        sx={{
+                          "& .MuiTablePagination-selectLabel": {
+                            fontSize: "0.75rem",
+                          },
+                          "& .MuiTablePagination-displayedRows": {
+                            fontSize: "0.75rem",
+                          },
+                          "& .MuiTablePagination-select": {
+                            fontSize: "0.75rem",
+                          },
+                          "& .MuiTablePagination-menuItem": {
+                            fontSize: "0.75rem",
+                          },
+                        }}
                       />
                     </Paper>
                   </Grid>
@@ -279,27 +410,37 @@ const QASLevel1Dashboard = () => {
       </Card>
 
       {/* Charts Section */}
-      <Grid container spacing={3} mb={3}>
+      <Grid container spacing={2} mb={2}>
         {/* Line Chart */}
         <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
-            <CardContent>
-              <Typography fontWeight={600} mb={2}>
+            <CardContent sx={{ p: 1.5 }}>
+              <Typography
+                fontWeight={600}
+                mb={1}
+                sx={{
+                  fontSize: "0.85rem",
+                }}
+              >
                 Total Application Case Trend
               </Typography>
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={lineData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip
+                    contentStyle={{
+                      fontSize: "0.7rem",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                   <Line
                     type="monotone"
                     dataKey="cases"
                     stroke="#1976d2"
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -308,19 +449,25 @@ const QASLevel1Dashboard = () => {
         </Grid>
         <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
-            <CardContent>
-              <Typography fontWeight={600} mb={2}>
+            <CardContent sx={{ p: 1.5 }}>
+              <Typography
+                fontWeight={600}
+                mb={1}
+                sx={{
+                  fontSize: "0.85rem",
+                }}
+              >
                 Application Status Distribution
               </Typography>
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
+                    outerRadius={70}
                     dataKey="value"
-                    label
+                    label={{ fontSize: 10 }}
                   >
                     {pieData.map((entry, index) => (
                       <Cell
@@ -329,8 +476,12 @@ const QASLevel1Dashboard = () => {
                       />
                     ))}
                   </Pie>
-                  <Tooltip />
-                  <Legend />
+                  <Tooltip
+                    contentStyle={{
+                      fontSize: "0.7rem",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -339,17 +490,27 @@ const QASLevel1Dashboard = () => {
 
         <Grid item size={{ xs: 12, sm: 12, md: 4 }}>
           <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
-            <CardContent>
-              <Typography fontWeight={600} mb={2}>
-                Current Year Monthly Application Received
+            <CardContent sx={{ p: 1.5 }}>
+              <Typography
+                fontWeight={600}
+                mb={1}
+                sx={{
+                  fontSize: "0.85rem",
+                }}
+              >
+                Current Year Monthly Applications
               </Typography>
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={barData}>
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar barSize={25} dataKey="reports" fill="#1976d2" />
+                  <XAxis dataKey="month" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip
+                    contentStyle={{
+                      fontSize: "0.7rem",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "0.7rem" }} />
+                  <Bar barSize={18} dataKey="reports" fill="#1976d2" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -359,32 +520,128 @@ const QASLevel1Dashboard = () => {
 
       {/* Table Section */}
       <Paper sx={{ border: "1px solid", borderColor: "divider" }}>
-        <CardContent>
-          <Typography variant="h6" mb={2}>
+        <CardContent sx={{ p: 1.5 }}>
+          <Typography
+            variant="h6"
+            mb={1.5}
+            sx={{
+              fontSize: "0.95rem",
+            }}
+          >
             Recent Applications
           </Typography>
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer component={Paper} elevation={0}>
+            <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Applicant</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Date</TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: "0.8rem",
+                      py: 0.5,
+                    }}
+                  >
+                    ID
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: "0.8rem",
+                      py: 0.5,
+                    }}
+                  >
+                    Applicant
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: "0.8rem",
+                      py: 0.5,
+                    }}
+                  >
+                    Status
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: "0.8rem",
+                      py: 0.5,
+                    }}
+                  >
+                    Date
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 <TableRow>
-                  <TableCell>001</TableCell>
-                  <TableCell>John Doe</TableCell>
-                  <TableCell sx={{ color: "green" }}>Approved</TableCell>
-                  <TableCell>2026-03-01</TableCell>
+                  <TableCell
+                    sx={{
+                      fontSize: "0.75rem",
+                      py: 0.5,
+                    }}
+                  >
+                    001
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontSize: "0.75rem",
+                      py: 0.5,
+                    }}
+                  >
+                    John Doe
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      color: "green",
+                      fontSize: "0.75rem",
+                      py: 0.5,
+                    }}
+                  >
+                    Approved
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontSize: "0.75rem",
+                      py: 0.5,
+                    }}
+                  >
+                    2026-03-01
+                  </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>002</TableCell>
-                  <TableCell>Jane Smith</TableCell>
-                  <TableCell sx={{ color: "orange" }}>Pending</TableCell>
-                  <TableCell>2026-03-02</TableCell>
+                  <TableCell
+                    sx={{
+                      fontSize: "0.75rem",
+                      py: 0.5,
+                    }}
+                  >
+                    002
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontSize: "0.75rem",
+                      py: 0.5,
+                    }}
+                  >
+                    Jane Smith
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      color: "orange",
+                      fontSize: "0.75rem",
+                      py: 0.5,
+                    }}
+                  >
+                    Pending
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontSize: "0.75rem",
+                      py: 0.5,
+                    }}
+                  >
+                    2026-03-02
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>

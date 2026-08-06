@@ -43,7 +43,6 @@ const ViewCurriculumIndex = () => {
   const [remarksInput, setRemarksInput] = useState("");
   const [remarksError, setRemarksError] = useState("");
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
-  console.log("Current Role ID:", currentRoleId);
 
   // Dialog states
   const [actionDialogOpen, setActionDialogOpen] = useState(false);

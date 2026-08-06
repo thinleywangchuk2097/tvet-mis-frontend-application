@@ -26,6 +26,7 @@ import {
   Select,
   CircularProgress,
   Tooltip,
+  FormHelperText,
 } from "@mui/material";
 import ReceiptIcon from "@mui/icons-material/Receipt";
 import PrintIcon from "@mui/icons-material/Print";
@@ -33,21 +34,42 @@ import DownloadIcon from "@mui/icons-material/Download";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import CancelIcon from "@mui/icons-material/Cancel";
 import CloseIcon from "@mui/icons-material/Close";
+import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
+import LockResetIcon from "@mui/icons-material/LockReset";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import PublicPageService from "../../../api/services/internal/public/PublicPageService";
 import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 import { exportToExcel } from "@/utils/exportExcel";
-import PaymentsIcon from '@mui/icons-material/Payments';
+import PaymentsIcon from "@mui/icons-material/Payments";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 
+// ===== Validation Schema for Generate PA =====
+const generatePAValidationSchema = Yup.object({
+  applicationNo: Yup.string().required("Application No is required"),
+  instituteId: Yup.string().required("Institute is required"),
+  serviceCode: Yup.string().required("Service Code is required"),
+  taxPayerNo: Yup.string().required("Tax Payer No is required"),
+  taxPayerEmail: Yup.string()
+    .email("Invalid email address")
+    .required("Tax Payer Email is required"),
+  taxPayerMobileNo: Yup.string()
+    .required("Mobile No is required")
+    .matches(/^\d{8}$/, "Mobile No must be exactly 8 digits"),
+  taxPayerName: Yup.string().required("Tax Payer Name is required"),
+});
 
 const BirmsAgencyPaymentIndex = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [openReceiptDialog, setOpenReceiptDialog] = useState(false);
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
+  const [openGeneratePADialog, setOpenGeneratePADialog] = useState(false);
   const [payments, setPayments] = useState([]);
   const [filteredPayments, setFilteredPayments] = useState([]);
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -58,6 +80,7 @@ const BirmsAgencyPaymentIndex = () => {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [bankNames, setBankNames] = useState([]);
   const [receiptData, setReceiptData] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Filter states
   const [institutes, setInstitutes] = useState([]);
@@ -67,6 +90,50 @@ const BirmsAgencyPaymentIndex = () => {
   const [selectedStatus, setSelectedStatus] = useState("");
 
   const actionId = useSelector((state) => state.auth.id);
+
+  // Helper function for required label (without red color)
+  const requiredLabel = (label) => <>{label} *</>;
+
+  // Formik for Generate PA
+  const generatePAFormik = useFormik({
+    initialValues: {
+      applicationNo: "",
+      instituteId: "",
+      serviceCode: "",
+      taxPayerNo: "",
+      taxPayerEmail: "",
+      taxPayerMobileNo: "",
+      taxPayerName: "",
+    },
+    validationSchema: generatePAValidationSchema,
+    validateOnChange: true,
+    validateOnBlur: true,
+    onSubmit: async (values, { resetForm }) => {
+      setSubmitting(true);
+      try {
+        const {
+          applicationNo,
+          instituteId,
+          taxPayerNo,
+          taxPayerEmail,
+          taxPayerMobileNo,
+          taxPayerName,
+          serviceCode,
+        } = values;
+
+        setOpenGeneratePADialog(false);
+        navigate(
+          `/birms/common-payment-index/${applicationNo}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId}`,
+        );
+        resetForm();
+        toast.success("Navigating to payment page...");
+      } catch (error) {
+        toast.error("Failed to navigate to payment page");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
 
   // Fetch data on component mount
   useEffect(() => {
@@ -86,7 +153,6 @@ const BirmsAgencyPaymentIndex = () => {
       const response = await BirmsPaymentService.getAllPaymentDetails();
       console.log("Payment details from API:", response.data);
 
-      // Map the API response to the format expected by the component
       const mappedPayments = response.data.map((item, index) => ({
         id: parseInt(item.id) || index + 1,
         payment_no: item.payment_advice_no || `PAY-${Date.now()}-${index}`,
@@ -126,6 +192,7 @@ const BirmsAgencyPaymentIndex = () => {
         tax_payer_no: item.tax_payer_no,
         payment_request_date: item.payment_request_date,
         payment_mode: item.payment_mode,
+        birms_payment_status: item.birms_payment_status,
       }));
 
       setPayments(mappedPayments);
@@ -260,6 +327,17 @@ const BirmsAgencyPaymentIndex = () => {
     setPage(0);
   };
 
+  // Generate PA handlers
+  const handleOpenGeneratePADialog = () => {
+    generatePAFormik.resetForm();
+    setOpenGeneratePADialog(true);
+  };
+
+  const handleCloseGeneratePADialog = () => {
+    setOpenGeneratePADialog(false);
+    generatePAFormik.resetForm();
+  };
+
   // Excel Export function
   const handleExcelExport = () => {
     const today = new Date().toISOString().split("T")[0];
@@ -275,6 +353,7 @@ const BirmsAgencyPaymentIndex = () => {
       Amount: item.amount || 0,
       "Payment Date": formatDate(item.payment_date),
       "Payment Status": getStatusName(item.status_id, item.payment_status),
+      "BIRMS Status": item.birms_payment_status || "N/A",
       Platform: item.platform || "N/A",
       "Receipt No": item.receipt_no || "N/A",
       "Mobile No": item.mobile_no || "N/A",
@@ -310,7 +389,7 @@ const BirmsAgencyPaymentIndex = () => {
         <head>
           <title>Payment Receipt</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
+            body { font-family: Cambria; padding: 20px; }
             @media print {
               body { padding: 0; }
               .no-print { display: none; }
@@ -333,17 +412,14 @@ const BirmsAgencyPaymentIndex = () => {
       return;
     }
 
-    // Prevent multiple clicks on the same receipt
     if (downloadingReceipts[paymentId]) {
       return;
     }
 
     try {
-      // Set downloading for this specific receipt
       setDownloadingReceipts((prev) => ({ ...prev, [paymentId]: true }));
 
       const response = await BirmsPaymentService.getPaymentReceipt(receiptNo);
-
       console.log("Receipt response:", response);
 
       const data = response.data;
@@ -439,7 +515,6 @@ const BirmsAgencyPaymentIndex = () => {
 
       toast.error(errorMessage);
     } finally {
-      // Clear downloading state for this receipt
       setDownloadingReceipts((prev) => ({ ...prev, [paymentId]: false }));
     }
   };
@@ -596,7 +671,7 @@ const BirmsAgencyPaymentIndex = () => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "BTN", // Bhutanese Ngultrum
+      currency: "BTN",
       minimumFractionDigits: 2,
     })
       .format(amount)
@@ -634,7 +709,11 @@ const BirmsAgencyPaymentIndex = () => {
     return (
       <Paper
         elevation={3}
-        style={{ padding: 50, margin: 10, textAlign: "center" }}
+        style={{
+          padding: 50,
+          margin: 10,
+          textAlign: "center",
+        }}
       >
         <CircularProgress />
         <Typography variant="h6" sx={{ mt: 2 }}>
@@ -726,8 +805,19 @@ const BirmsAgencyPaymentIndex = () => {
               size="small"
               onClick={handleClearFilters}
               startIcon={<FilterListIcon />}
+              sx={{ textTransform: "none" }}
             >
               Clear Filters
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              onClick={handleOpenGeneratePADialog}
+              startIcon={<SettingsSuggestIcon />}
+              sx={{ textTransform: "none" }}
+            >
+              Generate PA
             </Button>
             <Button
               variant="contained"
@@ -736,6 +826,7 @@ const BirmsAgencyPaymentIndex = () => {
               onClick={handleExcelExport}
               disabled={filteredPayments.length === 0}
               startIcon={<DownloadIcon />}
+              sx={{ textTransform: "none" }}
             >
               Export to Excel
             </Button>
@@ -748,16 +839,23 @@ const BirmsAgencyPaymentIndex = () => {
         <Table size="small" sx={tableStyle}>
           <TableHead>
             <TableRow>
-              <TableCell>#</TableCell>
-              <TableCell>Payment Advice No.</TableCell>
-              <TableCell>Reference No</TableCell>
-              <TableCell>Institute</TableCell>
-              <TableCell>Course</TableCell>
-              <TableCell>Tax Payer</TableCell>
-              <TableCell>Amount</TableCell>
-              <TableCell>Due Date</TableCell>
-              <TableCell>Payment Status</TableCell>
-              <TableCell align="center">Action</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>#</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                Payment Advice No.
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Reference No</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Institute</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Course</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Tax Payer</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Due Date</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Payment Status</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                BIRMS Payment Status
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold" }}>
+                Action
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -856,6 +954,14 @@ const BirmsAgencyPaymentIndex = () => {
                           }}
                         />
                       </TableCell>
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontSize: "0.75rem" }}
+                        >
+                          {payment.birms_payment_status || "N/A"}
+                        </Typography>
+                      </TableCell>
                       <TableCell align="center">
                         <Box
                           display="flex"
@@ -949,7 +1055,7 @@ const BirmsAgencyPaymentIndex = () => {
                 })
             ) : (
               <TableRow>
-                <TableCell colSpan={10} align="center">
+                <TableCell colSpan={11} align="center">
                   <Typography variant="body1" sx={{ py: 3 }}>
                     No payment records found
                   </Typography>
@@ -968,6 +1074,227 @@ const BirmsAgencyPaymentIndex = () => {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </TableContainer>
+
+      {/* Generate PA Dialog */}
+      <Dialog
+        open={openGeneratePADialog}
+        onClose={handleCloseGeneratePADialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <SettingsSuggestIcon color="primary" />
+            <Typography variant="h6">Generate Payment Advice</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="textSecondary" gutterBottom>
+            Please fill in all the details below to generate a payment advice.
+          </Typography>
+
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label={requiredLabel("Application No")}
+                placeholder="Enter application number"
+                name="applicationNo"
+                size="small"
+                value={generatePAFormik.values.applicationNo}
+                onChange={generatePAFormik.handleChange}
+                onBlur={generatePAFormik.handleBlur}
+                error={
+                  generatePAFormik.touched.applicationNo &&
+                  Boolean(generatePAFormik.errors.applicationNo)
+                }
+                helperText={
+                  generatePAFormik.touched.applicationNo &&
+                  generatePAFormik.errors.applicationNo
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <FormControl
+                fullWidth
+                size="small"
+                error={
+                  generatePAFormik.touched.instituteId &&
+                  Boolean(generatePAFormik.errors.instituteId)
+                }
+              >
+                <InputLabel>{requiredLabel("Institute")}</InputLabel>
+                <Select
+                  name="instituteId"
+                  value={generatePAFormik.values.instituteId}
+                  onChange={generatePAFormik.handleChange}
+                  onBlur={generatePAFormik.handleBlur}
+                  label="Institute"
+                >
+                  <MenuItem value="">Select Institute</MenuItem>
+                  {institutes.map((institute) => (
+                    <MenuItem
+                      key={institute.id}
+                      value={institute.id.toString()}
+                    >
+                      {institute.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {generatePAFormik.touched.instituteId &&
+                  generatePAFormik.errors.instituteId && (
+                    <FormHelperText>
+                      {generatePAFormik.errors.instituteId}
+                    </FormHelperText>
+                  )}
+              </FormControl>
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label={requiredLabel("Service Code")}
+                placeholder="Enter service code (e.g., BIRMS, BIRMS-TRAINING, etc.)"
+                name="serviceCode"
+                size="small"
+                value={generatePAFormik.values.serviceCode}
+                onChange={generatePAFormik.handleChange}
+                onBlur={generatePAFormik.handleBlur}
+                error={
+                  generatePAFormik.touched.serviceCode &&
+                  Boolean(generatePAFormik.errors.serviceCode)
+                }
+                helperText={
+                  generatePAFormik.touched.serviceCode &&
+                  generatePAFormik.errors.serviceCode
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label={requiredLabel("Tax Payer No")}
+                placeholder="Enter tax payer number"
+                name="taxPayerNo"
+                size="small"
+                value={generatePAFormik.values.taxPayerNo}
+                onChange={generatePAFormik.handleChange}
+                onBlur={generatePAFormik.handleBlur}
+                error={
+                  generatePAFormik.touched.taxPayerNo &&
+                  Boolean(generatePAFormik.errors.taxPayerNo)
+                }
+                helperText={
+                  generatePAFormik.touched.taxPayerNo &&
+                  generatePAFormik.errors.taxPayerNo
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label={requiredLabel("Tax Payer Email")}
+                placeholder="Enter tax payer email"
+                type="email"
+                name="taxPayerEmail"
+                size="small"
+                value={generatePAFormik.values.taxPayerEmail}
+                onChange={generatePAFormik.handleChange}
+                onBlur={generatePAFormik.handleBlur}
+                error={
+                  generatePAFormik.touched.taxPayerEmail &&
+                  Boolean(generatePAFormik.errors.taxPayerEmail)
+                }
+                helperText={
+                  generatePAFormik.touched.taxPayerEmail &&
+                  generatePAFormik.errors.taxPayerEmail
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label={requiredLabel("Tax Payer Mobile No")}
+                placeholder="Enter mobile number"
+                name="taxPayerMobileNo"
+                size="small"
+                value={generatePAFormik.values.taxPayerMobileNo}
+                onChange={generatePAFormik.handleChange}
+                onBlur={generatePAFormik.handleBlur}
+                error={
+                  generatePAFormik.touched.taxPayerMobileNo &&
+                  Boolean(generatePAFormik.errors.taxPayerMobileNo)
+                }
+                helperText={
+                  generatePAFormik.touched.taxPayerMobileNo &&
+                  generatePAFormik.errors.taxPayerMobileNo
+                }
+              />
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label={requiredLabel("Tax Payer Name")}
+                placeholder="Enter tax payer name"
+                name="taxPayerName"
+                size="small"
+                value={generatePAFormik.values.taxPayerName}
+                onChange={generatePAFormik.handleChange}
+                onBlur={generatePAFormik.handleBlur}
+                error={
+                  generatePAFormik.touched.taxPayerName &&
+                  Boolean(generatePAFormik.errors.taxPayerName)
+                }
+                helperText={
+                  generatePAFormik.touched.taxPayerName &&
+                  generatePAFormik.errors.taxPayerName
+                }
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => {
+              generatePAFormik.resetForm();
+            }}
+            startIcon={<LockResetIcon />}
+            sx={{ textTransform: "none" }}
+          >
+            Reset
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={handleCloseGeneratePADialog}
+            startIcon={<CloseIcon />}
+            sx={{ textTransform: "none" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={generatePAFormik.handleSubmit}
+            startIcon={
+              submitting ? (
+                <CircularProgress size={20} sx={{ color: "#fff" }} />
+              ) : (
+                <SettingsSuggestIcon />
+              )
+            }
+            sx={{ textTransform: "none" }}
+            disabled={submitting}
+          >
+            {submitting ? "Generating..." : "Generate PA"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Cancel Payment Dialog */}
       <Dialog
@@ -1016,7 +1343,7 @@ const BirmsAgencyPaymentIndex = () => {
                       {formatCurrency(paymentToCancel.amount)}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12}>
+                  <Grid item size={{ xs: 12, md: 6 }}>
                     <Typography variant="caption" color="textSecondary">
                       Tax Payer:
                     </Typography>
@@ -1024,7 +1351,7 @@ const BirmsAgencyPaymentIndex = () => {
                       {paymentToCancel.tax_payer_name}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12}>
+                  <Grid item size={{ xs: 12, md: 6 }}>
                     <Typography variant="caption" color="textSecondary">
                       Payment Status:
                     </Typography>
@@ -1041,6 +1368,7 @@ const BirmsAgencyPaymentIndex = () => {
                         ),
                         color: "white",
                         mt: 0.5,
+                        "& .MuiChip-label": {},
                       }}
                     />
                   </Grid>
@@ -1160,7 +1488,7 @@ const BirmsAgencyPaymentIndex = () => {
                     {formatDate(selectedPayment.payment_date)}
                   </Typography>
                 </Grid>
-                <Grid item xs={12}>
+                <Grid item size={{ xs: 12, md: 6 }}>
                   <Divider sx={{ my: 1 }} />
                 </Grid>
                 <Grid item xs={6}>
@@ -1227,7 +1555,7 @@ const BirmsAgencyPaymentIndex = () => {
                     {selectedPayment.receipt_no || "N/A"}
                   </Typography>
                 </Grid>
-                <Grid item xs={12}>
+                <Grid item size={{ xs: 12, md: 6 }}>
                   <Typography variant="body2" color="textSecondary">
                     Status:
                   </Typography>
@@ -1244,11 +1572,12 @@ const BirmsAgencyPaymentIndex = () => {
                       ),
                       color: "white",
                       mt: 0.5,
+                      "& .MuiChip-label": {},
                     }}
                   />
                 </Grid>
                 {selectedPayment.description && (
-                  <Grid item xs={12}>
+                  <Grid item size={{ xs: 12, md: 6 }}>
                     <Typography variant="body2" color="textSecondary">
                       Description:
                     </Typography>
@@ -1258,7 +1587,7 @@ const BirmsAgencyPaymentIndex = () => {
                   </Grid>
                 )}
                 {selectedPayment.redirect_url && (
-                  <Grid item xs={12}>
+                  <Grid item size={{ xs: 12, md: 6 }}>
                     <Button
                       variant="outlined"
                       size="small"
@@ -1266,13 +1595,14 @@ const BirmsAgencyPaymentIndex = () => {
                         window.open(selectedPayment.redirect_url, "_blank")
                       }
                       startIcon={<ReceiptIcon />}
+                      sx={{ textTransform: "none" }}
                     >
                       View Full Receipt
                     </Button>
                   </Grid>
                 )}
                 {selectedPayment.receiptDetails && (
-                  <Grid item xs={12}>
+                  <Grid item size={{ xs: 12, md: 6 }}>
                     <Divider sx={{ my: 1 }} />
                     <Typography variant="subtitle2" gutterBottom>
                       Receipt Details from BIRMS:
@@ -1303,6 +1633,7 @@ const BirmsAgencyPaymentIndex = () => {
             size="small"
             variant="contained"
             onClick={() => setOpenReceiptDialog(false)}
+            sx={{ textTransform: "none" }}
           >
             Close
           </Button>

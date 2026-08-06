@@ -1,6 +1,11 @@
-// AssessorAccreditorQMSAuditor.jsx
-import { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+// AssessorAccreditorQMSAuditorRenewal.jsx
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Box,
   Paper,
@@ -28,9 +33,9 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import CommonService from "../../api/services/internal/common/CommonService";
 import AssessorAccreditorQMSAuditorService from "../../api/services/internal/registration/AssessorAccreditorQMSAuditorService";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
-// Helper function to convert file to Base64
+// ==================== UTILITY FUNCTIONS ====================
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -44,476 +49,819 @@ const fileToBase64 = (file) =>
     reader.onerror = reject;
   });
 
-const AssessorAccreditorQMSAuditorRenewal = () => {
-  const { serviceId } = useParams();
-  const [serviceName, setServiceName] = useState("");
-  const [hasCitizenId, setHasCitizenId] = useState("yes");
-  const [loading, setLoading] = useState(false);
-  const formikRef = useRef();
+const requiredLabel = (label) => (
+  <>
+    {label}
+    <Typography component="span" sx={{ color: "red" }}>
+      *
+    </Typography>
+  </>
+);
 
-  // State for dropdown data
+// ==================== CUSTOM HOOKS ====================
+const useDropdownData = () => {
   const [sectors, setSectors] = useState([]);
   const [dzongkhags, setDzongkhags] = useState([]);
   const [certificationLevels, setCertificationLevels] = useState([]);
   const [genders, setGenders] = useState([]);
   const [occupations, setOccupations] = useState([]);
   const [selectedSectorId, setSelectedSectorId] = useState("");
-  const [renewalApplicantDetails, setRenewalApplicantDetails] = useState(null);
-  const [fetchingDetails, setFetchingDetails] = useState(false);
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchServiceName();
-  }, [serviceId]);
-
-  // Function to fetch renewal applicant details
-  const fetchRenewalApplicantDetails = async (citizenId, referenceNo) => {
-    // Don't fetch if both are empty
-    if (!citizenId && !referenceNo) {
-      return;
-    }
-
-    // Don't fetch if citizenId is provided but not complete (11 digits)
-    if (citizenId && citizenId.length !== 11) {
-      return;
-    }
-
-    setFetchingDetails(true);
+  const fetchDropdownData = useCallback(async () => {
     try {
-      const response = await AssessorAccreditorQMSAuditorService.getApplicationByCitizenIdOrReferenceNo(
-        citizenId || null,
-        referenceNo || null,
-        serviceId
-      );
-      
-      console.log("fetch Renewal Applicant Details response", response);
+      const [sectorsRes, dzongkhagsRes, certificationsRes, gendersRes] =
+        await Promise.all([
+          CommonService.getAllSectors(),
+          CommonService.getAllDzongkhags(),
+          CommonService.getByParentId(10),
+          CommonService.getByParentId(8),
+        ]);
 
-      // Check if response.data is an array and has at least one item
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-        const applicantData = response.data[0]; // Get the first applicant from the array
-        
-        setRenewalApplicantDetails(applicantData);
-        
-        // Auto-fill the form with the fetched data
-        if (formikRef.current) {
-          // Map snake_case to camelCase for form fields
-          formikRef.current.setFieldValue("fullName", applicantData.full_name || "");
-          formikRef.current.setFieldValue("genderId", applicantData.gender_id || "");
-          formikRef.current.setFieldValue("mobileNo", applicantData.mobile_no || "");
-          formikRef.current.setFieldValue("email", applicantData.email || "");
-          formikRef.current.setFieldValue("dzongkhagId", applicantData.dzongkhag_id || "");
-          formikRef.current.setFieldValue("organizationName", applicantData.organization_name || "");
-          
-          // Set citizenId if available
-          if (applicantData.citizen_id) {
-            formikRef.current.setFieldValue("citizenId", applicantData.citizen_id);
-          }
-          
-          // For service 32 (Assessor)
-          if (serviceId === "32") {
-            formikRef.current.setFieldValue("sectorId", applicantData.sector_id || "");
-            formikRef.current.setFieldValue("occupationId", applicantData.occupation_id || "");
-            formikRef.current.setFieldValue("certificationLevelId", applicantData.certification_level_id || "");
-            if (applicantData.sector_id) {
-              setSelectedSectorId(applicantData.sector_id);
-            }
-          }
-          
-          // For service 5 (Accreditor)
-          if (serviceId === "5") {
-            formikRef.current.setFieldValue("sectorId", applicantData.sector_id || "");
-            formikRef.current.setFieldValue("occupationId", applicantData.occupation_id || "");
-            formikRef.current.setFieldValue("certificationLevelId", applicantData.certification_level_id || "");
-            formikRef.current.setFieldValue("designation", applicantData.designation || "");
-            formikRef.current.setFieldValue("yearsOfExperience", applicantData.years_of_experience || "");
-            formikRef.current.setFieldValue("responsibility", applicantData.responsibility || "");
-            if (applicantData.sector_id) {
-              setSelectedSectorId(applicantData.sector_id);
-            }
-          }
-          
-          // For service 3 (QMS Auditor)
-          if (serviceId === "3") {
-            formikRef.current.setFieldValue("qmsTraining", applicantData.qms_training || "");
-            formikRef.current.setFieldValue("academicBackground", applicantData.academic_background || "");
-            
-            // Handle work_experiences - parse if it's a string
-            if (applicantData.work_experiences) {
-              let workExperiences = applicantData.work_experiences;
-              if (typeof workExperiences === 'string') {
-                try {
-                  workExperiences = JSON.parse(workExperiences);
-                } catch (e) {
-                  workExperiences = [];
-                }
-              }
-              if (Array.isArray(workExperiences) && workExperiences.length > 0) {
-                formikRef.current.setFieldValue("workExperiences", workExperiences);
-              }
-            }
-          }
-          
-          toast.success("Applicant details fetched successfully!");
-        }
-      } else {
-        toast.warning("No existing application found for the provided ID");
-        setRenewalApplicantDetails(null);
-      }
+      setSectors(sectorsRes.data || []);
+      setDzongkhags(dzongkhagsRes.data || []);
+      setCertificationLevels(certificationsRes.data || []);
+      setGenders(gendersRes.data || []);
     } catch (error) {
-      console.error("Error fetching Renewal Applicant Details:", error);
-      toast.error("Failed to fetch applicant details. Please try again.");
-      setRenewalApplicantDetails(null);
-    } finally {
-      setFetchingDetails(false);
+      console.error("Error fetching dropdown data:", error);
+      toast.error("Failed to load dropdown data");
     }
-  };
-
-  // Handle Citizen ID change
-  const handleCitizenIdChange = (e, formik) => {
-    const value = e.target.value;
-    formik.setFieldValue("citizenId", value);
-    
-    // Clear previous reference number when citizen ID is entered
-    if (value) {
-      formik.setFieldValue("referenceNo", "");
-    }
-    
-    // Fetch details when CID is complete (11 digits)
-    if (value && value.length === 11) {
-      fetchRenewalApplicantDetails(value, null);
-    }
-  };
-
-  // Handle Reference No change
-  const handleReferenceNoChange = (e, formik) => {
-    const value = e.target.value;
-    formik.setFieldValue("referenceNo", value);
-    
-    // Clear previous citizen ID when reference number is entered
-    if (value) {
-      formik.setFieldValue("citizenId", "");
-    }
-    
-    // Fetch details when reference number has at least 3 characters
-    if (value && value.length >= 3) {
-      fetchRenewalApplicantDetails(null, value);
-    }
-  };
-
-  // Reset all form fields when switching between Yes/No
-  const handleHasCitizenIdChange = (e) => {
-    const newValue = e.target.value;
-    setHasCitizenId(newValue);
-    setRenewalApplicantDetails(null);
-    setSelectedSectorId("");
-    
-    // Reset all form fields
-    if (formikRef.current) {
-      // Reset to initial values based on serviceId
-      const initialValues = getInitialValues();
-      formikRef.current.resetForm({
-        values: initialValues
-      });
-      
-      // Clear any touched state
-      formikRef.current.setTouched({});
-      
-      // Clear any errors
-      formikRef.current.setErrors({});
-      
-      // Clear documents
-      formikRef.current.setFieldValue("documents", []);
-    }
-  };
-
-  useEffect(() => {
-    fetchSectors();
-    fetchDzongkhags();
-    fetchCertificationLevels();
-    fetchGenders();
   }, []);
 
-  // Fetch occupations when sector changes
-  useEffect(() => {
-    if (selectedSectorId && (serviceId === "32" || serviceId === "5")) {
-      fetchOccupationsBySector(selectedSectorId);
+  const fetchOccupationsBySector = useCallback(async (sectorId) => {
+    if (!sectorId) {
+      setOccupations([]);
+      return;
     }
-  }, [selectedSectorId, serviceId]);
-
-  const fetchServiceName = async () => {
     try {
-      const response = await CommonService.getServiceName(serviceId);
-      setServiceName(response.data.serviceName);
-    } catch (error) {
-      console.error("Error fetching service name:", error);
-    }
-  };
-
-  const fetchSectors = async () => {
-    try {
-      const sectorDtls = await CommonService.getAllSectors();
-      setSectors(sectorDtls.data);
-    } catch (error) {
-      console.error("Error fetching sectors:", error);
-    }
-  };
-
-  const fetchDzongkhags = async () => {
-    try {
-      const dzongkhagLists = await CommonService.getAllDzongkhags();
-      setDzongkhags(dzongkhagLists.data);
-    } catch (error) {
-      console.error("Error fetching dzongkhags:", error);
-    }
-  };
-
-  const fetchCertificationLevels = async () => {
-    try {
-      const certifications = await CommonService.getByParentId(10);
-      setCertificationLevels(certifications.data);
-    } catch (error) {
-      console.error("Error fetching certification levels:", error);
-    }
-  };
-
-  const fetchGenders = async () => {
-    try {
-      const genderDt = await CommonService.getByParentId(8);
-      setGenders(genderDt.data);
-    } catch (error) {
-      console.error("Error fetching genders:", error);
-    }
-  };
-
-  const fetchOccupationsBySector = async (sectorId) => {
-    try {
-      const occupationLists =
-        await CommonService.getOccupationsBySectorId(sectorId);
-      setOccupations(occupationLists.data);
+      const response = await CommonService.getOccupationsBySectorId(sectorId);
+      setOccupations(response.data || []);
     } catch (error) {
       console.error("Error fetching occupations:", error);
+      setOccupations([]);
     }
-  };
+  }, []);
 
-  // Dynamic validation schema based on serviceId
-  const getValidationSchema = (values = {}) => {
-    const baseSchema = {
-      fullName: Yup.string().required("Full Name is required"),
-      genderId: Yup.number().required("Gender is required"),
-      mobileNo: Yup.string().required("Mobile No is required"),
-      email: Yup.string().email("Invalid email").required("Email is required"),
-      dzongkhagId: Yup.number().required("Dzongkhag is required"),
-      organizationName: Yup.string().required("Organization Name is required"),
-      documents: Yup.array().min(1, "Please upload at least one file"),
-    };
-
-    // Add conditional validation based on hasCitizenId
-    if (hasCitizenId === "yes") {
-      baseSchema.citizenId = Yup.string()
-        .matches(/^[0-9]{11}$/, "Invalid CID number (11 digits required)")
-        .required("Citizen ID Number is required");
-    } else {
-      baseSchema.referenceNo = Yup.string().required(
-        "Reference No is required",
-      );
-    }
-
-    // Service 32: Assessor
-    if (serviceId === "32") {
-      return Yup.object({
-        ...baseSchema,
-        sectorId: Yup.number().required("Sector is required"),
-        occupationId: Yup.number().required("Occupation is required"),
-        certificationLevelId: Yup.number().required(
-          "Certification Level is required",
-        ),
-      });
-    }
-
-    // Service 5: Accreditor
-    if (serviceId === "5") {
-      return Yup.object({
-        ...baseSchema,
-        sectorId: Yup.number().required("Sector is required"),
-        occupationId: Yup.number().required("Occupation is required"),
-        certificationLevelId: Yup.number().required(
-          "Certification Level is required",
-        ),
-        designation: Yup.string().required("Designation is required"),
-        yearsOfExperience: Yup.number()
-          .min(5, "Minimum 5 years required")
-          .required("Number of Years is required"),
-        responsibility: Yup.string().required("Responsibility is required"),
-      });
-    }
-
-    // Service 3: QMS Auditor
-    if (serviceId === "3") {
-      const schema = {
-        ...baseSchema,
-        qmsTraining: Yup.string().required(
-          "Please specify if QMS training attended",
-        ),
-        workExperiences: Yup.array()
-          .of(
-            Yup.object({
-              organizationName: Yup.string().required(
-                "Organization Name required",
-              ),
-              designation: Yup.string().required("Designation required"),
-              year: Yup.number()
-                .min(5, "Minimum 5 years required")
-                .required("Number of Years required"),
-              responsibility: Yup.string().required("Responsibility required"),
-            }),
-          )
-          .min(1, "At least one work experience required"),
-      };
-
-      // Add conditional validation for academic background
-      if (values.qmsTraining === "Yes") {
-        schema.academicBackground = Yup.string().required(
-          "Academic / Technical / Professional Background is required when QMS training is Yes",
-        );
-      }
-
-      return Yup.object(schema);
-    }
-
-    return Yup.object(baseSchema);
-  };
-
-  // Dynamic initial values based on serviceId
-  const getInitialValues = () => {
-    const baseValues = {
-      citizenId: "",
-      referenceNo: "",
-      fullName: "",
-      genderId: "",
-      mobileNo: "",
-      email: "",
-      dzongkhagId: "",
-      organizationName: "",
-      documents: [],
-      serviceId: serviceId ? parseInt(serviceId) : null,
-      assignedRoleId: 7,
-      assignedUserId: null,
-      statusId: 55,
-      remarks: "",
-    };
-
-    if (serviceId === "32") {
-      return {
-        ...baseValues,
-        sectorId: "",
-        occupationId: "",
-        certificationLevelId: "",
-      };
-    }
-
-    if (serviceId === "5") {
-      return {
-        ...baseValues,
-        sectorId: "",
-        occupationId: "",
-        certificationLevelId: "",
-        designation: "",
-        yearsOfExperience: "",
-        responsibility: "",
-      };
-    }
-
-    if (serviceId === "3") {
-      return {
-        ...baseValues,
-        qmsTraining: "",
-        academicBackground: "",
-        workExperiences: [
-          {
-            organizationName: "",
-            designation: "",
-            year: "",
-            responsibility: "",
-          },
-        ],
-      };
-    }
-
-    return baseValues;
-  };
-
-  const requiredLabel = (label) => (
-    <>
-      {label}
-      <Typography component="span" sx={{ color: "red" }}>
-        *
-      </Typography>
-    </>
+  const handleSectorChange = useCallback(
+    (sectorId, formik) => {
+      setSelectedSectorId(sectorId);
+      formik.setFieldValue("sectorId", sectorId);
+      formik.setFieldValue("occupationId", "");
+      fetchOccupationsBySector(sectorId);
+    },
+    [fetchOccupationsBySector],
   );
 
-  const handleSubmit = async (values, { resetForm, setSubmitting }) => {
-    setLoading(true);
-    try {
-      const documents = await Promise.all(
-        values.documents.map((file) => fileToBase64(file)),
-      );
-
-      const submitData = { ...values };
-      submitData.documents = documents;
-
-      // Remove the field that is not needed based on selection
-      if (hasCitizenId === "yes") {
-        delete submitData.referenceNo;
-      } else {
-        delete submitData.citizenId;
-      }
-
-      // Ensure numeric fields are properly formatted
-      if (submitData.genderId)
-        submitData.genderId = Number(submitData.genderId);
-      if (submitData.dzongkhagId)
-        submitData.dzongkhagId = Number(submitData.dzongkhagId);
-      if (submitData.sectorId)
-        submitData.sectorId = Number(submitData.sectorId);
-      if (submitData.occupationId)
-        submitData.occupationId = Number(submitData.occupationId);
-      if (submitData.certificationLevelId)
-        submitData.certificationLevelId = Number(
-          submitData.certificationLevelId,
-        );
-      if (submitData.yearsOfExperience)
-        submitData.yearsOfExperience = Number(submitData.yearsOfExperience);
-
-      if (submitData.workExperiences) {
-        submitData.workExperiences = submitData.workExperiences.map((exp) => ({
-          ...exp,
-          year: exp.year ? Number(exp.year) : null,
-        }));
-      }
-
-      console.log("Payload being sent:", submitData);
-
-      const response =
-        await AssessorAccreditorQMSAuditorService.registerAssessorAccreditorQMSAuditor(
-          submitData,
-        );
-      console.log("response", response);
-      if (response.status === 201 || response.status === 200) {
-        toast.success(`${serviceName} submitted successfully!`);
-        resetForm();
-        setSelectedSectorId("");
-        setHasCitizenId("yes");
-        setRenewalApplicantDetails(null);
-        navigate("/");
-      }
-    } catch (error) {
-      console.error("Submission error:", error);
-      toast.error(error.message || "Submission failed");
-    } finally {
-      setLoading(false);
-      setSubmitting(false);
-    }
+  return {
+    sectors,
+    dzongkhags,
+    certificationLevels,
+    genders,
+    occupations,
+    selectedSectorId,
+    fetchDropdownData,
+    fetchOccupationsBySector,
+    handleSectorChange,
   };
+};
+
+const useRenewalApplicant = (serviceId) => {
+  const [renewalApplicantDetails, setRenewalApplicantDetails] = useState(null);
+  const [fetchingDetails, setFetchingDetails] = useState(false);
+
+  const fetchApplicantDetails = useCallback(
+    async (citizenId, referenceNo, formik) => {
+      if (!citizenId && !referenceNo) return;
+      if (citizenId && citizenId.length !== 11) return;
+
+      setFetchingDetails(true);
+      try {
+        const response =
+          await AssessorAccreditorQMSAuditorService.getApplicationByCitizenIdOrReferenceNo(
+            citizenId || null,
+            referenceNo || null,
+            serviceId,
+          );
+
+        if (
+          response.data &&
+          Array.isArray(response.data) &&
+          response.data.length > 0
+        ) {
+          const applicantData = response.data[0];
+          setRenewalApplicantDetails(applicantData);
+          populateFormWithApplicantData(applicantData, formik);
+          toast.success("Applicant details fetched successfully!");
+        } else {
+          toast.warning("No existing application found for the provided ID");
+          setRenewalApplicantDetails(null);
+        }
+      } catch (error) {
+        console.error("Error fetching Renewal Applicant Details:", error);
+        toast.error("Failed to fetch applicant details. Please try again.");
+        setRenewalApplicantDetails(null);
+      } finally {
+        setFetchingDetails(false);
+      }
+    },
+    [serviceId],
+  );
+
+  const populateFormWithApplicantData = useCallback(
+    (applicantData, formik) => {
+      const fieldMappings = {
+        fullName: applicantData.full_name,
+        genderId: applicantData.gender_id,
+        mobileNo: applicantData.mobile_no,
+        email: applicantData.email,
+        dzongkhagId: applicantData.dzongkhag_id,
+        organizationName: applicantData.organization_name,
+        citizenId: applicantData.citizen_id,
+      };
+
+      Object.entries(fieldMappings).forEach(([field, value]) => {
+        if (value) formik.setFieldValue(field, value);
+      });
+
+      // Service-specific fields
+      if (serviceId === "32" || serviceId === "5") {
+        if (applicantData.sector_id) {
+          formik.setFieldValue("sectorId", applicantData.sector_id);
+          // We'll need to fetch occupations separately
+        }
+        formik.setFieldValue("occupationId", applicantData.occupation_id || "");
+        formik.setFieldValue(
+          "certificationLevelId",
+          applicantData.certification_level_id || "",
+        );
+      }
+
+      if (serviceId === "5") {
+        formik.setFieldValue("designation", applicantData.designation || "");
+        formik.setFieldValue(
+          "yearsOfExperience",
+          applicantData.years_of_experience || "",
+        );
+        formik.setFieldValue(
+          "responsibility",
+          applicantData.responsibility || "",
+        );
+      }
+
+      if (serviceId === "3") {
+        formik.setFieldValue("qmsTraining", applicantData.qms_training || "");
+        formik.setFieldValue(
+          "academicBackground",
+          applicantData.academic_background || "",
+        );
+
+        if (applicantData.work_experiences) {
+          let workExperiences = applicantData.work_experiences;
+          if (typeof workExperiences === "string") {
+            try {
+              workExperiences = JSON.parse(workExperiences);
+            } catch (e) {
+              workExperiences = [];
+            }
+          }
+          if (Array.isArray(workExperiences) && workExperiences.length > 0) {
+            formik.setFieldValue("workExperiences", workExperiences);
+          }
+        }
+      }
+    },
+    [serviceId],
+  );
+
+  const resetApplicantDetails = useCallback(() => {
+    setRenewalApplicantDetails(null);
+  }, []);
+
+  return {
+    renewalApplicantDetails,
+    fetchingDetails,
+    fetchApplicantDetails,
+    resetApplicantDetails,
+  };
+};
+
+// ==================== SCHEMA GENERATORS ====================
+const getBaseValidationSchema = (hasCitizenId) => {
+  const baseSchema = {
+    fullName: Yup.string().required("Full Name is required"),
+    genderId: Yup.number().required("Gender is required"),
+    mobileNo: Yup.string().required("Mobile No is required"),
+    email: Yup.string().email("Invalid email").required("Email is required"),
+    dzongkhagId: Yup.number().required("Dzongkhag is required"),
+    organizationName: Yup.string().required("Organization Name is required"),
+    documents: Yup.array().min(1, "Please upload at least one file"),
+  };
+
+  if (hasCitizenId === "yes") {
+    baseSchema.citizenId = Yup.string()
+      .matches(/^[0-9]{11}$/, "Invalid CID number (11 digits required)")
+      .required("Citizen ID Number is required");
+  } else {
+    baseSchema.referenceNo = Yup.string().required("Reference No is required");
+  }
+
+  return baseSchema;
+};
+
+const getAssessorSchema = (hasCitizenId) => {
+  const base = getBaseValidationSchema(hasCitizenId);
+  return Yup.object({
+    ...base,
+    sectorId: Yup.number().required("Sector is required"),
+    occupationId: Yup.number().required("Occupation is required"),
+    certificationLevelId: Yup.number().required(
+      "Certification Level is required",
+    ),
+  });
+};
+
+const getAccreditorSchema = (hasCitizenId) => {
+  const base = getBaseValidationSchema(hasCitizenId);
+  return Yup.object({
+    ...base,
+    sectorId: Yup.number().required("Sector is required"),
+    occupationId: Yup.number().required("Occupation is required"),
+    certificationLevelId: Yup.number().required(
+      "Certification Level is required",
+    ),
+    designation: Yup.string().required("Designation is required"),
+    yearsOfExperience: Yup.number()
+      .min(5, "Minimum 5 years required")
+      .required("Number of Years is required"),
+    responsibility: Yup.string().required("Responsibility is required"),
+  });
+};
+
+const getQMSAuditorSchema = (hasCitizenId, values = {}) => {
+  const base = getBaseValidationSchema(hasCitizenId);
+  const schema = {
+    ...base,
+    qmsTraining: Yup.string().required(
+      "Please specify if QMS training attended",
+    ),
+    workExperiences: Yup.array()
+      .of(
+        Yup.object({
+          organizationName: Yup.string().required("Organization Name required"),
+          designation: Yup.string().required("Designation required"),
+          year: Yup.number()
+            .min(5, "Minimum 5 years required")
+            .required("Number of Years required"),
+          responsibility: Yup.string().required("Responsibility required"),
+        }),
+      )
+      .min(1, "At least one work experience required"),
+  };
+
+  if (values.qmsTraining === "Yes") {
+    schema.academicBackground = Yup.string().required(
+      "Academic / Technical / Professional Background is required when QMS training is Yes",
+    );
+  }
+
+  return Yup.object(schema);
+};
+
+const getValidationSchema = (serviceId, hasCitizenId, values = {}) => {
+  const serviceSchemaMap = {
+    32: getAssessorSchema,
+    5: getAccreditorSchema,
+    3: (hasCitizenId) => getQMSAuditorSchema(hasCitizenId, values),
+  };
+
+  const schemaGenerator =
+    serviceSchemaMap[serviceId] || getBaseValidationSchema;
+  return schemaGenerator(hasCitizenId);
+};
+
+// ==================== INITIAL VALUES GENERATOR ====================
+const getInitialValues = (serviceId) => {
+  const baseValues = {
+    citizenId: "",
+    referenceNo: "",
+    fullName: "",
+    genderId: "",
+    mobileNo: "",
+    email: "",
+    dzongkhagId: "",
+    organizationName: "",
+    documents: [],
+    serviceId: serviceId ? parseInt(serviceId) : null,
+    assignedRoleId: 7,
+    assignedUserId: null,
+    statusId: 55,
+    remarks: "",
+  };
+
+  const serviceSpecificValues = {
+    32: { sectorId: "", occupationId: "", certificationLevelId: "" },
+    5: {
+      sectorId: "",
+      occupationId: "",
+      certificationLevelId: "",
+      designation: "",
+      yearsOfExperience: "",
+      responsibility: "",
+    },
+    3: {
+      qmsTraining: "",
+      academicBackground: "",
+      workExperiences: [
+        { organizationName: "", designation: "", year: "", responsibility: "" },
+      ],
+    },
+  };
+
+  return { ...baseValues, ...(serviceSpecificValues[serviceId] || {}) };
+};
+
+// ==================== REUSABLE COMPONENTS ====================
+const FormSection = ({ title, children, sx = {} }) => (
+  <Paper
+    sx={{
+      p: { xs: 2, md: 3 },
+      mb: 4,
+      borderRadius: 2,
+      border: "1px solid #e0e0e0",
+      ...sx,
+    }}
+  >
+    <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+      {title}
+    </Typography>
+    <Divider sx={{ mb: 3 }} />
+    {children}
+  </Paper>
+);
+
+const SelectField = ({
+  formik,
+  name,
+  label,
+  options,
+  valueKey = "id",
+  labelKey = "name",
+  disabled = false,
+  loading = false,
+  ...props
+}) => (
+  <TextField
+    select
+    fullWidth
+    label={requiredLabel(label)}
+    name={name}
+    size="small"
+    value={formik.values[name] || ""}
+    onChange={formik.handleChange}
+    onBlur={formik.handleBlur}
+    error={formik.touched[name] && Boolean(formik.errors[name])}
+    helperText={formik.touched[name] && formik.errors[name]}
+    disabled={disabled || loading}
+    {...props}
+  >
+    <MenuItem value="">Select</MenuItem>
+    {options.map((item) => (
+      <MenuItem key={item[valueKey]} value={item[valueKey]}>
+        {item[labelKey]}
+      </MenuItem>
+    ))}
+  </TextField>
+);
+
+const TextInputField = ({
+  formik,
+  name,
+  label,
+  type = "text",
+  disabled = false,
+  loading = false,
+  multiline = false,
+  rows = 1,
+  ...props
+}) => (
+  <TextField
+    fullWidth
+    type={type}
+    label={requiredLabel(label)}
+    name={name}
+    size="small"
+    value={formik.values[name] || ""}
+    onChange={formik.handleChange}
+    onBlur={formik.handleBlur}
+    error={formik.touched[name] && Boolean(formik.errors[name])}
+    helperText={formik.touched[name] && formik.errors[name]}
+    disabled={disabled || loading}
+    multiline={multiline}
+    rows={rows}
+    {...props}
+  />
+);
+
+const WorkExperienceField = ({ formik, index, exp, onRemove, loading }) => (
+  <Grid container spacing={3} sx={{ mb: 2, alignItems: "flex-start" }}>
+    <Grid item size={{ xs: 12, md: 3 }}>
+      <TextInputField
+        formik={formik}
+        name={`workExperiences[${index}].organizationName`}
+        label="Organization Name"
+        loading={loading}
+      />
+    </Grid>
+    <Grid item size={{ xs: 12, md: 2 }}>
+      <TextInputField
+        formik={formik}
+        name={`workExperiences[${index}].designation`}
+        label="Designation"
+        loading={loading}
+      />
+    </Grid>
+    <Grid item size={{ xs: 12, md: 3 }}>
+      <TextInputField
+        formik={formik}
+        name={`workExperiences[${index}].year`}
+        label="Number of Years"
+        type="number"
+        loading={loading}
+      />
+    </Grid>
+    <Grid item size={{ xs: 12, md: 3 }}>
+      <TextInputField
+        formik={formik}
+        name={`workExperiences[${index}].responsibility`}
+        label="Responsibility"
+        multiline
+        rows={2}
+        loading={loading}
+      />
+    </Grid>
+    <Grid
+      item
+      size={{ xs: 12, md: 1 }}
+      sx={{ display: "flex", alignItems: "center", pt: 1 }}
+    >
+      {index > 0 && (
+        <IconButton
+          color="error"
+          onClick={() => onRemove(index)}
+          disabled={loading}
+        >
+          <RemoveCircleOutlineIcon />
+        </IconButton>
+      )}
+    </Grid>
+  </Grid>
+);
+
+// ==================== MAIN COMPONENT ====================
+const AssessorAccreditorQMSAuditorRenewal = () => {
+  const { serviceId } = useParams();
+  const [serviceName, setServiceName] = useState("");
+  const [hasCitizenId, setHasCitizenId] = useState("yes");
+  const [loading, setLoading] = useState(false);
+  const formikRef = useRef();
+  const navigate = useNavigate();
+
+  const dropdownData = useDropdownData();
+  const applicant = useRenewalApplicant(serviceId);
+
+  // Fetch service name
+  useEffect(() => {
+    const fetchServiceName = async () => {
+      try {
+        const response = await CommonService.getServiceName(serviceId);
+        setServiceName(response.data.serviceName);
+      } catch (error) {
+        console.error("Error fetching service name:", error);
+      }
+    };
+    if (serviceId) fetchServiceName();
+  }, [serviceId]);
+
+  // Fetch dropdown data on mount
+  useEffect(() => {
+    dropdownData.fetchDropdownData();
+  }, []);
+
+  // Handle sector change
+  const handleSectorChange = useCallback(
+    (e, formik) => {
+      const sectorId = e.target.value;
+      dropdownData.handleSectorChange(sectorId, formik);
+    },
+    [dropdownData],
+  );
+
+  // Handle Citizen ID change
+  const handleCitizenIdChange = useCallback(
+    (e, formik) => {
+      const value = e.target.value;
+      formik.setFieldValue("citizenId", value);
+      if (value) formik.setFieldValue("referenceNo", "");
+      if (value && value.length === 11) {
+        applicant.fetchApplicantDetails(value, null, formik);
+      }
+    },
+    [applicant],
+  );
+
+  // Handle Reference No change
+  const handleReferenceNoChange = useCallback(
+    (e, formik) => {
+      const value = e.target.value;
+      formik.setFieldValue("referenceNo", value);
+      if (value) formik.setFieldValue("citizenId", "");
+      if (value && value.length >= 3) {
+        applicant.fetchApplicantDetails(null, value, formik);
+      }
+    },
+    [applicant],
+  );
+
+  // Reset form
+  const handleReset = useCallback(
+    (formik) => {
+      formik.resetForm();
+      dropdownData.setSelectedSectorId("");
+      setHasCitizenId("yes");
+      applicant.resetApplicantDetails();
+    },
+    [dropdownData, applicant],
+  );
+
+  // Handle Has Citizen ID toggle
+  const handleHasCitizenIdChange = useCallback(
+    (e) => {
+      const newValue = e.target.value;
+      setHasCitizenId(newValue);
+      applicant.resetApplicantDetails();
+      dropdownData.setSelectedSectorId("");
+
+      if (formikRef.current) {
+        const initialValues = getInitialValues(serviceId);
+        formikRef.current.resetForm({ values: initialValues });
+        formikRef.current.setTouched({});
+        formikRef.current.setErrors({});
+        formikRef.current.setFieldValue("documents", []);
+      }
+    },
+    [serviceId, applicant],
+  );
+
+  // Handle form submission
+  const handleSubmit = useCallback(
+    async (values, { resetForm, setSubmitting }) => {
+      setLoading(true);
+      try {
+        const documents = await Promise.all(
+          values.documents.map((file) => fileToBase64(file)),
+        );
+
+        const submitData = { ...values, documents };
+        if (hasCitizenId === "yes") delete submitData.referenceNo;
+        else delete submitData.citizenId;
+
+        // Ensure numeric fields are properly formatted
+        const numericFields = [
+          "genderId",
+          "dzongkhagId",
+          "sectorId",
+          "occupationId",
+          "certificationLevelId",
+          "yearsOfExperience",
+        ];
+        numericFields.forEach((field) => {
+          if (submitData[field]) submitData[field] = Number(submitData[field]);
+        });
+
+        if (submitData.workExperiences) {
+          submitData.workExperiences = submitData.workExperiences.map(
+            (exp) => ({
+              ...exp,
+              year: exp.year ? Number(exp.year) : null,
+            }),
+          );
+        }
+
+        const response =
+          await AssessorAccreditorQMSAuditorService.registerAssessorAccreditorQMSAuditor(
+            submitData,
+          );
+
+        if (response.status === 201 || response.status === 200) {
+          toast.success(`${serviceName} submitted successfully!`);
+          resetForm();
+          dropdownData.setSelectedSectorId("");
+          setHasCitizenId("yes");
+          applicant.resetApplicantDetails();
+          navigate("/");
+        }
+      } catch (error) {
+        console.error("Submission error:", error);
+        toast.error(error.message || "Submission failed");
+      } finally {
+        setLoading(false);
+        setSubmitting(false);
+      }
+    },
+    [hasCitizenId, serviceName, navigate, dropdownData, applicant],
+  );
+
+  // Render service-specific sections
+  const renderServiceSpecificSection = useCallback(
+    (formik) => {
+      if (serviceId === "32") {
+        return (
+          <Grid container spacing={3}>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <SelectField
+                formik={formik}
+                name="sectorId"
+                label="Sector"
+                options={dropdownData.sectors}
+                labelKey="sectorName"
+                onChange={(e) => handleSectorChange(e, formik)}
+                loading={loading}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <SelectField
+                formik={formik}
+                name="occupationId"
+                label="Occupation"
+                options={dropdownData.occupations}
+                labelKey="occupationName"
+                disabled={!formik.values.sectorId}
+                loading={loading}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <SelectField
+                formik={formik}
+                name="certificationLevelId"
+                label="Certification Level"
+                options={dropdownData.certificationLevels}
+                loading={loading}
+              />
+            </Grid>
+          </Grid>
+        );
+      }
+
+      if (serviceId === "5") {
+        return (
+          <Grid container spacing={3}>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <SelectField
+                formik={formik}
+                name="sectorId"
+                label="Sector"
+                options={dropdownData.sectors}
+                labelKey="sectorName"
+                onChange={(e) => handleSectorChange(e, formik)}
+                loading={loading}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <SelectField
+                formik={formik}
+                name="occupationId"
+                label="Occupation"
+                options={dropdownData.occupations}
+                labelKey="occupationName"
+                disabled={!formik.values.sectorId}
+                loading={loading}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <SelectField
+                formik={formik}
+                name="certificationLevelId"
+                label="Certification Level"
+                options={dropdownData.certificationLevels}
+                loading={loading}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextInputField
+                formik={formik}
+                name="designation"
+                label="Designation"
+                loading={loading}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextInputField
+                formik={formik}
+                name="yearsOfExperience"
+                label="Number of Years"
+                type="number"
+                loading={loading}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextInputField
+                formik={formik}
+                name="responsibility"
+                label="Responsibility"
+                loading={loading}
+              />
+            </Grid>
+          </Grid>
+        );
+      }
+
+      if (serviceId === "3") {
+        return (
+          <>
+            <Grid container spacing={3}>
+              <Grid item size={{ xs: 12, md: 6 }}>
+                <SelectField
+                  formik={formik}
+                  name="qmsTraining"
+                  label="QMS Auditor Training Attended"
+                  options={[
+                    { id: "Yes", name: "Yes" },
+                    { id: "No", name: "No" },
+                  ]}
+                  valueKey="id"
+                  labelKey="name"
+                  loading={loading}
+                />
+              </Grid>
+            </Grid>
+            {formik.values.qmsTraining === "Yes" && (
+              <Grid container spacing={3} sx={{ mt: 2 }}>
+                <Grid item size={{ xs: 12 }}>
+                  <TextInputField
+                    formik={formik}
+                    name="academicBackground"
+                    label="Academic / Technical / Professional Background"
+                    multiline
+                    rows={4}
+                    loading={loading}
+                    placeholder="Please provide details of your academic qualifications, technical certifications, and professional background..."
+                  />
+                </Grid>
+              </Grid>
+            )}
+          </>
+        );
+      }
+
+      return null;
+    },
+    [serviceId, dropdownData, loading, handleSectorChange],
+  );
+
+  // Render work experiences for QMS Auditor
+  const renderWorkExperiences = useCallback(
+    (formik) => {
+      if (serviceId !== "3") return null;
+
+      return (
+        <FormSection title="Registration Criteria: Relevant Work Experience (Minimum of 5 years)">
+          <FieldArray
+            name="workExperiences"
+            render={(arrayHelpers) => (
+              <>
+                {formik.values.workExperiences?.map((exp, index) => (
+                  <WorkExperienceField
+                    key={index}
+                    formik={formik}
+                    index={index}
+                    exp={exp}
+                    onRemove={arrayHelpers.remove}
+                    loading={loading}
+                  />
+                ))}
+                <Button
+                  variant="contained"
+                  startIcon={<AddCircleOutlineIcon />}
+                  onClick={() =>
+                    arrayHelpers.push({
+                      organizationName: "",
+                      designation: "",
+                      year: "",
+                      responsibility: "",
+                    })
+                  }
+                  sx={{ mt: 2 }}
+                  disabled={loading}
+                >
+                  Add More
+                </Button>
+              </>
+            )}
+          />
+        </FormSection>
+      );
+    },
+    [serviceId, loading],
+  );
 
   return (
     <Box sx={{ m: { xs: 2, md: 2 } }}>
@@ -569,796 +917,130 @@ const AssessorAccreditorQMSAuditorRenewal = () => {
         {/* Registration Form */}
         <Formik
           innerRef={formikRef}
-          initialValues={getInitialValues()}
-          validationSchema={(values) => getValidationSchema(values)}
+          initialValues={getInitialValues(serviceId)}
+          validationSchema={(values) =>
+            getValidationSchema(serviceId, hasCitizenId, values)
+          }
           enableReinitialize={true}
           onSubmit={handleSubmit}
         >
           {(formik) => (
             <form onSubmit={formik.handleSubmit}>
-              {/* Section: Basic Info */}
-              <Paper
-                sx={{
-                  p: { xs: 2, md: 3 },
-                  mb: 4,
-                  borderRadius: 2,
-                  border: "1px solid #e0e0e0",
-                }}
-              >
-                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-                  Basic Information
-                </Typography>
-                <Divider sx={{ mb: 3 }} />
-
+              {/* Basic Information Section */}
+              <FormSection title="Basic Information">
                 <Grid container spacing={3}>
-                  {/* Show Citizen ID field when "Yes" is selected */}
-                  {hasCitizenId === "yes" && (
+                  {hasCitizenId === "yes" ? (
                     <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={requiredLabel("Citizen ID Number")}
+                      <TextInputField
+                        formik={formik}
                         name="citizenId"
-                        size="small"
-                        value={formik.values.citizenId || ""}
-                        onChange={(e) => handleCitizenIdChange(e, formik)}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.citizenId &&
-                          Boolean(formik.errors.citizenId)
-                        }
-                        helperText={
-                          formik.touched.citizenId && formik.errors.citizenId
-                        }
-                        disabled={loading || fetchingDetails}
+                        label="Citizen ID Number"
+                        loading={loading || applicant.fetchingDetails}
                         placeholder="Enter your Citizen ID Number"
+                        onChange={(e) => handleCitizenIdChange(e, formik)}
                         InputProps={{
-                          endAdornment: fetchingDetails && (
+                          endAdornment: applicant.fetchingDetails && (
                             <CircularProgress size={20} />
                           ),
                         }}
                       />
                     </Grid>
-                  )}
-
-                  {/* Show Reference No field when "No" is selected */}
-                  {hasCitizenId === "no" && (
+                  ) : (
                     <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={requiredLabel("Reference No")}
+                      <TextInputField
+                        formik={formik}
                         name="referenceNo"
-                        size="small"
-                        value={formik.values.referenceNo || ""}
-                        onChange={(e) => handleReferenceNoChange(e, formik)}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.referenceNo &&
-                          Boolean(formik.errors.referenceNo)
-                        }
-                        helperText={
-                          formik.touched.referenceNo &&
-                          formik.errors.referenceNo
-                        }
-                        disabled={loading || fetchingDetails}
+                        label="Reference No"
+                        loading={loading || applicant.fetchingDetails}
                         placeholder="Enter reference number"
+                        onChange={(e) => handleReferenceNoChange(e, formik)}
                         InputProps={{
-                          endAdornment: fetchingDetails && (
+                          endAdornment: applicant.fetchingDetails && (
                             <CircularProgress size={20} />
                           ),
                         }}
                       />
                     </Grid>
                   )}
-
                   <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      label={requiredLabel("Full Name")}
+                    <TextInputField
+                      formik={formik}
                       name="fullName"
-                      size="small"
-                      value={formik.values.fullName || ""}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.fullName &&
-                        Boolean(formik.errors.fullName)
-                      }
-                      helperText={
-                        formik.touched.fullName && formik.errors.fullName
-                      }
-                      disabled={loading}
+                      label="Full Name"
+                      loading={loading}
                     />
                   </Grid>
-
                   <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label={requiredLabel("Gender")}
+                    <SelectField
+                      formik={formik}
                       name="genderId"
-                      size="small"
-                      value={formik.values.genderId || ""}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.genderId &&
-                        Boolean(formik.errors.genderId)
-                      }
-                      helperText={
-                        formik.touched.genderId && formik.errors.genderId
-                      }
-                      disabled={loading}
-                    >
-                      <MenuItem value="">Select</MenuItem>
-                      {genders.map((gender) => (
-                        <MenuItem key={gender.id} value={gender.id}>
-                          {gender.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                      label="Gender"
+                      options={dropdownData.genders}
+                      loading={loading}
+                    />
                   </Grid>
-
                   <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      label={requiredLabel("Mobile No")}
+                    <TextInputField
+                      formik={formik}
                       name="mobileNo"
-                      size="small"
-                      value={formik.values.mobileNo || ""}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.mobileNo &&
-                        Boolean(formik.errors.mobileNo)
-                      }
-                      helperText={
-                        formik.touched.mobileNo && formik.errors.mobileNo
-                      }
-                      disabled={loading}
+                      label="Mobile No"
+                      loading={loading}
                     />
                   </Grid>
-
                   <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      label={requiredLabel("Email")}
+                    <TextInputField
+                      formik={formik}
                       name="email"
-                      size="small"
-                      value={formik.values.email || ""}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.email && Boolean(formik.errors.email)
-                      }
-                      helperText={formik.touched.email && formik.errors.email}
-                      disabled={loading}
+                      label="Email"
+                      loading={loading}
                     />
                   </Grid>
-
                   <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label={requiredLabel(
-                        "Location of Working Organization (Dzongkhag)",
-                      )}
+                    <SelectField
+                      formik={formik}
                       name="dzongkhagId"
-                      size="small"
-                      value={formik.values.dzongkhagId || ""}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.dzongkhagId &&
-                        Boolean(formik.errors.dzongkhagId)
-                      }
-                      helperText={
-                        formik.touched.dzongkhagId && formik.errors.dzongkhagId
-                      }
-                      disabled={loading}
-                    >
-                      <MenuItem value="">Select</MenuItem>
-                      {dzongkhags.map((dz) => (
-                        <MenuItem key={dz.id} value={dz.id}>
-                          {dz.dzonkhagName || dz.dzongkhagName}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                      label="Location of Working Organization (Dzongkhag)"
+                      options={dropdownData.dzongkhags}
+                      labelKey="dzonkhagName"
+                      loading={loading}
+                    />
                   </Grid>
-
                   <Grid item size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      label={requiredLabel("Name of the Working Organization")}
+                    <TextInputField
+                      formik={formik}
                       name="organizationName"
-                      size="small"
-                      value={formik.values.organizationName || ""}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.organizationName &&
-                        Boolean(formik.errors.organizationName)
-                      }
-                      helperText={
-                        formik.touched.organizationName &&
-                        formik.errors.organizationName
-                      }
-                      disabled={loading}
+                      label="Name of the Working Organization"
+                      loading={loading}
                     />
                   </Grid>
                 </Grid>
-              </Paper>
+              </FormSection>
 
-              {/* Section: Assessor Criteria (Service 32) */}
-              {serviceId === "32" && (
-                <Paper
-                  sx={{
-                    p: { xs: 2, md: 3 },
-                    mb: 4,
-                    borderRadius: 2,
-                    border: "1px solid #e0e0e0",
-                  }}
+              {/* Service Specific Section */}
+              {(serviceId === "32" || serviceId === "5") && (
+                <FormSection
+                  title={
+                    serviceId === "32"
+                      ? "Assessor Registration Criteria"
+                      : "Accreditor Registration Criteria"
+                  }
                 >
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight={600}
-                    sx={{ mb: 2 }}
-                  >
-                    Assessor Registration Criteria
-                  </Typography>
-                  <Divider sx={{ mb: 3 }} />
-                  <Grid container spacing={3}>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("Sector")}
-                        name="sectorId"
-                        size="small"
-                        value={formik.values.sectorId || ""}
-                        onChange={(e) => {
-                          const sectorId = e.target.value;
-                          formik.handleChange(e);
-                          setSelectedSectorId(sectorId);
-                          formik.setFieldValue("occupationId", "");
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.sectorId &&
-                          Boolean(formik.errors.sectorId)
-                        }
-                        helperText={
-                          formik.touched.sectorId && formik.errors.sectorId
-                        }
-                        disabled={loading}
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        {sectors.map((sec) => (
-                          <MenuItem key={sec.id} value={sec.id}>
-                            {sec.sectorName}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("Occupation")}
-                        name="occupationId"
-                        size="small"
-                        value={formik.values.occupationId || ""}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.occupationId &&
-                          Boolean(formik.errors.occupationId)
-                        }
-                        helperText={
-                          formik.touched.occupationId &&
-                          formik.errors.occupationId
-                        }
-                        disabled={loading || !formik.values.sectorId}
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        {occupations.map((occ) => (
-                          <MenuItem key={occ.id} value={occ.id}>
-                            {occ.occupationName}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("Certification Level")}
-                        name="certificationLevelId"
-                        size="small"
-                        value={formik.values.certificationLevelId || ""}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.certificationLevelId &&
-                          Boolean(formik.errors.certificationLevelId)
-                        }
-                        helperText={
-                          formik.touched.certificationLevelId &&
-                          formik.errors.certificationLevelId
-                        }
-                        disabled={loading}
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        {certificationLevels.map((lvl) => (
-                          <MenuItem key={lvl.id} value={lvl.id}>
-                            {lvl.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                  </Grid>
-                </Paper>
+                  {renderServiceSpecificSection(formik)}
+                </FormSection>
               )}
 
-              {/* Section: Accreditor Criteria (Service 5) */}
-              {serviceId === "5" && (
-                <Paper
-                  sx={{
-                    p: { xs: 2, md: 3 },
-                    mb: 4,
-                    borderRadius: 2,
-                    border: "1px solid #e0e0e0",
-                  }}
-                >
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight={600}
-                    sx={{ mb: 2 }}
-                  >
-                    Accreditor Registration Criteria
-                  </Typography>
-                  <Divider sx={{ mb: 3 }} />
-                  <Grid container spacing={3}>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("Sector")}
-                        name="sectorId"
-                        size="small"
-                        value={formik.values.sectorId || ""}
-                        onChange={(e) => {
-                          const sectorId = e.target.value;
-                          formik.handleChange(e);
-                          setSelectedSectorId(sectorId);
-                          formik.setFieldValue("occupationId", "");
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.sectorId &&
-                          Boolean(formik.errors.sectorId)
-                        }
-                        helperText={
-                          formik.touched.sectorId && formik.errors.sectorId
-                        }
-                        disabled={loading}
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        {sectors.map((sec) => (
-                          <MenuItem key={sec.id} value={sec.id}>
-                            {sec.sectorName}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("Occupation")}
-                        name="occupationId"
-                        size="small"
-                        value={formik.values.occupationId || ""}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.occupationId &&
-                          Boolean(formik.errors.occupationId)
-                        }
-                        helperText={
-                          formik.touched.occupationId &&
-                          formik.errors.occupationId
-                        }
-                        disabled={loading || !formik.values.sectorId}
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        {occupations.map((occ) => (
-                          <MenuItem key={occ.id} value={occ.id}>
-                            {occ.occupationName}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("Certification Level")}
-                        name="certificationLevelId"
-                        size="small"
-                        value={formik.values.certificationLevelId || ""}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.certificationLevelId &&
-                          Boolean(formik.errors.certificationLevelId)
-                        }
-                        helperText={
-                          formik.touched.certificationLevelId &&
-                          formik.errors.certificationLevelId
-                        }
-                        disabled={loading}
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        {certificationLevels.map((lvl) => (
-                          <MenuItem key={lvl.id} value={lvl.id}>
-                            {lvl.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={requiredLabel("Designation")}
-                        name="designation"
-                        size="small"
-                        value={formik.values.designation || ""}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.designation &&
-                          Boolean(formik.errors.designation)
-                        }
-                        helperText={
-                          formik.touched.designation &&
-                          formik.errors.designation
-                        }
-                        disabled={loading}
-                      />
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={requiredLabel("Number of Years")}
-                        name="yearsOfExperience"
-                        size="small"
-                        type="number"
-                        value={formik.values.yearsOfExperience || ""}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.yearsOfExperience &&
-                          Boolean(formik.errors.yearsOfExperience)
-                        }
-                        helperText={
-                          formik.touched.yearsOfExperience &&
-                          formik.errors.yearsOfExperience
-                        }
-                        disabled={loading}
-                      />
-                    </Grid>
-
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={requiredLabel("Responsibility")}
-                        name="responsibility"
-                        size="small"
-                        value={formik.values.responsibility || ""}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.responsibility &&
-                          Boolean(formik.errors.responsibility)
-                        }
-                        helperText={
-                          formik.touched.responsibility &&
-                          formik.errors.responsibility
-                        }
-                        disabled={loading}
-                      />
-                    </Grid>
-                  </Grid>
-                </Paper>
-              )}
-
-              {/* Section: QMS Auditor Criteria (Service 3) */}
+              {/* QMS Auditor Sections */}
               {serviceId === "3" && (
                 <>
-                  <Paper
-                    sx={{
-                      p: { xs: 2, md: 3 },
-                      mb: 4,
-                      borderRadius: 2,
-                      border: "1px solid #e0e0e0",
-                    }}
-                  >
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={600}
-                      sx={{ mb: 2 }}
-                    >
-                      Registration Criteria
-                    </Typography>
-                    <Divider sx={{ mb: 3 }} />
-                    <Grid container spacing={3}>
-                      <Grid item size={{ xs: 12, md: 6 }}>
-                        <TextField
-                          select
-                          fullWidth
-                          label={requiredLabel("QMS Auditor Training Attended")}
-                          name="qmsTraining"
-                          size="small"
-                          value={formik.values.qmsTraining || ""}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.qmsTraining &&
-                            Boolean(formik.errors.qmsTraining)
-                          }
-                          helperText={
-                            formik.touched.qmsTraining &&
-                            formik.errors.qmsTraining
-                          }
-                          disabled={loading}
-                        >
-                          <MenuItem value="">Select</MenuItem>
-                          <MenuItem value="Yes">Yes</MenuItem>
-                          <MenuItem value="No">No</MenuItem>
-                        </TextField>
-                      </Grid>
-                    </Grid>
-
-                    {formik.values.qmsTraining === "Yes" && (
-                      <Grid container spacing={3} sx={{ mt: 2 }}>
-                        <Grid item size={{ xs: 12 }}>
-                          <TextField
-                            fullWidth
-                            multiline
-                            rows={4}
-                            label={requiredLabel(
-                              "Academic / Technical / Professional Background",
-                            )}
-                            name="academicBackground"
-                            size="small"
-                            value={formik.values.academicBackground || ""}
-                            onChange={formik.handleChange}
-                            onBlur={formik.handleBlur}
-                            error={
-                              formik.touched.academicBackground &&
-                              Boolean(formik.errors.academicBackground)
-                            }
-                            helperText={
-                              formik.touched.academicBackground &&
-                              formik.errors.academicBackground
-                            }
-                            disabled={loading}
-                            placeholder="Please provide details of your academic qualifications, technical certifications, and professional background..."
-                          />
-                        </Grid>
-                      </Grid>
-                    )}
-                  </Paper>
-
-                  {/* Work Experience - Dynamic with FieldArray */}
-                  <Paper
-                    sx={{
-                      p: { xs: 2, md: 3 },
-                      mb: 4,
-                      borderRadius: 2,
-                      border: "1px solid #e0e0e0",
-                    }}
-                  >
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={600}
-                      sx={{ mb: 2 }}
-                    >
-                      Registration Criteria: Relevant Work Experience (Minimum
-                      of 5 years)
-                    </Typography>
-                    <Divider sx={{ mb: 3 }} />
-
-                    <FieldArray
-                      name="workExperiences"
-                      render={(arrayHelpers) => (
-                        <>
-                          {formik.values.workExperiences &&
-                            formik.values.workExperiences.map((exp, index) => (
-                              <Grid
-                                container
-                                spacing={3}
-                                key={index}
-                                sx={{ mb: 2, alignItems: "flex-start" }}
-                              >
-                                <Grid item size={{ xs: 12, md: 3 }}>
-                                  <TextField
-                                    fullWidth
-                                    label={requiredLabel("Organization Name")}
-                                    name={`workExperiences[${index}].organizationName`}
-                                    size="small"
-                                    value={exp.organizationName || ""}
-                                    onChange={formik.handleChange}
-                                    onBlur={formik.handleBlur}
-                                    error={
-                                      formik.touched.workExperiences &&
-                                      formik.touched.workExperiences[index]
-                                        ?.organizationName &&
-                                      Boolean(
-                                        formik.errors.workExperiences?.[index]
-                                          ?.organizationName,
-                                      )
-                                    }
-                                    helperText={
-                                      formik.touched.workExperiences &&
-                                      formik.touched.workExperiences[index]
-                                        ?.organizationName &&
-                                      formik.errors.workExperiences?.[index]
-                                        ?.organizationName
-                                    }
-                                    disabled={loading}
-                                  />
-                                </Grid>
-                                <Grid item size={{ xs: 12, md: 2 }}>
-                                  <TextField
-                                    fullWidth
-                                    label={requiredLabel("Designation")}
-                                    name={`workExperiences[${index}].designation`}
-                                    size="small"
-                                    value={exp.designation || ""}
-                                    onChange={formik.handleChange}
-                                    onBlur={formik.handleBlur}
-                                    error={
-                                      formik.touched.workExperiences &&
-                                      formik.touched.workExperiences[index]
-                                        ?.designation &&
-                                      Boolean(
-                                        formik.errors.workExperiences?.[index]
-                                          ?.designation,
-                                      )
-                                    }
-                                    helperText={
-                                      formik.touched.workExperiences &&
-                                      formik.touched.workExperiences[index]
-                                        ?.designation &&
-                                      formik.errors.workExperiences?.[index]
-                                        ?.designation
-                                    }
-                                    disabled={loading}
-                                  />
-                                </Grid>
-                                <Grid item size={{ xs: 12, md: 3 }}>
-                                  <TextField
-                                    fullWidth
-                                    type="number"
-                                    label={requiredLabel("Number of Years")}
-                                    name={`workExperiences[${index}].year`}
-                                    size="small"
-                                    value={exp.year || ""}
-                                    onChange={formik.handleChange}
-                                    onBlur={formik.handleBlur}
-                                    error={
-                                      formik.touched.workExperiences &&
-                                      formik.touched.workExperiences[index]
-                                        ?.year &&
-                                      Boolean(
-                                        formik.errors.workExperiences?.[index]
-                                          ?.year,
-                                      )
-                                    }
-                                    helperText={
-                                      formik.touched.workExperiences &&
-                                      formik.touched.workExperiences[index]
-                                        ?.year &&
-                                      formik.errors.workExperiences?.[index]
-                                        ?.year
-                                    }
-                                    disabled={loading}
-                                  />
-                                </Grid>
-                                <Grid item size={{ xs: 12, md: 3 }}>
-                                  <TextField
-                                    fullWidth
-                                    rows={2}
-                                    label={requiredLabel("Responsibility")}
-                                    name={`workExperiences[${index}].responsibility`}
-                                    size="small"
-                                    value={exp.responsibility || ""}
-                                    onChange={formik.handleChange}
-                                    onBlur={formik.handleBlur}
-                                    error={
-                                      formik.touched.workExperiences &&
-                                      formik.touched.workExperiences[index]
-                                        ?.responsibility &&
-                                      Boolean(
-                                        formik.errors.workExperiences?.[index]
-                                          ?.responsibility,
-                                      )
-                                    }
-                                    helperText={
-                                      formik.touched.workExperiences &&
-                                      formik.touched.workExperiences[index]
-                                        ?.responsibility &&
-                                      formik.errors.workExperiences?.[index]
-                                        ?.responsibility
-                                    }
-                                    disabled={loading}
-                                  />
-                                </Grid>
-                                <Grid
-                                  item
-                                  size={{ xs: 12, md: 1 }}
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    pt: 1,
-                                  }}
-                                >
-                                  {index > 0 && (
-                                    <IconButton
-                                      color="error"
-                                      onClick={() => arrayHelpers.remove(index)}
-                                      disabled={loading}
-                                    >
-                                      <RemoveCircleOutlineIcon />
-                                    </IconButton>
-                                  )}
-                                </Grid>
-                              </Grid>
-                            ))}
-
-                          <Button
-                            variant="contained"
-                            startIcon={<AddCircleOutlineIcon />}
-                            onClick={() =>
-                              arrayHelpers.push({
-                                organizationName: "",
-                                designation: "",
-                                year: "",
-                                responsibility: "",
-                              })
-                            }
-                            sx={{ mt: 2 }}
-                            disabled={loading}
-                          >
-                            Add More
-                          </Button>
-                        </>
-                      )}
-                    />
-                  </Paper>
+                  <FormSection title="Registration Criteria">
+                    {renderServiceSpecificSection(formik)}
+                  </FormSection>
+                  {renderWorkExperiences(formik)}
                 </>
               )}
 
-              {/* Section: Supporting Documents */}
-              <Paper
-                sx={{
-                  p: { xs: 2, md: 3 },
-                  mb: 4,
-                  borderRadius: 2,
-                  border: "1px solid #e0e0e0",
-                }}
-              >
-                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-                  Supporting Documents
-                </Typography>
-                <Divider sx={{ mb: 3 }} />
+              {/* Supporting Documents */}
+              <FormSection title="Supporting Documents">
                 <Box
                   sx={{
                     p: 2,
@@ -1380,7 +1062,7 @@ const AssessorAccreditorQMSAuditorRenewal = () => {
                     {formik.errors.documents}
                   </Typography>
                 )}
-              </Paper>
+              </FormSection>
 
               {/* Form Actions */}
               <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
@@ -1415,12 +1097,7 @@ const AssessorAccreditorQMSAuditorRenewal = () => {
                     fontWeight: 600,
                     textTransform: "none",
                   }}
-                  onClick={() => {
-                    formik.resetForm();
-                    setSelectedSectorId("");
-                    setHasCitizenId("yes");
-                    setRenewalApplicantDetails(null);
-                  }}
+                  onClick={() => handleReset(formik)}
                   disabled={loading}
                 >
                   Reset

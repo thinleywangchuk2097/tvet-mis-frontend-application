@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Paper,
   Typography,
@@ -28,19 +28,28 @@ import {
   MenuItem,
   Select,
   FormControl,
+  Tooltip,
+  Autocomplete,
+  Stack,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import ReceiptIcon from "@mui/icons-material/Receipt";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import PaymentIcon from "@mui/icons-material/Payment";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EngineeringIcon from "@mui/icons-material/Engineering";
 import { toast } from "react-toastify";
+import ManageHistoryIcon from '@mui/icons-material/ManageHistory';
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
 import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
+import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
+import UserRoleManagementService from "../../../api/services/internal/userrole/UserRoleManagementService";
 
 const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
@@ -48,19 +57,22 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [courseDetails, setCourseDetails] = useState(null);
+  const [instituteData, setInstituteData] = useState(null);
   const [selectedTrainees, setSelectedTrainees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusList, setStatusList] = useState([]);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [currentStatusId, setCurrentStatusId] = useState(null);
+
+  //assessors
+  const [assessors, setAssessors] = useState([]);
+  const [selectedAssessor, setSelectedAssessor] = useState("");
+  const [assignedAssessors, setAssignedAssessors] = useState([]);
+
   // State for CA dates (only used when they don't exist in course details)
   const [caStartDate, setCaStartDate] = useState("");
   const [caEndDate, setCaEndDate] = useState("");
-  const [paymentStatusDetails, setPaymentStatusDetails] = useState([]);
-
-  // State for payment advice
-  const [paymentAdviceNo, setPaymentAdviceNo] = useState(null);
-  const [paymentRedirectUrl, setPaymentRedirectUrl] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState(null);
 
   // State for qualifications lookup
   const [academicQualifications, setAcademicQualifications] = useState([]);
@@ -80,6 +92,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] =
     useState({});
 
+  // State for storing remarks for each trainee
+  const [traineeRemarks, setTraineeRemarks] = useState({});
+
   // State to track if all CA marks exist
   const [allCAmarksExist, setAllCAmarksExist] = useState(false);
 
@@ -89,18 +104,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [remarks, setRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
 
-  // PA Dialog states
-  const [paDialogOpen, setPaDialogOpen] = useState(false);
-  const [paData, setPaData] = useState({
-    taxPayerNo: "",
-    payerEmail: "",
-    mobileNo: "",
-    taxPayerName: "",
-    paymentDueDate: "",
-    refNo: "",
-    totalPayableAmount: "",
-  });
-  const [paErrors, setPaErrors] = useState({});
+  // Assessor delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [assessorToDelete, setAssessorToDelete] = useState(null);
 
   // Pagination
   const [page, setPage] = useState(0);
@@ -122,17 +128,44 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const isServiceId39 = courseDetails?.service_id === "39";
 
   // Check if CA dates are null (both start and end dates are null/empty)
-  const areCADatesNull = !courseDetails?.ca_start_date && !courseDetails?.ca_end_date;
+  const areCADatesNull =
+    !courseDetails?.ca_start_date && !courseDetails?.ca_end_date;
 
-  // Check if approve button should be enabled (OR condition)
-  const isApproveEnabled = !!paymentAdviceNo || areCADatesNull;
+  // Helper function to check if certification level requires numeric input (only 111 and 112)
+  const isNumericCertificationLevel = () => {
+    const levelId = courseDetails?.certification_level_id;
+    return levelId === "111" || levelId === "112";
+  };
+
+  // Check if payment is completed
+  const isPaymentCompleted = () => {
+    return paymentStatus && paymentStatus.paymentStatus === "paid";
+  };
+
+  // Check if approve button should be enabled (only when payment is paid)
+  const isApproveEnabled = paymentStatus && paymentStatus.paymentStatus === "paid";
+
+  // Helper function to get service code based on service_id
+  const getServiceCodeByServiceId = useCallback((serviceId) => {
+    if (!serviceId) return null;
+
+    // Map service_id to service codes
+    const serviceCodeMap = {
+      39: 100586, // RPL course
+      37: 100584, // Accredited course 
+      // Add more mappings as needed
+    };
+
+    return serviceCodeMap[serviceId] || null;
+  }, []);
 
   // Fetch data on component mount
   useEffect(() => {
     fetchAcademicQualification();
     fetchStatusList();
     fetchAcademicCompetency();
-    fetchPaymentDetail();
+    fetchAssessors();
+    fetchPaymentStatus();
   }, []);
 
   // Fetch course details and selected trainees when dependencies are ready
@@ -150,6 +183,13 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     selectedStatusId,
     academicCompetency,
   ]);
+
+  // Fetch institute data when courseDetails is available
+  useEffect(() => {
+    if (courseDetails?.registration_no) {
+      fetchInstituteData();
+    }
+  }, [courseDetails]);
 
   // Check CA marks whenever selectedTrainees changes
   useEffect(() => {
@@ -241,31 +281,59 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  const fetchPaymentDetail = async () => {
+  const fetchAssessors = async () => {
+    try {
+      const response =
+        await UserRoleManagementService.getRegisteredAssessors(access_token);
+      // Map the API response to the format expected by the component
+      const mappedAssessors = response.data.map((assessor) => ({
+        id: assessor.id,
+        userId: assessor.user_id,
+        name: `${assessor.first_name} ${assessor.middle_name ? assessor.middle_name + " " : ""}${assessor.last_name}`,
+        email: assessor.email_id,
+        mobileNo: assessor.mobile_no,
+        designation: assessor.current_role || "Assessor",
+        location: assessor.location_id || "N/A",
+      }));
+      setAssessors(mappedAssessors);
+      console.log("Assessor fetched:", mappedAssessors);
+    } catch (error) {
+      console.error("Error fetching Assessor:", error);
+      setAssessors([]);
+    }
+  };
+
+  const fetchPaymentStatus = async () => {
     try {
       const response =
         await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
-     
-      setPaymentStatusDetails(response.data);
-      console.log("payment details", response.data);
-
-      // Extract paymentAdviceNo if it exists
-      if (response.data && response.data.paymentAdviceNo) {
-        setPaymentAdviceNo(response.data.paymentAdviceNo);
-        if (response.data.redirectUrl) {
-          setPaymentRedirectUrl(response.data.redirectUrl);
-        }
-      } else {
-        setPaymentAdviceNo(null);
-        setPaymentRedirectUrl(null);
-      }
-
-      console.log("payment details:", response);
+      setPaymentStatus(response.data);
+      console.log("Payment status fetched:", response.data);
     } catch (error) {
-      console.error("Error fetching payment details :", error);
-      toast.error("Failed to fetch payment details");
-      setPaymentAdviceNo(null);
-      setPaymentRedirectUrl(null);
+      console.error("Error fetching payment status:", error);
+      setPaymentStatus(null);
+    }
+  };
+
+  const fetchInstituteData = async () => {
+    try {
+      if (!courseDetails?.registration_no) {
+        console.log("No registration number available yet");
+        return;
+      }
+      const response = await InstituteRegistrationService.getInstituteDetails(
+        courseDetails.registration_no,
+      );
+      // Check if response.data is an array and get the first element
+      const data =
+        Array.isArray(response.data) && response.data.length > 0
+          ? response.data[0]
+          : response.data;
+      setInstituteData(data);
+      console.log("Institute data fetched:", data);
+    } catch (error) {
+      console.error("Error fetching institute data:", error);
+      setInstituteData(null);
     }
   };
 
@@ -299,6 +367,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       const initialPractical = {};
       const initialViva = {};
       const initialVivaPractical = {};
+      const initialRemarks = {};
 
       selected.forEach((trainee) => {
         initialTheory[trainee.id] = trainee.theory_assessment || "";
@@ -306,26 +375,23 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         initialViva[trainee.id] = trainee.viva_assessment || "";
         initialVivaPractical[trainee.id] =
           trainee.viva_practical_assessment || "";
+        initialRemarks[trainee.id] = trainee.remarks || "";
       });
 
       setTraineeTheoryAssessments(initialTheory);
       setTraineePracticalAssessments(initialPractical);
       setTraineeVivaAssessments(initialViva);
       setTraineeVivaPracticalAssessments(initialVivaPractical);
+      setTraineeRemarks(initialRemarks);
 
       // Check CA marks existence
       const allHaveCA = selected.every(
-        (trainee) => 
-          trainee.internal_assessment !== null && 
+        (trainee) =>
+          trainee.internal_assessment !== null &&
           trainee.internal_assessment !== "" &&
-          trainee.internal_assessment !== undefined
+          trainee.internal_assessment !== undefined,
       );
       setAllCAmarksExist(allHaveCA);
-
-      console.log("Selected trainees:", selected);
-      console.log("Has internal assessment for course:", hasInternal);
-      console.log("All CA marks exist:", allHaveCA);
-      console.log("Is service_id 39:", isServiceId39);
     } catch (error) {
       console.error("Error fetching selected trainees:", error);
       toast.error("Failed to fetch selected trainees");
@@ -343,13 +409,79 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
     // Check if all trainees have internal_assessment (CA marks)
     const allHaveCA = selectedTrainees.every(
-      (trainee) => 
-        trainee.internal_assessment !== null && 
+      (trainee) =>
+        trainee.internal_assessment !== null &&
         trainee.internal_assessment !== "" &&
-        trainee.internal_assessment !== undefined
+        trainee.internal_assessment !== undefined,
     );
-    
+
     setAllCAmarksExist(allHaveCA);
+  };
+
+  // Assessor handlers
+  const handleAddAssessor = () => {
+    if (!selectedAssessor) {
+      toast.error("Please select an assessor to add");
+      return;
+    }
+
+    // Check if assessor is already added
+    if (
+      assignedAssessors.some(
+        (ass) => ass.id.toString() === selectedAssessor.toString(),
+      )
+    ) {
+      toast.error("This assessor is already assigned");
+      return;
+    }
+
+    // Find selected assessor details
+    const selectedAssessorDetails = assessors.find(
+      (ass) => ass.id.toString() === selectedAssessor.toString(),
+    );
+
+    if (!selectedAssessorDetails) {
+      toast.error("Selected assessor not found");
+      return;
+    }
+
+    // Create assignment record
+    const assignmentRecord = {
+      id: selectedAssessorDetails.id,
+      userId: selectedAssessorDetails.userId,
+      name: selectedAssessorDetails.name,
+      email: selectedAssessorDetails.email,
+      mobileNo: selectedAssessorDetails.mobileNo,
+      designation: selectedAssessorDetails.designation || "Assessor",
+      location: selectedAssessorDetails.location || "N/A",
+      assignedDate: new Date().toISOString(),
+      assignedBy: actionId,
+    };
+
+    setAssignedAssessors((prev) => [...prev, assignmentRecord]);
+    toast.success(`${selectedAssessorDetails.name} added successfully`);
+    setSelectedAssessor("");
+  };
+
+  const openDeleteAssessorDialog = (assessor) => {
+    setAssessorToDelete(assessor);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteAssessor = () => {
+    if (assessorToDelete) {
+      setAssignedAssessors((prev) =>
+        prev.filter((ass) => ass.id !== assessorToDelete.id),
+      );
+      toast.info(`${assessorToDelete.name} has been removed`);
+      setDeleteDialogOpen(false);
+      setAssessorToDelete(null);
+    }
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setAssessorToDelete(null);
   };
 
   // Handle theory assessment change
@@ -384,151 +516,61 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }));
   };
 
-  // Handle PA Dialog open
-  const handlePADialogOpen = () => {
-    // Pre-fill data from course details
-    setPaData({
-      taxPayerNo: courseDetails?.registration_no || "",
-      payerEmail: courseDetails?.institute_email || "",
-      mobileNo: courseDetails?.institue_mobile_number || "",
-      taxPayerName: courseDetails?.institute_name || "",
-      paymentDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0], // 7 days from now
-      refNo: courseDetails?.application_no || applicationNo || "",
-      totalPayableAmount: "", // Leave empty for user to enter
-    });
-    setPaErrors({});
-    setPaDialogOpen(true);
-  };
-
-  // Handle PA Dialog close
-  const handlePADialogClose = () => {
-    setPaDialogOpen(false);
-    setPaData({
-      taxPayerNo: "",
-      payerEmail: "",
-      mobileNo: "",
-      taxPayerName: "",
-      paymentDueDate: "",
-      refNo: "",
-      totalPayableAmount: "",
-    });
-  };
-
-  // Handle PA data change
-  const handlePADataChange = (field, value) => {
-    setPaData((prev) => ({
+  // Handle remarks change
+  const handleRemarksChange = (traineeId, value) => {
+    setTraineeRemarks((prev) => ({
       ...prev,
-      [field]: value,
+      [traineeId]: value,
     }));
-    // Clear error for this field
-    setPaErrors((prev) => ({
-      ...prev,
-      [field]: "",
-    }));
-  };
-
-  // Validate PA form
-  const validatePAForm = () => {
-    const errors = {};
-    const requiredFields = {
-      taxPayerNo: "Tax Payer No",
-      payerEmail: "Payer Email",
-      mobileNo: "Mobile No",
-      taxPayerName: "Tax Payer Name",
-      paymentDueDate: "Payment Due Date",
-      refNo: "Reference No",
-      totalPayableAmount: "Total Payable Amount",
-    };
-
-    for (const [field, label] of Object.entries(requiredFields)) {
-      if (!paData[field] || paData[field].toString().trim() === "") {
-        errors[field] = `${label} is required`;
-      }
-    }
-
-    // Validate email format
-    if (
-      paData.payerEmail &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paData.payerEmail)
-    ) {
-      errors.payerEmail = "Invalid email format";
-    }
-
-    // Validate mobile number (assuming 8 digits for Bhutan)
-    if (paData.mobileNo && !/^[0-9]{8}$/.test(paData.mobileNo)) {
-      errors.mobileNo = "Invalid mobile number (must be 8 digits)";
-    }
-
-    // Validate total payable amount is a positive number
-    if (
-      paData.totalPayableAmount &&
-      parseFloat(paData.totalPayableAmount) <= 0
-    ) {
-      errors.totalPayableAmount = "Amount must be greater than 0";
-    }
-
-    setPaErrors(errors);
-    return Object.keys(errors).length === 0;
   };
 
   // Handle Generate PA
-  const handleGeneratePA = async () => {
-    if (!validatePAForm()) {
+  const handleGeneratePA = () => {
+    if (!courseDetails) {
+      toast.error("Course data not found");
       return;
     }
 
-    setActionLoading(true);
-    try {
-      // Prepare PA data
-      const paPayload = {
-        applicationNo: applicationNo,
-        taxPayerNo: paData.taxPayerNo,
-        taxPayerEmail: paData.payerEmail,
-        taxPayerMobileNo: paData.mobileNo,
-        taxPayerName: paData.taxPayerName,
-        paymentDueDate: paData.paymentDueDate,
-        refNo: paData.refNo,
-        totalPayableAmount: parseFloat(paData.totalPayableAmount),
-        // Add any additional fields needed by your API
-        serviceCode: 100578,
-        courseName: courseDetails?.course_name,
-        serviceId: courseDetails?.service_id,
-        selectedTraineeCount: selectedTrainees.length,
-      };
+    // Get institute data (handle both array and object)
+    const institute =
+      Array.isArray(instituteData) && instituteData.length > 0
+        ? instituteData[0]
+        : instituteData;
 
-      console.log("PA Payload:", paPayload);
+    // Get mobile and email from institute data if available, otherwise from course details
+    const taxPayerEmail =
+      institute?.email_id || courseDetails.institute_email || "N/A";
+    const taxPayerMobileNo =
+      institute?.mobile_no || courseDetails.institue_mobile_number || "N/A";
+    const instituteId =
+      institute?.institute_id || courseDetails.registration_no || "N/A";
 
-      // Call your API to generate PA
-      const response =
-        await BirmsPaymentService.generatePaymentAdvice(paPayload);
+    // Prepare the data for BIRMS payment
+    const applicationNo = courseDetails.application_no;
 
-      // After successful generation, refresh payment details
-      await fetchPaymentDetail();
-      
-      toast.success("Payment Advice generated successfully!");
+    // Determine service code based on service_id
+    const serviceCode = getServiceCodeByServiceId(courseDetails?.service_id);
 
-      handlePADialogClose();
-
-      // Optionally navigate to PA view or download
-      // navigate(`/payment-advice/${applicationNo}`);
-    } catch (error) {
-      console.error("Error generating Payment Advice:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to generate Payment Advice",
-      );
-    } finally {
-      setActionLoading(false);
+    if (!serviceCode) {
+      toast.error("Unsupported service for payment generation");
+      return;
     }
+
+    const taxPayerNo = courseDetails.registration_no || "N/A";
+    const taxPayerName = courseDetails.institute_name || "N/A";
+
+    // Navigate to BIRMS payment page
+    navigate(
+      `/birms/common-payment-index/${applicationNo}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId}`,
+    );
   };
 
-  // Handle View PA
-  const handleViewPA = () => {
-    if (paymentRedirectUrl) {
-      window.open(paymentRedirectUrl, '_blank');
+  // Function to handle redirect to payment
+  const handleRedirectToPayment = (redirectUrl) => {
+    if (redirectUrl) {
+      window.open(redirectUrl, "_blank");
     } else {
-      toast.info("Payment Advice URL not available");
+      toast.error("No redirect URL available");
     }
   };
 
@@ -616,17 +658,18 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           .map((trainee) => ({
             traineeId: parseInt(trainee.id),
             theoryAssessment:
-              courseDetails?.certification_level_id === "36" && !isServiceId39
+              isNumericCertificationLevel() && !isServiceId39
                 ? traineeTheoryAssessments[trainee.id]
                   ? parseInt(traineeTheoryAssessments[trainee.id])
                   : null
                 : traineeTheoryAssessments[trainee.id] || null,
             practicalAssessment:
-              courseDetails?.certification_level_id === "36" && !isServiceId39
+              isNumericCertificationLevel() && !isServiceId39
                 ? traineePracticalAssessments[trainee.id]
                   ? parseInt(traineePracticalAssessments[trainee.id])
                   : null
                 : traineePracticalAssessments[trainee.id] || null,
+            remarks: traineeRemarks[trainee.id] || null,
           }));
 
         if (traineeMarksList.length > 0) {
@@ -650,11 +693,19 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             practicalAssessment: traineeVivaPracticalAssessments[trainee.id]
               ? parseInt(traineeVivaPracticalAssessments[trainee.id])
               : null,
+            remarks: traineeRemarks[trainee.id] || null,
           }));
 
         if (traineeVivaList.length > 0) {
           payload.traineeVivaAssessments = traineeVivaList;
         }
+      }
+
+      // Add assigned assessors to payload
+      if (assignedAssessors.length > 0) {
+        payload.assignedAssessors = assignedAssessors.map((ass) => ({
+          userId: ass.userId,
+        }));
       }
 
       console.log("Final approval payload:", payload);
@@ -724,10 +775,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           <strong>Course Name: {courseDetails?.course_name}</strong>
           <br />
           <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-          {paymentAdviceNo && (
+          {paymentStatus && paymentStatus.paymentAdviceNo && (
             <>
               <br />
-              <strong>Payment Advice No: {paymentAdviceNo}</strong>
+              <strong>
+                Payment Advice No: {paymentStatus.paymentAdviceNo}
+              </strong>
             </>
           )}
           {!hasCADatesInCourse && caStartDate && caEndDate && (
@@ -749,6 +802,13 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </strong>
             </>
           )}
+          {assignedAssessors.length > 0 && (
+            <>
+              <br />
+              <br />
+              <strong>Assigned Assessors: {assignedAssessors.length}</strong>
+            </>
+          )}
         </DialogContentText>
       );
     } else {
@@ -762,10 +822,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             <strong>Course Name: {courseDetails?.course_name}</strong>
             <br />
             <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-            {paymentAdviceNo && (
+            {paymentStatus && paymentStatus.paymentAdviceNo && (
               <>
                 <br />
-                <strong>Payment Advice No: {paymentAdviceNo}</strong>
+                <strong>
+                  Payment Advice No: {paymentStatus.paymentAdviceNo}
+                </strong>
               </>
             )}
             {!hasCADatesInCourse && caStartDate && caEndDate && (
@@ -809,7 +871,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const handleRefresh = () => {
     fetchData();
-    fetchPaymentDetail();
+    fetchPaymentStatus();
     toast.info("Data refreshed");
   };
 
@@ -861,229 +923,23 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       } else {
         cols += 2; // theory and practical for other services
       }
+      cols++; // remarks column
+      if (isNumericCertificationLevel() && !isServiceId39) {
+        cols++; // total column for level 111/112
+      }
     }
     return cols;
   };
 
-  // Render assessment column based on service type
-  const renderAssessmentColumn = (trainee) => {
-    const hasInternalAssessment =
-      trainee.internal_assessment !== null &&
-      trainee.internal_assessment !== "";
+  // Get available assessors (not yet assigned)
+  const availableAssessors = assessors.filter(
+    (ass) => !assignedAssessors.some((assigned) => assigned.id === ass.id),
+  );
 
-    if (isServiceId39) {
-      // For service_id 39: Show Viva and Practical columns
-      return (
-        <>
-          {/* Viva Assessment Column */}
-          <TableCell>
-            {hasInternalAssessment ? (
-              courseDetails?.certification_level_id === "36" ? (
-                <TextField
-                  type="number"
-                  size="small"
-                  value={traineeVivaAssessments[trainee.id] || ""}
-                  onChange={(e) =>
-                    handleVivaAssessmentChange(trainee.id, e.target.value)
-                  }
-                  fullWidth
-                  InputProps={{
-                    inputProps: { min: 0, max: 100 },
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-              ) : (
-                <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                  <Select
-                    value={traineeVivaAssessments[trainee.id] || ""}
-                    onChange={(e) =>
-                      handleVivaAssessmentChange(trainee.id, e.target.value)
-                    }
-                    displayEmpty
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select Competency</em>
-                    </MenuItem>
-                    {academicCompetency.map((competency) => (
-                      <MenuItem key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )
-            ) : (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                sx={{ fontStyle: "italic" }}
-              >
-                N/A
-              </Typography>
-            )}
-          </TableCell>
-
-          {/* Practical Assessment Column for service_id 39 */}
-          <TableCell>
-            {hasInternalAssessment ? (
-              courseDetails?.certification_level_id === "36" ? (
-                <TextField
-                  type="number"
-                  size="small"
-                  value={traineeVivaPracticalAssessments[trainee.id] || ""}
-                  onChange={(e) =>
-                    handleVivaPracticalAssessmentChange(
-                      trainee.id,
-                      e.target.value,
-                    )
-                  }
-                  fullWidth
-                  InputProps={{
-                    inputProps: { min: 0, max: 100 },
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-              ) : (
-                <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                  <Select
-                    value={traineeVivaPracticalAssessments[trainee.id] || ""}
-                    onChange={(e) =>
-                      handleVivaPracticalAssessmentChange(
-                        trainee.id,
-                        e.target.value,
-                      )
-                    }
-                    displayEmpty
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select Competency</em>
-                    </MenuItem>
-                    {academicCompetency.map((competency) => (
-                      <MenuItem key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )
-            ) : (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                sx={{ fontStyle: "italic" }}
-              >
-                N/A
-              </Typography>
-            )}
-          </TableCell>
-        </>
-      );
-    } else {
-      // For other services: Show Theory and Practical columns
-      return (
-        <>
-          {/* Theory Assessment Column */}
-          <TableCell>
-            {hasInternalAssessment ? (
-              courseDetails?.certification_level_id === "36" ? (
-                <TextField
-                  type="number"
-                  size="small"
-                  value={traineeTheoryAssessments[trainee.id] || ""}
-                  onChange={(e) =>
-                    handleTheoryAssessmentChange(trainee.id, e.target.value)
-                  }
-                  fullWidth
-                  InputProps={{
-                    inputProps: { min: 0, max: 100 },
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-              ) : (
-                <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                  <Select
-                    value={traineeTheoryAssessments[trainee.id] || ""}
-                    onChange={(e) =>
-                      handleTheoryAssessmentChange(trainee.id, e.target.value)
-                    }
-                    displayEmpty
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select Competency</em>
-                    </MenuItem>
-                    {academicCompetency.map((competency) => (
-                      <MenuItem key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )
-            ) : (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                sx={{ fontStyle: "italic" }}
-              >
-                N/A
-              </Typography>
-            )}
-          </TableCell>
-
-          {/* Practical Assessment Column for other services */}
-          <TableCell>
-            {hasInternalAssessment ? (
-              courseDetails?.certification_level_id === "36" ? (
-                <TextField
-                  type="number"
-                  size="small"
-                  value={traineePracticalAssessments[trainee.id] || ""}
-                  onChange={(e) =>
-                    handlePracticalAssessmentChange(trainee.id, e.target.value)
-                  }
-                  fullWidth
-                  InputProps={{
-                    inputProps: { min: 0, max: 100 },
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-              ) : (
-                <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                  <Select
-                    value={traineePracticalAssessments[trainee.id] || ""}
-                    onChange={(e) =>
-                      handlePracticalAssessmentChange(
-                        trainee.id,
-                        e.target.value,
-                      )
-                    }
-                    displayEmpty
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select Competency</em>
-                    </MenuItem>
-                    {academicCompetency.map((competency) => (
-                      <MenuItem key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )
-            ) : (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                sx={{ fontStyle: "italic" }}
-              >
-                N/A
-              </Typography>
-            )}
-          </TableCell>
-        </>
-      );
-    }
-  };
+  // Get selected assessor details
+  const selectedAssessorDetails = assessors.find(
+    (ass) => ass.id.toString() === selectedAssessor?.toString(),
+  );
 
   if (loading && !courseDetails && selectedTrainees.length === 0) {
     return (
@@ -1125,6 +981,110 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         </Box>
       </Box>
 
+      {/* Payment Status Card */}
+      {paymentStatus && (
+        <Card
+          sx={{ mb: 3, bgcolor: isPaymentCompleted() ? "#e8f5e9" : "#fff3e0" }}
+        >
+          <CardContent>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Typography variant="h6" gutterBottom>
+                Payment Status
+              </Typography>
+              <Chip
+                label={paymentStatus.paymentStatus || "Pending"}
+                color={isPaymentCompleted() ? "success" : "warning"}
+                size="small"
+              />
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+            <Grid container spacing={2}>
+              {paymentStatus.paymentAdviceNo && (
+                <Grid item size={{ xs: 12, md: 3 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Payment Advice No:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {paymentStatus.paymentAdviceNo}
+                  </Typography>
+                </Grid>
+              )}
+              {paymentStatus.refNo && (
+                <Grid item size={{ xs: 12, md: 3 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Reference No:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {paymentStatus.refNo}
+                  </Typography>
+                </Grid>
+              )}
+              {paymentStatus.totalPayableAmount && (
+                <Grid item size={{ xs: 12, md: 3 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Amount:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold" color="primary">
+                    Nu. {paymentStatus.totalPayableAmount}
+                  </Typography>
+                </Grid>
+              )}
+              {paymentStatus.paymentDueDate && (
+                <Grid item size={{ xs: 12, md: 3 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Due Date:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {formatDate(paymentStatus.paymentDueDate)}
+                  </Typography>
+                </Grid>
+              )}
+              {paymentStatus.paymentMode && (
+                <Grid item size={{ xs: 12, md: 3 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Payment Mode:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {paymentStatus.paymentMode}
+                  </Typography>
+                </Grid>
+              )}
+              {paymentStatus.platform && (
+                <Grid item size={{ xs: 12, md: 3 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Platform:
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {paymentStatus.platform}
+                  </Typography>
+                </Grid>
+              )}
+            </Grid>
+            {paymentStatus.redirectUrl && (
+              <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  startIcon={<PaymentIcon />}
+                  onClick={() =>
+                    handleRedirectToPayment(paymentStatus.redirectUrl)
+                  }
+                >
+                  Proceed to Payment
+                </Button>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Course Information Card */}
       {courseDetails && (
         <Card sx={{ mb: 3 }}>
@@ -1155,7 +1115,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   Total Seats:
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.total_no_trainees}
+                  {courseDetails.enrollment_capacity}
                 </Typography>
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
@@ -1168,23 +1128,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Course Fee:
+                  Fees Per Trainee
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
-                  Nu. {courseDetails.course_fee}
+                  Nu. {courseDetails.fees_per_trainee}
                 </Typography>
               </Grid>
-              {/* Show Payment Advice No if it exists */}
-              {paymentAdviceNo && (
-                <Grid item size={{ xs: 12, md: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Payment Advice No:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold" color="success">
-                    {paymentAdviceNo}
-                  </Typography>
-                </Grid>
-              )}
               {/* Show CA dates from course details if they exist */}
               {courseDetails.ca_start_date && (
                 <Grid item size={{ xs: 12, md: 2 }}>
@@ -1270,6 +1219,195 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         </Card>
       )}
 
+      {/* Assessor Assignment Section - Only show when all CA marks exist */}
+      {allCAmarksExist && !isActionDisabled() && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <EngineeringIcon sx={{ mr: 1, color: "primary.main" }} />
+              <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+                Assign Assessors
+              </Typography>
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+
+            {/* Selected Assessors Display */}
+            {assignedAssessors.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
+                  Assigned Assessors ({assignedAssessors.length}):
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {assignedAssessors.map((ass) => (
+                    <Chip
+                      key={ass.id}
+                      label={`${ass.name} (${ass.userId})`}
+                      color="success"
+                      onDelete={() => openDeleteAssessorDialog(ass)}
+                      deleteIcon={<DeleteIcon sx={{ color: "#d32f2f" }} />}
+                      sx={{
+                        mb: 1,
+                        "& .MuiChip-deleteIcon": {
+                          color: "#d32f2f",
+                          "&:hover": {
+                            color: "#b71c1c",
+                          },
+                        },
+                      }}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            <Grid container spacing={2} alignItems="center">
+              <Grid item size={{ xs: 12, md: 8 }}>
+                <Autocomplete
+                  fullWidth
+                  size="small"
+                  options={availableAssessors}
+                  getOptionLabel={(option) =>
+                    `${option.name} (${option.userId})`
+                  }
+                  value={selectedAssessorDetails || null}
+                  onChange={(event, newValue) => {
+                    setSelectedAssessor(newValue ? newValue.id : "");
+                  }}
+                  filterOptions={(options, state) => {
+                    const searchTerm = state.inputValue.toLowerCase().trim();
+                    // Only show results if search term has at least 2 characters
+                    if (!searchTerm || searchTerm.length < 2) {
+                      return [];
+                    }
+
+                    return options.filter(
+                      (option) =>
+                        option.name.toLowerCase().includes(searchTerm) ||
+                        option.userId?.toLowerCase().includes(searchTerm) ||
+                        option.email?.toLowerCase().includes(searchTerm) ||
+                        option.mobileNo?.includes(searchTerm),
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Search Assessor by Name or User ID"
+                      placeholder="Type at least 2 characters to search..."
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <li {...props}>
+                      <Box>
+                        <Typography variant="body2">{option.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          User ID: {option.userId} | Email:{" "}
+                          {option.email || "N/A"} | Mobile:{" "}
+                          {option.mobileNo || "N/A"}
+                        </Typography>
+                      </Box>
+                    </li>
+                  )}
+                  noOptionsText="No assessors available"
+                  loadingText="Loading..."
+                  disabled={availableAssessors.length === 0}
+                  openOnFocus={false}
+                />
+              </Grid>
+
+              <Grid item size={{ xs: 12, md: 4 }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="medium"
+                  startIcon={<PersonAddIcon />}
+                  onClick={handleAddAssessor}
+                  disabled={
+                    !selectedAssessor || availableAssessors.length === 0
+                  }
+                  sx={{
+                    fontWeight: 600,
+                    textTransform: "none",
+                    width: "100%",
+                  }}
+                >
+                  Add Assessor
+                </Button>
+              </Grid>
+            </Grid>
+
+            {/* Selected Assessor Details Preview */}
+            {selectedAssessor && selectedAssessorDetails && (
+              <Box
+                sx={{
+                  mt: 2,
+                  p: 2,
+                  bgcolor: "action.hover",
+                  borderRadius: 1,
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                  Selected Assessor Details:
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item size={{ xs: 12, md: 3 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Name
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500}>
+                      {selectedAssessorDetails.name}
+                    </Typography>
+                  </Grid>
+                  <Grid item size={{ xs: 12, md: 3 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      User ID
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500}>
+                      {selectedAssessorDetails.userId}
+                    </Typography>
+                  </Grid>
+                  <Grid item size={{ xs: 12, md: 3 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Email
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500}>
+                      {selectedAssessorDetails.email || "N/A"}
+                    </Typography>
+                  </Grid>
+                  <Grid item size={{ xs: 12, md: 3 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Mobile No
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500}>
+                      {selectedAssessorDetails.mobileNo || "N/A"}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+
+            {/* Empty State */}
+            {assignedAssessors.length === 0 && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                No assessors have been assigned yet. Use the search above to add
+                assessors.
+              </Alert>
+            )}
+
+            {/* Show no data message */}
+            {assessors.length === 0 && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                No assessors found. Please check if there are active assessor
+                users in the system.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Selected Trainees Table */}
       <Card>
         <CardContent>
@@ -1322,6 +1460,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                           : "Theory Assessment"}
                       </TableCell>
                       <TableCell>Practical Assessment</TableCell>
+                      {/* Total column for level 111/112 */}
+                      {isNumericCertificationLevel() && !isServiceId39 && (
+                        <TableCell>Total</TableCell>
+                      )}
+                      {/* Remarks column - common for all */}
+                      <TableCell>Remarks</TableCell>
                     </>
                   )}
                 </TableRow>
@@ -1334,6 +1478,15 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                       const hasInternalAssessment =
                         trainee.internal_assessment !== null &&
                         trainee.internal_assessment !== "";
+
+                      // Calculate total for level 111/112
+                      const theoryValue = isNumericCertificationLevel() && !isServiceId39
+                        ? parseInt(traineeTheoryAssessments[trainee.id]) || 0
+                        : 0;
+                      const practicalValue = isNumericCertificationLevel() && !isServiceId39
+                        ? parseInt(traineePracticalAssessments[trainee.id]) || 0
+                        : 0;
+                      const totalValue = theoryValue + practicalValue;
 
                       return (
                         <TableRow key={trainee.id} hover>
@@ -1361,8 +1514,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                           {/* Show CA Mark/Competency value only if CA dates exist in course */}
                           {hasCADatesInCourse && (
                             <TableCell>
-                              {courseDetails?.certification_level_id ===
-                              "36" ? (
+                              {isNumericCertificationLevel() ? (
                                 <Chip
                                   label={trainee.internal_assessment || "N/A"}
                                   size="small"
@@ -1382,8 +1534,187 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                             </TableCell>
                           )}
                           {/* Render assessment columns based on service type */}
-                          {hasInternalAssessmentForCourse &&
-                            renderAssessmentColumn(trainee)}
+                          {hasInternalAssessmentForCourse && (
+                            <>
+                              {/* Theory/Viva Assessment Column */}
+                              <TableCell>
+                                {hasInternalAssessment ? (
+                                  isNumericCertificationLevel() ? (
+                                    isServiceId39 ? (
+                                      <TextField
+                                        type="number"
+                                        size="small"
+                                        value={traineeVivaAssessments[trainee.id] || ""}
+                                        onChange={(e) =>
+                                          handleVivaAssessmentChange(trainee.id, e.target.value)
+                                        }
+                                        fullWidth
+                                        InputProps={{
+                                          inputProps: { min: 0, max: 100 },
+                                        }}
+                                        sx={{ minWidth: 100 }}
+                                      />
+                                    ) : (
+                                      <TextField
+                                        type="number"
+                                        size="small"
+                                        value={traineeTheoryAssessments[trainee.id] || ""}
+                                        onChange={(e) =>
+                                          handleTheoryAssessmentChange(trainee.id, e.target.value)
+                                        }
+                                        fullWidth
+                                        InputProps={{
+                                          inputProps: { min: 0, max: 100 },
+                                        }}
+                                        sx={{ minWidth: 100 }}
+                                      />
+                                    )
+                                  ) : (
+                                    <FormControl size="small" fullWidth sx={{ minWidth: 130 }}>
+                                      <Select
+                                        value={isServiceId39 
+                                          ? (traineeVivaAssessments[trainee.id] || "")
+                                          : (traineeTheoryAssessments[trainee.id] || "")
+                                        }
+                                        onChange={(e) => {
+                                          if (isServiceId39) {
+                                            handleVivaAssessmentChange(trainee.id, e.target.value);
+                                          } else {
+                                            handleTheoryAssessmentChange(trainee.id, e.target.value);
+                                          }
+                                        }}
+                                        displayEmpty
+                                      >
+                                        <MenuItem value="" disabled>
+                                          <em>Select Competency</em>
+                                        </MenuItem>
+                                        {academicCompetency.map((competency) => (
+                                          <MenuItem key={competency.id} value={competency.id}>
+                                            {competency.name}
+                                          </MenuItem>
+                                        ))}
+                                      </Select>
+                                    </FormControl>
+                                  )
+                                ) : (
+                                  <Typography
+                                    variant="body2"
+                                    color="textSecondary"
+                                    sx={{ fontStyle: "italic" }}
+                                  >
+                                    N/A
+                                  </Typography>
+                                )}
+                              </TableCell>
+
+                              {/* Practical Assessment Column */}
+                              <TableCell>
+                                {hasInternalAssessment ? (
+                                  isNumericCertificationLevel() ? (
+                                    isServiceId39 ? (
+                                      <TextField
+                                        type="number"
+                                        size="small"
+                                        value={traineeVivaPracticalAssessments[trainee.id] || ""}
+                                        onChange={(e) =>
+                                          handleVivaPracticalAssessmentChange(trainee.id, e.target.value)
+                                        }
+                                        fullWidth
+                                        InputProps={{
+                                          inputProps: { min: 0, max: 100 },
+                                        }}
+                                        sx={{ minWidth: 100 }}
+                                      />
+                                    ) : (
+                                      <TextField
+                                        type="number"
+                                        size="small"
+                                        value={traineePracticalAssessments[trainee.id] || ""}
+                                        onChange={(e) =>
+                                          handlePracticalAssessmentChange(trainee.id, e.target.value)
+                                        }
+                                        fullWidth
+                                        InputProps={{
+                                          inputProps: { min: 0, max: 100 },
+                                        }}
+                                        sx={{ minWidth: 100 }}
+                                      />
+                                    )
+                                  ) : (
+                                    <FormControl size="small" fullWidth sx={{ minWidth: 130 }}>
+                                      <Select
+                                        value={isServiceId39 
+                                          ? (traineeVivaPracticalAssessments[trainee.id] || "")
+                                          : (traineePracticalAssessments[trainee.id] || "")
+                                        }
+                                        onChange={(e) => {
+                                          if (isServiceId39) {
+                                            handleVivaPracticalAssessmentChange(trainee.id, e.target.value);
+                                          } else {
+                                            handlePracticalAssessmentChange(trainee.id, e.target.value);
+                                          }
+                                        }}
+                                        displayEmpty
+                                      >
+                                        <MenuItem value="" disabled>
+                                          <em>Select Competency</em>
+                                        </MenuItem>
+                                        {academicCompetency.map((competency) => (
+                                          <MenuItem key={competency.id} value={competency.id}>
+                                            {competency.name}
+                                          </MenuItem>
+                                        ))}
+                                      </Select>
+                                    </FormControl>
+                                  )
+                                ) : (
+                                  <Typography
+                                    variant="body2"
+                                    color="textSecondary"
+                                    sx={{ fontStyle: "italic" }}
+                                  >
+                                    N/A
+                                  </Typography>
+                                )}
+                              </TableCell>
+
+                              {/* Total Column - Only for level 111/112 and not service_id 39 */}
+                              {isNumericCertificationLevel() && !isServiceId39 && (
+                                <TableCell>
+                                  {hasInternalAssessment ? (
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {totalValue}
+                                    </Typography>
+                                  ) : (
+                                    <Typography
+                                      variant="body2"
+                                      color="textSecondary"
+                                      sx={{ fontStyle: "italic" }}
+                                    >
+                                      N/A
+                                    </Typography>
+                                  )}
+                                </TableCell>
+                              )}
+
+                              {/* Remarks Column - Common for all */}
+                              <TableCell>
+                                <TextField
+                                  size="small"
+                                  fullWidth
+                                  multiline
+                                  rows={1}
+                                  value={traineeRemarks[trainee.id] || ""}
+                                  onChange={(e) =>
+                                    handleRemarksChange(trainee.id, e.target.value)
+                                  }
+                                  placeholder="Add remarks..."
+                                  sx={{ minWidth: 120 }}
+                                  disabled={isActionDisabled()}
+                                />
+                              </TableCell>
+                            </>
+                          )}
                         </TableRow>
                       );
                     })
@@ -1416,72 +1747,118 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         sx={{ display: "flex", justifyContent: "space-between", gap: 2, mt: 3 }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<ReceiptIcon />}
-            onClick={handlePADialogOpen}
-            disabled={
-              isActionDisabled() || 
-              actionLoading ||
-              !!paymentAdviceNo ||
-              !allCAmarksExist
-            }
-            sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-          >
-            Generate PA
-          </Button>
-          
-          {/* Show message when CA marks are missing */}
-          {!allCAmarksExist && !paymentAdviceNo && selectedTrainees.length > 0 && (
-            <Typography
-              variant="caption"
-              color="error"
-              sx={{ alignSelf: "center" }}
-            >
-              CA Mark/Competency values are required for all selected trainees
-            </Typography>
-          )}
-          
-          {paymentAdviceNo && (
-            <Button
-              variant="outlined"
-              color="info"
-              startIcon={<VisibilityIcon />}
-              onClick={handleViewPA}
-              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-            >
-              View PA
-            </Button>
-          )}
-          
-          {paymentAdviceNo && (
-            <Typography
-              variant="caption"
-              color="success"
-              sx={{ fontWeight: "bold" }}
-            >
-              PA Generated: {paymentAdviceNo}
-            </Typography>
-          )}
-        </Box>
-        
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<CheckCircleIcon />}
-              onClick={() => openDialog(57)}
-              disabled={
-                isActionDisabled() || 
-                actionLoading ||
-                !isApproveEnabled  // OR condition: paymentAdviceNo exists OR CA dates are null
+          {!paymentStatus ? (
+            <Tooltip
+              title={
+                !allCAmarksExist
+                  ? "CA Mark/Competency values are required for all selected trainees"
+                  : "Generate Payment Advice"
               }
-              sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+              arrow
             >
-              Approve
-            </Button>
+              <span>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<ManageHistoryIcon />}
+                  onClick={handleGeneratePA}
+                  disabled={
+                    isActionDisabled() || actionLoading || !allCAmarksExist
+                  }
+                  sx={{
+                    px: 3,
+                    py: 0.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
+                >
+                  Generate PA
+                </Button>
+              </span>
+            </Tooltip>
+          ) : (
+            <>
+              {paymentStatus.redirectUrl && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<PaymentIcon />}
+                  onClick={() =>
+                    handleRedirectToPayment(paymentStatus.redirectUrl)
+                  }
+                  sx={{
+                    px: 3,
+                    py: 0.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
+                >
+                  Proceed to Payment
+                </Button>
+              )}
+              {isPaymentCompleted() && (
+                <Chip label="Payment Completed" color="success" size="small" />
+              )}
+            </>
+          )}
+
+          {/* Show message when CA marks are missing */}
+          {!allCAmarksExist &&
+            !paymentStatus &&
+            selectedTrainees.length > 0 && (
+              <Typography
+                variant="caption"
+                color="error"
+                sx={{ alignSelf: "center" }}
+              >
+                CA Mark/Competency values are required for all selected trainees
+              </Typography>
+            )}
+        </Box>
+
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 1,
+          }}
+        >
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <Tooltip
+              title={
+                !isApproveEnabled
+                  ? paymentStatus && !isPaymentCompleted()
+                    ? "Payment must be completed before approval"
+                    : !paymentStatus
+                      ? "Payment required - Generate PA first"
+                      : "Payment must be completed before approval"
+                  : "Approve this course selection"
+              }
+              arrow
+            >
+              <span>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<CheckCircleIcon />}
+                  onClick={() => openDialog(57)}
+                  disabled={
+                    isActionDisabled() ||
+                    actionLoading ||
+                    !isApproveEnabled
+                  }
+                  sx={{
+                    px: 3,
+                    py: 0.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
+                >
+                  Approve
+                </Button>
+              </span>
+            </Tooltip>
             <Button
               variant="contained"
               color="error"
@@ -1493,32 +1870,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               Reject
             </Button>
           </Box>
-          
-          {/* Show message when approval is not enabled */}
-          {!isApproveEnabled && !isActionDisabled() && selectedTrainees.length > 0 && (
-            <Typography
-              variant="caption"
-              color="textSecondary"
-              sx={{ alignSelf: "center" }}
-            >
-              {!paymentAdviceNo && !areCADatesNull 
-                ? "Generate PA OR set CA dates to enable approval" 
-                : "Approval not available"}
-            </Typography>
-          )}
-          
-          {/* Show success message when approval is enabled */}
-          {isApproveEnabled && !isActionDisabled() && selectedTrainees.length > 0 && (
-            <Typography
-              variant="caption"
-              color="success"
-              sx={{ alignSelf: "center", fontWeight: "bold" }}
-            >
-              {paymentAdviceNo 
-                ? "✓ Approval enabled (PA generated)" 
-                : "✓ Approval enabled (CA dates are null)"}
-            </Typography>
-          )}
         </Box>
       </Box>
 
@@ -1555,151 +1906,42 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Payment Advice (PA) Dialog */}
+      {/* Delete Assessor Confirmation Dialog */}
       <Dialog
-        open={paDialogOpen}
-        onClose={handlePADialogClose}
+        open={deleteDialogOpen}
+        onClose={closeDeleteDialog}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <ReceiptIcon color="primary" />
-          Generate Payment Advice
-        </DialogTitle>
+        <DialogTitle>Confirm Removal</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Please provide the following details to generate the Payment Advice
-            for course:
-            <strong> {courseDetails?.course_name}</strong>
+          <DialogContentText>
+            {assessorToDelete && (
+              <>
+                Are you sure you want to remove{" "}
+                <strong>{assessorToDelete?.name}</strong> (
+                {assessorToDelete?.userId}) from the assessor assignment?
+              </>
+            )}
           </DialogContentText>
-
-          <Grid container spacing={2}>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                label="Tax Payer No"
-                fullWidth
-                value={paData.taxPayerNo}
-                onChange={(e) =>
-                  handlePADataChange("taxPayerNo", e.target.value)
-                }
-                error={!!paErrors.taxPayerNo}
-                helperText={paErrors.taxPayerNo}
-                required
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                label="Payer Email"
-                fullWidth
-                type="email"
-                value={paData.payerEmail}
-                onChange={(e) =>
-                  handlePADataChange("payerEmail", e.target.value)
-                }
-                error={!!paErrors.payerEmail}
-                helperText={paErrors.payerEmail}
-                required
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                label="Mobile No"
-                fullWidth
-                value={paData.mobileNo}
-                onChange={(e) => handlePADataChange("mobileNo", e.target.value)}
-                error={!!paErrors.mobileNo}
-                helperText={paErrors.mobileNo || "Enter 8 digits mobile number"}
-                required
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                label="Tax Payer Name"
-                fullWidth
-                value={paData.taxPayerName}
-                onChange={(e) =>
-                  handlePADataChange("taxPayerName", e.target.value)
-                }
-                error={!!paErrors.taxPayerName}
-                helperText={paErrors.taxPayerName}
-                required
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                label="Payment Due Date"
-                type="date"
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                value={paData.paymentDueDate}
-                onChange={(e) =>
-                  handlePADataChange("paymentDueDate", e.target.value)
-                }
-                error={!!paErrors.paymentDueDate}
-                helperText={paErrors.paymentDueDate}
-                required
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                label="Reference No"
-                fullWidth
-                value={paData.refNo}
-                onChange={(e) => handlePADataChange("refNo", e.target.value)}
-                error={!!paErrors.refNo}
-                helperText={paErrors.refNo}
-                required
-                disabled
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                label="Total Payable Amount"
-                fullWidth
-                type="number"
-                InputProps={{
-                  startAdornment: (
-                    <Typography variant="body2" sx={{ mr: 1 }}>
-                      Nu.
-                    </Typography>
-                  ),
-                }}
-                value={paData.totalPayableAmount}
-                onChange={(e) =>
-                  handlePADataChange("totalPayableAmount", e.target.value)
-                }
-                error={!!paErrors.totalPayableAmount}
-                helperText={
-                  paErrors.totalPayableAmount ||
-                  "Enter the total amount payable"
-                }
-                required
-                placeholder="Enter amount"
-              />
-            </Grid>
-          </Grid>
         </DialogContent>
         <DialogActions>
           <Button
-            color="error"
-            variant="contained"
+            color="primary"
+            variant="outlined"
             size="small"
-            onClick={handlePADialogClose}
-            disabled={actionLoading}
+            onClick={closeDeleteDialog}
           >
             Cancel
           </Button>
           <Button
-            onClick={handleGeneratePA}
-            color="primary"
+            onClick={handleDeleteAssessor}
+            color="error"
             variant="contained"
             size="small"
-            disabled={actionLoading}
-            startIcon={
-              actionLoading ? <CircularProgress size={20} /> : <ReceiptIcon />
-            }
+            startIcon={<DeleteIcon />}
           >
-            {actionLoading ? "Generating..." : "Generate PA"}
+            Remove
           </Button>
         </DialogActions>
       </Dialog>

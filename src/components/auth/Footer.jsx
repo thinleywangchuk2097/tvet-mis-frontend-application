@@ -15,7 +15,8 @@ const Footer = () => {
       })}
     >
       <Typography variant="body2">
-        © 2026 All rights reserved. TVET-Mis Ministry of Education and Skills Development.
+        © 2026 All rights reserved. TVET-Mis Ministry of Education and Skills
+        Development.
       </Typography>
     </Box>
   );

@@ -97,7 +97,9 @@ const TS = {
     color: PD,
     whiteSpace: "nowrap",
   },
-  "& td": { fontSize: "0.8rem" },
+  "& td": {
+    fontSize: "0.8rem",
+  },
   "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
   "& tbody tr:hover td": { bgcolor: "#f5f9ff" },
 };
@@ -303,11 +305,20 @@ const PublicIndex = () => {
         <Box>
           <Typography
             fontWeight={800}
-            sx={{ color: W, fontSize: "0.88rem", lineHeight: 1.1 }}
+            sx={{
+              color: W,
+              fontSize: "0.88rem",
+              lineHeight: 1.1,
+            }}
           >
             Track Your Application
           </Typography>
-          <Typography sx={{ color: alpha(W, 0.65), fontSize: "0.7rem" }}>
+          <Typography
+            sx={{
+              color: alpha(W, 0.65),
+              fontSize: "0.7rem",
+            }}
+          >
             Check the status of your submission
           </Typography>
         </Box>
@@ -688,7 +699,7 @@ const PublicIndex = () => {
               bgcolor: "#ffffff",
             }}
           >
-            <CardContent >
+            <CardContent>
               <OngoingProgramsIndex />
             </CardContent>
           </Card>
@@ -738,9 +749,16 @@ const PublicIndex = () => {
                     height: 20,
                     fontWeight: 700,
                   },
-                  "& .MuiButton-root": { fontSize: "0.7rem", py: 0.4 },
-                  "& .MuiInputBase-input": { fontSize: "0.82rem" },
-                  "& .MuiTablePagination-root": { fontSize: "0.75rem" },
+                  "& .MuiButton-root": {
+                    fontSize: "0.7rem",
+                    py: 0.4,
+                  },
+                  "& .MuiInputBase-input": {
+                    fontSize: "0.82rem",
+                  },
+                  "& .MuiTablePagination-root": {
+                    fontSize: "0.75rem",
+                  },
                 }}
               >
                 <CourseTraineeAnnouncementsIndex />
@@ -816,13 +834,18 @@ const PublicIndex = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography
                         fontWeight={700}
-                        sx={{ color: link.color, mb: 0.3 }}
+                        sx={{
+                          color: link.color,
+                          mb: 0.3,
+                        }}
                       >
                         {link.label}
                       </Typography>
                       <Typography
                         variant="caption"
-                        sx={{ color: "text.secondary" }}
+                        sx={{
+                          color: "text.secondary",
+                        }}
                       >
                         {link.desc}
                       </Typography>
@@ -917,12 +940,21 @@ const PublicIndex = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                      <Typography sx={{ color: "error.main", fontWeight: 600 }}>
+                      <Typography
+                        sx={{
+                          color: "error.main",
+                          fontWeight: 600,
+                        }}
+                      >
                         No application found for the entered number.
                       </Typography>
                       <Typography
                         variant="caption"
-                        sx={{ color: "#666", mt: 1, display: "block" }}
+                        sx={{
+                          color: "#666",
+                          mt: 1,
+                          display: "block",
+                        }}
                       >
                         Please check your application number and try again.
                       </Typography>

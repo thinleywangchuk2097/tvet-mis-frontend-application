@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -158,7 +158,7 @@ const TaskListIndex = () => {
           mb: 2,
         }}
       >
-        <Typography variant="h5">Task List </Typography>
+        <Typography variant="h5">Task List</Typography>
 
         <TextField
           variant="outlined"
@@ -166,7 +166,9 @@ const TaskListIndex = () => {
           placeholder="Search applications..."
           value={searchTerm}
           onChange={handleSearchChange}
-          sx={{ width: 300 }}
+          sx={{
+            width: 300,
+          }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -202,20 +204,17 @@ const TaskListIndex = () => {
             <Table
               stickyHeader
               aria-label="task list index table"
-              sx={{ borderCollapse: "collapse" }}
+              sx={{
+                borderCollapse: "collapse",
+              }}
             >
               <TableHead>
-                <TableRow
-                  sx={{
-                    "& .MuiTableCell-root": {
-                      textAlign: "center",
-                    },
-                  }}
-                >
+                <TableRow>
                   <TableCell
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
+                      textAlign: "center",
                     }}
                   >
                     Serial No
@@ -224,6 +223,7 @@ const TaskListIndex = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
+                      textAlign: "center",
                     }}
                   >
                     Application No
@@ -232,6 +232,7 @@ const TaskListIndex = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
+                      textAlign: "center",
                     }}
                   >
                     Service Name
@@ -240,6 +241,7 @@ const TaskListIndex = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
+                      textAlign: "center",
                     }}
                   >
                     Applicant Name
@@ -248,6 +250,7 @@ const TaskListIndex = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
+                      textAlign: "center",
                     }}
                   >
                     Submitted Date
@@ -256,14 +259,16 @@ const TaskListIndex = () => {
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
+                      textAlign: "center",
                     }}
                   >
                     Current Status
                   </TableCell>
-                   <TableCell
+                  <TableCell
                     sx={{
                       border: "1px solid #e0e0e0",
                       fontWeight: "bold",
+                      textAlign: "center",
                     }}
                   >
                     Remarks
@@ -274,10 +279,18 @@ const TaskListIndex = () => {
                 {paginatedTasks.length > 0 ? (
                   paginatedTasks.map((task) => (
                     <TableRow key={task.id} hover>
-                      <TableCell sx={{ border: "1px solid #e0e0e0" }}>
+                      <TableCell
+                        sx={{
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
                         {task.serialNo}
                       </TableCell>
-                      <TableCell sx={{ border: "1px solid #e0e0e0" }}>
+                      <TableCell
+                        sx={{
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                           <Link
                             component="button"
@@ -303,20 +316,36 @@ const TaskListIndex = () => {
                           </IconButton>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ border: "1px solid #e0e0e0" }}>
+                      <TableCell
+                        sx={{
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
                         <Typography variant="body2">
                           {task.serviceName}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ border: "1px solid #e0e0e0" }}>
+                      <TableCell
+                        sx={{
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
                         <Typography variant="body2">
                           {task.applicantName}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ border: "1px solid #e0e0e0" }}>
+                      <TableCell
+                        sx={{
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
                         {task.submittedDate}
                       </TableCell>
-                      <TableCell sx={{ border: "1px solid #e0e0e0" }}>
+                      <TableCell
+                        sx={{
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
                         <Chip
                           label={task.currentStatus}
                           size="small"
@@ -332,7 +361,11 @@ const TaskListIndex = () => {
                           }}
                         />
                       </TableCell>
-                       <TableCell sx={{ border: "1px solid #e0e0e0" }}>
+                      <TableCell
+                        sx={{
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
                         {task.remarks || "N/A"}
                       </TableCell>
                     </TableRow>
@@ -342,7 +375,10 @@ const TaskListIndex = () => {
                     <TableCell
                       colSpan={7}
                       align="center"
-                      sx={{ border: "1px solid #e0e0e0", py: 4 }}
+                      sx={{
+                        border: "1px solid #e0e0e0",
+                        py: 4,
+                      }}
                     >
                       <Typography color="text.secondary">
                         {searchTerm

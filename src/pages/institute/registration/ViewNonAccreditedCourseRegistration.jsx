@@ -1,3 +1,4 @@
+// ViewApplyNonAccreditedCourse.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
@@ -22,29 +23,32 @@ import {
   DialogActions,
   CircularProgress,
   Radio,
-  RadioGroup,
-  FormControlLabel,
-  FormControl,
-  FormLabel,
   Alert,
+  Chip,
+  Card,
+  CardContent,
+  Tooltip,
 } from "@mui/material";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import BusinessIcon from "@mui/icons-material/Business";
-import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
 import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
+import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import PaymentIcon from "@mui/icons-material/Payment";
 import FileDownload from "../../../components/file/FileDownload";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import ApplyNonAccreditedCourseService from "../../../api/services/internal/course/ApplyNonAccreditedCourseService";
 import CommonService from "../../../api/services/internal/common/CommonService";
+import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 
+// ==================== CONSTANTS ====================
 const TABLE_STYLE = {
   border: "1px solid",
   borderColor: "divider",
@@ -63,256 +67,220 @@ const TABLE_STYLE = {
   },
 };
 
-const ViewApplyNonAccreditedCourse = () => {
-  const { applicationNo } = useParams();
-  const navigate = useNavigate();
-  const access_token = useSelector((state) => state.auth.accessToken);
-  const actionId = useSelector((state) => state.auth.id);
-  const currentRoleId = useSelector((state) => state.auth.current_roleId);
+const SERVICE_CODE = 100574;
+const QUALITY_SERVICE_ID = 13;
+const STATUS = {
+  VERIFY_QAS1: 56,
+  APPROVE_DG: 57,
+  REJECT: 58,
+  ENDORSE_REC: 59,
+  REJECT_QAS2: 60,
+  VERIFY_QAS2: 62,
+};
 
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [tabValue, setTabValue] = useState(0);
+// ==================== UTILITY FUNCTIONS ====================
+const parseDocuments = (docsData) => {
+  if (!docsData) return [];
+  if (Array.isArray(docsData)) {
+    return docsData.map((doc) => ({
+      name: doc.documentName || doc.name || "Document",
+      url: doc.url || "",
+      id: doc.id,
+      filePath: doc.url,
+    }));
+  }
+  if (typeof docsData === "string") {
+    try {
+      const parsed = JSON.parse(docsData);
+      if (Array.isArray(parsed)) {
+        return parsed.map((doc) => ({
+          name: doc.documentName || "Document",
+          url: doc.url || "",
+          id: doc.id,
+          filePath: doc.url,
+        }));
+      }
+    } catch (e) {
+      console.error("Error parsing documents:", e);
+    }
+  }
+  return [];
+};
+
+const structureQualityData = (data) => {
+  if (!data || data.length === 0) return [];
+  const mainCategories = data.filter((item) => item.parentId === 0);
+  const subCategories = data.filter((item) => item.parentId !== 0);
+  return mainCategories.map((category) => ({
+    id: category.id.toString(),
+    title: category.dropdownName || category.description,
+    rows: subCategories
+      .filter((sub) => sub.parentId === category.id)
+      .map((sub) => ({
+        id: sub.id.toString(),
+        value: sub.dropdownName || sub.description,
+      })),
+  }));
+};
+
+// ==================== CUSTOM HOOKS ====================
+const useCourseData = (applicationNo, access_token) => {
   const [courseData, setCourseData] = useState(null);
   const [documents, setDocuments] = useState([]);
-  const [newDocuments, setNewDocuments] = useState([]);
   const [certificateLevels, setCertificateLevels] = useState([]);
-  const [qualityData, setQualityData] = useState([]);
-  const [qualityResponses, setQualityResponses] = useState({});
-  const [qualityRemarks, setQualityRemarks] = useState({});
-  const [rawQualityStandards, setRawQualityStandards] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Dialog states
-  const [actionDialogOpen, setActionDialogOpen] = useState(false);
-  const [selectedStatusId, setSelectedStatusId] = useState(null);
-  const [remarks, setRemarks] = useState("");
-  const [remarksError, setRemarksError] = useState("");
-
-  const roleId = currentRoleId?.toString();
-
-  useEffect(() => {
-    if (applicationNo) {
-      fetchAllData();
+  const fetchCertificateLevels = useCallback(async () => {
+    try {
+      const response = await CommonService.getByParentId(10);
+      setCertificateLevels(response.data || []);
+    } catch (error) {
+      console.error("Error fetching certificate levels:", error);
     }
-  }, [applicationNo]);
+  }, []);
 
-  useEffect(() => {
-    if (qualityData.length > 0 && rawQualityStandards) {
-      const { responses, remarks } = parseQualityStandardsWithData(
-        rawQualityStandards,
-        qualityData
-      );
-      setQualityResponses(responses);
-      setQualityRemarks(remarks);
+  const fetchCourseDetails = useCallback(async () => {
+    try {
+      const response =
+        await ApplyNonAccreditedCourseService.getNonAccreditedCourseByApplicationNo(
+          applicationNo,
+          access_token,
+        );
+      let data = response.data;
+      if (Array.isArray(data) && data.length > 0) data = data[0];
+
+      setCourseData(data);
+      setDocuments(parseDocuments(data.documents));
+      return data;
+    } catch (error) {
+      console.error("Error fetching course details:", error);
+      throw error;
     }
-  }, [qualityData, rawQualityStandards]);
+  }, [applicationNo, access_token]);
 
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      await Promise.all([
-        fetchCourseDetails(),
-        fetchCertificateLevels(),
-        fetchQualityStandards(),
-      ]);
+      await Promise.all([fetchCourseDetails(), fetchCertificateLevels()]);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load course data");
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchQualityStandards = async () => {
-    try {
-      const response = await CommonService.getAllQualitystandards(13);
-      if (response.data && response.data.length > 0) {
-        const mainCategories = response.data.filter(
-          (item) => item.parentId === 0
-        );
-        const subCategories = response.data.filter(
-          (item) => item.parentId !== 0
-        );
-        const structured = mainCategories.map((category) => ({
-          id: category.id.toString(),
-          title: category.dropdownName || category.description,
-          rows: subCategories
-            .filter((sub) => sub.parentId === category.id)
-            .map((sub) => ({
-              id: sub.id.toString(),
-              value: sub.dropdownName || sub.description,
-            })),
-        }));
-        setQualityData(structured);
-      }
-    } catch (error) {
-      console.error("Error fetching quality standards:", error);
-    }
-  };
-
-  const parseQualityStandardsWithData = (qualityStr, qualityDataRef) => {
-    try {
-      if (!qualityStr) return { responses: {}, remarks: {} };
-
-      const data =
-        typeof qualityStr === "string" ? JSON.parse(qualityStr) : qualityStr;
-
-      const responseMap = {};
-      const remarksMap = {};
-
-      data.forEach((item) => {
-        const subQuestionId = item.standardId?.toString();
-        const responseValue = item.responseId;
-        const remarkValue = item.remarks || "";
-
-        let categoryId = null;
-        for (const category of qualityDataRef) {
-          const foundRow = category.rows.find(
-            (row) => row.id === subQuestionId
-          );
-          if (foundRow) {
-            categoryId = category.id;
-            break;
-          }
-        }
-
-        if (categoryId && subQuestionId) {
-          if (!responseMap[categoryId]) responseMap[categoryId] = {};
-          if (!remarksMap[categoryId]) remarksMap[categoryId] = {};
-
-          responseMap[categoryId][subQuestionId] = responseValue;
-          remarksMap[categoryId][subQuestionId] = remarkValue;
-        }
-      });
-
-      return { responses: responseMap, remarks: remarksMap };
-    } catch (error) {
-      console.error("Error parsing quality standards:", error);
-      return { responses: {}, remarks: {} };
-    }
-  };
-
-  const fetchCertificateLevels = async () => {
-    try {
-      const response = await CommonService.getByParentId(10);
-      setCertificateLevels(response.data);
-    } catch (error) {
-      console.error("Error fetching certificate levels:", error);
-    }
-  };
-
-  const fetchCourseDetails = async () => {
-    try {
-      const response =
-        await ApplyNonAccreditedCourseService.getNonAccreditedCourseByApplicationNo(
-          applicationNo,
-          access_token
-        );
-      console.log("NonAccredited Course Details Response:", response);
-      
-      let data = response.data;
-      if (Array.isArray(data) && data.length > 0) {
-        data = data[0];
-      }
-
-      setCourseData(data);
-
-      // Parse documents
-      if (data.documents) {
-        let parsedDocs = [];
-
-        if (Array.isArray(data.documents)) {
-          parsedDocs = data.documents.map((doc) => ({
-            name: doc.documentName || doc.name || "Document",
-            url: doc.url || "",
-            id: doc.id,
-            filePath: doc.url,
-          }));
-        } else if (typeof data.documents === "string") {
-          try {
-            const parsed = JSON.parse(data.documents);
-            if (Array.isArray(parsed)) {
-              parsedDocs = parsed.map((doc) => ({
-                name: doc.documentName || "Document",
-                url: doc.url || "",
-                id: doc.id,
-                filePath: doc.url,
-              }));
-            }
-          } catch (e) {
-            console.error("Error parsing documents:", e);
-          }
-        }
-
-        setDocuments(parsedDocs);
-      }
-
-      // Store raw quality standards
-      if (data.quality_standard_responses) {
-        setRawQualityStandards(data.quality_standard_responses);
-      }
-    } catch (error) {
-      console.error("Error fetching course details:", error);
-      throw error;
-    }
-  };
-
-  const handleFileUpload = useCallback((uploadedFiles) => {
-    setNewDocuments(uploadedFiles || []);
-  }, []);
+  }, [fetchCourseDetails, fetchCertificateLevels]);
 
   const getCertificateLevelName = useCallback(
     (id) => {
       if (!id) return "N/A";
-      const certificateLevel = certificateLevels.find(
-        (level) => String(level.id) === String(id)
-      );
-      return certificateLevel
-        ? certificateLevel.name || certificateLevel.value || "N/A"
-        : id;
+      const level = certificateLevels.find((l) => String(l.id) === String(id));
+      return level ? level.name || level.value || "N/A" : id;
     },
-    [certificateLevels]
+    [certificateLevels],
   );
 
-  const handleQualityResponseChange = (categoryId, subQuestionId, value) => {
-    setQualityResponses((prev) => {
-      const newResponses = { ...prev };
+  return {
+    courseData,
+    documents,
+    certificateLevels,
+    loading,
+    fetchAllData,
+    fetchCourseDetails,
+    getCertificateLevelName,
+    setDocuments,
+  };
+};
 
-      if (!newResponses[categoryId]) {
-        newResponses[categoryId] = {};
+const useQualityStandards = (rawQualityData) => {
+  const [qualityData, setQualityData] = useState([]);
+  const [qualityResponses, setQualityResponses] = useState({});
+  const [qualityRemarks, setQualityRemarks] = useState({});
+  const [rawQualityStandards, setRawQualityStandards] = useState(null);
+
+  const fetchQualityStandards = useCallback(async () => {
+    try {
+      const response =
+        await CommonService.getAllQualitystandards(QUALITY_SERVICE_ID);
+      const structured = structureQualityData(response.data || []);
+      setQualityData(structured);
+    } catch (error) {
+      console.error("Error fetching quality standards:", error);
+    }
+  }, []);
+
+  const parseQualityStandardsWithData = useCallback(
+    (qualityStr, qualityDataRef) => {
+      try {
+        if (!qualityStr) return { responses: {}, remarks: {} };
+        const data =
+          typeof qualityStr === "string" ? JSON.parse(qualityStr) : qualityStr;
+        const responseMap = {};
+        const remarksMap = {};
+
+        data.forEach((item) => {
+          const subQuestionId = item.standardId?.toString();
+          const responseValue = item.responseId;
+          const remarkValue = item.remarks || "";
+
+          let categoryId = null;
+          for (const category of qualityDataRef) {
+            if (category.rows.find((row) => row.id === subQuestionId)) {
+              categoryId = category.id;
+              break;
+            }
+          }
+
+          if (categoryId && subQuestionId) {
+            if (!responseMap[categoryId]) responseMap[categoryId] = {};
+            if (!remarksMap[categoryId]) remarksMap[categoryId] = {};
+            responseMap[categoryId][subQuestionId] = responseValue;
+            remarksMap[categoryId][subQuestionId] = remarkValue;
+          }
+        });
+        return { responses: responseMap, remarks: remarksMap };
+      } catch (error) {
+        console.error("Error parsing quality standards:", error);
+        return { responses: {}, remarks: {} };
       }
+    },
+    [],
+  );
 
-      if (newResponses[categoryId][subQuestionId] === value) {
-        delete newResponses[categoryId][subQuestionId];
-        if (Object.keys(newResponses[categoryId]).length === 0) {
-          delete newResponses[categoryId];
+  const handleQualityResponseChange = useCallback(
+    (categoryId, subQuestionId, value) => {
+      setQualityResponses((prev) => {
+        const newResponses = { ...prev };
+        if (!newResponses[categoryId]) newResponses[categoryId] = {};
+        if (newResponses[categoryId][subQuestionId] === value) {
+          delete newResponses[categoryId][subQuestionId];
+          if (Object.keys(newResponses[categoryId]).length === 0) {
+            delete newResponses[categoryId];
+          }
+        } else {
+          newResponses[categoryId][subQuestionId] = value;
         }
-      } else {
-        newResponses[categoryId][subQuestionId] = value;
-      }
+        return newResponses;
+      });
+    },
+    [],
+  );
 
-      return newResponses;
-    });
-  };
+  const handleQualityRemarkChange = useCallback(
+    (categoryId, subQuestionId, value) => {
+      setQualityRemarks((prev) => ({
+        ...prev,
+        [categoryId]: { ...prev[categoryId], [subQuestionId]: value },
+      }));
+    },
+    [],
+  );
 
-  const handleQualityRemarkChange = (categoryId, subQuestionId, value) => {
-    setQualityRemarks((prev) => ({
-      ...prev,
-      [categoryId]: {
-        ...prev[categoryId],
-        [subQuestionId]: value,
-      },
-    }));
-  };
-
-  const prepareQualityStandardsForBackend = () => {
+  const prepareQualityStandardsForBackend = useCallback(() => {
     const qualityStandardsData = [];
-
     Object.keys(qualityResponses).forEach((categoryId) => {
       Object.keys(qualityResponses[categoryId]).forEach((subQuestionId) => {
         const responseId = qualityResponses[categoryId][subQuestionId];
         const remark = qualityRemarks[categoryId]?.[subQuestionId] || "";
-
         if (responseId && responseId !== "") {
           qualityStandardsData.push({
             standardId: parseInt(subQuestionId),
@@ -322,40 +290,504 @@ const ViewApplyNonAccreditedCourse = () => {
         }
       });
     });
-
     return qualityStandardsData;
-  };
+  }, [qualityResponses, qualityRemarks]);
 
-  const openActionDialog = (statusId) => {
+  const loadExistingResponses = useCallback(
+    (rawData) => {
+      if (rawData) {
+        setRawQualityStandards(rawData);
+        if (qualityData.length > 0) {
+          const { responses, remarks } = parseQualityStandardsWithData(
+            rawData,
+            qualityData,
+          );
+          setQualityResponses(responses);
+          setQualityRemarks(remarks);
+        }
+      }
+    },
+    [qualityData, parseQualityStandardsWithData],
+  );
+
+  return {
+    qualityData,
+    qualityResponses,
+    qualityRemarks,
+    rawQualityStandards,
+    fetchQualityStandards,
+    loadExistingResponses,
+    handleQualityResponseChange,
+    handleQualityRemarkChange,
+    prepareQualityStandardsForBackend,
+  };
+};
+
+const usePayment = (applicationNo) => {
+  const [paymentStatus, setPaymentStatus] = useState(null);
+
+  const fetchPaymentStatus = useCallback(async () => {
+    try {
+      const response =
+        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      setPaymentStatus(response.data);
+    } catch (error) {
+      console.error("Error fetching payment status:", error);
+      setPaymentStatus(null);
+    }
+  }, [applicationNo]);
+
+  const isPaymentPaid = useMemo(() => {
+    return paymentStatus?.paymentStatus?.toLowerCase() === "paid";
+  }, [paymentStatus]);
+
+  return { paymentStatus, fetchPaymentStatus, isPaymentPaid };
+};
+
+const useActionDialog = () => {
+  const [open, setOpen] = useState(false);
+  const [selectedStatusId, setSelectedStatusId] = useState(null);
+  const [remarks, setRemarks] = useState("");
+  const [remarksError, setRemarksError] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const openDialog = (statusId) => {
     setSelectedStatusId(statusId);
     setRemarks("");
     setRemarksError("");
-    setActionDialogOpen(true);
+    setOpen(true);
   };
 
   const closeDialog = () => {
-    setActionDialogOpen(false);
+    setOpen(false);
     setSelectedStatusId(null);
     setRemarks("");
     setRemarksError("");
+    setActionLoading(false);
   };
 
+  return {
+    open,
+    selectedStatusId,
+    remarks,
+    remarksError,
+    actionLoading,
+    setRemarks,
+    setRemarksError,
+    setActionLoading,
+    openDialog,
+    closeDialog,
+  };
+};
+
+// ==================== REUSABLE COMPONENTS ====================
+const SectionHeader = ({ title }) => (
+  <Typography variant="subtitle2" fontWeight={600} mb={2}>
+    {title}
+  </Typography>
+);
+
+const ReadOnlyField = ({ label, value, gridProps = { xs: 12, md: 6 } }) => (
+  <Grid item {...gridProps}>
+    <TextField
+      fullWidth
+      size="small"
+      label={label}
+      value={value || "N/A"}
+      slotProps={{ input: { readOnly: true } }}
+    />
+  </Grid>
+);
+
+const ChecklistQuestion = ({
+  row,
+  index,
+  categoryId,
+  qualityResponses,
+  qualityRemarks,
+  onResponseChange,
+  onRemarkChange,
+}) => {
+  const selectedValue = qualityResponses[categoryId]?.[row.id];
+  const isYes = selectedValue === "Y";
+  const isNo = selectedValue === "N";
+  const remark = qualityRemarks[categoryId]?.[row.id] || "";
+
+  return (
+    <TableRow key={row.id}>
+      <TableCell>{index + 1}</TableCell>
+      <TableCell>{row.value}</TableCell>
+      <TableCell align="center">
+        <Radio
+          size="small"
+          sx={{ p: 0.25 }}
+          checked={isYes}
+          onChange={() => {
+            const newValue = isYes ? undefined : "Y";
+            onResponseChange(categoryId, row.id, newValue);
+          }}
+        />
+      </TableCell>
+      <TableCell align="center">
+        <Radio
+          size="small"
+          sx={{ p: 0.25 }}
+          checked={isNo}
+          onChange={() => {
+            const newValue = isNo ? undefined : "N";
+            onResponseChange(categoryId, row.id, newValue);
+          }}
+        />
+      </TableCell>
+      <TableCell>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Enter remarks"
+          value={remark}
+          onChange={(e) => onRemarkChange(categoryId, row.id, e.target.value)}
+          slotProps={{ input: { sx: { fontSize: "0.75rem" } } }}
+          multiline
+          rows={2}
+        />
+      </TableCell>
+    </TableRow>
+  );
+};
+
+const ChecklistCategory = ({
+  standard,
+  qualityResponses,
+  qualityRemarks,
+  onResponseChange,
+  onRemarkChange,
+}) => (
+  <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
+      {standard.title}
+    </Typography>
+    <TableContainer>
+      <Table size="small" sx={TABLE_STYLE}>
+        <TableHead>
+          <TableRow>
+            <TableCell width="40">Sl. No</TableCell>
+            <TableCell>Quality Indicator</TableCell>
+            <TableCell align="center" width="80">
+              YES
+            </TableCell>
+            <TableCell align="center" width="80">
+              NO
+            </TableCell>
+            <TableCell width="250">Remarks</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {standard.rows.map((row, index) => (
+            <ChecklistQuestion
+              key={row.id}
+              row={row}
+              index={index}
+              categoryId={standard.id}
+              qualityResponses={qualityResponses}
+              qualityRemarks={qualityRemarks}
+              onResponseChange={onResponseChange}
+              onRemarkChange={onRemarkChange}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  </Paper>
+);
+
+const PaymentInfoCard = ({ paymentStatus, onGeneratePayment }) => {
+  if (paymentStatus) {
+    return (
+      <Card variant="outlined" sx={{ p: 0 }}>
+        <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+          <Grid container spacing={0.5}>
+            {[
+              {
+                label: "Payment Advice No:",
+                value: paymentStatus.paymentAdviceNo,
+              },
+              { label: "Ref No:", value: paymentStatus.refNo },
+              { label: "Tax Payer:", value: paymentStatus.taxPayerName },
+              {
+                label: "Status:",
+                value: paymentStatus.paymentStatus,
+                chip: true,
+                chipColor:
+                  paymentStatus.paymentStatus === "paid"
+                    ? "success"
+                    : "warning",
+              },
+              { label: "Due Date:", value: paymentStatus.paymentDueDate },
+              { label: "Platform:", value: paymentStatus.platform },
+              {
+                label: "Amount:",
+                value: `Nu. ${paymentStatus.totalPayableAmount || "0.00"}`,
+                highlight: true,
+              },
+              {
+                label: "Payment Mode:",
+                value: paymentStatus.paymentMode || "Not yet paid",
+              },
+            ].map((field, idx) => (
+              <Grid item key={idx} size={{ xs: 12, sm: 6, md: 3 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                    py: 0.25,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ minWidth: field.chip ? 60 : 70 }}
+                  >
+                    {field.label}
+                  </Typography>
+                  {field.chip ? (
+                    <Chip
+                      label={field.value || "N/A"}
+                      color={field.chipColor}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        fontSize: "0.65rem",
+                        "& .MuiChip-label": { px: 1 },
+                      }}
+                    />
+                  ) : field.highlight ? (
+                    <Typography
+                      variant="body2"
+                      fontWeight={600}
+                      color="primary"
+                      sx={{ fontSize: "0.8rem" }}
+                    >
+                      {field.value}
+                    </Typography>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      fontWeight={500}
+                      sx={{ fontSize: "0.75rem" }}
+                      noWrap
+                    >
+                      {field.value || "N/A"}
+                    </Typography>
+                  )}
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+          {paymentStatus.redirectUrl && (
+            <Box sx={{ mt: 1.5, display: "flex", justifyContent: "center" }}>
+              <Button
+                variant="contained"
+                color="primary"
+                size="small"
+                startIcon={<PaymentIcon sx={{ fontSize: 18 }} />}
+                onClick={() => window.open(paymentStatus.redirectUrl, "_blank")}
+                sx={{
+                  px: 2.5,
+                  py: 0.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                  fontSize: "0.75rem",
+                }}
+              >
+                Proceed to Payment
+              </Button>
+            </Box>
+          )}
+          <Alert
+            severity="info"
+            sx={{
+              mt: 1,
+              py: 0.25,
+              "& .MuiAlert-message": { fontSize: "0.7rem", py: 0.25 },
+            }}
+          >
+            PA number already generated. Click above to proceed with payment.
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card variant="outlined">
+      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+        <Typography variant="body2" gutterBottom sx={{ fontSize: "0.8rem" }}>
+          Click the button below to generate a PA number and proceed to payment.
+        </Typography>
+        <Box sx={{ mt: 1.5, display: "flex", justifyContent: "center" }}>
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<SettingsSuggestIcon sx={{ fontSize: 18 }} />}
+            onClick={onGeneratePayment}
+            sx={{
+              px: 3,
+              py: 0.5,
+              fontWeight: 600,
+              textTransform: "none",
+              fontSize: "0.75rem",
+            }}
+          >
+            Generate PA Number
+          </Button>
+        </Box>
+        <Alert
+          severity="info"
+          sx={{
+            mt: 1.5,
+            py: 0.25,
+            "& .MuiAlert-message": { fontSize: "0.7rem", py: 0.25 },
+          }}
+        >
+          <strong>Note:</strong> This will create a payment request and redirect
+          you to the payment portal.
+        </Alert>
+      </CardContent>
+    </Card>
+  );
+};
+
+const TabNavigation = ({
+  tabs,
+  tabValue,
+  setTabValue,
+  roleId,
+  isLastTab,
+  isFirstTab,
+  onPrevious,
+  onNext,
+  children,
+}) => (
+  <>
+    <Tabs
+      value={tabValue}
+      onChange={(e, v) => setTabValue(v)}
+      variant="fullWidth"
+      sx={{ "& .MuiTab-root": { textTransform: "none", fontWeight: 600 } }}
+    >
+      {tabs.map((tab, index) => (
+        <Tab key={index} icon={tab.icon} label={tab.label} />
+      ))}
+    </Tabs>
+    {children}
+    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
+      {!isFirstTab && (
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<SkipPreviousIcon />}
+          onClick={onPrevious}
+          sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
+        >
+          Previous
+        </Button>
+      )}
+      {!isLastTab && (
+        <Button
+          variant="contained"
+          color="primary"
+          size="small"
+          endIcon={<SkipNextIcon />}
+          onClick={onNext}
+          sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
+        >
+          Next
+        </Button>
+      )}
+    </Box>
+  </>
+);
+
+// ==================== MAIN COMPONENT ====================
+const ViewApplyNonAccreditedCourse = () => {
+  const { applicationNo } = useParams();
+  const navigate = useNavigate();
+  const access_token = useSelector((state) => state.auth.accessToken);
+  const actionId = useSelector((state) => state.auth.id);
+  const currentRoleId = useSelector((state) => state.auth.current_roleId);
+
+  // Custom hooks
+  const courseDataHook = useCourseData(applicationNo, access_token);
+  const qualityHook = useQualityStandards();
+  const paymentHook = usePayment(applicationNo);
+  const dialogHook = useActionDialog();
+
+  const [newDocuments, setNewDocuments] = useState([]);
+  const [tabValue, setTabValue] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const roleId = currentRoleId?.toString();
+
+  // Fetch all data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        await courseDataHook.fetchAllData();
+        await qualityHook.fetchQualityStandards();
+        await paymentHook.fetchPaymentStatus();
+
+        // Load existing quality responses if available
+        if (courseDataHook.courseData?.quality_standard_responses) {
+          qualityHook.loadExistingResponses(
+            courseDataHook.courseData.quality_standard_responses,
+          );
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [applicationNo]);
+
+  // Update quality responses when data changes
+  useEffect(() => {
+    if (courseDataHook.courseData?.quality_standard_responses) {
+      qualityHook.loadExistingResponses(
+        courseDataHook.courseData.quality_standard_responses,
+      );
+    }
+  }, [courseDataHook.courseData, qualityHook.qualityData]);
+
+  const handleFileUpload = useCallback((uploadedFiles) => {
+    setNewDocuments(uploadedFiles || []);
+  }, []);
+
   const handleAction = async () => {
-    if ((selectedStatusId === 58 || selectedStatusId === 60) && !remarks.trim()) {
-      setRemarksError("Remarks are required for rejection");
+    const isRejectAction =
+      dialogHook.selectedStatusId === STATUS.REJECT ||
+      dialogHook.selectedStatusId === STATUS.REJECT_QAS2;
+
+    if (isRejectAction && !dialogHook.remarks.trim()) {
+      dialogHook.setRemarksError("Remarks are required for rejection");
       return;
     }
 
     setActionLoading(true);
     try {
-      const qualityStandardsData = prepareQualityStandardsForBackend();
-
+      const qualityStandardsData =
+        qualityHook.prepareQualityStandardsForBackend();
       const payload = {
         applicationNo: applicationNo,
-        statusId: selectedStatusId,
-        serviceId: 13,
+        statusId: dialogHook.selectedStatusId,
+        serviceId: QUALITY_SERVICE_ID,
         assignedRoleId: currentRoleId,
-        remarks: remarks || "Application processed",
+        remarks: dialogHook.remarks.trim() || "Application processed",
         updatedBy: actionId,
         documents: newDocuments,
         qualityStandards: qualityStandardsData,
@@ -364,37 +796,24 @@ const ViewApplyNonAccreditedCourse = () => {
       const response =
         await ApplyNonAccreditedCourseService.verifyNonAccreditedCourse(
           payload,
-          access_token
+          access_token,
         );
 
       if (response.status === 200 || response.status === 201) {
-        let successMessage;
-        switch (selectedStatusId) {
-          case 56:
-            successMessage = "Course verified successfully";
-            break;
-          case 62:
-            successMessage = "Course verified successfully";
-            break;
-          case 59:
-            successMessage = "Course endorsed successfully";
-            break;
-          case 57:
-            successMessage = "Course approved successfully";
-            break;
-          case 58:
-            successMessage = "Course rejected successfully";
-            break;
-          case 60:
-            successMessage = "Forwarded back to QAS Level 1 successfully";
-            break;
-          default:
-            successMessage = "Action completed successfully";
-        }
-
-        toast.success(successMessage);
-        closeDialog();
-        await fetchCourseDetails();
+        const statusMessages = {
+          [STATUS.VERIFY_QAS1]: "Course verified successfully",
+          [STATUS.VERIFY_QAS2]: "Course verified successfully",
+          [STATUS.ENDORSE_REC]: "Course endorsed successfully",
+          [STATUS.APPROVE_DG]: "Course approved successfully",
+          [STATUS.REJECT]: "Course rejected successfully",
+          [STATUS.REJECT_QAS2]: "Forwarded back to QAS Level 1 successfully",
+        };
+        toast.success(
+          statusMessages[dialogHook.selectedStatusId] ||
+            "Action completed successfully",
+        );
+        dialogHook.closeDialog();
+        await courseDataHook.fetchCourseDetails();
         setNewDocuments([]);
         navigate("/tasklist/task-details-index");
       }
@@ -406,35 +825,49 @@ const ViewApplyNonAccreditedCourse = () => {
     }
   };
 
-  const getDialogTitle = () => {
-    switch (selectedStatusId) {
-      case 56:
-        return "Verify Course Application";
-      case 62:
-        return "Verify Course Application";
-      case 59:
-        return "Endorse Course Application";
-      case 57:
-        return "Approve Course Application";
-      case 58:
-        return "Reject Course Application";
-      case 60:
-        return "Forward Back to QAS Level 1";
-      default:
-        return "Confirm Action";
+  const handlePaymentNavigation = useCallback(() => {
+    if (!courseDataHook.courseData) {
+      toast.error("Course data not found");
+      return;
     }
-  };
+    const data = courseDataHook.courseData;
+    navigate(
+      `/birms/common-payment-index/${data.application_no}/${SERVICE_CODE}/${data.registration_no || "N/A"}/${data.email_id || "N/A"}/${data.mobile_no || "N/A"}/${data.proposed_institute_name || "N/A"}/${data.institute_id || 0}`,
+    );
+  }, [courseDataHook.courseData, navigate]);
+
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      { icon: <BusinessIcon />, label: "Course Information" },
+      { icon: <VerifiedIcon />, label: "Quality Standards" },
+      { icon: <FileOpenIcon />, label: "Supporting Documents" },
+    ];
+    if (currentRoleId == 7) {
+      baseTabs.push({
+        icon: <SettingsSuggestIcon />,
+        label: "Generate PA Number",
+      });
+    }
+    return baseTabs;
+  }, [currentRoleId]);
 
   const getDialogContent = () => {
-    if (selectedStatusId === 58 || selectedStatusId === 60) {
+    const isRejectAction =
+      dialogHook.selectedStatusId === STATUS.REJECT ||
+      dialogHook.selectedStatusId === STATUS.REJECT_QAS2;
+
+    if (isRejectAction) {
       return (
         <>
           <DialogContentText sx={{ mb: 2 }}>
-            Please provide remarks for rejecting this non-accredited course application:
+            Please provide remarks for rejecting this non-accredited course
+            application:
             <br />
             <strong>Application No: {applicationNo}</strong>
             <br />
-            <strong>Course Title: {courseData?.course_title}</strong>
+            <strong>
+              Course Title: {courseDataHook.courseData?.course_title}
+            </strong>
           </DialogContentText>
           <TextField
             autoFocus
@@ -443,194 +876,42 @@ const ViewApplyNonAccreditedCourse = () => {
             fullWidth
             multiline
             rows={4}
-            value={remarks}
+            value={dialogHook.remarks}
             onChange={(e) => {
-              setRemarks(e.target.value);
-              setRemarksError("");
+              dialogHook.setRemarks(e.target.value);
+              dialogHook.setRemarksError("");
             }}
-            error={!!remarksError}
-            helperText={remarksError}
+            error={!!dialogHook.remarksError}
+            helperText={dialogHook.remarksError}
             required
           />
         </>
       );
     } else {
-      const actionText =
-        selectedStatusId === 56 || selectedStatusId === 62
-          ? "verify"
-          : selectedStatusId === 59
-          ? "endorse"
-          : "approve";
-
+      const actionMap = {
+        [STATUS.VERIFY_QAS1]: "verify",
+        [STATUS.VERIFY_QAS2]: "verify",
+        [STATUS.ENDORSE_REC]: "endorse",
+        [STATUS.APPROVE_DG]: "approve",
+      };
       return (
         <DialogContentText>
-          Are you sure you want to {actionText} this non-accredited course application?
+          Are you sure you want to{" "}
+          {actionMap[dialogHook.selectedStatusId] || "process"} this
+          non-accredited course application?
           <br />
           <strong>Application No: {applicationNo}</strong>
           <br />
-          <strong>Course Title: {courseData?.course_title}</strong>
+          <strong>
+            Course Title: {courseDataHook.courseData?.course_title}
+          </strong>
         </DialogContentText>
       );
     }
   };
 
-  const getConfirmButtonColor = () => {
-    switch (selectedStatusId) {
-      case 56:
-      case 57:
-      case 62:
-        return "success";
-      case 58:
-        return "error";
-      case 59:
-        return "primary";
-      case 60:
-        return "warning";
-      default:
-        return "primary";
-    }
-  };
-
-  const getConfirmButtonText = () => {
-    if (actionLoading) return <CircularProgress size={24} />;
-    switch (selectedStatusId) {
-      case 56:
-        return "Confirm Verify";
-      case 62:
-        return "Confirm Verify";
-      case 59:
-        return "Confirm Endorse";
-      case 57:
-        return "Confirm Approve";
-      case 58:
-      case 60:
-        return "Confirm Reject";
-      default:
-        return "Confirm";
-    }
-  };
-
-  const renderChecklist = useCallback(
-    (standard) => {
-      return (
-        <Grid item xs={12} key={standard.id}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
-              {standard.title}
-            </Typography>
-            <TableContainer>
-              <Table size="small" sx={TABLE_STYLE}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell width="40">Sl. No</TableCell>
-                    <TableCell>Quality Indicator</TableCell>
-                    <TableCell align="center" width="80">
-                      YES
-                    </TableCell>
-                    <TableCell align="center" width="80">
-                      NO
-                    </TableCell>
-                    <TableCell width="250">Remarks</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {standard.rows.map((row, index) => {
-                    const selectedValue = qualityResponses[standard.id]?.[row.id];
-                    const isYes = selectedValue === "Y";
-                    const isNo = selectedValue === "N";
-                    const remark = qualityRemarks[standard.id]?.[row.id] || "";
-
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell>{row.value}</TableCell>
-                        <TableCell align="center">
-                          <Radio
-                            size="small"
-                            sx={{ p: 0.25 }}
-                            checked={isYes}
-                            onChange={() => {
-                              const newValue = isYes ? undefined : "Y";
-                              handleQualityResponseChange(
-                                standard.id,
-                                row.id,
-                                newValue
-                              );
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Radio
-                            size="small"
-                            sx={{ p: 0.25 }}
-                            checked={isNo}
-                            onChange={() => {
-                              const newValue = isNo ? undefined : "N";
-                              handleQualityResponseChange(
-                                standard.id,
-                                row.id,
-                                newValue
-                              );
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            placeholder="Enter remarks"
-                            value={remark}
-                            onChange={(e) =>
-                              handleQualityRemarkChange(
-                                standard.id,
-                                row.id,
-                                e.target.value
-                              )
-                            }
-                            slotProps={{
-                              input: {
-                                sx: { fontSize: "0.75rem" },
-                              },
-                            }}
-                            multiline
-                            rows={2}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
-      );
-    },
-    [qualityResponses, qualityRemarks]
-  );
-
-  const tabs = [
-    { icon: <BusinessIcon />, label: "Course Information" },
-    { icon: <VerifiedIcon />, label: "Quality Standards" },
-    { icon: <FileOpenIcon />, label: "Supporting Documents" },
-  ];
-
-  // Navigation handlers
-  const handleNextTab = () => {
-    if (tabValue < tabs.length - 1) {
-      setTabValue(tabValue + 1);
-    }
-  };
-
-  const handlePreviousTab = () => {
-    if (tabValue > 0) {
-      setTabValue(tabValue - 1);
-    }
-  };
-
-  // Helper functions for button visibility
-  const isFirstTab = () => tabValue === 0;
-  const isLastTab = () => tabValue === tabs.length - 1;
+  const isLastTab = tabValue === tabs.length - 1;
+  const isFirstTab = tabValue === 0;
 
   if (loading) {
     return (
@@ -643,7 +924,7 @@ const ViewApplyNonAccreditedCourse = () => {
     );
   }
 
-  if (!courseData) {
+  if (!courseDataHook.courseData) {
     return (
       <Box sx={{ m: 3 }}>
         <Paper sx={{ p: 3 }}>
@@ -659,6 +940,8 @@ const ViewApplyNonAccreditedCourse = () => {
     );
   }
 
+  const data = courseDataHook.courseData;
+
   return (
     <Box>
       <Paper sx={{ p: 2 }}>
@@ -667,251 +950,230 @@ const ViewApplyNonAccreditedCourse = () => {
         </Typography>
         <Divider />
 
-        <Tabs
-          value={tabValue}
-          onChange={(e, v) => setTabValue(v)}
-          variant="fullWidth"
-          sx={{
-            "& .MuiTab-root": { textTransform: "none", fontWeight: 600 },
-          }}
+        <TabNavigation
+          tabs={tabs}
+          tabValue={tabValue}
+          setTabValue={setTabValue}
+          roleId={roleId}
+          isLastTab={isLastTab}
+          isFirstTab={isFirstTab}
+          onPrevious={() => setTabValue(tabValue - 1)}
+          onNext={() => setTabValue(tabValue + 1)}
         >
-          {tabs.map((tab, index) => (
-            <Tab key={index} icon={tab.icon} label={tab.label} />
-          ))}
-        </Tabs>
-
-        {/* Tab 0: Course Information */}
-        {tabValue === 0 && (
-          <Paper sx={{ p: 3, mb: 2 }} variant="outlined">
-            {/* Institute Information */}
-            <Typography variant="subtitle2" fontWeight={600} mb={2}>
-              Institute Information
-            </Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item size={{ xs: 12, md: 6 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+          {/* Tab 0: Course Information */}
+          {tabValue === 0 && (
+            <Paper sx={{ p: 3, mb: 2 }} variant="outlined">
+              <SectionHeader title="Institute Information" />
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <ReadOnlyField
                   label="Training Provider/Institution Name"
-                  value={courseData.proposed_institute_name || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={data.proposed_institute_name}
                 />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 6 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+                <ReadOnlyField
                   label="Registration Number"
-                  value={courseData.registration_no || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={data.registration_no}
                 />
               </Grid>
-            </Grid>
-
-            <Divider sx={{ my: 3 }} />
-
-            {/* Course Information */}
-            <Typography variant="subtitle2" fontWeight={600} mb={2}>
-              Course Information
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item size={{ xs: 12, md: 6 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Course Title"
-                  value={courseData.course_title || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 6 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+              <Divider sx={{ my: 3 }} />
+              <SectionHeader title="Course Information" />
+              <Grid container spacing={2}>
+                <ReadOnlyField label="Course Title" value={data.course_title} />
+                <ReadOnlyField
                   label="Certificate Level"
-                  value={getCertificateLevelName(courseData.certificate_level_id)}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={courseDataHook.getCertificateLevelName(
+                    data.certificate_level_id,
+                  )}
                 />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+                <ReadOnlyField
                   label="Theory (Hours)"
-                  value={courseData.theory_hour || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={data.total_theory_duration}
+                  gridProps={{ xs: 12, md: 4 }}
                 />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+                <ReadOnlyField
                   label="Practical (Hours)"
-                  value={courseData.practical_hour || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={data.total_practical_duration}
+                  gridProps={{ xs: 12, md: 4 }}
                 />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+                <ReadOnlyField
                   label="OJT (Hours)"
-                  value={courseData.ojt_hour || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={data.total_ojt_duration}
+                  gridProps={{ xs: 12, md: 4 }}
                 />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+                <ReadOnlyField
                   label="Fees per trainee (RM)"
-                  value={courseData.fees_per_trainee || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={data.fees_per_trainee}
+                  gridProps={{ xs: 12, md: 4 }}
                 />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+                <ReadOnlyField
                   label="Enrollment capacity per batch"
-                  value={courseData.enrolment_capacity || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={data.enrolment_capacity}
+                  gridProps={{ xs: 12, md: 4 }}
                 />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
+                <ReadOnlyField
                   label="Curriculum Type"
-                  value={courseData.curriculum_name || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
+                  value={data.curriculum_name}
+                  gridProps={{ xs: 12, md: 4 }}
                 />
               </Grid>
-            </Grid>
-
-            {/* Remarks Section if exists */}
-            {courseData.remarks && (
-              <>
-                <Divider sx={{ my: 3 }} />
-                <Typography variant="subtitle2" fontWeight={600} mb={2}>
-                  Remarks / History
-                </Typography>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  value={courseData.remarks || ""}
-                  slotProps={{ input: { readOnly: true } }}
-                  size="small"
-                />
-              </>
-            )}
-          </Paper>
-        )}
-
-        {/* Tab 1: Quality Standards */}
-        {tabValue === 1 && (
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item size={{ xs: 12 }}>
-              {qualityData.length > 0 ? (
-                qualityData.map(renderChecklist)
-              ) : (
-                <Paper sx={{ p: 3, textAlign: "center" }}>
-                  <Typography color="text.secondary">
-                    No quality standards available for this service
-                  </Typography>
-                </Paper>
+              {data.remarks && (
+                <>
+                  <Divider sx={{ my: 3 }} />
+                  <SectionHeader title="Remarks / History" />
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={data.remarks || ""}
+                    slotProps={{ input: { readOnly: true } }}
+                    size="small"
+                  />
+                </>
               )}
-            </Grid>
-          </Grid>
-        )}
+            </Paper>
+          )}
 
-        {/* Tab 2: Supporting Documents */}
-        {tabValue === 2 && (
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item size={{ xs: 12 }}>
-              <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-                <Box
-                  component="ol"
-                  sx={{
-                    pl: 3,
-                    mb: 2,
-                    "& li": {
-                      fontSize: "0.85rem",
-                      fontStyle: "italic",
-                      mb: 0.5,
-                    },
-                  }}
+          {/* Tab 1: Quality Standards */}
+          {tabValue === 1 && (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item size={{ xs: 12 }}>
+                {qualityHook.qualityData.length > 0 ? (
+                  qualityHook.qualityData.map((standard) => (
+                    <ChecklistCategory
+                      key={standard.id}
+                      standard={standard}
+                      qualityResponses={qualityHook.qualityResponses}
+                      qualityRemarks={qualityHook.qualityRemarks}
+                      onResponseChange={qualityHook.handleQualityResponseChange}
+                      onRemarkChange={qualityHook.handleQualityRemarkChange}
+                    />
+                  ))
+                ) : (
+                  <Paper sx={{ p: 3, textAlign: "center" }}>
+                    <Typography color="text.secondary">
+                      No quality standards available for this service
+                    </Typography>
+                  </Paper>
+                )}
+              </Grid>
+            </Grid>
+          )}
+
+          {/* Tab 2: Supporting Documents */}
+          {tabValue === 2 && (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item size={{ xs: 12 }}>
+                <Paper
+                  sx={{ p: 2, border: "1px solid", borderColor: "divider" }}
                 >
-                  <li>Course curriculum and syllabus</li>
-                  <li>Trainer qualifications and certifications</li>
-                  <li>Facility and infrastructure documents</li>
-                  <li>Other supporting documents as required</li>
-                </Box>
-                <FileDownload
-                  initialFiles={documents}
-                  onFileUpload={handleFileUpload}
-                  allowUpload={true}
-                />
-              </Paper>
+                  <Box
+                    component="ol"
+                    sx={{
+                      pl: 3,
+                      mb: 2,
+                      "& li": {
+                        fontSize: "0.85rem",
+                        fontStyle: "italic",
+                        mb: 0.5,
+                      },
+                    }}
+                  >
+                    <li>Course curriculum and syllabus</li>
+                    <li>Trainer qualifications and certifications</li>
+                    <li>Facility and infrastructure documents</li>
+                    <li>Other supporting documents as required</li>
+                  </Box>
+                  <FileDownload
+                    initialFiles={courseDataHook.documents}
+                    onFileUpload={handleFileUpload}
+                    allowUpload={true}
+                  />
+                </Paper>
+              </Grid>
             </Grid>
-          </Grid>
-        )}
-
-        {/* Navigation and Action Buttons */}
-        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-          {!isFirstTab() && (
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<SkipPreviousIcon />}
-              onClick={handlePreviousTab}
-              sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
-            >
-              Previous
-            </Button>
           )}
 
-          {!isLastTab() && (
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              endIcon={<SkipNextIcon />}
-              onClick={handleNextTab}
-              sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
-            >
-              Next
-            </Button>
+          {/* Generate PA Number Tab */}
+          {currentRoleId == 7 && tabValue === 3 && (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item size={{ xs: 12 }}>
+                <Paper
+                  sx={{ p: 2, border: "1px solid", borderColor: "divider" }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                    <AccountBalanceIcon
+                      sx={{ mr: 1, color: "primary.main", fontSize: 20 }}
+                    />
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      Generate PA Number
+                    </Typography>
+                  </Box>
+                  <PaymentInfoCard
+                    paymentStatus={paymentHook.paymentStatus}
+                    onGeneratePayment={handlePaymentNavigation}
+                  />
+                </Paper>
+              </Grid>
+            </Grid>
           )}
 
-          {isLastTab() && (
-            <>
+          {/* Action Buttons */}
+          {isLastTab && (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 2,
+                mt: 3,
+              }}
+            >
               {roleId === "7" && (
                 <>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    size="small"
-                    startIcon={<CheckCircleIcon />}
-                    onClick={() => openActionDialog(56)}
-                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                  <Tooltip
+                    title={
+                      !paymentHook.isPaymentPaid
+                        ? "Payment must be completed before verification"
+                        : ""
+                    }
+                    arrow
                   >
-                    Verify
-                  </Button>
+                    <span>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="small"
+                        startIcon={<CheckCircleIcon />}
+                        onClick={() =>
+                          dialogHook.openDialog(STATUS.VERIFY_QAS1)
+                        }
+                        disabled={!paymentHook.isPaymentPaid}
+                        sx={{
+                          px: 3,
+                          py: 0.5,
+                          fontWeight: 600,
+                          textTransform: "none",
+                        }}
+                      >
+                        Verify
+                      </Button>
+                    </span>
+                  </Tooltip>
                   <Button
                     variant="contained"
                     color="error"
                     size="small"
                     startIcon={<CancelIcon />}
-                    onClick={() => openActionDialog(58)}
-                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                    onClick={() => dialogHook.openDialog(STATUS.REJECT)}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
                   >
                     Reject
                   </Button>
                 </>
               )}
-
               {roleId === "10" && (
                 <>
                   <Button
@@ -919,8 +1181,13 @@ const ViewApplyNonAccreditedCourse = () => {
                     color="success"
                     size="small"
                     startIcon={<CheckCircleIcon />}
-                    onClick={() => openActionDialog(62)}
-                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                    onClick={() => dialogHook.openDialog(STATUS.VERIFY_QAS2)}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
                   >
                     Verify
                   </Button>
@@ -929,69 +1196,120 @@ const ViewApplyNonAccreditedCourse = () => {
                     color="error"
                     size="small"
                     startIcon={<CancelIcon />}
-                    onClick={() => openActionDialog(60)}
-                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                    onClick={() => dialogHook.openDialog(STATUS.REJECT_QAS2)}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
                   >
                     Reject
                   </Button>
                 </>
               )}
-
               {roleId === "23" && (
                 <Button
                   variant="contained"
                   color="primary"
                   size="small"
                   startIcon={<VerifiedIcon />}
-                  onClick={() => openActionDialog(59)}
-                  sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                  onClick={() => dialogHook.openDialog(STATUS.ENDORSE_REC)}
+                  sx={{
+                    px: 3,
+                    py: 0.5,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
                 >
                   Endorse
                 </Button>
               )}
-
               {roleId === "22" && (
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="small"
-                  startIcon={<CheckCircleIcon />}
-                  onClick={() => openActionDialog(57)}
-                  sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                <Tooltip
+                  title={
+                    !paymentHook.isPaymentPaid
+                      ? "Payment must be completed before approval"
+                      : ""
+                  }
+                  arrow
                 >
-                  Approve
-                </Button>
+                  <span>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      size="small"
+                      startIcon={<CheckCircleIcon />}
+                      onClick={() => dialogHook.openDialog(STATUS.APPROVE_DG)}
+                      disabled={!paymentHook.isPaymentPaid}
+                      sx={{
+                        px: 3,
+                        py: 0.5,
+                        fontWeight: 600,
+                        textTransform: "none",
+                      }}
+                    >
+                      Approve
+                    </Button>
+                  </span>
+                </Tooltip>
               )}
-            </>
+            </Box>
           )}
-        </Box>
+        </TabNavigation>
       </Paper>
 
       {/* Action Dialog */}
-      <Dialog open={actionDialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{getDialogTitle()}</DialogTitle>
+      <Dialog
+        open={dialogHook.open}
+        onClose={dialogHook.closeDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {dialogHook.selectedStatusId === STATUS.VERIFY_QAS1
+            ? "Verify Course Application"
+            : dialogHook.selectedStatusId === STATUS.VERIFY_QAS2
+              ? "Verify Course Application"
+              : dialogHook.selectedStatusId === STATUS.ENDORSE_REC
+                ? "Endorse Course Application"
+                : dialogHook.selectedStatusId === STATUS.APPROVE_DG
+                  ? "Approve Course Application"
+                  : dialogHook.selectedStatusId === STATUS.REJECT
+                    ? "Reject Course Application"
+                    : dialogHook.selectedStatusId === STATUS.REJECT_QAS2
+                      ? "Forward Back to QAS Level 1"
+                      : "Confirm Action"}
+        </DialogTitle>
         <DialogContent>{getDialogContent()}</DialogContent>
         <DialogActions>
           <Button
             color="error"
             variant="contained"
             size="small"
-            onClick={closeDialog}
+            onClick={dialogHook.closeDialog}
             disabled={actionLoading}
           >
             Cancel
           </Button>
           <Button
             onClick={handleAction}
-            color={getConfirmButtonColor()}
+            color={
+              dialogHook.selectedStatusId === STATUS.REJECT ||
+              dialogHook.selectedStatusId === STATUS.REJECT_QAS2
+                ? "error"
+                : "success"
+            }
             variant="contained"
             size="small"
             disabled={
               actionLoading ||
-              ((selectedStatusId === 58 || selectedStatusId === 60) && !remarks.trim())
+              ((dialogHook.selectedStatusId === STATUS.REJECT ||
+                dialogHook.selectedStatusId === STATUS.REJECT_QAS2) &&
+                !dialogHook.remarks.trim())
             }
           >
-            {getConfirmButtonText()}
+            {actionLoading ? <CircularProgress size={24} /> : "Confirm"}
           </Button>
         </DialogActions>
       </Dialog>

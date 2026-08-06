@@ -37,19 +37,21 @@ import {
   Payment as PaymentIcon,
   AccountBalance,
   Verified,
+  OpenInNew as OpenInNewIcon,
 } from "@mui/icons-material";
 import FastForwardIcon from "@mui/icons-material/FastForward";
 import FastRewindIcon from "@mui/icons-material/FastRewind";
 import CurrencyExchangeIcon from "@mui/icons-material/CurrencyExchange";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import CommonBirmsPaymentService from "../../../api/services/internal/birms/CommonBirmsPaymentService";
 
 const CommonBirmsPayment = () => {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
 
   // State for URL parameters
@@ -69,7 +71,6 @@ const CommonBirmsPayment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [paymentAdviceData, setPaymentAdviceData] = useState(null);
- 
 
   const [formValues, setFormValues] = useState({
     totalPayableAmount: "",
@@ -102,8 +103,13 @@ const CommonBirmsPayment = () => {
       taxPayerEmail: taxPayerEmail || "",
       taxPayerMobileNo: taxPayerMobileNo || "",
       taxPayerName: taxPayerName || "",
-      instituteId: instituteId || "", 
+      instituteId: instituteId || "",
     });
+
+    // Store the application number for reference
+    if (applicationNo) {
+      sessionStorage.setItem("currentApplicationNo", applicationNo);
+    }
   }, [params]);
 
   // Required label helper
@@ -204,16 +210,32 @@ const CommonBirmsPayment = () => {
         setOpenDialog(false);
         setActiveStep(2);
 
-        // Navigate to success page after delay
-        setTimeout(() => {
-          navigate("/", {
-            state: {
-              ...paymentParams,
-              ...values,
-              paymentAdvice: data,
-            },
-          });
-        }, 5000);
+        //  Go back to previous page with success state
+        // Store payment success data in sessionStorage for persistence
+        sessionStorage.setItem(
+          "paymentSuccess",
+          JSON.stringify({
+            ...paymentParams,
+            ...values,
+            paymentAdvice: data,
+            paymentStatus: "success",
+            timestamp: new Date().toISOString(),
+          }),
+        );
+
+        // Navigate back with state
+        navigate(-1, {
+          state: {
+            ...paymentParams,
+            ...values,
+            paymentAdvice: data,
+            paymentStatus: "success",
+            timestamp: new Date().toISOString(),
+            fromPayment: true,
+          },
+        });
+
+        return; // Exit after navigation
       } else {
         setError(response.data?.message || "Failed to generate payment advice");
         toast.error(
@@ -251,7 +273,7 @@ const CommonBirmsPayment = () => {
 
       const response =
         await CommonBirmsPaymentService.generatePaymentAdvice(paymentRequest);
-
+      console.log("birms response", response.data)
       if (response.status === 200 || response.status === 201) {
         setPaymentAdviceData(response.data);
         setActiveStep(2);
@@ -260,16 +282,30 @@ const CommonBirmsPayment = () => {
         setOpenDialog(false);
         setFormValues({ totalPayableAmount: "", paymentDueDate: "" });
 
-        // Navigate to success page after delay
-        setTimeout(() => {
-          navigate("/", {
-            state: {
-              ...paymentParams,
-              ...values,
-              paymentAdvice: response.data,
-            },
-          });
-        }, 3000);
+        // Store payment success data in sessionStorage for persistence
+        sessionStorage.setItem(
+          "paymentSuccess",
+          JSON.stringify({
+            ...paymentParams,
+            ...values,
+            paymentAdvice: response.data,
+            paymentStatus: "success",
+            timestamp: new Date().toISOString(),
+          }),
+        );
+
+        navigate(-1, {
+          state: {
+            ...paymentParams,
+            ...values,
+            paymentAdvice: response.data,
+            paymentStatus: "success",
+            timestamp: new Date().toISOString(),
+            fromPayment: true,
+          },
+        });
+
+        return; // Exit after navigation
       } else {
         setError(response.data?.message || "Failed to generate payment advice");
         toast.error(
@@ -955,7 +991,7 @@ const CommonBirmsPayment = () => {
                     },
                   }}
                 >
-                  Proceed to Payment
+                  Proceed PA Genaration
                 </Button>
               )}
               {activeStep === 2 && (
@@ -965,7 +1001,30 @@ const CommonBirmsPayment = () => {
                   color="success"
                   size="medium"
                   startIcon={<CheckCircle />}
-                  onClick={() => navigate("/dashboard")}
+                  onClick={() => {
+                    //Go back to previous page with success state
+                    if (paymentAdviceData) {
+                      sessionStorage.setItem(
+                        "paymentSuccess",
+                        JSON.stringify({
+                          ...paymentParams,
+                          paymentAdvice: paymentAdviceData,
+                          paymentStatus: "success",
+                          timestamp: new Date().toISOString(),
+                        }),
+                      );
+                    }
+
+                    navigate(-1, {
+                      state: {
+                        ...paymentParams,
+                        paymentAdvice: paymentAdviceData,
+                        paymentStatus: "success",
+                        fromPayment: true,
+                        timestamp: new Date().toISOString(),
+                      },
+                    });
+                  }}
                   sx={{
                     borderRadius: 2,
                     textTransform: "none",
@@ -973,7 +1032,7 @@ const CommonBirmsPayment = () => {
                     px: 3,
                   }}
                 >
-                  Go to Dashboard
+                  Go Back
                 </Button>
               )}
             </Box>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// CertificateIndex.jsx
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Paper,
   Typography,
@@ -26,11 +27,174 @@ import { exportToExcel } from "@/utils/exportExcel";
 import { useSelector } from "react-redux";
 import {
   generateAssessmentCertificatePdf,
-  generateAllAssessmentCertificatesPdf
+  generateAllAssessmentCertificatesPdf,
 } from "@/utils/assessmentCertificatePdf";
 import CertificationService from "../../api/services/internal/certification/CertificationService";
 
-const CertificateIndex = () => {
+// ==================== CONSTANTS ====================
+const TABLE_STYLE = {
+  border: "1px solid #ccc",
+  "& th, & td": {
+    border: "1px solid #ccc",
+    padding: "8px",
+  },
+};
+
+const PROGRAM_TYPES = [
+  { id: "BQF", label: "BQF Program" },
+  { id: "NON_BQF", label: "Non BQF Program" },
+  { id: "RPL", label: "RPL Program" },
+];
+
+const ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
+
+// ==================== SAMPLE DATA ====================
+const SAMPLE_COURSE_DATA = [
+  {
+    id: 1,
+    course_name: "Excavator Operator",
+    program_type: "BQF",
+    start_date: "2026-01-15",
+    end_date: "2026-03-15",
+  },
+  {
+    id: 2,
+    course_name: "Crane Operator",
+    program_type: "BQF",
+    start_date: "2026-02-01",
+    end_date: "2026-04-01",
+  },
+  {
+    id: 3,
+    course_name: "Forklift Operator",
+    program_type: "BQF",
+    start_date: "2026-03-01",
+    end_date: "2026-05-01",
+  },
+  {
+    id: 4,
+    course_name: "Basic Computer Skills",
+    program_type: "NON_BQF",
+    start_date: "2026-01-20",
+    end_date: "2026-02-20",
+  },
+  {
+    id: 5,
+    course_name: "English Language",
+    program_type: "NON_BQF",
+    start_date: "2026-02-15",
+    end_date: "2026-04-15",
+  },
+  {
+    id: 6,
+    course_name: "Accounting Basics",
+    program_type: "NON_BQF",
+    start_date: "2026-03-10",
+    end_date: "2026-05-10",
+  },
+  {
+    id: 7,
+    course_name: "RPL Construction",
+    program_type: "RPL",
+    start_date: "2026-01-10",
+    end_date: "2026-03-10",
+  },
+  {
+    id: 8,
+    course_name: "RPL Hospitality",
+    program_type: "RPL",
+    start_date: "2026-02-20",
+    end_date: "2026-04-20",
+  },
+  {
+    id: 9,
+    course_name: "RPL Agriculture",
+    program_type: "RPL",
+    start_date: "2026-03-15",
+    end_date: "2026-05-15",
+  },
+];
+
+const SAMPLE_REPORTS = [
+  {
+    id: 1,
+    name: "Pema Dorji",
+    cid: "1160400783",
+    gender: "M",
+    programType: "BQF",
+    course: "Excavator Operator",
+    courseStartDate: "2026-01-15",
+    courseEndDate: "2026-03-15",
+    certificate: "BQF Certificate 2",
+    internal: "Competent",
+    theory: "Competent",
+    practical: "Competent",
+    result: "Competent",
+  },
+  {
+    id: 2,
+    name: "Tashi",
+    cid: "1160400909",
+    gender: "M",
+    programType: "BQF",
+    course: "Excavator Operator",
+    courseStartDate: "2026-01-15",
+    courseEndDate: "2026-03-15",
+    certificate: "BQF Certificate 2",
+    internal: "Competent",
+    theory: "Competent",
+    practical: "Competent",
+    result: "Competent",
+  },
+  {
+    id: 3,
+    name: "Pema Lhamo",
+    cid: "1160400783",
+    gender: "F",
+    programType: "NON_BQF",
+    course: "Basic Computer Skills",
+    courseStartDate: "2026-01-20",
+    courseEndDate: "2026-02-20",
+    certificate: "Certificate of Completion",
+    internal: "Competent",
+    theory: "Not Competent",
+    practical: "Competent",
+    result: "Not Competent",
+  },
+  {
+    id: 4,
+    name: "Wahgchuk Pemo",
+    cid: "189700202",
+    gender: "F",
+    programType: "RPL",
+    course: "RPL Construction",
+    courseStartDate: "2026-01-10",
+    courseEndDate: "2026-03-10",
+    certificate: "RPL Certificate",
+    internal: "Competent",
+    theory: "Competent",
+    practical: "Competent",
+    result: "Competent",
+  },
+  {
+    id: 5,
+    name: "Sonam Dorji",
+    cid: "1160400123",
+    gender: "M",
+    programType: "NON_BQF",
+    course: "English Language",
+    courseStartDate: "2026-02-15",
+    courseEndDate: "2026-04-15",
+    certificate: "Certificate of Completion",
+    internal: "Competent",
+    theory: "Competent",
+    practical: "Competent",
+    result: "Competent",
+  },
+];
+
+// ==================== CUSTOM HOOKS ====================
+const useFilters = (initialFilters = {}) => {
   const [filters, setFilters] = useState({
     programType: "",
     courseType: "",
@@ -38,138 +202,361 @@ const CertificateIndex = () => {
     courseEndDate: "",
     applicationNo: "",
     search: "",
+    ...initialFilters,
   });
 
-  // Pagination state
+  const handleFilterChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters({
+      programType: "",
+      courseType: "",
+      courseStartDate: "",
+      courseEndDate: "",
+      applicationNo: "",
+      search: "",
+    });
+  }, []);
+
+  return { filters, handleFilterChange, clearFilters };
+};
+
+const usePagination = (initialRowsPerPage = 5) => {
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(initialRowsPerPage);
+
+  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (e) => {
+    setRowsPerPage(parseInt(e.target.value, 10));
+    setPage(0);
+  };
+
+  return {
+    page,
+    rowsPerPage,
+    handleChangePage,
+    handleChangeRowsPerPage,
+  };
+};
+
+const useCourseData = (access_token) => {
   const [courseList, setCourseList] = useState([]);
   const [filteredCourseList, setFilteredCourseList] = useState([]);
-  const access_token = useSelector((state) => state.auth.accessToken);
+  const [loading, setLoading] = useState(false);
 
-  // Program types
-  const programTypes = [
-    { id: "BQF", label: "BQF Program" },
-    { id: "NON_BQF", label: "Non BQF Program" },
-    { id: "RPL", label: "RPL Program" },
-  ];
+  const fetchAssessmentCourses = useCallback(async () => {
+    setLoading(true);
+    try {
+      // For API integration:
+      // const response = await CertificationService.getAssessmentCourses(access_token);
+      // setCourseList(response.data);
+      // setFilteredCourseList(response.data);
 
-  // Sample course data with program type mapping and dates
-  const courseData = [
-    // BQF Programs
-    { 
-      id: 1, 
-      course_name: "Excavator Operator", 
-      program_type: "BQF",
-      start_date: "2026-01-15",
-      end_date: "2026-03-15"
-    },
-    { 
-      id: 2, 
-      course_name: "Crane Operator", 
-      program_type: "BQF",
-      start_date: "2026-02-01",
-      end_date: "2026-04-01"
-    },
-    { 
-      id: 3, 
-      course_name: "Forklift Operator", 
-      program_type: "BQF",
-      start_date: "2026-03-01",
-      end_date: "2026-05-01"
-    },
-    // Non BQF Programs
-    { 
-      id: 4, 
-      course_name: "Basic Computer Skills", 
-      program_type: "NON_BQF",
-      start_date: "2026-01-20",
-      end_date: "2026-02-20"
-    },
-    { 
-      id: 5, 
-      course_name: "English Language", 
-      program_type: "NON_BQF",
-      start_date: "2026-02-15",
-      end_date: "2026-04-15"
-    },
-    { 
-      id: 6, 
-      course_name: "Accounting Basics", 
-      program_type: "NON_BQF",
-      start_date: "2026-03-10",
-      end_date: "2026-05-10"
-    },
-    // RPL Programs
-    { 
-      id: 7, 
-      course_name: "RPL Construction", 
-      program_type: "RPL",
-      start_date: "2026-01-10",
-      end_date: "2026-03-10"
-    },
-    { 
-      id: 8, 
-      course_name: "RPL Hospitality", 
-      program_type: "RPL",
-      start_date: "2026-02-20",
-      end_date: "2026-04-20"
-    },
-    { 
-      id: 9, 
-      course_name: "RPL Agriculture", 
-      program_type: "RPL",
-      start_date: "2026-03-15",
-      end_date: "2026-05-15"
-    },
-  ];
-
-  console.log("token", access_token)
+      // Using static data for now
+      setCourseList(SAMPLE_COURSE_DATA);
+      setFilteredCourseList(SAMPLE_COURSE_DATA);
+    } catch (error) {
+      console.error("Error fetching Course:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [access_token]);
 
   useEffect(() => {
     fetchAssessmentCourses();
-  }, []);
+  }, [fetchAssessmentCourses]);
 
-  // Filter courses when program type changes
-  useEffect(() => {
-    if (filters.programType) {
-      const filtered = courseData.filter(
-        course => course.program_type === filters.programType
-      );
-      setFilteredCourseList(filtered);
-      // Reset course type when program type changes
-      setFilters(prev => ({
-        ...prev,
-        courseType: "",
-      }));
-    } else {
-      setFilteredCourseList([]);
-      setFilters(prev => ({
-        ...prev,
-        courseType: "",
-      }));
-    }
-  }, [filters.programType]);
+  const filterCoursesByProgramType = useCallback(
+    (programType) => {
+      if (programType) {
+        const filtered = courseList.filter(
+          (course) => course.program_type === programType,
+        );
+        setFilteredCourseList(filtered);
+      } else {
+        setFilteredCourseList([]);
+      }
+    },
+    [courseList],
+  );
 
-  const fetchAssessmentCourses = async () => {
-    try {
-      // If you want to fetch from API instead of using static data
-      // const courseLists = await CertificationService.getAssessmentCourses(access_token);
-      // console.log("courseList", courseLists.data);
-      // setCourseList(courseLists.data);
-      
-      // Using static data for now
-      setCourseList(courseData);
-      setFilteredCourseList(courseData);
-    } catch (error) {
-      console.error("Error fetching Course:", error);
-    }
+  return {
+    courseList,
+    filteredCourseList,
+    loading,
+    fetchAssessmentCourses,
+    filterCoursesByProgramType,
   };
+};
 
+// ==================== REUSABLE COMPONENTS ====================
+const SectionHeader = ({ title }) => (
+  <Typography variant="h6" mb={3}>
+    {title}
+  </Typography>
+);
+
+const FilterSelect = ({
+  name,
+  value,
+  label,
+  options,
+  onChange,
+  disabled = false,
+}) => (
+  <FormControl fullWidth size="small" disabled={disabled}>
+    <InputLabel>{label}</InputLabel>
+    <Select name={name} value={value} onChange={onChange} label={label}>
+      <MenuItem value="">-Select-</MenuItem>
+      {options.map((option) => (
+        <MenuItem key={option.id || option} value={option.id || option}>
+          {option.label || option}
+        </MenuItem>
+      ))}
+    </Select>
+  </FormControl>
+);
+
+const FilterDateField = ({ name, value, label, onChange }) => (
+  <TextField
+    fullWidth
+    label={label}
+    type="date"
+    name={name}
+    value={value}
+    onChange={onChange}
+    size="small"
+    InputLabelProps={{ shrink: true }}
+  />
+);
+
+const FilterTextField = ({ name, value, label, type = "text", onChange }) => (
+  <TextField
+    fullWidth
+    label={label}
+    type={type}
+    name={name}
+    value={value}
+    onChange={onChange}
+    size="small"
+  />
+);
+
+const ActionButtons = ({
+  onClear,
+  onExport,
+  disabled,
+  exportLabel = "Export",
+}) => (
+  <Box sx={{ display: "flex", gap: 1 }}>
+    <Button
+      variant="contained"
+      size="small"
+      color="secondary"
+      onClick={onClear}
+      fullWidth
+    >
+      Clear
+    </Button>
+    <Button
+      variant="contained"
+      size="small"
+      startIcon={<DownloadIcon />}
+      disabled={disabled}
+      fullWidth
+      onClick={onExport}
+    >
+      {exportLabel}
+    </Button>
+  </Box>
+);
+
+const SearchField = ({
+  value,
+  onChange,
+  placeholder = "Search reports...",
+}) => (
+  <TextField
+    size="small"
+    placeholder={placeholder}
+    name="search"
+    value={value}
+    onChange={onChange}
+    InputProps={{
+      startAdornment: (
+        <InputAdornment position="start">
+          <SearchIcon />
+        </InputAdornment>
+      ),
+    }}
+  />
+);
+
+const DataTable = ({
+  columns,
+  data,
+  page,
+  rowsPerPage,
+  emptyMessage = "No data found",
+}) => {
+  const paginatedData = data.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage,
+  );
+
+  return (
+    <TableContainer>
+      <Table size="small" sx={TABLE_STYLE}>
+        <TableHead>
+          <TableRow
+            sx={{
+              background: "#f5f5f5",
+              "& .MuiTableCell-root": { fontWeight: "bold" },
+            }}
+          >
+            {columns.map((col) => (
+              <TableCell key={col.id} align={col.align || "left"}>
+                {col.render ? col.render(col) : col.label}
+              </TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {paginatedData.length > 0 ? (
+            paginatedData.map((item, index) => (
+              <TableRow key={item.id} hover>
+                {columns.map((col) => (
+                  <TableCell key={col.id} align={col.align || "left"}>
+                    {col.render
+                      ? col.render(item, index + page * rowsPerPage)
+                      : item[col.field] || "N/A"}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} align="center" sx={{ py: 3 }}>
+                {emptyMessage}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+};
+
+const PaginationFooter = ({
+  count,
+  rowsPerPage,
+  page,
+  onPageChange,
+  onRowsPerPageChange,
+}) => (
+  <Box
+    sx={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}
+  >
+    <Typography variant="caption" color="text.secondary">
+      Showing {Math.min((page + 1) * rowsPerPage, count)} of {count} reports
+    </Typography>
+    <TablePagination
+      rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
+      component="div"
+      count={count}
+      rowsPerPage={rowsPerPage}
+      page={page}
+      onPageChange={onPageChange}
+      onRowsPerPageChange={onRowsPerPageChange}
+      sx={{
+        ".MuiTablePagination-select": { borderRadius: 1 },
+        ".MuiTablePagination-displayedRows": { margin: 0 },
+      }}
+    />
+  </Box>
+);
+
+// ==================== MAIN COMPONENT ====================
+const CertificateIndex = () => {
+  const access_token = useSelector((state) => state.auth.accessToken);
   const today = new Date().toISOString().split("T")[0];
 
-  const handleExcel = () => {
-    const data = filteredReports.map((item, index) => ({
+  // Custom hooks
+  const filters = useFilters();
+  const pagination = usePagination(5);
+  const courseData = useCourseData(access_token);
+
+  // Sample reports - in real app, this would come from API
+  const [reports] = useState(SAMPLE_REPORTS);
+
+  // Filter reports based on selected filters
+  const filteredReports = useMemo(() => {
+    return reports.filter((report) => {
+      const matchesProgramType =
+        filters.filters.programType === "" ||
+        report.programType === filters.filters.programType;
+      const matchesCourseType =
+        filters.filters.courseType === "" ||
+        report.course === filters.filters.courseType;
+      const matchesApplicationNo =
+        filters.filters.applicationNo === "" ||
+        report.applicationNo === filters.filters.applicationNo;
+
+      let matchesStartDate = true;
+      let matchesEndDate = true;
+
+      if (filters.filters.courseStartDate) {
+        matchesStartDate =
+          report.courseStartDate >= filters.filters.courseStartDate;
+      }
+      if (filters.filters.courseEndDate) {
+        matchesEndDate = report.courseEndDate <= filters.filters.courseEndDate;
+      }
+
+      const matchesSearch =
+        filters.filters.search === "" ||
+        report.name
+          .toLowerCase()
+          .includes(filters.filters.search.toLowerCase()) ||
+        report.course
+          .toLowerCase()
+          .includes(filters.filters.search.toLowerCase());
+
+      return (
+        matchesProgramType &&
+        matchesCourseType &&
+        matchesApplicationNo &&
+        matchesStartDate &&
+        matchesEndDate &&
+        matchesSearch
+      );
+    });
+  }, [reports, filters.filters]);
+
+  // Update filtered reports count for pagination
+  useEffect(() => {
+    pagination.handleChangePage(null, 0);
+  }, [filters.filters]);
+
+  // Handle program type change
+  const handleProgramTypeChange = (e) => {
+    const value = e.target.value;
+    filters.handleFilterChange(e);
+    courseData.filterCoursesByProgramType(value);
+    // Reset course type when program type changes
+    filters.handleFilterChange({ target: { name: "courseType", value: "" } });
+  };
+
+  // Export handlers
+  const handleExcel = useCallback(() => {
+    const exportData = filteredReports.map((item, index) => ({
       SlNo: index + 1,
       Name: item.name,
       CID: item.cid,
@@ -184,421 +571,182 @@ const CertificateIndex = () => {
       Practical: item.practical,
       Result: item.result,
     }));
+    exportToExcel(exportData, `Assessment_Result_${today}`);
+  }, [filteredReports, today]);
 
-    exportToExcel(data, `Assessment_Result_${today}`);
-  };
-
-  // Certificate PDF
-  const handlePdf = (report) => {
+  const handlePdf = useCallback((report) => {
     generateAssessmentCertificatePdf(report);
-  };
+  }, []);
 
-  // Certificate PDF for All
-  const handleDownloadAll = () => {
+  const handleDownloadAll = useCallback(() => {
     generateAllAssessmentCertificatesPdf(filteredReports);
-  };
+  }, [filteredReports]);
 
-  // Sample report data with program type and dates
-  const [reports] = useState([
-    {
-      id: 1,
-      name: "Pema Dorji",
-      cid: "1160400783",
-      gender: "M",
-      programType: "BQF",
-      course: "Excavator Operator",
-      courseStartDate: "2026-01-15",
-      courseEndDate: "2026-03-15",
-      certificate: "BQF Certificate 2",
-      internal: "Competent",
-      theory: "Competent",
-      practical: "Competent",
-      result: "Competent",
-    },
-    {
-      id: 2,
-      name: "Tashi",
-      cid: "1160400909",
-      gender: "M",
-      programType: "BQF",
-      course: "Excavator Operator",
-      courseStartDate: "2026-01-15",
-      courseEndDate: "2026-03-15",
-      certificate: "BQF Certificate 2",
-      internal: "Competent",
-      theory: "Competent",
-      practical: "Competent",
-      result: "Competent",
-    },
-    {
-      id: 3,
-      name: "Pema Lhamo",
-      cid: "1160400783",
-      gender: "F",
-      programType: "NON_BQF",
-      course: "Basic Computer Skills",
-      courseStartDate: "2026-01-20",
-      courseEndDate: "2026-02-20",
-      certificate: "Certificate of Completion",
-      internal: "Competent",
-      theory: "Not Competent",
-      practical: "Competent",
-      result: "Not Competent",
-    },
-    {
-      id: 4,
-      name: "Wahgchuk Pemo",
-      cid: "189700202",
-      gender: "F",
-      programType: "RPL",
-      course: "RPL Construction",
-      courseStartDate: "2026-01-10",
-      courseEndDate: "2026-03-10",
-      certificate: "RPL Certificate",
-      internal: "Competent",
-      theory: "Competent",
-      practical: "Competent",
-      result: "Competent",
-    },
-    {
-      id: 5,
-      name: "Sonam Dorji",
-      cid: "1160400123",
-      gender: "M",
-      programType: "NON_BQF",
-      course: "English Language",
-      courseStartDate: "2026-02-15",
-      courseEndDate: "2026-04-15",
-      certificate: "Certificate of Completion",
-      internal: "Competent",
-      theory: "Competent",
-      practical: "Competent",
-      result: "Competent",
-    },
-  ]);
+  // Table columns configuration
+  const columns = useMemo(
+    () => [
+      { id: "index", label: "#", render: (_, index) => index + 1 },
+      { id: "name", label: "Name", field: "name" },
+      { id: "cid", label: "CID/Reference No", field: "cid" },
+      { id: "gender", label: "Gender", field: "gender" },
+      { id: "programType", label: "Program Type", field: "programType" },
+      { id: "course", label: "Course", field: "course" },
+      {
+        id: "courseStartDate",
+        label: "Course Start Date",
+        field: "courseStartDate",
+      },
+      { id: "courseEndDate", label: "Course End Date", field: "courseEndDate" },
+      { id: "certificate", label: "Certificate", field: "certificate" },
+      { id: "internal", label: "Internal", field: "internal" },
+      { id: "theory", label: "Theory", field: "theory" },
+      { id: "practical", label: "Practical", field: "practical" },
+      { id: "result", label: "Result", field: "result" },
+      {
+        id: "actions",
+        label: "",
+        align: "center",
+        render: (item) => (
+          <Button
+            variant="text"
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={() => handlePdf(item)}
+            sx={{ textTransform: "none" }}
+          >
+            Certificate
+          </Button>
+        ),
+      },
+    ],
+    [handlePdf],
+  );
 
-  // Handle filter changes
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    setPage(0); // Reset to first page when filters change
-  };
+  // Add Download All button to header
+  const headerColumns = useMemo(() => {
+    const downloadAllCol = {
+      id: "downloadAll",
+      label: "",
+      align: "center",
+      render: () => (
+        <Button
+          variant="text"
+          size="small"
+          startIcon={<DownloadIcon />}
+          onClick={handleDownloadAll}
+          sx={{ textTransform: "none", fontWeight: "bold" }}
+        >
+          Download All
+        </Button>
+      ),
+    };
+    return [...columns.slice(0, -1), downloadAllCol];
+  }, [columns, handleDownloadAll]);
 
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters({
-      programType: "",
-      courseType: "",
-      courseStartDate: "",
-      courseEndDate: "",
-      applicationNo: "",
-      search: "",
-    });
-    setFilteredCourseList([]);
-    setPage(0); // Reset to first page when clearing filters
-  };
-
-  // Filter reports based on selected filters
-  const filteredReports = reports.filter((report) => {
-    const matchesProgramType = filters.programType === "" || report.programType === filters.programType;
-    const matchesCourseType = filters.courseType === "" || report.course === filters.courseType;
-    const matchesApplicationNo = filters.applicationNo === "" || report.applicationNo === filters.applicationNo;
-    
-    // Date filtering
-    let matchesStartDate = true;
-    let matchesEndDate = true;
-    
-    if (filters.courseStartDate) {
-      matchesStartDate = report.courseStartDate >= filters.courseStartDate;
-    }
-    if (filters.courseEndDate) {
-      matchesEndDate = report.courseEndDate <= filters.courseEndDate;
-    }
-    
-    const matchesSearch = filters.search === "" ||
-      report.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-      report.course.toLowerCase().includes(filters.search.toLowerCase());
-
-    return matchesProgramType && matchesCourseType && matchesApplicationNo && 
-           matchesStartDate && matchesEndDate && matchesSearch;
-  });
-
-  // Handle page change
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  // Handle rows per page change
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  // Paginated reports
+  // Paginated reports for display
   const paginatedReports = filteredReports.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage,
+    pagination.page * pagination.rowsPerPage,
+    pagination.page * pagination.rowsPerPage + pagination.rowsPerPage,
   );
 
   return (
     <Paper sx={{ p: 2, mt: 1 }}>
-      <Typography variant="h6" mb={3}>
-        Assessment Certificate
-      </Typography>
+      <SectionHeader title="Assessment Certificate" />
 
       {/* Filter Section */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item size={{ xs: 12, md: 3 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Program Type</InputLabel>
-            <Select
-              name="programType"
-              value={filters.programType}
-              onChange={handleFilterChange}
-              label="Program Type"
-            >
-              <MenuItem value="">-Select-</MenuItem>
-              {programTypes.map((type) => (
-                <MenuItem key={type.id} value={type.id}>
-                  {type.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <FilterSelect
+            name="programType"
+            value={filters.filters.programType}
+            label="Program Type"
+            options={PROGRAM_TYPES}
+            onChange={handleProgramTypeChange}
+          />
         </Grid>
 
         <Grid item size={{ xs: 12, md: 3 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Course</InputLabel>
-            <Select
-              name="courseType"
-              value={filters.courseType}
-              onChange={handleFilterChange}
-              label="Course"
-              disabled={!filters.programType}
-            >
-              <MenuItem value="">-Select-</MenuItem>
-              {filteredCourseList.map((course) => (
-                <MenuItem key={course.id} value={course.course_name}>
-                  {course.course_name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <FilterSelect
+            name="courseType"
+            value={filters.filters.courseType}
+            label="Course"
+            options={courseData.filteredCourseList.map((c) => ({
+              id: c.course_name,
+              label: c.course_name,
+            }))}
+            onChange={filters.handleFilterChange}
+            disabled={!filters.filters.programType}
+          />
         </Grid>
 
         <Grid item size={{ xs: 12, md: 3 }}>
-          <TextField
-            fullWidth
-            label="Course Start Date"
-            type="date"
+          <FilterDateField
             name="courseStartDate"
-            value={filters.courseStartDate}
-            onChange={handleFilterChange}
-            size="small"
-            InputLabelProps={{
-              shrink: true,
-            }}
+            value={filters.filters.courseStartDate}
+            label="Course Start Date"
+            onChange={filters.handleFilterChange}
           />
         </Grid>
 
         <Grid item size={{ xs: 12, md: 3 }}>
-          <TextField
-            fullWidth
-            label="Course End Date"
-            type="date"
+          <FilterDateField
             name="courseEndDate"
-            value={filters.courseEndDate}
-            onChange={handleFilterChange}
-            size="small"
-            InputLabelProps={{
-              shrink: true,
-            }}
+            value={filters.filters.courseEndDate}
+            label="Course End Date"
+            onChange={filters.handleFilterChange}
           />
         </Grid>
 
         <Grid item size={{ xs: 12, md: 3 }}>
-          <TextField
-            fullWidth
+          <FilterTextField
+            name="applicationNo"
+            value={filters.filters.applicationNo}
             label="Application No"
             type="number"
-            name="applicationNo"
-            value={filters.applicationNo}
-            onChange={handleFilterChange}
-            size="small"
+            onChange={filters.handleFilterChange}
           />
         </Grid>
 
         <Grid item size={{ xs: 12, md: 3 }}>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Button
-              variant="contained"
-              size="small"
-              color="secondary"
-              onClick={handleClearFilters}
-              fullWidth
-            >
-              Clear
-            </Button>
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<DownloadIcon />}
-              disabled={filteredReports.length === 0}
-              fullWidth
-              onClick={handleExcel}
-            >
-              Export
-            </Button>
-          </Box>
+          <ActionButtons
+            onClear={filters.clearFilters}
+            onExport={handleExcel}
+            disabled={filteredReports.length === 0}
+          />
         </Grid>
       </Grid>
 
-      {/* Divider after filters */}
       <Divider sx={{ my: 2 }} />
 
-      {/* Search - Right aligned */}
+      {/* Search */}
       <Grid container justifyContent="flex-end" sx={{ mb: 2 }}>
         <Grid item>
-          <TextField
-            size="small"
-            placeholder="Search reports..."
-            name="search"
-            value={filters.search}
-            onChange={handleFilterChange}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
+          <SearchField
+            value={filters.filters.search}
+            onChange={filters.handleFilterChange}
           />
         </Grid>
       </Grid>
 
       {/* Reports Table */}
-      <TableContainer>
-        <Table
-          size="small"
-          sx={{
-            border: "1px solid #ccc",
-            "& th, & td": {
-              border: "1px solid #ccc",
-              padding: "8px",
-            },
-          }}
-        >
-          <TableHead>
-            <TableRow sx={{
-              background: "#f5f5f5",
-              "& .MuiTableCell-root": {
-                fontWeight: "bold",
-              },
-            }}>
-              <TableCell>#</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>CID/Reference No</TableCell>
-              <TableCell>Gender</TableCell>
-              <TableCell>Program Type</TableCell>
-              <TableCell>Course</TableCell>
-              <TableCell>Course Start Date</TableCell>
-              <TableCell>Course End Date</TableCell>
-              <TableCell>Certificate</TableCell>
-              <TableCell>Internal</TableCell>
-              <TableCell>Theory</TableCell>
-              <TableCell>Practical</TableCell>
-              <TableCell>Result</TableCell>
-              <TableCell align="center">
-                <Button
-                  variant="text"
-                  size="small"
-                  startIcon={<DownloadIcon />}
-                  onClick={handleDownloadAll}
-                  sx={{ textTransform: "none", fontWeight: "bold" }}
-                >
-                  Download All
-                </Button>
-              </TableCell>
-            </TableRow>
-          </TableHead>
+      <DataTable
+        columns={headerColumns}
+        data={paginatedReports}
+        page={0}
+        rowsPerPage={paginatedReports.length}
+        emptyMessage="No reports found matching your criteria"
+      />
 
-          <TableBody>
-            {paginatedReports.length > 0 ? (
-              paginatedReports.map((report, index) => (
-                <TableRow key={report.id} hover>
-                  <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                  <TableCell>{report.name}</TableCell>
-                  <TableCell>{report.cid}</TableCell>
-                  <TableCell>{report.gender}</TableCell>
-                  <TableCell>{report.programType}</TableCell>
-                  <TableCell>{report.course}</TableCell>
-                  <TableCell>{report.courseStartDate}</TableCell>
-                  <TableCell>{report.courseEndDate}</TableCell>
-                  <TableCell>{report.certificate}</TableCell>
-                  <TableCell>{report.internal}</TableCell>
-                  <TableCell>{report.theory}</TableCell>
-                  <TableCell>{report.practical}</TableCell>
-                  <TableCell>{report.result}</TableCell>
-                  <TableCell align="center">
-                    <Button
-                      variant="text"
-                      size="small"
-                      startIcon={<DownloadIcon />}
-                      onClick={() => handlePdf(report)}
-                      sx={{ textTransform: "none" }}
-                    >
-                      Certificate
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={14} align="center" sx={{ py: 3 }}>
-                  No reports found matching your criteria
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Divider before pagination */}
       <Divider sx={{ my: 2 }} />
 
       {/* Pagination */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Typography variant="caption" color="text.secondary">
-          Showing {paginatedReports.length} of {filteredReports.length} reports
-        </Typography>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={filteredReports.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          sx={{
-            ".MuiTablePagination-select": {
-              borderRadius: 1,
-            },
-            ".MuiTablePagination-displayedRows": {
-              margin: 0,
-            },
-          }}
-        />
-      </Box>
+      <PaginationFooter
+        count={filteredReports.length}
+        rowsPerPage={pagination.rowsPerPage}
+        page={pagination.page}
+        onPageChange={pagination.handleChangePage}
+        onRowsPerPageChange={pagination.handleChangeRowsPerPage}
+      />
     </Paper>
   );
 };

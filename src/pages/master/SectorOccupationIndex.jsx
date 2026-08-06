@@ -39,6 +39,13 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import SectorOccupationService from "../../api/services/internal/master/SectorOccupationService";
 
+// Helper component for required field indicator
+const RequiredStar = () => (
+  <Typography component="span" sx={{ color: "red" }}>
+    *
+  </Typography>
+);
+
 // Validation schema for Sector with Occupations
 const sectorOccupationSchema = Yup.object().shape({
   sectorName: Yup.string().required("Sector name is required"),
@@ -155,7 +162,7 @@ const SectorOccupationIndex = () => {
     try {
       const response =
         await SectorOccupationService.getAllSectorOccupationsList(access_token);
-      console.log("Fetched Sectors with Occupations data:", response.data);  
+      console.log("Fetched Sectors with Occupations data:", response.data);
       if (response && response.data) {
         const transformedData = transformApiData(response.data);
         setSectors(transformedData);
@@ -294,15 +301,13 @@ const SectorOccupationIndex = () => {
     });
   };
 
-  // Add occupation to the list
+  // Add occupation to the list - FIXED: No ID for new occupations
   const handleAddOccupation = () => {
     const { newOccupationName, newIscoCode, occupations } = formik.values;
     if (newOccupationName.trim() !== "" && newIscoCode.trim() !== "") {
       const newOccupation = {
-        id:
-          occupations.length > 0
-            ? Math.max(...occupations.map((o) => o.id), 0) + 1
-            : Date.now(),
+        // IMPORTANT: Do NOT include id for new occupations
+        // The backend will generate the ID
         occupationName: newOccupationName.trim(),
         iscoCode: newIscoCode.trim(),
         isActive: true,
@@ -363,7 +368,7 @@ const SectorOccupationIndex = () => {
     setOpen(true);
   };
 
-  // Save sector (Create or Update)
+  // Save sector (Create or Update) - FIXED: Only include ID for existing occupations
   const handleSaveSector = async (values) => {
     try {
       // Prepare data for API (convert boolean to 'Y'/'N' for backend)
@@ -372,7 +377,9 @@ const SectorOccupationIndex = () => {
         sectorName: values.sectorName,
         isActive: values.isActive ? "Y" : "N",
         child: values.occupations.map((occ) => ({
-          id: occ.id,
+          // Only include id if it exists (for existing occupations)
+          // Don't send id for new occupations (no id or undefined)
+          ...(occ.id ? { id: occ.id } : {}),
           occupationName: occ.occupationName,
           iscoCode: occ.iscoCode,
           isActive: occ.isActive ? "Y" : "N",
@@ -397,12 +404,12 @@ const SectorOccupationIndex = () => {
       } else {
         // Create new sector
         console.log("Creating new sector with data:", sectorData);
-       /*  const response =
+        const response =
           await SectorOccupationService.submitSectorWithOccupations(
             sectorData,
             access_token,
-          ); */
-        
+          );
+
         if (response.status === 200 || response.status === 201) {
           toast.success("Sector created successfully!");
           await fetchSectorsOccupationDetails();
@@ -427,10 +434,11 @@ const SectorOccupationIndex = () => {
 
   const handleConfirmDelete = async () => {
     try {
-      const response = await SectorOccupationService.deleteSectorWithOccupations(
-        sectorToDelete,
-        access_token,
-      );
+      const response =
+        await SectorOccupationService.deleteSectorWithOccupations(
+          sectorToDelete,
+          access_token,
+        );
       console.log("Delete sectorToDelete:", sectorToDelete);
       if (response.status === 200 || response.status === 204) {
         toast.success("Sector deleted successfully");
@@ -673,10 +681,15 @@ const SectorOccupationIndex = () => {
               </IconButton>
             </DialogTitle>
             <DialogContent dividers>
+              {/* Sector Name - Required */}
               <TextField
                 fullWidth
                 margin="normal"
-                label="Sector Name"
+                label={
+                  <>
+                    Sector Name <RequiredStar />
+                  </>
+                }
                 name="sectorName"
                 size="small"
                 value={formik.values.sectorName}
@@ -705,8 +718,9 @@ const SectorOccupationIndex = () => {
                 sx={{ mt: 1, mb: 2 }}
               />
 
+              {/* Occupations - Required */}
               <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-                Occupations
+                Occupations <RequiredStar />
               </Typography>
               {formik.touched.occupations &&
                 formik.errors.occupations &&
@@ -794,7 +808,7 @@ const SectorOccupationIndex = () => {
                   <Stack direction="column" spacing={1}>
                     {formik.values.occupations.map((occ, index) => (
                       <Box
-                        key={occ.id}
+                        key={index} // Use index as key since new occupations won't have IDs
                         sx={{
                           display: "flex",
                           alignItems: "center",
@@ -886,20 +900,30 @@ const SectorOccupationIndex = () => {
             </IconButton>
           </DialogTitle>
           <DialogContent dividers>
+            {/* Occupation Name - Required in edit dialog */}
             <TextField
               fullWidth
               margin="normal"
-              label="Occupation Name"
+              label={
+                <>
+                  Occupation Name <RequiredStar />
+                </>
+              }
               value={editOccupationDialog.occupation?.occupationName || ""}
               onChange={(e) =>
                 handleEditOccupationChange("occupationName", e.target.value)
               }
               size="small"
             />
+            {/* ISCO Code - Required in edit dialog */}
             <TextField
               fullWidth
               margin="normal"
-              label="ISCO Code"
+              label={
+                <>
+                  ISCO Code <RequiredStar />
+                </>
+              }
               value={editOccupationDialog.occupation?.iscoCode || ""}
               onChange={(e) =>
                 handleEditOccupationChange("iscoCode", e.target.value)

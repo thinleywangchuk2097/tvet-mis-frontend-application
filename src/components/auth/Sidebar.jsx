@@ -10,6 +10,7 @@ import {
   Typography,
   ListItemButton,
   useTheme,
+  Tooltip,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import * as MuiIcons from "@mui/icons-material";
@@ -25,20 +26,31 @@ const Sidebar = () => {
   const [expandedMenus, setExpandedMenus] = useState({});
 
   const toggleMenu = (menuId) => {
-    setExpandedMenus((prev) => ({
-      ...prev,
-      [menuId]: !prev[menuId],
-    }));
+    setExpandedMenus((prev) => {
+      // If the clicked menu is already open, close it
+      if (prev[menuId]) {
+        return { ...prev, [menuId]: false };
+      }
+      // Otherwise, close all menus and open only the clicked one
+      const newState = {};
+      // Close all menus
+      Object.keys(prev).forEach((key) => {
+        newState[key] = false;
+      });
+      // Open the clicked menu
+      newState[menuId] = true;
+      return newState;
+    });
   };
 
   const isActive = (path) => location.pathname === path;
 
   // Dynamic icon rendering
   const renderIcon = (iconName) => {
-    if (!iconName) return 0;
+    if (!iconName) return null;
     const formattedName = iconName.replace(/Icon$/, "");
     const IconComponent = MuiIcons[formattedName];
-    if (!IconComponent) return 0;
+    if (!IconComponent) return null;
     return <IconComponent fontSize="small" />;
   };
 
@@ -124,29 +136,35 @@ const Sidebar = () => {
               <React.Fragment key={menu.id}>
                 {/* Parent Menu */}
                 <ListItem disablePadding>
-                  <ListItemButton
-                    sx={menuItemSx(activeMain)}
-                    onClick={() =>
-                      hasSubmenus
-                        ? toggleMenu(menu.id)
-                        : navigate(menu.route_name)
-                    }
-                  >
-                    <ListItemIcon>{renderIcon(menu.menuIcon)}</ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Typography sx={{ fontSize: "0.85rem" }}>
-                          {menu.privilege_name}
-                        </Typography>
+                  <Tooltip title={menu.privilege_name} placement="right" arrow>
+                    <ListItemButton
+                      sx={menuItemSx(activeMain)}
+                      onClick={() =>
+                        hasSubmenus
+                          ? toggleMenu(menu.id)
+                          : navigate(menu.route_name)
                       }
-                    />
-                    {hasSubmenus &&
-                      (expandedMenus[menu.id] ? (
-                        <ExpandLessIcon fontSize="small" />
-                      ) : (
-                        <ExpandMoreIcon fontSize="small" />
-                      ))}
-                  </ListItemButton>
+                    >
+                      <ListItemIcon>{renderIcon(menu.menuIcon)}</ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Typography
+                            sx={{
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            {menu.privilege_name}
+                          </Typography>
+                        }
+                      />
+                      {hasSubmenus &&
+                        (expandedMenus[menu.id] ? (
+                          <ExpandLessIcon fontSize="small" />
+                        ) : (
+                          <ExpandMoreIcon fontSize="small" />
+                        ))}
+                    </ListItemButton>
+                  </Tooltip>
                 </ListItem>
 
                 {/* Submenus */}
@@ -155,18 +173,28 @@ const Sidebar = () => {
                     <List disablePadding>
                       {submenus.map((submenu) => (
                         <ListItem key={submenu.id} disablePadding>
-                          <ListItemButton
-                            sx={subMenuItemSx(isActive(submenu.route_name))}
-                            onClick={() => navigate(submenu.route_name)}
+                          <Tooltip
+                            title={submenu.privilege_name}
+                            placement="right"
+                            arrow
                           >
-                            <ListItemText
-                              primary={
-                                <Typography sx={{ fontSize: "0.8rem" }}>
-                                  {submenu.privilege_name}
-                                </Typography>
-                              }
-                            />
-                          </ListItemButton>
+                            <ListItemButton
+                              sx={subMenuItemSx(isActive(submenu.route_name))}
+                              onClick={() => navigate(submenu.route_name)}
+                            >
+                              <ListItemText
+                                primary={
+                                  <Typography
+                                    sx={{
+                                      fontSize: "0.8rem",
+                                    }}
+                                  >
+                                    {submenu.privilege_name}
+                                  </Typography>
+                                }
+                              />
+                            </ListItemButton>
+                          </Tooltip>
                         </ListItem>
                       ))}
                     </List>

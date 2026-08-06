@@ -190,7 +190,13 @@ const SwitchRole = () => {
           </Box>
 
           {currentRole && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                mt: 1,
+              }}
+            >
               Current role:{" "}
               <strong>
                 {availableRoles.find((r) => r.value === currentRole)?.label}
@@ -230,7 +236,9 @@ const SwitchRole = () => {
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ ml: "auto" }}
+                        sx={{
+                          ml: "auto",
+                        }}
                       >
                         (Current)
                       </Typography>
@@ -245,7 +253,10 @@ const SwitchRole = () => {
                 variant="contained"
                 color="primary"
                 disabled={isSubmitting || !values.role}
-                sx={{ mt: 3, mb: 2 }}
+                sx={{
+                  mt: 3,
+                  mb: 2,
+                }}
                 startIcon={<PublishedWithChangesIcon />}
               >
                 {isSubmitting ? "Switching Roles..." : "Switch Role"}

@@ -31,7 +31,7 @@ const validationSchema = Yup.object({
   ownershipTypeId: Yup.string().required("Ownership Type is required"),
 
   otherOwnershipTypeId: Yup.string().when("ownershipTypeId", {
-    is: (val) => val === "2", // ID for "Others (Organisation/Agency/Cooperatives/Group)"
+    is: (val) => val === "2",
     then: (schema) => schema.required("Please select the type of 'Others'"),
   }),
 
@@ -39,30 +39,28 @@ const validationSchema = Yup.object({
     ["ownershipTypeId", "otherOwnershipTypeId"],
     {
       is: (ownershipTypeId, otherOwnershipTypeId) =>
-        ownershipTypeId === "1" || // Company
-        (ownershipTypeId === "2" && // Others
-          (otherOwnershipTypeId === "6" || // Cooperative
-            otherOwnershipTypeId === "7")), // Group
+        ownershipTypeId === "1" ||
+        (ownershipTypeId === "2" &&
+          (otherOwnershipTypeId === "6" || otherOwnershipTypeId === "7")),
       then: (schema) => schema.required("Registration No is required"),
     },
   ),
 
   companyName: Yup.string().when(["ownershipTypeId", "otherOwnershipTypeId"], {
     is: (ownershipTypeId, otherOwnershipTypeId) =>
-      ownershipTypeId === "1" || // Company
-      (ownershipTypeId === "2" && // Others
-        (otherOwnershipTypeId === "6" || // Cooperative
-          otherOwnershipTypeId === "7")), // Group
+      ownershipTypeId === "1" ||
+      (ownershipTypeId === "2" &&
+        (otherOwnershipTypeId === "6" || otherOwnershipTypeId === "7")),
     then: (schema) => schema.required("Company Name is required"),
   }),
 
   otherName: Yup.string().when("otherOwnershipTypeId", {
-    is: (val) => val === "5" || val === "8", // Agency (5) or Organization (8)
+    is: (val) => val === "5" || val === "8",
     then: (schema) => schema.required("Name is required"),
   }),
 
   otherAddress: Yup.string().when("otherOwnershipTypeId", {
-    is: (val) => val === "5" || val === "8", // Agency (5) or Organization (8)
+    is: (val) => val === "5" || val === "8",
     then: (schema) => schema.required("Address is required"),
   }),
 
@@ -71,7 +69,7 @@ const validationSchema = Yup.object({
   ),
 
   promoterCitizenId: Yup.string().when("ownershipTypeId", {
-    is: "4", // Sole Proprietorship
+    is: "4",
     then: (schema) =>
       schema
         .required("Promoter Citizen ID is required")
@@ -79,7 +77,7 @@ const validationSchema = Yup.object({
   }),
 
   promoterName: Yup.string().when("ownershipTypeId", {
-    is: "4", // Sole Proprietorship
+    is: "4",
     then: (schema) => schema.required("Promoter Name is required"),
   }),
 
@@ -99,23 +97,23 @@ const validationSchema = Yup.object({
     Yup.object().shape({
       typeOfOwner: Yup.string().required("Type of Owner is required"),
       citizenId: Yup.string().when("typeOfOwner", {
-        is: "22", // ID for Individual
+        is: "22",
         then: (schema) =>
           schema
             .required("Citizen ID is required")
             .matches(/^\d{11}$/, "Citizen ID must be exactly 11 digits"),
       }),
       partnerName: Yup.string().when("typeOfOwner", {
-        is: "22", // ID for Individual
+        is: "22",
         then: (schema) => schema.required("Partner Name is required"),
       }),
       registrationNo: Yup.string().when("typeOfOwner", {
-        is: "23", // ID for Company
+        is: "23",
         then: (schema) =>
           schema.required("Partner Company Registration No is required"),
       }),
       companyName: Yup.string().when("typeOfOwner", {
-        is: "23", // ID for Company
+        is: "23",
         then: (schema) => schema.required("Partner Company Name is required"),
       }),
     }),
@@ -177,7 +175,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
     }
   };
 
-  // Function to fetch and auto-fill promoter details
   const fetchAndFillPromoterDetails = async (cid, formik) => {
     if (!cid || cid.length !== 11) {
       toast.warning("Please enter a valid 11-digit CID");
@@ -192,7 +189,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
         const fullName =
           `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
 
-        // Auto-fill the promoter name
         formik.setFieldValue("promoterName", fullName);
 
         toast.success(`Citizen details fetched successfully for ${fullName}`);
@@ -211,7 +207,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
     }
   };
 
-  // Function to fetch and auto-fill partner details
   const fetchAndFillPartnerDetails = async (cid, formik, index) => {
     if (!cid || cid.length !== 11) {
       toast.warning("Please enter a valid 11-digit CID");
@@ -226,7 +221,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
         const fullName =
           `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
 
-        // Auto-fill the partner name
         formik.setFieldValue(`partners[${index}].partnerName`, fullName);
 
         toast.success(`Citizen details fetched successfully for ${fullName}`);
@@ -341,7 +335,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       otherName: "",
       otherAddress: "",
       partners: [],
-      // Training Provider Profile
       proposedInstituteName: "",
       dzongkhagId: "",
       exactLocation: "",
@@ -353,9 +346,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       sectorId: "",
       courseId: "",
       activityLevelId: "",
-      // Supporting Documents
       files: [],
-      // Declaration
       declarationAccepted: false,
     },
 
@@ -416,18 +407,15 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
     },
   });
 
-  // Helper function to check if ownership type is "Others"
   const isOthersType = () => {
     return formik.values.ownershipTypeId === "2";
   };
 
-  // Helper function to check if other ownership type is Agency or Organization
   const isAgencyOrOrganization = () => {
     const id = formik.values.otherOwnershipTypeId;
     return id === "5" || id === "8";
   };
 
-  // Helper function to check if other ownership type is Cooperative or Group
   const isCooperativeOrGroup = () => {
     const id = formik.values.otherOwnershipTypeId;
     return id === "6" || id === "7";
@@ -444,16 +432,15 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
 
   return (
     <Box sx={{ m: 1 }}>
-      <Paper
-        sx={{
-          p: 2,
-        }}
-      >
+      <Paper sx={{ p: 2 }}>
         <Box textAlign="center" sx={{ mb: 4 }}>
           <Typography
             textTransform="uppercase"
             fontWeight="bold"
-            sx={{ textDecoration: "underline", fontSize: "1.3rem" }}
+            sx={{
+              textDecoration: "underline",
+              fontSize: "1.3rem",
+            }}
           >
             {serviceName} Form
           </Typography>
@@ -479,7 +466,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                   value={formik.values.ownershipTypeId}
                   onChange={(e) => {
                     formik.handleChange(e);
-                    // reset dependent fields
                     formik.setFieldValue("otherOwnershipTypeId", "");
                     formik.setFieldValue("registrationNo", "");
                     formik.setFieldValue("companyName", "");
@@ -611,7 +597,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                                 onChange={formik.handleChange}
                                 onBlur={(e) => {
                                   formik.handleBlur(e);
-                                  // Auto-fetch citizen details when CID is entered and is 11 digits
                                   if (
                                     e.target.value &&
                                     e.target.value.length === 11
@@ -761,6 +746,9 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                           },
                         ])
                       }
+                      sx={{
+                        textTransform: "none",
+                      }}
                     >
                       Add Partner
                     </Button>
@@ -909,7 +897,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                       onChange={formik.handleChange}
                       onBlur={(e) => {
                         formik.handleBlur(e);
-                        // Auto-fetch citizen details when CID is entered and is 11 digits
                         if (e.target.value && e.target.value.length === 11) {
                           fetchAndFillPromoterDetails(e.target.value, formik);
                         }
