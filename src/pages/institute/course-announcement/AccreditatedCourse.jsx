@@ -360,7 +360,7 @@ const AccreditatedCourse = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        Accredited Course Announcement
+        List of BQF Programme Announcements
       </Typography>
 
       {/* Search + Add Course */}
@@ -510,7 +510,7 @@ const AccreditatedCourse = () => {
         maxWidth="lg"
         fullWidth
       >
-        <DialogTitle>Create Accredited Course</DialogTitle>
+        <DialogTitle>Create BQF Programme</DialogTitle>
         <Formik
           initialValues={initialValues}
           validationSchema={validationSchema}

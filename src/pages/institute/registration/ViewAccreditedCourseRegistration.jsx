@@ -1196,9 +1196,6 @@ const ViewAccreditedCourseRegistration = () => {
     const shouldHideAssignTabs =
       Number(currentStatusId) === 115 || Number(currentStatusId) === 127;
 
-    console.log("Current Status ID in tabs:", currentStatusId);
-    console.log("Should hide assign tabs:", shouldHideAssignTabs);
-
     // Add Generate PA Number tab for role 7 - ALWAYS show this tab regardless of status
     if (showGeneratePANumberTab) {
       baseTabs.push({

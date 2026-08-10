@@ -147,7 +147,7 @@ const QASLevel1Dashboard = () => {
           fontSize: "1.1rem",
         }}
       >
-        QAS Level 1 Dashboard
+        QAS Dashboard
       </Typography>
 
       {/* Filter Section */}

@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Paper,
   Typography,
@@ -25,6 +31,7 @@ import MonitoringAssessmentService from "../../../api/services/internal/monitori
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
+import FileDownload from "../../../components/file/FileDownload";
 
 const TABLE_STYLE = {
   border: "1px solid",
@@ -77,8 +84,16 @@ const ViewInstituteMonitoringIndex = () => {
   const [qualityStandardsLoading, setQualityStandardsLoading] = useState(false);
   const [qualityStandardsError, setQualityStandardsError] = useState(null);
 
+  // File upload state
+  const [documents, setDocuments] = useState([]);
+  const [newDocuments, setNewDocuments] = useState([]);
+
+  // Use ref to track if data has been fetched
+  const dataFetchedRef = useRef(false);
+
   useEffect(() => {
-    if (applicationNo) {
+    if (applicationNo && !dataFetchedRef.current) {
+      dataFetchedRef.current = true;
       fetchInstituteMonitoringAssessment();
     }
     fetchDzongkhagLists();
@@ -103,7 +118,6 @@ const ViewInstituteMonitoringIndex = () => {
     try {
       const response = await CommonService.getAllDzongkhags();
       setDzongkhagList(response.data);
-      console.log("Dzongkhag Dropdown:", response.data);
     } catch (error) {
       console.error("Error fetching dzongkhag dropdown:", error);
       toast.error("Failed to load dzongkhags");
@@ -114,11 +128,8 @@ const ViewInstituteMonitoringIndex = () => {
     setQualityStandardsLoading(true);
     setQualityStandardsError(null);
     try {
-      console.log("Fetching quality standards for service ID:", serviceId);
       const response = await CommonService.getAllQualitystandards(serviceId);
       const checklistData = response.data;
-      console.log("Raw Quality Standards Response:", checklistData);
-
       if (checklistData && checklistData.length > 0) {
         const mainCategories = checklistData.filter(
           (item) =>
@@ -214,7 +225,8 @@ const ViewInstituteMonitoringIndex = () => {
       console.log("Institute Monitoring Details:", data);
 
       if (data && data.length > 0) {
-        await handleViewChecklist(data[0]);
+        // Call handleViewChecklist directly with the data
+        await loadInstituteData(data[0]);
       }
     } catch (error) {
       console.error("Error fetching Institute Monitoring Details:", error);
@@ -278,12 +290,39 @@ const ViewInstituteMonitoringIndex = () => {
     [dzongkhagList],
   );
 
-  const handleViewChecklist = async (institute) => {
+  // Separate function to load institute data without causing infinite loops
+  const loadInstituteData = useCallback(async (institute) => {
     setSelectedInstitute(institute);
     setDescription(institute.description || "");
     setDescriptionError("");
     setQualityResponses({});
     setQualityRemarks({});
+
+    // Parse existing documents
+    if (institute.documents) {
+      try {
+        let parsedDocs =
+          typeof institute.documents === "string"
+            ? JSON.parse(institute.documents)
+            : institute.documents;
+
+        if (Array.isArray(parsedDocs)) {
+          const formattedDocs = parsedDocs.map((doc) => ({
+            name: doc.documentName || doc.name || "Document",
+            url: doc.url || "",
+            id: doc.id,
+            filePath: doc.url,
+          }));
+          setDocuments(formattedDocs);
+        }
+      } catch (e) {
+        console.error("Error parsing documents:", e);
+        setDocuments([]);
+      }
+    } else {
+      setDocuments([]);
+    }
+    setNewDocuments([]);
 
     if (institute.service_id) {
       await fetchQualityStandards(institute.service_id);
@@ -291,7 +330,16 @@ const ViewInstituteMonitoringIndex = () => {
       toast.error("Service ID not found for this institute");
       setQualityData([]);
     }
+  }, []);
+
+  const handleViewChecklist = async (institute) => {
+    await loadInstituteData(institute);
   };
+
+  // Handle file upload for new documents
+  const handleFileUpload = useCallback((uploadedFiles) => {
+    setNewDocuments(uploadedFiles || []);
+  }, []);
 
   const handleDescriptionChange = (event) => {
     setDescription(event.target.value);
@@ -419,6 +467,21 @@ const ViewInstituteMonitoringIndex = () => {
     return qualityStandardsData;
   }, [qualityResponses, qualityRemarks, selectedInstitute]);
 
+  // File to base64 conversion
+  const fileToBase64 = useCallback((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () =>
+        resolve({
+          name: file.name,
+          content: reader.result.split(",")[1],
+          contentType: file.type || "application/octet-stream",
+        });
+      reader.onerror = reject;
+    });
+  }, []);
+
   // Single function to handle submission with dynamic statusId
   const handleSubmit = async (statusId, actionType) => {
     // Validate description before submission
@@ -441,22 +504,30 @@ const ViewInstituteMonitoringIndex = () => {
         return;
       }
 
-      // Single payload with dynamic statusId
+      // Prepare documents payload
+      let documentsPayload = [];
+      if (newDocuments.length > 0) {
+        documentsPayload = await Promise.all(
+          newDocuments.map((file) => fileToBase64(file)),
+        );
+      }
+
       const payload = {
         id: selectedInstitute?.id,
         instituteId: selectedInstitute?.institute_id,
+        instituteName: selectedInstitute?.institute_name,
         registrationNo: selectedInstitute?.registration_no,
         monitoringDate: selectedInstitute?.monitoring_date,
         dzongkhagId: parseInt(selectedInstitute?.dzongkhag_id),
         exactLocation: selectedInstitute?.exact_location,
-        //serviceId: selectedInstitute?.service_id,
-        serviceId: 47,//use this serviceId for workflow
+        serviceId: 47, // use this serviceId for workflow
         applicationNo: selectedInstitute?.application_no,
         qualityStandards: qualityStandardsData,
         statusId: statusId, // Dynamic statusId (57 for Approve, 104 for Resubmit)
         description: description.trim(),
         updatedBy: actionId,
         assignedRoleId: currentRoleId,
+        documents: documentsPayload, // Add documents to payload
       };
 
       console.log(`${actionType} Payload with Status ID ${statusId}:`, payload);
@@ -475,7 +546,6 @@ const ViewInstituteMonitoringIndex = () => {
             <br />
             Institute: {selectedInstitute?.institute_name}
             <br />
-            Status: {actionType} (ID: {statusId})
           </div>,
           {
             position: "top-right",
@@ -486,7 +556,7 @@ const ViewInstituteMonitoringIndex = () => {
         // Navigate back after successful submission
         setTimeout(() => {
           navigate(-1);
-        }, 2000);
+        }, 1000);
       }
     } catch (error) {
       console.error(`Error ${actionType} checklist:`, error);
@@ -749,6 +819,22 @@ const ViewInstituteMonitoringIndex = () => {
                 />
               </Box>
 
+              {/* File Download/Upload Section */}
+              <Box sx={{ mt: 3 }}>
+                <Paper
+                  sx={{ p: 3, border: "1px solid", borderColor: "divider" }}
+                >
+                  <Typography variant="subtitle1" gutterBottom>
+                    Supporting Documents
+                  </Typography>
+                  <FileDownload
+                    initialFiles={documents}
+                    onFileUpload={handleFileUpload}
+                    allowUpload={true}
+                  />
+                </Paper>
+              </Box>
+
               <Box
                 sx={{
                   mt: 3,
@@ -762,12 +848,14 @@ const ViewInstituteMonitoringIndex = () => {
                   color="secondary"
                   variant="outlined"
                   disabled={submitting}
+                  size="small"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleResubmit}
                   variant="contained"
+                  size="small"
                   startIcon={
                     submitting ? <CircularProgress size={20} /> : <ReplayIcon />
                   }
@@ -787,6 +875,7 @@ const ViewInstituteMonitoringIndex = () => {
                   onClick={handleApprove}
                   variant="contained"
                   color="success"
+                  size="small"
                   startIcon={
                     submitting ? (
                       <CircularProgress size={20} />

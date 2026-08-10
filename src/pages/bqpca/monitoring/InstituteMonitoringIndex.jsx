@@ -31,6 +31,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import CloseIcon from "@mui/icons-material/Close";
 import ReplayIcon from "@mui/icons-material/Replay";
 import LockIcon from "@mui/icons-material/Lock";
+import FileUpload from "../../../components/file/FileUpload"; // Import FileUpload component
 import MonitoringAssessmentService from "../../../api/services/internal/monitoring/MonitoringAssessmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
@@ -62,7 +63,7 @@ const InstituteMonitoringIndex = () => {
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
-  
+
   // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -76,10 +77,16 @@ const InstituteMonitoringIndex = () => {
   const [description, setDescription] = useState("");
   const [descriptionError, setDescriptionError] = useState("");
 
+  // File upload state
+  const [files, setFiles] = useState([]);
+  const [filesError, setFilesError] = useState("");
+
   // Quality checklist state
   const [qualityResponses, setQualityResponses] = useState({});
   const [qualityRemarks, setQualityRemarks] = useState({});
-  const [instituteMonitoringDetails, setInstituteMonitoringDetails] = useState([]);
+  const [instituteMonitoringDetails, setInstituteMonitoringDetails] = useState(
+    [],
+  );
   const [dzongkhagList, setDzongkhagList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [qualityData, setQualityData] = useState([]);
@@ -112,7 +119,6 @@ const InstituteMonitoringIndex = () => {
     try {
       const response = await CommonService.getAllDzongkhags();
       setDzongkhagList(response.data);
-      console.log("Dzongkhag Dropdown:", response.data);
     } catch (error) {
       console.error("Error fetching dzongkhag dropdown:", error);
       toast.error("Failed to load dzongkhags");
@@ -123,7 +129,6 @@ const InstituteMonitoringIndex = () => {
     try {
       const statusResponse = await CommonService.getByParentId(4);
       setStatusList(statusResponse.data);
-      console.log("Status List:", statusResponse.data);
     } catch (error) {
       console.error("Error fetching status list:", error);
     }
@@ -133,11 +138,8 @@ const InstituteMonitoringIndex = () => {
     setQualityStandardsLoading(true);
     setQualityStandardsError(null);
     try {
-      console.log("Fetching quality standards for service ID:", serviceId);
       const response = await CommonService.getAllQualitystandards(serviceId);
       const checklistData = response.data;
-      console.log("Raw Quality Standards Response:", checklistData);
-
       if (checklistData && checklistData.length > 0) {
         // Structure the data based on parent-child relationship
         const mainCategories = checklistData.filter(
@@ -151,9 +153,6 @@ const InstituteMonitoringIndex = () => {
             (item.parentId !== 0 && item.parentId) ||
             (item.parent_id !== 0 && item.parent_id),
         );
-
-        console.log("Main Categories:", mainCategories);
-        console.log("Sub Categories:", subCategories);
 
         let structured = [];
 
@@ -204,7 +203,6 @@ const InstituteMonitoringIndex = () => {
         // Filter out categories with no rows
         structured = structured.filter((category) => category.rows.length > 0);
 
-        console.log("Structured quality data:", structured);
         setQualityData(structured);
 
         if (structured.length === 0) {
@@ -213,7 +211,6 @@ const InstituteMonitoringIndex = () => {
           );
         }
       } else {
-        console.log("No quality standards data received");
         setQualityStandardsError(
           "No quality standards available for this service",
         );
@@ -240,7 +237,6 @@ const InstituteMonitoringIndex = () => {
           access_token,
         );
       setInstituteMonitoringDetails(response.data);
-      console.log("Institute Monitoring Details:", response.data);
     } catch (error) {
       console.error("Error fetching Institute Monitoring Details:", error);
       toast.error("Failed to load Institute Monitoring Details");
@@ -283,7 +279,6 @@ const InstituteMonitoringIndex = () => {
             remarks[categoryId][item.standardId] = item.remarks || "";
           } else {
             // If category not found, put in a default category
-            console.log("No category found for standardId:", item.standardId);
             const defaultCategoryId = "default";
             if (!responses[defaultCategoryId]) {
               responses[defaultCategoryId] = {};
@@ -330,26 +325,26 @@ const InstituteMonitoringIndex = () => {
     (statusId) => {
       const statusName = getStatusName(statusId);
       const statusColors = {
-        'submitted': 'info',
-        'Verified': 'primary',
-        'Approved': 'success',
-        'Rejected': 'error',
-        'Endorsed': 'warning',
-        'Forwarded QAS Level 1': 'secondary',
-        'Forwarded Level 2': 'secondary',
-        'verified2': 'primary',
-        'pending': 'warning',
-        'selected': 'success',
-        'passed': 'success',
-        'failed': 'error',
-        'resumitted': 'info',
-        'Forwarded TTTRC': 'secondary',
-        'Forwarded Head TTTRC': 'secondary',
-        'Revision': 'warning'
+        submitted: "info",
+        Verified: "primary",
+        Approved: "success",
+        Rejected: "error",
+        Endorsed: "warning",
+        "Forwarded QAS Level 1": "secondary",
+        "Forwarded Level 2": "secondary",
+        verified2: "primary",
+        pending: "warning",
+        selected: "success",
+        passed: "success",
+        failed: "error",
+        resumitted: "info",
+        "Forwarded TTTRC": "secondary",
+        "Forwarded Head TTTRC": "secondary",
+        Revision: "warning",
       };
-      return statusColors[statusName] || 'default';
+      return statusColors[statusName] || "default";
     },
-    [getStatusName]
+    [getStatusName],
   );
 
   // Check if status is Approved (status_id = 57)
@@ -367,6 +362,8 @@ const InstituteMonitoringIndex = () => {
     setQualityRemarks({});
     setDescription(institute.description || "");
     setDescriptionError("");
+    setFiles([]); // Reset files
+    setFilesError("");
 
     // Fetch quality standards using the service_id from the institute data
     if (institute.service_id) {
@@ -385,13 +382,21 @@ const InstituteMonitoringIndex = () => {
     }
   };
 
+  // Handle files change
+  const handleFilesChange = (uploadedFiles) => {
+    setFiles(uploadedFiles);
+    if (uploadedFiles.length > 0) {
+      setFilesError("");
+    }
+  };
+
   // Handle quality response change
   const handleQualityResponseChange = (categoryId, questionId, value) => {
     // Don't allow changes if status is Approved
     if (selectedInstitute && isStatusApproved(selectedInstitute.status_id)) {
       return;
     }
-    
+
     setQualityResponses((prev) => {
       const newResponses = { ...prev };
 
@@ -417,7 +422,7 @@ const InstituteMonitoringIndex = () => {
     if (selectedInstitute && isStatusApproved(selectedInstitute.status_id)) {
       return;
     }
-    
+
     setQualityRemarks((prev) => ({
       ...prev,
       [categoryId]: {
@@ -452,10 +457,16 @@ const InstituteMonitoringIndex = () => {
     return description && description.trim().length > 0;
   }, [description]);
 
+  // Check if files are uploaded (optional - can be required or not)
+  const isFilesValid = useMemo(() => {
+    return true;
+    // return files.length > 0;
+  }, [files]);
+
   // Check if form is valid for submission
   const isFormValid = useMemo(() => {
-    return isAllQuestionsAnswered && isDescriptionFilled;
-  }, [isAllQuestionsAnswered, isDescriptionFilled]);
+    return isAllQuestionsAnswered && isDescriptionFilled && isFilesValid;
+  }, [isAllQuestionsAnswered, isDescriptionFilled, isFilesValid]);
 
   // Get progress text
   const getProgressText = useCallback(() => {
@@ -481,6 +492,20 @@ const InstituteMonitoringIndex = () => {
 
     return `${answeredQuestions}/${totalQuestions} questions answered`;
   }, [qualityData, qualityResponses]);
+
+  // File to base64 conversion
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () =>
+        resolve({
+          name: file.name,
+          content: reader.result.split(",")[1],
+          contentType: file.type || "application/octet-stream",
+        });
+      reader.onerror = reject;
+    });
 
   // Prepare quality standards for update
   const prepareQualityStandardsForUpdate = useCallback(() => {
@@ -518,7 +543,6 @@ const InstituteMonitoringIndex = () => {
       });
     });
 
-    console.log("Prepared quality standards for update:", qualityStandardsData);
     return qualityStandardsData;
   }, [qualityResponses, qualityRemarks, selectedInstitute]);
 
@@ -548,9 +572,16 @@ const InstituteMonitoringIndex = () => {
         return;
       }
 
+      // Convert files to base64 if there are any
+      let documents = [];
+      if (files.length > 0) {
+        documents = await Promise.all(files.map((file) => fileToBase64(file)));
+      }
+
       const payload = {
         id: selectedInstitute?.id,
         instituteId: selectedInstitute?.institute_id,
+        instituteName: selectedInstitute?.institute_name,
         registrationNo: selectedInstitute?.registration_no,
         monitoringDate: selectedInstitute?.monitoring_date,
         dzongkhagId: parseInt(selectedInstitute?.dzongkhag_id),
@@ -562,6 +593,7 @@ const InstituteMonitoringIndex = () => {
         description: description.trim(),
         actionId: actionId,
         assignedRoleId: currentRoleId,
+        documents: documents, // Add documents to payload
       };
 
       console.log("Resubmit Payload:", payload);
@@ -574,19 +606,7 @@ const InstituteMonitoringIndex = () => {
         );
 
       if (response.status === 200 || response.status === 201) {
-        toast.success(
-          <div>
-            <strong>Checklist Resubmitted Successfully!</strong>
-            <br />
-            Institute: {selectedInstitute?.institute_name}
-            <br />
-            Questions Updated: {qualityStandardsData.length}
-          </div>,
-          {
-            position: "top-right",
-            autoClose: 5000,
-          },
-        );
+        toast.success("Checklist Resubmitted Successfully!");
 
         // Refresh the data
         await fetchInstituteMonitoringAssessment();
@@ -605,7 +625,8 @@ const InstituteMonitoringIndex = () => {
     (standard) => {
       const categoryResponses = qualityResponses[standard.id] || {};
       const categoryRemarks = qualityRemarks[standard.id] || {};
-      const isApproved = selectedInstitute && isStatusApproved(selectedInstitute.status_id);
+      const isApproved =
+        selectedInstitute && isStatusApproved(selectedInstitute.status_id);
 
       return (
         <Grid item size={{ xs: 12, md: 12 }} key={standard.id}>
@@ -808,7 +829,7 @@ const InstituteMonitoringIndex = () => {
               {paginatedInstitutes.length > 0 ? (
                 paginatedInstitutes.map((institute, index) => {
                   const isApproved = isStatusApproved(institute.status_id);
-                  
+
                   return (
                     <TableRow key={institute.id} hover>
                       <TableCell>{page * rowsPerPage + index + 1}</TableCell>
@@ -850,9 +871,13 @@ const InstituteMonitoringIndex = () => {
                               onClick={() => handleViewChecklist(institute)}
                               sx={{
                                 textTransform: "none",
-                                backgroundColor: isApproved ? "#9e9e9e" : "#1976d2",
+                                backgroundColor: isApproved
+                                  ? "#9e9e9e"
+                                  : "#1976d2",
                                 "&:hover": {
-                                  backgroundColor: isApproved ? "#9e9e9e" : "#1565c0",
+                                  backgroundColor: isApproved
+                                    ? "#9e9e9e"
+                                    : "#1565c0",
                                 },
                                 "&.Mui-disabled": {
                                   backgroundColor: "#e0e0e0",
@@ -939,11 +964,14 @@ const InstituteMonitoringIndex = () => {
               {getDzongkhagName(selectedInstitute?.dzongkhag_id)} | Monitoring
               Date: {selectedInstitute?.monitoring_date}
             </Typography>
-            {selectedInstitute && isStatusApproved(selectedInstitute.status_id) && (
-              <Alert severity="info" icon={<LockIcon />} sx={{ mt: 1 }}>
-                <strong>Approved Status:</strong> This checklist is approved and is in <strong>View-Only</strong> mode. No modifications are allowed.
-              </Alert>
-            )}
+            {selectedInstitute &&
+              isStatusApproved(selectedInstitute.status_id) && (
+                <Alert severity="info" icon={<LockIcon />} sx={{ mt: 1 }}>
+                  <strong>Approved Status:</strong> This checklist is approved
+                  and is in <strong>View-Only</strong> mode. No modifications
+                  are allowed.
+                </Alert>
+              )}
           </Box>
 
           {qualityStandardsLoading ? (
@@ -970,31 +998,36 @@ const InstituteMonitoringIndex = () => {
                 <Typography variant="caption" color="text.secondary">
                   {getProgressText()}
                 </Typography>
-                {selectedInstitute && isStatusApproved(selectedInstitute.status_id) && (
-                  <Typography variant="caption" color="info.main">
-                    <LockIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
-                    View Only Mode
-                  </Typography>
-                )}
-                {!isAllQuestionsAnswered && !isStatusApproved(selectedInstitute?.status_id) && (
-                  <Typography variant="caption" color="error">
-                    * Please answer all questions
-                  </Typography>
-                )}
-                {isAllQuestionsAnswered && !isStatusApproved(selectedInstitute?.status_id) && (
-                  <Typography variant="caption" color="success.main">
-                    ✓ All questions answered
-                  </Typography>
-                )}
+                {selectedInstitute &&
+                  isStatusApproved(selectedInstitute.status_id) && (
+                    <Typography variant="caption" color="info.main">
+                      <LockIcon
+                        sx={{ fontSize: 14, verticalAlign: "middle", mr: 0.5 }}
+                      />
+                      View Only Mode
+                    </Typography>
+                  )}
+                {!isAllQuestionsAnswered &&
+                  !isStatusApproved(selectedInstitute?.status_id) && (
+                    <Typography variant="caption" color="error">
+                      * Please answer all questions
+                    </Typography>
+                  )}
+                {isAllQuestionsAnswered &&
+                  !isStatusApproved(selectedInstitute?.status_id) && (
+                    <Typography variant="caption" color="success.main">
+                      ✓ All questions answered
+                    </Typography>
+                  )}
               </Box>
               <Grid container spacing={2}>
                 {qualityData.map(renderChecklist)}
               </Grid>
 
-              {/* Description Field - Below Quality Standards Table */}
+              {/* Description Field */}
               <Box sx={{ mt: 3 }}>
                 <Typography variant="subtitle1" gutterBottom>
-                  Description / Remarks 
+                  Description / Remarks
                   {!isStatusApproved(selectedInstitute?.status_id) && (
                     <span style={{ color: "red" }}>*</span>
                   )}
@@ -1010,13 +1043,60 @@ const InstituteMonitoringIndex = () => {
                   size="medium"
                   error={!!descriptionError}
                   helperText={descriptionError}
-                  disabled={selectedInstitute && isStatusApproved(selectedInstitute.status_id)}
+                  disabled={
+                    selectedInstitute &&
+                    isStatusApproved(selectedInstitute.status_id)
+                  }
                   sx={{
                     "& .MuiInputBase-root": {
                       fontSize: "0.875rem",
                     },
                   }}
                 />
+              </Box>
+
+              {/* File Upload Section */}
+              <Box sx={{ mt: 3 }}>
+                <Paper
+                  sx={{ p: 3, border: "1px solid", borderColor: "divider" }}
+                >
+                  <Typography variant="subtitle1" gutterBottom>
+                    Supporting Documents
+                    {!isStatusApproved(selectedInstitute?.status_id) && (
+                      <span style={{ color: "red" }}>*</span>
+                    )}
+                  </Typography>
+                  <FileUpload
+                    files={files}
+                    onFilesChange={handleFilesChange}
+                    disabled={
+                      selectedInstitute &&
+                      isStatusApproved(selectedInstitute.status_id)
+                    }
+                    maxFiles={5}
+                    acceptedFileTypes={[
+                      ".pdf",
+                      ".doc",
+                      ".docx",
+                      ".jpg",
+                      ".jpeg",
+                      ".png",
+                    ]}
+                  />
+                  {filesError && (
+                    <Typography color="error" variant="caption">
+                      {filesError}
+                    </Typography>
+                  )}
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 1, display: "block" }}
+                  >
+                    Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG (Max 5
+                    files)
+                  </Typography>
+                </Paper>
               </Box>
             </>
           ) : (
@@ -1032,44 +1112,51 @@ const InstituteMonitoringIndex = () => {
             onClick={() => setChecklistDialogOpen(false)}
             color="secondary"
             variant="outlined"
+            size="small"
             disabled={submitting}
           >
             Close
           </Button>
-          
+
           {/* Only show Resubmit button if status is NOT Approved */}
-          {selectedInstitute && !isStatusApproved(selectedInstitute.status_id) && (
-            <Tooltip
-              title={
-                !isFormValid
-                  ? "Please answer all questions and fill in the description"
-                  : "Resubmit the checklist"
-              }
-              placement="top"
-            >
-              <span>
-                <Button
-                  onClick={handleResubmit}
-                  variant="contained"
-                  color="primary"
-                  startIcon={
-                    submitting ? <CircularProgress size={20} /> : <ReplayIcon />
-                  }
-                  disabled={submitting || !isFormValid}
-                  sx={{
-                    backgroundColor: "#ff9800",
-                    "&:hover": { backgroundColor: "#f57c00" },
-                    "&.Mui-disabled": {
-                      backgroundColor: "#ffb74d",
-                      opacity: 0.7,
-                    },
-                  }}
-                >
-                  {submitting ? "Resubmitting..." : "Resubmit"}
-                </Button>
-              </span>
-            </Tooltip>
-          )}
+          {selectedInstitute &&
+            !isStatusApproved(selectedInstitute.status_id) && (
+              <Tooltip
+                title={
+                  !isFormValid
+                    ? "Please answer all questions and fill in the description"
+                    : "Resubmit the checklist"
+                }
+                placement="top"
+              >
+                <span>
+                  <Button
+                    onClick={handleResubmit}
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                    startIcon={
+                      submitting ? (
+                        <CircularProgress size={20} />
+                      ) : (
+                        <ReplayIcon />
+                      )
+                    }
+                    disabled={submitting || !isFormValid}
+                    sx={{
+                      backgroundColor: "#ff9800",
+                      "&:hover": { backgroundColor: "#f57c00" },
+                      "&.Mui-disabled": {
+                        backgroundColor: "#ffb74d",
+                        opacity: 0.7,
+                      },
+                    }}
+                  >
+                    {submitting ? "Resubmitting..." : "Resubmit"}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
         </DialogActions>
       </Dialog>
     </>

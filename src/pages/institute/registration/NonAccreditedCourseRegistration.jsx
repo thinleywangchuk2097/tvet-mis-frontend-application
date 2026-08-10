@@ -210,19 +210,19 @@ const NonAccreditedCourseRegistration = () => {
           );
 
           // Get hours from curriculum data if available
-          const theoryHour = curriculumType?.total_theory_duration 
-            ? parseInt(curriculumType.total_theory_duration) 
+          const theoryHour = curriculumType?.total_theory_duration
+            ? parseInt(curriculumType.total_theory_duration)
             : 0;
-          const practicalHour = curriculumType?.total_practical_duration 
-            ? parseInt(curriculumType.total_practical_duration) 
+          const practicalHour = curriculumType?.total_practical_duration
+            ? parseInt(curriculumType.total_practical_duration)
             : 0;
-          const ojtHour = curriculumType?.total_ojt_duration 
-            ? parseInt(curriculumType.total_ojt_duration) 
+          const ojtHour = curriculumType?.total_ojt_duration
+            ? parseInt(curriculumType.total_ojt_duration)
             : 0;
 
           // Get certificate level from curriculum
-          const certificateLevelId = curriculumType?.certificate_level_id 
-            ? String(curriculumType.certificate_level_id) 
+          const certificateLevelId = curriculumType?.certificate_level_id
+            ? String(curriculumType.certificate_level_id)
             : item.certificate_level_id || "";
 
           return {
@@ -522,16 +522,24 @@ const NonAccreditedCourseRegistration = () => {
         const curriculum = curriculumTypes.find(
           (t) => String(t.id) === String(values.curriculumId),
         );
-        
+
         const newCourse = {
           id: response.data?.id || courses.length + 1,
           courseTitle: values.courseTitle,
-          theoryHour: curriculum?.total_theory_duration ? parseInt(curriculum.total_theory_duration) : parseInt(values.theoryHour),
-          practicalHour: curriculum?.total_practical_duration ? parseInt(curriculum.total_practical_duration) : parseInt(values.practicalHour),
-          ojtHour: curriculum?.total_ojt_duration ? parseInt(curriculum.total_ojt_duration) : parseInt(values.ojtHour),
+          theoryHour: curriculum?.total_theory_duration
+            ? parseInt(curriculum.total_theory_duration)
+            : parseInt(values.theoryHour),
+          practicalHour: curriculum?.total_practical_duration
+            ? parseInt(curriculum.total_practical_duration)
+            : parseInt(values.practicalHour),
+          ojtHour: curriculum?.total_ojt_duration
+            ? parseInt(curriculum.total_ojt_duration)
+            : parseInt(values.ojtHour),
           feesPerTrainee: parseInt(values.feesPerTrainee),
           enrolmentCapacity: parseInt(values.enrolmentCapacity),
-          certificateLevelId: curriculum?.certificate_level_id ? String(curriculum.certificate_level_id) : values.certificateLevelId,
+          certificateLevelId: curriculum?.certificate_level_id
+            ? String(curriculum.certificate_level_id)
+            : values.certificateLevelId,
           curriculumId: values.curriculumId,
           curriculumName: curriculum?.curriculum_name || "",
           attachment: values.files.map((file) => file.name).join(", "),
@@ -575,17 +583,17 @@ const NonAccreditedCourseRegistration = () => {
 
   const getCertificateLevelName = (levelId) => {
     if (!levelId) return "-";
-    
+
     // Convert both to string for comparison
     const levelIdStr = String(levelId);
-    
+
     // Find the certificate level
-    const level = certificateLevels.find(
-      (l) => String(l.id) === levelIdStr
-    );
-    
+    const level = certificateLevels.find((l) => String(l.id) === levelIdStr);
+
     // Return the name or fallback
-    return level?.name || level?.value || level?.certificate_level_name || levelIdStr;
+    return (
+      level?.name || level?.value || level?.certificate_level_name || levelIdStr
+    );
   };
 
   // Get curriculum type name - robust version with fallback
@@ -672,7 +680,7 @@ const NonAccreditedCourseRegistration = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        Add Non Accredited Course
+        List of Non-BQF Programmes
       </Typography>
 
       {/* Search + Add Button */}
@@ -708,7 +716,7 @@ const NonAccreditedCourseRegistration = () => {
             onClick={() => setOpenAdd(true)}
             sx={{ height: "36px" }}
           >
-            Add Course
+            Add Programme
           </Button>
         </Grid>
       </Grid>
@@ -720,13 +728,13 @@ const NonAccreditedCourseRegistration = () => {
             <TableRow>
               <TableCell>#</TableCell>
               <TableCell>Application No.</TableCell>
-              <TableCell>Course Title</TableCell>
+              <TableCell>Programme Title</TableCell>
               <TableCell>Fees Per Trainee (Nu.)</TableCell>
               <TableCell>Theory (Hrs)</TableCell>
               <TableCell>Practical (Hrs)</TableCell>
               <TableCell>OJT (Hrs)</TableCell>
               <TableCell>Certificate Level</TableCell>
-              <TableCell>Curriculum</TableCell>
+              <TableCell>Curriculum Title</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Action</TableCell>
             </TableRow>
@@ -760,8 +768,8 @@ const NonAccreditedCourseRegistration = () => {
                             course.statusName === "submitted"
                               ? "#2196f3"
                               : course.statusName === "Verified"
-                              ? "#4caf50"
-                              : "#ff9800",
+                                ? "#4caf50"
+                                : "#ff9800",
                           color: "white",
                           fontWeight: "medium",
                           minWidth: "100px",
@@ -868,7 +876,7 @@ const NonAccreditedCourseRegistration = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label="Course Title"
+                  label="Programme Title"
                   size="small"
                   value={selectedCourse.courseTitle}
                   slotProps={{
@@ -961,7 +969,7 @@ const NonAccreditedCourseRegistration = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label="Curriculum Type"
+                  label="Curriculum Title"
                   size="small"
                   value={
                     selectedCourse.curriculumDisplayName ||
@@ -1032,7 +1040,7 @@ const NonAccreditedCourseRegistration = () => {
         maxWidth="xl"
         fullWidth
       >
-        <DialogTitle>Add Non Accredited Course</DialogTitle>
+        <DialogTitle>Registration of Non-BQF Programme</DialogTitle>
         <Formik
           innerRef={formikRef}
           initialValues={initialValues}
@@ -1091,7 +1099,43 @@ const NonAccreditedCourseRegistration = () => {
                         fullWidth
                         label={
                           <>
-                            Curriculum Type <RequiredStar />
+                            Programme Type <RequiredStar />
+                          </>
+                        }
+                        name="curriculumId"
+                        size="small"
+                        value={formik.values.curriculumId}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          formik.handleChange(e);
+                          setSelectedCurriculumId(selectedId);
+                        }}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.curriculumId &&
+                          Boolean(formik.errors.curriculumId)
+                        }
+                        helperText={
+                          formik.touched.curriculumId &&
+                          formik.errors.curriculumId
+                        }
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        <MenuItem value="1">
+                          Non-BQF Programme more than 140 hours
+                        </MenuItem>
+                        <MenuItem value="2">
+                          Non-BQF Programme less than 140 hours
+                        </MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={
+                          <>
+                            Curriculum Title <RequiredStar />
                           </>
                         }
                         name="curriculumId"
@@ -1269,7 +1313,7 @@ const NonAccreditedCourseRegistration = () => {
                         fullWidth
                         label={
                           <>
-                            Course Title <RequiredStar />
+                            Programme Title <RequiredStar />
                           </>
                         }
                         name="courseTitle"

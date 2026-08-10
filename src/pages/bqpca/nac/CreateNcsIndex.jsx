@@ -27,7 +27,7 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -106,7 +106,7 @@ const CreateNcsIndex = () => {
 
   const fetchCertificationLevels = async () => {
     try {
-      const certifications = await CommonService.getByParentId(10);
+      const certifications = await CommonService.getByParentId(27);
       setCertificationLevels(certifications.data);
     } catch (error) {
       console.error("Error fetching certification levels:", error);
@@ -116,11 +116,12 @@ const CreateNcsIndex = () => {
 
   const fetchOccupationsBySector = async (sectorId) => {
     try {
-      const occupationLists = await CommonService.getOccupationsBySectorId(sectorId);
+      const occupationLists =
+        await CommonService.getOccupationsBySectorId(sectorId);
       setOccupations(occupationLists.data);
 
       const mapping = {};
-      occupationLists.data.forEach(occ => {
+      occupationLists.data.forEach((occ) => {
         if (occ.courseTitle) {
           mapping[occ.id] = occ.courseTitle;
         } else {
@@ -128,7 +129,6 @@ const CreateNcsIndex = () => {
         }
       });
       setOccupationCourseMap(mapping);
-
     } catch (error) {
       console.error("Error fetching occupations:", error);
       toast.error("Failed to fetch occupations");
@@ -166,8 +166,8 @@ const CreateNcsIndex = () => {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return "";
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     } catch (error) {
       console.error("Error formatting date:", error);
@@ -186,7 +186,10 @@ const CreateNcsIndex = () => {
         const transformedData = response.data.map((item, index) => {
           let units = [];
           try {
-            units = typeof item.units === 'string' ? JSON.parse(item.units) : (item.units || []);
+            units =
+              typeof item.units === "string"
+                ? JSON.parse(item.units)
+                : item.units || [];
           } catch (e) {
             console.error("Error parsing units:", e);
             units = [];
@@ -194,7 +197,7 @@ const CreateNcsIndex = () => {
 
           let documents = [];
           try {
-            if (typeof item.documents === 'string') {
+            if (typeof item.documents === "string") {
               documents = JSON.parse(item.documents);
             } else if (Array.isArray(item.documents)) {
               documents = item.documents;
@@ -203,11 +206,10 @@ const CreateNcsIndex = () => {
             }
 
             // Ensure each document has documentId
-            documents = documents.map(doc => ({
+            documents = documents.map((doc) => ({
               ...doc,
-              documentId: doc.documentId || doc.id || null
+              documentId: doc.documentId || doc.id || null,
             }));
-
           } catch (e) {
             console.error("Error parsing documents:", e);
             documents = [];
@@ -221,7 +223,7 @@ const CreateNcsIndex = () => {
             validityDate: item.validityDate || "N/A",
             courseTitle: item.courseTitle || "N/A",
             units: units,
-            documents: documents
+            documents: documents,
           };
         });
 
@@ -247,9 +249,13 @@ const CreateNcsIndex = () => {
       setEditData(item);
       setExistingFiles(item.documents || []);
 
-      const occupation = occupations.find(occ => occ.occupationName === item.occupation);
-      const sector = sectors.find(sec => sec.sectorName === item.sector);
-      const certification = certificationLevels.find(cert => cert.name === item.bqfLevel);
+      const occupation = occupations.find(
+        (occ) => occ.occupationName === item.occupation,
+      );
+      const sector = sectors.find((sec) => sec.sectorName === item.sector);
+      const certification = certificationLevels.find(
+        (cert) => cert.name === item.bqfLevel,
+      );
 
       if (sector) {
         setSelectedSectorId(sector.id);
@@ -289,11 +295,14 @@ const CreateNcsIndex = () => {
   // Helper function to get file icon based on file type
   const getFileIcon = (fileName) => {
     if (!fileName) return <InsertDriveFileIcon />;
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    if (extension === 'pdf') return <PictureAsPdfIcon color="error" />;
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(extension)) return <ImageIcon color="primary" />;
-    if (['doc', 'docx'].includes(extension)) return <DescriptionIcon color="primary" />;
-    if (['xls', 'xlsx'].includes(extension)) return <DescriptionIcon color="success" />;
+    const extension = fileName.split(".").pop()?.toLowerCase();
+    if (extension === "pdf") return <PictureAsPdfIcon color="error" />;
+    if (["jpg", "jpeg", "png", "gif", "bmp", "svg"].includes(extension))
+      return <ImageIcon color="primary" />;
+    if (["doc", "docx"].includes(extension))
+      return <DescriptionIcon color="primary" />;
+    if (["xls", "xlsx"].includes(extension))
+      return <DescriptionIcon color="success" />;
     return <InsertDriveFileIcon />;
   };
 
@@ -302,12 +311,17 @@ const CreateNcsIndex = () => {
     // If file has documentId, download and open
     if (file.documentId) {
       try {
-        const response = await NcsService.downloadFile(file.documentId, access_token);
+        const response = await NcsService.downloadFile(
+          file.documentId,
+          access_token,
+        );
         if (response.status === 200) {
           // Create a blob URL and open in new tab
-          const blob = new Blob([response.data], { type: file.contentType || 'application/octet-stream' });
+          const blob = new Blob([response.data], {
+            type: file.contentType || "application/octet-stream",
+          });
           const url = window.URL.createObjectURL(blob);
-          window.open(url, '_blank');
+          window.open(url, "_blank");
           // Revoke the URL after a delay to free memory
           setTimeout(() => {
             window.URL.revokeObjectURL(url);
@@ -321,11 +335,11 @@ const CreateNcsIndex = () => {
       }
     } else if (file.url) {
       // If file has a direct URL (from API)
-      window.open(file.url, '_blank');
+      window.open(file.url, "_blank");
     } else if (file.content) {
       // If file has base64 content
-      const fileUrl = `data:${file.contentType || 'application/octet-stream'};base64,${file.content}`;
-      window.open(fileUrl, '_blank');
+      const fileUrl = `data:${file.contentType || "application/octet-stream"};base64,${file.content}`;
+      window.open(fileUrl, "_blank");
     } else {
       toast.warning("File URL not available");
     }
@@ -336,14 +350,19 @@ const CreateNcsIndex = () => {
     // If file has documentId, download via API
     if (file.documentId) {
       try {
-        const response = await NcsService.downloadFile(file.documentId, access_token);
+        const response = await NcsService.downloadFile(
+          file.documentId,
+          access_token,
+        );
         if (response.status === 200) {
           // Create a download link
-          const blob = new Blob([response.data], { type: file.contentType || 'application/octet-stream' });
+          const blob = new Blob([response.data], {
+            type: file.contentType || "application/octet-stream",
+          });
           const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
+          const link = document.createElement("a");
           link.href = url;
-          link.download = file.name || 'download';
+          link.download = file.name || "download";
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -358,17 +377,17 @@ const CreateNcsIndex = () => {
       }
     } else if (file.url) {
       // If file has a direct URL
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = file.url;
-      link.download = file.name || 'download';
+      link.download = file.name || "download";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } else if (file.content) {
       // If file has base64 content
-      const link = document.createElement('a');
-      link.href = `data:${file.contentType || 'application/octet-stream'};base64,${file.content}`;
-      link.download = file.name || 'download';
+      const link = document.createElement("a");
+      link.href = `data:${file.contentType || "application/octet-stream"};base64,${file.content}`;
+      link.download = file.name || "download";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -379,11 +398,11 @@ const CreateNcsIndex = () => {
 
   // Helper function to get all units for search
   const getAllUnitCodes = (item) => {
-    return item.units?.map(unit => unit.unitCode).join(' ') || '';
+    return item.units?.map((unit) => unit.unitCode).join(" ") || "";
   };
 
   const getAllUnitTitles = (item) => {
-    return item.units?.map(unit => unit.unitTitle).join(' ') || '';
+    return item.units?.map((unit) => unit.unitTitle).join(" ") || "";
   };
 
   const filteredData = data.filter(
@@ -391,7 +410,7 @@ const CreateNcsIndex = () => {
       item.sector?.toLowerCase().includes(search.toLowerCase()) ||
       item.occupation?.toLowerCase().includes(search.toLowerCase()) ||
       getAllUnitCodes(item).toLowerCase().includes(search.toLowerCase()) ||
-      getAllUnitTitles(item).toLowerCase().includes(search.toLowerCase())
+      getAllUnitTitles(item).toLowerCase().includes(search.toLowerCase()),
   );
 
   const tableStyle = {
@@ -405,9 +424,13 @@ const CreateNcsIndex = () => {
 
   const getInitialValues = () => {
     if (editData) {
-      const occupation = occupations.find(occ => occ.occupationName === editData.occupation);
-      const sector = sectors.find(sec => sec.sectorName === editData.sector);
-      const certification = certificationLevels.find(cert => cert.name === editData.bqfLevel);
+      const occupation = occupations.find(
+        (occ) => occ.occupationName === editData.occupation,
+      );
+      const sector = sectors.find((sec) => sec.sectorName === editData.sector);
+      const certification = certificationLevels.find(
+        (cert) => cert.name === editData.bqfLevel,
+      );
 
       const formattedDate = formatDateForInput(editData.validityDate);
 
@@ -417,9 +440,12 @@ const CreateNcsIndex = () => {
         certificationId: certification?.id || "",
         validityDate: formattedDate || "",
         courseTitle: editData.courseTitle || "",
-        units: editData.units && editData.units.length > 0 ? editData.units : [{ unitCode: "", unitTitle: "" }],
+        units:
+          editData.units && editData.units.length > 0
+            ? editData.units
+            : [{ unitCode: "", unitTitle: "" }],
         documents: [],
-        existingFiles: editData.documents || []
+        existingFiles: editData.documents || [],
       };
     }
     return {
@@ -430,7 +456,7 @@ const CreateNcsIndex = () => {
       courseTitle: "",
       units: [{ unitCode: "", unitTitle: "" }],
       documents: [],
-      existingFiles: []
+      existingFiles: [],
     };
   };
 
@@ -442,14 +468,16 @@ const CreateNcsIndex = () => {
     validityDate: Yup.date()
       .required("Validity Date is required")
       .min(new Date(), "Validity Date must be in the future"),
-    units: Yup.array().of(
-      Yup.object().shape({
-        unitCode: Yup.string().required("Unit Code is required"),
-        unitTitle: Yup.string()
-          .required("Unit Title is required")
-          .min(3, "Unit Title must be at least 3 characters"),
-      })
-    ).min(1, "At least one unit is required"),
+    units: Yup.array()
+      .of(
+        Yup.object().shape({
+          unitCode: Yup.string().required("Unit Code is required"),
+          unitTitle: Yup.string()
+            .required("Unit Title is required")
+            .min(3, "Unit Title must be at least 3 characters"),
+        }),
+      )
+      .min(1, "At least one unit is required"),
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
@@ -475,16 +503,17 @@ const CreateNcsIndex = () => {
                 contentType: result.contentType,
               };
             }
-          })
+          }),
         );
 
         // Only send documents that have content (new files)
-        documentsToSend = newDocuments.filter(doc =>
-          doc.content && doc.content.length > 0
+        documentsToSend = newDocuments.filter(
+          (doc) => doc.content && doc.content.length > 0,
         );
 
-        console.log(`Sending ${documentsToSend.length} new documents for update`);
-
+        console.log(
+          `Sending ${documentsToSend.length} new documents for update`,
+        );
       } else {
         // FOR CREATE: Send all documents (all have content)
         const allDocuments = await Promise.all(
@@ -503,7 +532,7 @@ const CreateNcsIndex = () => {
                 contentType: result.contentType,
               };
             }
-          })
+          }),
         );
 
         documentsToSend = allDocuments;
@@ -517,7 +546,7 @@ const CreateNcsIndex = () => {
         courseTitle: values.courseTitle,
         units: values.units,
         documents: documentsToSend,
-        publicationType: 'n',
+        publicationType: "n",
         createdBy: 1,
         updatedBy: 1,
       };
@@ -525,7 +554,11 @@ const CreateNcsIndex = () => {
       console.log("Sending payload with documents:", payload);
 
       if (editingId) {
-        const response = await NcsService.updateNcs(editingId, payload, access_token);
+        const response = await NcsService.updateNcs(
+          editingId,
+          payload,
+          access_token,
+        );
         if (response.status === 200 || response.status === 201) {
           toast.success("NCS updated successfully!");
           resetForm();
@@ -549,8 +582,8 @@ const CreateNcsIndex = () => {
       console.error("Error submitting NCS:", error);
       toast.error(
         error.response?.data?.message ||
-        error.message ||
-        "Failed to submit NCS"
+          error.message ||
+          "Failed to submit NCS",
       );
     } finally {
       setLoading(false);
@@ -595,9 +628,7 @@ const CreateNcsIndex = () => {
     if (!units || units.length === 0) return "N/A";
     return units.map((unit, idx) => (
       <Box key={`title-${idx}`} sx={{ mb: 0.5 }}>
-        <Typography variant="body2">
-          {unit.unitTitle}
-        </Typography>
+        <Typography variant="body2">{unit.unitTitle}</Typography>
         {idx < units.length - 1 && <Divider sx={{ my: 0.5 }} />}
       </Box>
     ));
@@ -615,14 +646,20 @@ const CreateNcsIndex = () => {
     return (
       <Stack direction="column" spacing={0.5}>
         {documents.map((file, index) => (
-          <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Box
+            key={index}
+            sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+          >
             {getFileIcon(file.name)}
-            <Typography variant="caption" sx={{
-              maxWidth: '80px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
+            <Typography
+              variant="caption"
+              sx={{
+                maxWidth: "80px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {file.name || `File ${index + 1}`}
             </Typography>
             <IconButton
@@ -669,25 +706,27 @@ const CreateNcsIndex = () => {
             <Box
               key={index}
               sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
                 p: 1,
-                bgcolor: '#f5f5f5',
+                bgcolor: "#f5f5f5",
                 borderRadius: 1,
-                border: '1px solid #e0e0e0'
+                border: "1px solid #e0e0e0",
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}
+              >
                 {getFileIcon(file.name)}
                 <Typography variant="body2" sx={{ flex: 1 }}>
                   {file.name || `File ${index + 1}`}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  {file.contentType || 'Unknown type'}
+                  {file.contentType || "Unknown type"}
                 </Typography>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <IconButton
                   size="small"
                   onClick={() => handleFileView(file)}
@@ -709,9 +748,11 @@ const CreateNcsIndex = () => {
                   color="error"
                   onClick={() => {
                     // Remove file from existingFiles
-                    const updatedFiles = existingFiles.filter((_, i) => i !== index);
+                    const updatedFiles = existingFiles.filter(
+                      (_, i) => i !== index,
+                    );
                     setExistingFiles(updatedFiles);
-                    formik.setFieldValue('existingFiles', updatedFiles);
+                    formik.setFieldValue("existingFiles", updatedFiles);
                   }}
                   title="Remove file"
                 >
@@ -738,7 +779,14 @@ const CreateNcsIndex = () => {
 
   if (fetchingData) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
         <CircularProgress />
       </Box>
     );
@@ -798,7 +846,7 @@ const CreateNcsIndex = () => {
               <TableCell>Occupation</TableCell>
               <TableCell>BQF Level</TableCell>
               <TableCell>Validity Date</TableCell>
-              <TableCell>Course Title</TableCell>
+              <TableCell>Programme Title</TableCell>
               <TableCell>Unit Code</TableCell>
               <TableCell>Unit Title</TableCell>
               <TableCell>Attachments</TableCell>
@@ -824,12 +872,8 @@ const CreateNcsIndex = () => {
                     </TableCell>
                     <TableCell>{item.validityDate}</TableCell>
                     <TableCell>{item.courseTitle}</TableCell>
-                    <TableCell>
-                      {renderUnitCodes(item.units)}
-                    </TableCell>
-                    <TableCell>
-                      {renderUnitTitles(item.units)}
-                    </TableCell>
+                    <TableCell>{renderUnitCodes(item.units)}</TableCell>
+                    <TableCell>{renderUnitTitles(item.units)}</TableCell>
                     <TableCell>
                       {renderFileAttachments(item.documents)}
                     </TableCell>
@@ -899,7 +943,9 @@ const CreateNcsIndex = () => {
                         size="small"
                         onClick={() => handleFileView(file)}
                         title="View"
-                        disabled={!file.documentId && !file.url && !file.content}
+                        disabled={
+                          !file.documentId && !file.url && !file.content
+                        }
                       >
                         <VisibilityIcon fontSize="small" />
                       </IconButton>
@@ -908,25 +954,25 @@ const CreateNcsIndex = () => {
                         size="small"
                         onClick={() => handleFileDownload(file)}
                         title="Download"
-                        disabled={!file.documentId && !file.url && !file.content}
+                        disabled={
+                          !file.documentId && !file.url && !file.content
+                        }
                       >
                         <DownloadIcon fontSize="small" />
                       </IconButton>
                     </Stack>
                   }
                 >
-                  <ListItemIcon>
-                    {getFileIcon(file.name)}
-                  </ListItemIcon>
+                  <ListItemIcon>{getFileIcon(file.name)}</ListItemIcon>
                   <ListItemText
                     primary={file.name || `File ${index + 1}`}
-                    secondary={file.contentType || 'Unknown type'}
+                    secondary={file.contentType || "Unknown type"}
                   />
                 </ListItem>
               ))}
             </List>
           ) : (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Box sx={{ textAlign: "center", py: 4 }}>
               <Typography color="textSecondary">
                 No attachments available
               </Typography>
@@ -949,7 +995,7 @@ const CreateNcsIndex = () => {
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
       >
         <DialogTitle>
@@ -1009,7 +1055,9 @@ const CreateNcsIndex = () => {
                       name="occupationId"
                       size="small"
                       value={formik.values.occupationId || ""}
-                      onChange={(e) => handleOccupationChange(e, formik.setFieldValue)}
+                      onChange={(e) =>
+                        handleOccupationChange(e, formik.setFieldValue)
+                      }
                       onBlur={formik.handleBlur}
                       error={
                         formik.touched.occupationId &&
@@ -1091,7 +1139,7 @@ const CreateNcsIndex = () => {
                     <TextField
                       fullWidth
                       type="text"
-                      label={requiredLabel("Course Title")}
+                      label={requiredLabel("Programme Title")}
                       name="courseTitle"
                       size="small"
                       InputLabelProps={{ shrink: true }}
@@ -1103,18 +1151,17 @@ const CreateNcsIndex = () => {
                         Boolean(formik.errors.courseTitle)
                       }
                       helperText={
-                        formik.touched.courseTitle &&
-                        formik.errors.courseTitle
+                        formik.touched.courseTitle && formik.errors.courseTitle
                       }
                       disabled={loading}
                       InputProps={{
                         readOnly: true,
                       }}
                       sx={{
-                        '& .MuiInputBase-input.Mui-readOnly': {
-                          backgroundColor: '#f5f5f5',
-                          cursor: 'not-allowed',
-                        }
+                        "& .MuiInputBase-input.Mui-readOnly": {
+                          backgroundColor: "#f5f5f5",
+                          cursor: "not-allowed",
+                        },
                       }}
                     />
                     <Typography variant="caption" color="textSecondary">
@@ -1122,130 +1169,115 @@ const CreateNcsIndex = () => {
                     </Typography>
                   </Grid>
 
-                  {/* Unit Details Section */}
+                  {/* Unit Details Section - Compact */}
                   <Grid item size={{ xs: 12 }}>
                     <Paper
                       sx={{
-                        p: { xs: 2, md: 3 },
+                        p: 2,
                         mb: 2,
-                        borderRadius: 2,
+                        borderRadius: 1,
                         border: "1px solid #e0e0e0",
                       }}
                     >
-                      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                      <Typography
+                        variant="subtitle2"
+                        fontWeight={600}
+                        sx={{ mb: 1 }}
+                      >
                         Unit Details
                       </Typography>
-                      <Divider sx={{ mb: 3 }} />
 
                       <FieldArray name="units">
                         {({ push, remove, form }) => (
                           <>
-                            <Box sx={{ overflowX: 'auto' }}>
-                              <Box sx={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr auto',
-                                gap: 2,
-                                mb: 2
-                              }}>
-                                <Typography variant="caption" fontWeight={600} color="textSecondary">
-                                  Unit Code
-                                </Typography>
-                                <Typography variant="caption" fontWeight={600} color="textSecondary">
-                                  Unit Title
-                                </Typography>
-                                <Typography variant="caption" fontWeight={600} color="textSecondary">
-                                  Action
-                                </Typography>
-                              </Box>
+                            {form.values.units.map((unit, index) => (
+                              <Box
+                                key={index}
+                                sx={{
+                                  display: "flex",
+                                  gap: 1,
+                                  alignItems: "center",
+                                  mb: 1,
+                                }}
+                              >
+                                <TextField
+                                  size="small"
+                                  placeholder="Title"
+                                  name={`units.${index}.unitTitle`}
+                                  value={unit.unitTitle}
+                                  onChange={formik.handleChange}
+                                  onBlur={formik.handleBlur}
+                                  error={
+                                    formik.touched.units?.[index]?.unitTitle &&
+                                    Boolean(
+                                      formik.errors.units?.[index]?.unitTitle,
+                                    )
+                                  }
+                                  helperText={
+                                    formik.touched.units?.[index]?.unitTitle &&
+                                    formik.errors.units?.[index]?.unitTitle
+                                  }
+                                  disabled={loading}
+                                  sx={{ flex: 2 }}
+                                />
+                                <TextField
+                                  size="small"
+                                  placeholder="Code"
+                                  name={`units.${index}.unitCode`}
+                                  value={unit.unitCode}
+                                  onChange={formik.handleChange}
+                                  onBlur={formik.handleBlur}
+                                  error={
+                                    formik.touched.units?.[index]?.unitCode &&
+                                    Boolean(
+                                      formik.errors.units?.[index]?.unitCode,
+                                    )
+                                  }
+                                  helperText={
+                                    formik.touched.units?.[index]?.unitCode &&
+                                    formik.errors.units?.[index]?.unitCode
+                                  }
+                                  disabled={loading}
+                                  sx={{ flex: 1 }}
+                                />
 
-                              {form.values.units.map((unit, index) => (
-                                <Box
-                                  key={index}
-                                  sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr auto',
-                                    gap: 2,
-                                    alignItems: 'center',
-                                    mb: 1.5,
-                                    p: 1,
-                                    borderRadius: 1,
-                                    bgcolor: index % 2 === 0 ? 'transparent' : 'action.hover'
-                                  }}
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => remove(index)}
+                                  disabled={
+                                    loading || form.values.units.length <= 1
+                                  }
                                 >
-                                  <TextField
-                                    fullWidth
-                                    type="text"
-                                    label={`Unit Code ${index + 1}`}
-                                    name={`units.${index}.unitCode`}
-                                    size="small"
-                                    value={unit.unitCode}
-                                    onChange={formik.handleChange}
-                                    onBlur={formik.handleBlur}
-                                    error={
-                                      formik.touched.units?.[index]?.unitCode &&
-                                      Boolean(formik.errors.units?.[index]?.unitCode)
-                                    }
-                                    helperText={
-                                      formik.touched.units?.[index]?.unitCode &&
-                                      formik.errors.units?.[index]?.unitCode
-                                    }
-                                    placeholder="e.g., BQF-2024-001"
-                                    disabled={loading}
-                                  />
-
-                                  <TextField
-                                    fullWidth
-                                    type="text"
-                                    label={`Unit Title ${index + 1}`}
-                                    name={`units.${index}.unitTitle`}
-                                    size="small"
-                                    value={unit.unitTitle}
-                                    onChange={formik.handleChange}
-                                    onBlur={formik.handleBlur}
-                                    error={
-                                      formik.touched.units?.[index]?.unitTitle &&
-                                      Boolean(formik.errors.units?.[index]?.unitTitle)
-                                    }
-                                    helperText={
-                                      formik.touched.units?.[index]?.unitTitle &&
-                                      formik.errors.units?.[index]?.unitTitle
-                                    }
-                                    placeholder="e.g., Basic Masonry Techniques"
-                                    disabled={loading}
-                                  />
-
-                                  <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                                    <IconButton
-                                      color="error"
-                                      onClick={() => remove(index)}
-                                      disabled={loading || form.values.units.length <= 1}
-                                      size="small"
-                                    >
-                                      <RemoveCircleOutlineIcon />
-                                    </IconButton>
-                                  </Box>
-                                </Box>
-                              ))}
-                            </Box>
+                                  <RemoveCircleOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            ))}
 
                             <Button
                               type="button"
                               variant="outlined"
-                              color="primary"
+                              size="small"
                               startIcon={<AddIcon />}
-                              onClick={() => push({ unitCode: "", unitTitle: "" })}
+                              onClick={() =>
+                                push({ unitCode: "", unitTitle: "" })
+                              }
                               disabled={loading}
-                              sx={{ mt: 2 }}
                               fullWidth
+                              sx={{ mt: 1, py: 0.5 }}
                             >
-                              ADD MORE UNIT
+                              Add Unit
                             </Button>
 
                             {formik.touched.units && formik.errors.units && (
-                              <Typography color="error" variant="caption" sx={{ display: 'block', mt: 1 }}>
-                                {typeof formik.errors.units === 'string'
+                              <Typography
+                                color="error"
+                                variant="caption"
+                                sx={{ display: "block", mt: 0.5 }}
+                              >
+                                {typeof formik.errors.units === "string"
                                   ? formik.errors.units
-                                  : 'Please fill in all unit details correctly'}
+                                  : "Fill all unit details"}
                               </Typography>
                             )}
                           </>
@@ -1302,14 +1334,24 @@ const CreateNcsIndex = () => {
                       </Box>
 
                       {formik.touched.documents && formik.errors.documents && (
-                        <Typography color="error" variant="caption" sx={{ display: 'block', mt: 1 }}>
+                        <Typography
+                          color="error"
+                          variant="caption"
+                          sx={{ display: "block", mt: 1 }}
+                        >
                           {formik.errors.documents}
                         </Typography>
                       )}
 
                       {/* Show total file count */}
-                      <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1 }}>
-                        Total files: {(existingFiles?.length || 0) + (formik.values.documents?.length || 0)}
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        sx={{ display: "block", mt: 1 }}
+                      >
+                        Total files:{" "}
+                        {(existingFiles?.length || 0) +
+                          (formik.values.documents?.length || 0)}
                       </Typography>
                     </Paper>
                   </Grid>
