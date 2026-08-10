@@ -896,7 +896,7 @@ const CurriculumIndex = () => {
               fullWidth
               label={
                 <>
-                  Curriculum Name <RequiredStar />
+                  Curriculum Title <RequiredStar />
                 </>
               }
               name="curriculumName"
@@ -928,7 +928,7 @@ const CurriculumIndex = () => {
               fullWidth
               label={
                 <>
-                  Curriculum Name <RequiredStar />
+                  Curriculum Title <RequiredStar />
                 </>
               }
               name="curriculumName"
@@ -1418,7 +1418,7 @@ const CurriculumIndex = () => {
             <TableRow>
               <TableCell>#</TableCell>
               <TableCell>Application No</TableCell>
-              <TableCell>Curriculum Name</TableCell>
+              <TableCell>Curriculum Title</TableCell>
               <TableCell>Curriculum Type</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>Attachment</TableCell>

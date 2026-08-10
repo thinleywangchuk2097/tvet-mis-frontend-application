@@ -756,7 +756,7 @@ const Level2Dashboard = () => {
           fontSize: "1.1rem",
         }}
       >
-        Level 2 Dashboard
+        TVETQC Dashboard
       </Typography>
 
       {/* KPI Cards */}

@@ -20,8 +20,6 @@ import {
   TableRow,
   Avatar,
   Drawer,
-  AppBar,
-  Toolbar,
   List,
   ListItem,
   ListItemIcon,
@@ -159,8 +157,8 @@ const initialValues = {
   status: "pending",
 };
 
-// Stat Card Component
-const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
+// Stat Card Component - Compact
+const StatCard = ({ title, value, icon, color, trend }) => {
   const getColorValue = (colorName) => {
     const colorMap = {
       primary: COLORS.primary,
@@ -179,17 +177,12 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
     <Card
       elevation={0}
       sx={{
-        borderRadius: 2,
-        height: "100%",
+        borderRadius: 1.5,
         border: "1px solid #e0e0e0",
         transition: "all 0.3s ease",
-        background: `linear-gradient(135deg, rgba(${parseInt(mainColor.slice(1, 3), 16)}, ${parseInt(mainColor.slice(3, 5), 16)}, ${parseInt(mainColor.slice(5, 7), 16)}, 0.05) 0%, #ffffff 100%)`,
-        position: "relative",
-        overflow: "hidden",
         "&:hover": {
-          transform: "translateY(-4px)",
-          boxShadow: `0 8px 24px rgba(0,0,0,0.1)`,
-          borderColor: mainColor,
+          transform: "translateY(-2px)",
+          boxShadow: `0 4px 12px rgba(0,0,0,0.1)`,
         },
         "&::before": {
           content: '""',
@@ -197,71 +190,60 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
           top: 0,
           left: 0,
           right: 0,
-          height: "4px",
-          background: `linear-gradient(90deg, ${mainColor}, ${mainColor}99)`,
+          height: "3px",
+          background: mainColor,
         },
       }}
     >
-      <CardContent sx={{ p: 3, position: "relative" }}>
+      <CardContent sx={{ p: 2, position: "relative" }}>
         <Box
           sx={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "flex-start",
+            alignItems: "center",
           }}
         >
           <Box>
             <Typography
               variant="caption"
-              sx={{
-                color: "#666",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-                fontWeight: 500,
-                display: "block",
-                mb: 0.5,
-              }}
+              color="text.secondary"
+              sx={{ textTransform: "uppercase", letterSpacing: "0.5px" }}
             >
               {title}
             </Typography>
-            <Typography variant="h4" fontWeight={700} sx={{ mb: 0.5 }}>
+            <Typography variant="h5" fontWeight={700}>
               {value}
             </Typography>
-            {subtitle && (
-              <Typography
-                variant="caption"
-                sx={{ color: "#666", display: "block", mb: 1 }}
-              >
-                {subtitle}
-              </Typography>
-            )}
             {trend && (
               <Chip
-                label={`${trend.value > 0 ? "+" : ""}${trend.value}% ${
-                  trend.label
-                }`}
+                label={`${trend.value > 0 ? "+" : ""}${trend.value}%`}
                 size="small"
-                icon={trend.value > 0 ? <TrendingUpIcon /> : <WarningIcon />}
+                icon={
+                  trend.value > 0 ? (
+                    <TrendingUpIcon sx={{ fontSize: 14 }} />
+                  ) : (
+                    <WarningIcon sx={{ fontSize: 14 }} />
+                  )
+                }
                 sx={{
+                  height: 20,
+                  fontSize: "0.65rem",
                   bgcolor: trend.value > 0 ? "#e8f5e9" : "#ffebee",
                   color: trend.value > 0 ? "#2e7d32" : "#d32f2f",
-                  fontSize: "0.75rem",
-                  height: 24,
                 }}
               />
             )}
           </Box>
           <Box
             sx={{
-              bgcolor: `${color}.light`,
+              bgcolor: alpha(mainColor, 0.1),
               color: mainColor,
-              borderRadius: "12px",
-              width: 56,
-              height: 56,
+              borderRadius: 1.5,
+              width: 42,
+              height: 42,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: `0 4px 12px rgba(0,0,0,0.1)`,
             }}
           >
             {icon}
@@ -309,51 +291,54 @@ const DefaultDashboard = () => {
       date: "2024-03-12",
     },
   ]);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState(null);
 
   // ================== Statistics Calculations ==================
   const totalRevenue = transactions.reduce(
     (sum, t) => (t.status === "completed" ? sum + t.amount : sum),
-    0
+    0,
   );
   const totalTransactions = transactions.length;
-  const pendingTransactions = transactions.filter((t) => t.status === "pending").length;
-  const avgTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+  const pendingTransactions = transactions.filter(
+    (t) => t.status === "pending",
+  ).length;
+  const avgTransactionValue =
+    totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
   const statsCards = [
     {
       title: "Total Revenue",
       value: `$${totalRevenue.toLocaleString()}`,
-      subtitle: "Year to date",
       icon: <MoneyIcon />,
       color: "primary",
-      trend: { value: 12.5, label: "vs last month" },
+      trend: { value: 12.5 },
     },
     {
       title: "Transactions",
       value: totalTransactions,
-      subtitle: "Total processed",
       icon: <CartIcon />,
       color: "secondary",
-      trend: { value: 5.2, label: "increase" },
+      trend: { value: 5.2 },
     },
     {
       title: "Pending",
       value: pendingTransactions,
-      subtitle: "Awaiting processing",
       icon: <TimelineIcon />,
       color: "warning",
-      trend: { value: -2, label: "decrease" },
+      trend: { value: -2 },
     },
     {
       title: "Average Value",
       value: `$${avgTransactionValue.toFixed(2)}`,
-      subtitle: "Per transaction",
       icon: <TrendingUpIcon />,
       color: "success",
-      trend: { value: 8.1, label: "improvement" },
+      trend: { value: 8.1 },
     },
   ];
 
@@ -361,27 +346,32 @@ const DefaultDashboard = () => {
   const handleAddTransaction = (values, { resetForm }) => {
     const newTransaction = {
       id: Date.now().toString(),
-      customerName: values.customerName,
-      email: values.email,
-      amount: values.amount,
-      status: values.status,
+      ...values,
       date: new Date().toISOString().split("T")[0],
     };
     setTransactions([newTransaction, ...transactions]);
     resetForm();
-    setSnackbar({ open: true, message: "Transaction added successfully!", severity: "success" });
+    setSnackbar({
+      open: true,
+      message: "Transaction added successfully!",
+      severity: "success",
+    });
   };
 
   const handleUpdateTransaction = (values, { resetForm }) => {
     if (editingId) {
       setTransactions(
         transactions.map((t) =>
-          t.id === editingId ? { ...t, ...values, date: t.date } : t
-        )
+          t.id === editingId ? { ...t, ...values, date: t.date } : t,
+        ),
       );
       setEditingId(null);
       resetForm();
-      setSnackbar({ open: true, message: "Transaction updated successfully!", severity: "success" });
+      setSnackbar({
+        open: true,
+        message: "Transaction updated successfully!",
+        severity: "success",
+      });
     }
   };
 
@@ -398,83 +388,75 @@ const DefaultDashboard = () => {
 
   const handleDelete = (id) => {
     setTransactions(transactions.filter((t) => t.id !== id));
-    setSnackbar({ open: true, message: "Transaction deleted successfully!", severity: "success" });
+    setSnackbar({
+      open: true,
+      message: "Transaction deleted successfully!",
+      severity: "success",
+    });
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
+  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   const getStatusChip = (status) => {
-    switch (status) {
-      case "completed":
-        return <Chip label="Completed" size="small" color="success" variant="outlined" />;
-      case "pending":
-        return <Chip label="Pending" size="small" color="warning" variant="outlined" />;
-      case "failed":
-        return <Chip label="Failed" size="small" color="error" variant="outlined" />;
-      default:
-        return <Chip label={status} size="small" />;
-    }
+    const config = {
+      completed: { color: "success", label: "Completed" },
+      pending: { color: "warning", label: "Pending" },
+      failed: { color: "error", label: "Failed" },
+    };
+    const { color, label } = config[status] || {
+      color: "default",
+      label: status,
+    };
+    return <Chip label={label} size="small" color={color} variant="outlined" />;
   };
 
-  const formikKey = editingId || "add";
-  const formInitialValues = editData && editingId ? editData : initialValues;
-
   const quickActions = [
-    { label: "Add Transaction", icon: <AddIcon />, color: "primary", onClick: () => {
-      setEditingId(null);
-      setEditData(null);
-      setDrawerOpen(true);
-    }},
+    {
+      label: "Add Transaction",
+      icon: <AddIcon />,
+      color: "primary",
+      onClick: () => {
+        setEditingId(null);
+        setEditData(null);
+        setDrawerOpen(true);
+      },
+    },
     { label: "View Reports", icon: <BarChartIcon />, color: "secondary" },
     { label: "System Settings", icon: <SettingsIcon />, color: "warning" },
     { label: "Monitor Performance", icon: <TimelineIcon />, color: "success" },
   ];
 
   return (
-    <Paper
-      sx={{
-        p: 3,
-        mt: 1,
-      }}
-    >
+    <Paper sx={{ p: 2, mt: 1 }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h5" fontWeight={800} gutterBottom>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" fontWeight={700}>
           Default Dashboard
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Welcome back! Here's an overview of your transaction activity and analytics.
+          Welcome back! Overview of your transaction activity.
         </Typography>
       </Box>
 
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         {statsCards.map((card, index) => (
           <Grid item size={{ xs: 12, sm: 6, md: 3 }} key={index}>
-            <StatCard
-              title={card.title}
-              value={card.value}
-              subtitle={card.subtitle}
-              icon={card.icon}
-              color={card.color}
-              trend={card.trend}
-            />
+            <StatCard {...card} />
           </Grid>
         ))}
       </Grid>
 
       {/* Graph Section 1 - Line Chart & Pie Chart */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item size={{ xs: 12, md: 8 }}>
           <Paper
             elevation={0}
             sx={{
-              p: 3,
-              borderRadius: 2,
+              p: 2,
+              borderRadius: 1.5,
               border: "1px solid #e0e0e0",
-              height: 350,
+              height: 300,
             }}
           >
             <Box
@@ -482,39 +464,35 @@ const DefaultDashboard = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                mb: 2,
+                mb: 1,
               }}
             >
-              <Typography variant="h7" fontWeight={600}>
+              <Typography variant="subtitle2" fontWeight={600}>
                 Monthly Transaction Performance
               </Typography>
-              <Tooltip title="Revenue Trend">
-                <IconButton size="small">
-                  <ShowChartIcon />
-                </IconButton>
-              </Tooltip>
+              <IconButton size="small">
+                <ShowChartIcon fontSize="small" />
+              </IconButton>
             </Box>
             <ResponsiveContainer width="100%" height="85%">
               <LineChart data={graphData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis dataKey="month" stroke="#666" />
-                <YAxis stroke="#666" />
+                <XAxis dataKey="month" stroke="#666" fontSize={10} />
+                <YAxis stroke="#666" fontSize={10} />
                 <RechartsTooltip
                   contentStyle={{
-                    borderRadius: 8,
+                    borderRadius: 6,
                     border: "1px solid #e0e0e0",
-                    backgroundColor: "#ffffff",
                   }}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
                 <Line
                   type="monotone"
                   dataKey="value"
                   name="Revenue"
                   stroke={COLORS.primary}
                   strokeWidth={2}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6 }}
+                  dot={{ r: 3 }}
                 />
                 <Line
                   type="monotone"
@@ -522,7 +500,7 @@ const DefaultDashboard = () => {
                   name="Active Users"
                   stroke={COLORS.secondary}
                   strokeWidth={2}
-                  dot={{ r: 4 }}
+                  dot={{ r: 3 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -533,10 +511,10 @@ const DefaultDashboard = () => {
           <Paper
             elevation={0}
             sx={{
-              p: 3,
-              borderRadius: 2,
+              p: 2,
+              borderRadius: 1.5,
               border: "1px solid #e0e0e0",
-              height: 350,
+              height: 300,
             }}
           >
             <Box
@@ -547,14 +525,12 @@ const DefaultDashboard = () => {
                 mb: 1,
               }}
             >
-              <Typography variant="h7" fontWeight={600}>
-                Transaction Status Distribution
+              <Typography variant="subtitle2" fontWeight={600}>
+                Status Distribution
               </Typography>
-              <Tooltip title="Pie Chart">
-                <IconButton size="small">
-                  <PieChartIcon />
-                </IconButton>
-              </Tooltip>
+              <IconButton size="small">
+                <PieChartIcon fontSize="small" />
+              </IconButton>
             </Box>
             <ResponsiveContainer width="100%" height="85%">
               <PieChart>
@@ -562,11 +538,11 @@ const DefaultDashboard = () => {
                   data={transactionStatusData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
+                  innerRadius={50}
+                  outerRadius={70}
+                  paddingAngle={3}
                   dataKey="value"
-                  label
+                  label={{ fontSize: 10 }}
                 >
                   {transactionStatusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -574,9 +550,8 @@ const DefaultDashboard = () => {
                 </Pie>
                 <RechartsTooltip
                   contentStyle={{
-                    borderRadius: 8,
+                    borderRadius: 6,
                     border: "1px solid #e0e0e0",
-                    backgroundColor: "#ffffff",
                   }}
                 />
               </PieChart>
@@ -586,68 +561,15 @@ const DefaultDashboard = () => {
       </Grid>
 
       {/* Graph Section 2 - Bar Chart & Donut Chart */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item size={{ xs: 12, md: 6 }}>
           <Paper
             elevation={0}
             sx={{
-              p: 3,
-              borderRadius: 2,
+              p: 2,
+              borderRadius: 1.5,
               border: "1px solid #e0e0e0",
-              height: 350,
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 2,
-              }}
-            >
-              <Typography variant="h7" fontWeight={600}>
-                Monthly Activity Overview
-              </Typography>
-              <Tooltip title="Stacked Bar Chart">
-                <IconButton size="small">
-                  <BarChartIcon />
-                </IconButton>
-              </Tooltip>
-            </Box>
-            <ResponsiveContainer width="100%" height="85%">
-              <BarChart data={monthlyActivity}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis dataKey="month" stroke="#666" />
-                <YAxis stroke="#666" />
-                <RechartsTooltip
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: "1px solid #e0e0e0",
-                    backgroundColor: "#ffffff",
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="proposals" name="Proposals" stackId="a" fill={COLORS.primary} />
-                <Bar
-                  dataKey="registrations"
-                  name="Registrations"
-                  stackId="a"
-                  fill={COLORS.secondary}
-                />
-                <Bar dataKey="endorsements" name="Endorsements" stackId="a" fill={COLORS.success} />
-              </BarChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-
-        <Grid item size={{ xs: 12, md: 6 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              border: "1px solid #e0e0e0",
-              height: 350,
+              height: 300,
             }}
           >
             <Box
@@ -658,14 +580,72 @@ const DefaultDashboard = () => {
                 mb: 1,
               }}
             >
-              <Typography variant="h7" fontWeight={600}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                Monthly Activity Overview
+              </Typography>
+              <IconButton size="small">
+                <BarChartIcon fontSize="small" />
+              </IconButton>
+            </Box>
+            <ResponsiveContainer width="100%" height="85%">
+              <BarChart data={monthlyActivity}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis dataKey="month" stroke="#666" fontSize={10} />
+                <YAxis stroke="#666" fontSize={10} />
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: 6,
+                    border: "1px solid #e0e0e0",
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Bar
+                  dataKey="proposals"
+                  name="Proposals"
+                  stackId="a"
+                  fill={COLORS.primary}
+                />
+                <Bar
+                  dataKey="registrations"
+                  name="Registrations"
+                  stackId="a"
+                  fill={COLORS.secondary}
+                />
+                <Bar
+                  dataKey="endorsements"
+                  name="Endorsements"
+                  stackId="a"
+                  fill={COLORS.success}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        <Grid item size={{ xs: 12, md: 6 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: 1.5,
+              border: "1px solid #e0e0e0",
+              height: 300,
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600}>
                 Institute Distribution
               </Typography>
-              <Tooltip title="Donut Chart">
-                <IconButton size="small">
-                  <DonutLargeIcon />
-                </IconButton>
-              </Tooltip>
+              <IconButton size="small">
+                <DonutLargeIcon fontSize="small" />
+              </IconButton>
             </Box>
             <ResponsiveContainer width="100%" height="85%">
               <PieChart>
@@ -673,11 +653,11 @@ const DefaultDashboard = () => {
                   data={instituteDistribution}
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={5}
+                  innerRadius={45}
+                  outerRadius={70}
+                  paddingAngle={3}
                   dataKey="value"
-                  label
+                  label={{ fontSize: 10 }}
                 >
                   {instituteDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -685,9 +665,8 @@ const DefaultDashboard = () => {
                 </Pie>
                 <RechartsTooltip
                   contentStyle={{
-                    borderRadius: 8,
+                    borderRadius: 6,
                     border: "1px solid #e0e0e0",
-                    backgroundColor: "#ffffff",
                   }}
                 />
               </PieChart>
@@ -699,101 +678,107 @@ const DefaultDashboard = () => {
       {/* Transactions Table Section */}
       <Paper
         elevation={0}
-        sx={{
-          p: 3,
-          borderRadius: 2,
-          border: "1px solid #e0e0e0",
-          mb: 4,
-        }}
+        sx={{ p: 2, borderRadius: 1.5, border: "1px solid #e0e0e0", mb: 3 }}
       >
         <Box
           sx={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            mb: 3,
+            mb: 2,
           }}
         >
-          <Typography variant="h7" fontWeight={600}>
+          <Typography variant="subtitle2" fontWeight={600}>
             Recent Transactions
           </Typography>
           <Button
             variant="contained"
+            size="small"
             startIcon={<AddIcon />}
             onClick={() => {
               setEditingId(null);
               setEditData(null);
               setDrawerOpen(true);
             }}
-            sx={{ textTransform: "none" }}
           >
-            New Transaction
+            New
           </Button>
         </Box>
         <TableContainer>
-          <Table sx={{ minWidth: 650 }}>
+          <Table size="small">
             <TableHead>
               <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                <TableCell><strong>Customer</strong></TableCell>
-                <TableCell><strong>Email</strong></TableCell>
-                <TableCell align="right"><strong>Amount</strong></TableCell>
-                <TableCell><strong>Status</strong></TableCell>
-                <TableCell><strong>Date</strong></TableCell>
-                <TableCell align="center"><strong>Actions</strong></TableCell>
+                <TableCell>
+                  <strong>Customer</strong>
+                </TableCell>
+                <TableCell>
+                  <strong>Email</strong>
+                </TableCell>
+                <TableCell align="right">
+                  <strong>Amount</strong>
+                </TableCell>
+                <TableCell>
+                  <strong>Status</strong>
+                </TableCell>
+                <TableCell>
+                  <strong>Date</strong>
+                </TableCell>
+                <TableCell align="center">
+                  <strong>Actions</strong>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
-                      No transactions yet. Click "New Transaction" to add.
-                    </Typography>
+                  <TableCell colSpan={6} align="center" sx={{ py: 2 }}>
+                    No transactions yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 transactions.map((transaction) => (
                   <TableRow key={transaction.id} hover>
                     <TableCell>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
                         <Avatar
                           sx={{
-                            width: 32,
-                            height: 32,
+                            width: 24,
+                            height: 24,
                             bgcolor: alpha(COLORS.primary, 0.1),
                             color: COLORS.primary,
+                            fontSize: 12,
                           }}
                         >
                           {transaction.customerName.charAt(0)}
                         </Avatar>
-                        <Typography fontWeight={500}>{transaction.customerName}</Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                          {transaction.customerName}
+                        </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell>{transaction.email}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>
+                    <TableCell variant="body2">{transaction.email}</TableCell>
+                    <TableCell align="right" variant="body2" fontWeight={600}>
                       ${transaction.amount.toLocaleString()}
                     </TableCell>
                     <TableCell>{getStatusChip(transaction.status)}</TableCell>
-                    <TableCell>{transaction.date}</TableCell>
+                    <TableCell variant="body2">{transaction.date}</TableCell>
                     <TableCell align="center">
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEdit(transaction)}
-                          sx={{ mr: 1, color: COLORS.primary }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDelete(transaction.id)}
-                          color="error"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEdit(transaction)}
+                        sx={{ color: COLORS.primary }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDelete(transaction.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 ))
@@ -804,15 +789,15 @@ const DefaultDashboard = () => {
       </Paper>
 
       {/* Area Chart Section */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item size={{ xs: 12 }}>
           <Paper
             elevation={0}
             sx={{
-              p: 3,
-              borderRadius: 2,
+              p: 2,
+              borderRadius: 1.5,
               border: "1px solid #e0e0e0",
-              height: 350,
+              height: 300,
             }}
           >
             <Box
@@ -820,34 +805,39 @@ const DefaultDashboard = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                mb: 2,
+                mb: 1,
               }}
             >
-              <Typography variant="h7" fontWeight={600}>
+              <Typography variant="subtitle2" fontWeight={600}>
                 Revenue Trend Analysis
               </Typography>
-              <Tooltip title="Area Chart">
-                <IconButton size="small">
-                  <ShowChartIcon />
-                </IconButton>
-              </Tooltip>
+              <IconButton size="small">
+                <ShowChartIcon fontSize="small" />
+              </IconButton>
             </Box>
             <ResponsiveContainer width="100%" height="85%">
               <AreaChart data={graphData}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0} />
+                    <stop
+                      offset="5%"
+                      stopColor={COLORS.primary}
+                      stopOpacity={0.3}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={COLORS.primary}
+                      stopOpacity={0}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis dataKey="month" stroke="#666" />
-                <YAxis stroke="#666" />
+                <XAxis dataKey="month" stroke="#666" fontSize={10} />
+                <YAxis stroke="#666" fontSize={10} />
                 <RechartsTooltip
                   contentStyle={{
-                    borderRadius: 8,
+                    borderRadius: 6,
                     border: "1px solid #e0e0e0",
-                    backgroundColor: "#ffffff",
                   }}
                 />
                 <Area
@@ -864,34 +854,24 @@ const DefaultDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Compact */}
       <Paper
         elevation={0}
-        sx={{
-          p: 3,
-          borderRadius: 2,
-          border: "1px solid #e0e0e0",
-        }}
+        sx={{ p: 2, borderRadius: 1.5, border: "1px solid #e0e0e0" }}
       >
-        <Typography variant="h7" fontWeight={600} gutterBottom>
+        <Typography variant="subtitle2" fontWeight={600} gutterBottom>
           Quick Actions
         </Typography>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
+        <Grid container spacing={1} sx={{ mt: 0.5 }}>
           {quickActions.map((action, index) => (
             <Grid item size={{ xs: 12, sm: 6, md: 3 }} key={index}>
               <Button
                 fullWidth
                 variant="outlined"
+                size="small"
                 startIcon={action.icon}
                 onClick={action.onClick}
-                sx={{
-                  p: 2,
-                  justifyContent: "flex-start",
-                  "&:hover": {
-                    borderColor: COLORS[action.color],
-                    bgcolor: alpha(COLORS[action.color], 0.04),
-                  },
-                }}
+                sx={{ justifyContent: "flex-start", py: 1 }}
               >
                 {action.label}
               </Button>
@@ -900,7 +880,7 @@ const DefaultDashboard = () => {
         </Grid>
       </Paper>
 
-      {/* Drawer Form with Formik + Yup */}
+      {/* Drawer Form */}
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -909,46 +889,52 @@ const DefaultDashboard = () => {
           setEditingId(null);
           setEditData(null);
         }}
-        sx={{ "& .MuiDrawer-paper": { width: { xs: "100%", sm: 450 }, p: 3 } }}
+        sx={{ "& .MuiDrawer-paper": { width: { xs: "100%", sm: 400 }, p: 2 } }}
       >
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-          <Typography variant="h6" fontWeight="700">
-            {editingId ? "Edit Transaction" : "Add New Transaction"}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 2,
+          }}
+        >
+          <Typography variant="h6" fontWeight={700}>
+            {editingId ? "Edit" : "Add"} Transaction
           </Typography>
           <IconButton
+            size="small"
             onClick={() => {
               setDrawerOpen(false);
               setEditingId(null);
               setEditData(null);
             }}
           >
-            <CloseIcon />
+            <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
-        <Divider sx={{ mb: 3 }} />
+        <Divider sx={{ mb: 2 }} />
 
         <Formik
-          key={formikKey}
-          initialValues={formInitialValues}
+          key={editingId || "add"}
+          initialValues={editData && editingId ? editData : initialValues}
           validationSchema={transactionSchema}
-          enableReinitialize={true}
+          enableReinitialize
           onSubmit={(values, helpers) => {
-            if (editingId) {
-              handleUpdateTransaction(values, helpers);
-            } else {
-              handleAddTransaction(values, helpers);
-            }
+            if (editingId) handleUpdateTransaction(values, helpers);
+            else handleAddTransaction(values, helpers);
             setDrawerOpen(false);
             setEditingId(null);
             setEditData(null);
           }}
         >
-          {({ errors, touched, isSubmitting, handleChange, handleBlur, values }) => (
+          {({ errors, touched, handleChange, handleBlur, values }) => (
             <Form>
-              <Grid container spacing={3}>
+              <Grid container spacing={2}>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
+                    size="small"
                     name="customerName"
                     label="Customer Name *"
                     value={values.customerName}
@@ -956,27 +942,26 @@ const DefaultDashboard = () => {
                     onBlur={handleBlur}
                     error={touched.customerName && Boolean(errors.customerName)}
                     helperText={touched.customerName && errors.customerName}
-                    variant="outlined"
-                    size="medium"
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
+                    size="small"
                     name="email"
-                    label="Email Address *"
+                    label="Email *"
                     type="email"
                     value={values.email}
                     onChange={handleChange}
                     onBlur={handleBlur}
                     error={touched.email && Boolean(errors.email)}
                     helperText={touched.email && errors.email}
-                    variant="outlined"
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
+                    size="small"
                     name="amount"
                     label="Amount ($) *"
                     type="number"
@@ -985,14 +970,16 @@ const DefaultDashboard = () => {
                     onBlur={handleBlur}
                     error={touched.amount && Boolean(errors.amount)}
                     helperText={touched.amount && errors.amount}
-                    variant="outlined"
-                    InputProps={{ startAdornment: <span style={{ marginRight: 4 }}>$</span> }}
+                    InputProps={{
+                      startAdornment: <span style={{ marginRight: 4 }}>$</span>,
+                    }}
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
                     select
                     fullWidth
+                    size="small"
                     name="status"
                     label="Status *"
                     value={values.status}
@@ -1001,7 +988,6 @@ const DefaultDashboard = () => {
                     error={touched.status && Boolean(errors.status)}
                     helperText={touched.status && errors.status}
                     SelectProps={{ native: true }}
-                    variant="outlined"
                   >
                     <option value="pending">Pending</option>
                     <option value="completed">Completed</option>
@@ -1013,23 +999,24 @@ const DefaultDashboard = () => {
                     fullWidth
                     type="submit"
                     variant="contained"
-                    disabled={isSubmitting}
+                    size="small"
                     startIcon={<SaveIcon />}
-                    sx={{ py: 1.2, borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+                    sx={{ py: 1, borderRadius: 1.5 }}
                   >
-                    {editingId ? "Update Transaction" : "Create Transaction"}
+                    {editingId ? "Update" : "Create"}
                   </Button>
                 </Grid>
                 <Grid item xs={12}>
                   <Button
                     fullWidth
                     variant="outlined"
+                    size="small"
                     onClick={() => {
                       setDrawerOpen(false);
                       setEditingId(null);
                       setEditData(null);
                     }}
-                    sx={{ borderRadius: 2, textTransform: "none" }}
+                    sx={{ borderRadius: 1.5 }}
                   >
                     Cancel
                   </Button>
@@ -1040,14 +1027,19 @@ const DefaultDashboard = () => {
         </Formik>
       </Drawer>
 
-      {/* Snackbar Notifications */}
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} variant="filled" sx={{ width: "100%" }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

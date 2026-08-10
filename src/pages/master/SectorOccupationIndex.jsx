@@ -25,6 +25,7 @@ import {
   FormControlLabel,
   Switch,
   CircularProgress,
+  useTheme,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -41,7 +42,7 @@ import SectorOccupationService from "../../api/services/internal/master/SectorOc
 
 // Helper component for required field indicator
 const RequiredStar = () => (
-  <Typography component="span" sx={{ color: "red" }}>
+  <Typography component="span" sx={{ color: "error.main" }}>
     *
   </Typography>
 );
@@ -67,6 +68,7 @@ const sectorOccupationSchema = Yup.object().shape({
 });
 
 const SectorOccupationIndex = () => {
+  const theme = useTheme();
   const access_token = useSelector((state) => state.auth.accessToken);
   const [sectors, setSectors] = useState([]);
   const [filteredSectors, setFilteredSectors] = useState([]);
@@ -83,7 +85,7 @@ const SectorOccupationIndex = () => {
     index: null,
   });
 
-  // Pagination
+  // Pagination - default to 5 rows per page
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
@@ -98,38 +100,12 @@ const SectorOccupationIndex = () => {
   // Parse API response and transform data
   const transformApiData = (apiResponse) => {
     try {
-      // Check if the response is an array and has the result property
       if (
         Array.isArray(apiResponse) &&
         apiResponse.length > 0 &&
         apiResponse[0].result
       ) {
         const parsedData = JSON.parse(apiResponse[0].result);
-
-        // Transform the data to match the component's expected format
-        const transformedData = parsedData.map((item) => ({
-          id: item.sector_id,
-          sectorName: item.sector_name,
-          isActive: true, // Default to active since API doesn't provide status
-          occupations:
-            item.occupations &&
-            Array.isArray(item.occupations) &&
-            item.occupations.length > 0
-              ? item.occupations.map((occ) => ({
-                  id: occ.occupation_id,
-                  occupationName: occ.occupation_name,
-                  iscoCode: occ.isco_code,
-                  isActive: true, // Default to active since API doesn't provide status
-                }))
-              : [], // Handle null or empty occupations as empty array
-        }));
-
-        return transformedData;
-      }
-      // Handle case where response might be directly the object with result property
-      else if (apiResponse && apiResponse.result) {
-        const parsedData = JSON.parse(apiResponse.result);
-
         const transformedData = parsedData.map((item) => ({
           id: item.sector_id,
           sectorName: item.sector_name,
@@ -146,7 +122,25 @@ const SectorOccupationIndex = () => {
                 }))
               : [],
         }));
-
+        return transformedData;
+      } else if (apiResponse && apiResponse.result) {
+        const parsedData = JSON.parse(apiResponse.result);
+        const transformedData = parsedData.map((item) => ({
+          id: item.sector_id,
+          sectorName: item.sector_name,
+          isActive: true,
+          occupations:
+            item.occupations &&
+            Array.isArray(item.occupations) &&
+            item.occupations.length > 0
+              ? item.occupations.map((occ) => ({
+                  id: occ.occupation_id,
+                  occupationName: occ.occupation_name,
+                  iscoCode: occ.isco_code,
+                  isActive: true,
+                }))
+              : [],
+        }));
         return transformedData;
       }
       return [];
@@ -167,7 +161,6 @@ const SectorOccupationIndex = () => {
         const transformedData = transformApiData(response.data);
         setSectors(transformedData);
         setFilteredSectors(transformedData);
-
         if (transformedData.length === 0) {
           toast.info("No sector data available");
         }
@@ -283,7 +276,6 @@ const SectorOccupationIndex = () => {
       toast.error("Occupation name and ISCO code are required");
       return;
     }
-
     const updatedOccupations = [...formik.values.occupations];
     updatedOccupations[index] = occupation;
     formik.setFieldValue("occupations", updatedOccupations, true);
@@ -301,13 +293,11 @@ const SectorOccupationIndex = () => {
     });
   };
 
-  // Add occupation to the list - FIXED: No ID for new occupations
+  // Add occupation to the list
   const handleAddOccupation = () => {
     const { newOccupationName, newIscoCode, occupations } = formik.values;
     if (newOccupationName.trim() !== "" && newIscoCode.trim() !== "") {
       const newOccupation = {
-        // IMPORTANT: Do NOT include id for new occupations
-        // The backend will generate the ID
         occupationName: newOccupationName.trim(),
         iscoCode: newIscoCode.trim(),
         isActive: true,
@@ -368,17 +358,14 @@ const SectorOccupationIndex = () => {
     setOpen(true);
   };
 
-  // Save sector (Create or Update) - FIXED: Only include ID for existing occupations
+  // Save sector (Create or Update)
   const handleSaveSector = async (values) => {
     try {
-      // Prepare data for API (convert boolean to 'Y'/'N' for backend)
       const sectorData = {
         id: editMode && currentSector ? currentSector.id : null,
         sectorName: values.sectorName,
         isActive: values.isActive ? "Y" : "N",
         child: values.occupations.map((occ) => ({
-          // Only include id if it exists (for existing occupations)
-          // Don't send id for new occupations (no id or undefined)
           ...(occ.id ? { id: occ.id } : {}),
           occupationName: occ.occupationName,
           iscoCode: occ.iscoCode,
@@ -387,7 +374,6 @@ const SectorOccupationIndex = () => {
       };
 
       if (editMode && currentSector) {
-        // Update existing sector
         const response =
           await SectorOccupationService.updateSectorWithOccupations(
             sectorData,
@@ -402,14 +388,12 @@ const SectorOccupationIndex = () => {
           return;
         }
       } else {
-        // Create new sector
         console.log("Creating new sector with data:", sectorData);
         const response =
           await SectorOccupationService.submitSectorWithOccupations(
             sectorData,
             access_token,
           );
-
         if (response.status === 200 || response.status === 201) {
           toast.success("Sector created successfully!");
           await fetchSectorsOccupationDetails();
@@ -477,15 +461,15 @@ const SectorOccupationIndex = () => {
   }, [open, formik.values]);
 
   return (
-    <Paper sx={{ p: 3, mt: 1 }}>
-      <Box sx={{ my: 4 }}>
+    <Paper sx={{ p: 2, mt: 1 }}>
+      <Box sx={{ my: 2 }}>
         <Stack
           direction="row"
           justifyContent="space-between"
           alignItems="center"
-          mb={3}
+          mb={2}
         >
-          <Typography variant="h5" component="h1">
+          <Typography variant="h6" component="h1">
             Sector & Occupation Management
           </Typography>
           <Stack direction="row" spacing={2} alignItems="center">
@@ -499,64 +483,67 @@ const SectorOccupationIndex = () => {
                 input: {
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchIcon />
+                      <SearchIcon fontSize="small" />
                     </InputAdornment>
                   ),
                 },
               }}
-              sx={{ width: 300 }}
+              sx={{ width: 250 }}
             />
             <Button
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleAddSector}
+              size="small"
             >
               Add Sector
             </Button>
           </Stack>
         </Stack>
 
-        <TableContainer component={Paper}>
+        <TableContainer
+          component={Paper}
+          sx={{
+            maxHeight: "auto",
+            height: "auto",
+            overflow: "hidden",
+          }}
+        >
           {loading ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
               <CircularProgress />
             </Box>
           ) : (
             <>
-              <Table sx={{ borderCollapse: "collapse" }}>
+              <Table
+                size="small"
+                sx={{
+                  tableLayout: "auto",
+                  width: "100%",
+                }}
+              >
                 <TableHead>
                   <TableRow
                     sx={{
                       "& .MuiTableCell-root": {
                         textAlign: "center",
+                        border: `1px solid ${theme.palette.divider}`,
+                        fontWeight: "bold",
+                        fontSize: "0.75rem",
+                        padding: "4px 8px",
+                        backgroundColor:
+                          theme.palette.mode === "dark"
+                            ? theme.palette.grey[900]
+                            : theme.palette.grey[100],
                       },
                     }}
                   >
-                    <TableCell
-                      sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
-                    >
-                      ID
-                    </TableCell>
-                    <TableCell
-                      sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
-                    >
-                      Sector Name
-                    </TableCell>
-                    <TableCell
-                      sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
-                    >
-                      Status
-                    </TableCell>
-                    <TableCell
-                      sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
-                    >
-                      Occupations
-                    </TableCell>
-                    <TableCell
-                      sx={{ border: "1px solid #ccc", fontWeight: "bold" }}
-                      align="center"
-                    >
-                      Actions
+                    <TableCell sx={{ width: "6%" }}>ID</TableCell>
+                    <TableCell sx={{ width: "18%" }}>Sector Name</TableCell>
+                    <TableCell sx={{ width: "10%" }}>Status</TableCell>
+                    <TableCell sx={{ width: "50%" }}>Occupation</TableCell>
+                    <TableCell sx={{ width: "16%" }} align="center">
+                      Action
                     </TableCell>
                   </TableRow>
                 </TableHead>
@@ -568,69 +555,196 @@ const SectorOccupationIndex = () => {
                         page * rowsPerPage + rowsPerPage,
                       )
                       .map((sector) => (
-                        <TableRow key={sector.id} hover>
-                          <TableCell sx={{ border: "1px solid #ccc" }}>
+                        <TableRow
+                          key={sector.id}
+                          hover
+                          sx={{
+                            "&:hover": {
+                              backgroundColor: theme.palette.action.hover,
+                            },
+                          }}
+                        >
+                          <TableCell
+                            align="center"
+                            sx={{
+                              border: `1px solid ${theme.palette.divider}`,
+                              padding: "4px 8px",
+                              fontSize: "0.75rem",
+                              color: theme.palette.text.primary,
+                            }}
+                          >
                             {sector.id}
                           </TableCell>
-                          <TableCell sx={{ border: "1px solid #ccc" }}>
+                          <TableCell
+                            align="center"
+                            sx={{
+                              border: `1px solid ${theme.palette.divider}`,
+                              padding: "4px 8px",
+                              fontSize: "0.75rem",
+                              color: theme.palette.text.primary,
+                            }}
+                          >
                             {sector.sectorName}
                           </TableCell>
-                          <TableCell sx={{ border: "1px solid #ccc" }}>
+                          <TableCell
+                            align="center"
+                            sx={{
+                              border: `1px solid ${theme.palette.divider}`,
+                              padding: "4px 8px",
+                            }}
+                          >
                             <Chip
                               label={sector.isActive ? "Active" : "Inactive"}
                               color={sector.isActive ? "success" : "default"}
                               size="small"
+                              sx={{ height: 20, fontSize: "0.65rem" }}
                             />
                           </TableCell>
-                          <TableCell sx={{ border: "1px solid #ccc" }}>
-                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                          <TableCell
+                            sx={{
+                              border: `1px solid ${theme.palette.divider}`,
+                              padding: "4px 8px",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.25,
+                                maxHeight: "120px",
+                                overflowY: "auto",
+                                "&::-webkit-scrollbar": {
+                                  width: "4px",
+                                },
+                                "&::-webkit-scrollbar-track": {
+                                  background:
+                                    theme.palette.mode === "dark"
+                                      ? theme.palette.grey[800]
+                                      : "#f1f1f1",
+                                  borderRadius: "2px",
+                                },
+                                "&::-webkit-scrollbar-thumb": {
+                                  background:
+                                    theme.palette.mode === "dark"
+                                      ? theme.palette.grey[600]
+                                      : "#c1c1c1",
+                                  borderRadius: "2px",
+                                  "&:hover": {
+                                    background:
+                                      theme.palette.mode === "dark"
+                                        ? theme.palette.grey[500]
+                                        : "#a8a8a8",
+                                  },
+                                },
+                              }}
+                            >
                               {sector.occupations.length > 0 ? (
-                                sector.occupations.map((occ) => (
-                                  <Chip
-                                    key={occ.id}
-                                    label={`${occ.iscoCode} - ${occ.occupationName}`}
-                                    size="small"
-                                    variant={
-                                      occ.isActive ? "filled" : "outlined"
-                                    }
-                                    color={occ.isActive ? "primary" : "default"}
-                                  />
+                                sector.occupations.map((occ, index) => (
+                                  <Box
+                                    key={occ.id || index}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 0.5,
+                                      py: 0.25,
+                                      px: 0.5,
+                                      borderBottom: `1px solid ${theme.palette.divider}`,
+                                      "&:last-child": {
+                                        borderBottom: "none",
+                                      },
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontSize: "0.7rem",
+                                        color: theme.palette.text.secondary,
+                                        fontWeight: "bold",
+                                        minWidth: "20px",
+                                      }}
+                                    >
+                                      {index + 1}.
+                                    </Typography>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontSize: "0.7rem",
+                                        color: theme.palette.text.primary,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {occ.occupationName}
+                                    </Typography>
+                                    <Chip
+                                      label={occ.iscoCode}
+                                      size="small"
+                                      sx={{
+                                        minWidth: "60px",
+                                        height: 18,
+                                        backgroundColor:
+                                          theme.palette.mode === "dark"
+                                            ? theme.palette.primary.dark
+                                            : "#e3f2fd",
+                                        fontWeight: "bold",
+                                        fontSize: "0.6rem",
+                                        color:
+                                          theme.palette.mode === "dark"
+                                            ? theme.palette.primary.contrastText
+                                            : "inherit",
+                                      }}
+                                    />
+                                  </Box>
                                 ))
                               ) : (
                                 <Typography
                                   variant="body2"
                                   color="text.secondary"
+                                  align="center"
+                                  sx={{ fontSize: "0.7rem", py: 0.5 }}
                                 >
                                   No occupations
                                 </Typography>
                               )}
-                            </Stack>
+                            </Box>
                           </TableCell>
                           <TableCell
-                            sx={{ border: "1px solid #ccc" }}
+                            sx={{
+                              border: `1px solid ${theme.palette.divider}`,
+                              padding: "4px 8px",
+                            }}
                             align="center"
                           >
                             <Box
                               sx={{
                                 display: "flex",
                                 justifyContent: "center",
-                                gap: 1,
+                                gap: 0.25,
                               }}
                             >
                               <Tooltip title="Edit">
                                 <IconButton
                                   color="primary"
+                                  size="small"
                                   onClick={() => handleEditSector(sector)}
+                                  sx={{ padding: "2px" }}
                                 >
-                                  <EditIcon />
+                                  <EditIcon
+                                    fontSize="small"
+                                    sx={{ fontSize: "1rem" }}
+                                  />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Delete">
                                 <IconButton
                                   color="error"
+                                  size="small"
                                   onClick={() => handleDeleteClick(sector.id)}
+                                  sx={{ padding: "2px" }}
                                 >
-                                  <DeleteIcon />
+                                  <DeleteIcon
+                                    fontSize="small"
+                                    sx={{ fontSize: "1rem" }}
+                                  />
                                 </IconButton>
                               </Tooltip>
                             </Box>
@@ -640,7 +754,7 @@ const SectorOccupationIndex = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                        <Typography variant="body1" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary">
                           {searchTerm
                             ? "No sectors found matching your search."
                             : "No sectors available."}
@@ -658,6 +772,13 @@ const SectorOccupationIndex = () => {
                 page={page}
                 onPageChange={handleChangePage}
                 onRowsPerPageChange={handleChangeRowsPerPage}
+                sx={{
+                  "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                    {
+                      fontSize: "0.75rem",
+                    },
+                  borderTop: `1px solid ${theme.palette.divider}`,
+                }}
               />
             </>
           )}
@@ -669,9 +790,14 @@ const SectorOccupationIndex = () => {
           onClose={() => setOpen(false)}
           fullWidth
           maxWidth="md"
+          PaperProps={{
+            sx: {
+              backgroundColor: theme.palette.background.paper,
+            },
+          }}
         >
           <form onSubmit={formik.handleSubmit}>
-            <DialogTitle>
+            <DialogTitle sx={{ fontSize: "1.1rem", py: 1.5 }}>
               {editMode ? "Edit Sector" : "Add New Sector"}
               <IconButton
                 sx={{ position: "absolute", right: 8, top: 8 }}
@@ -680,11 +806,10 @@ const SectorOccupationIndex = () => {
                 <CloseIcon />
               </IconButton>
             </DialogTitle>
-            <DialogContent dividers>
-              {/* Sector Name - Required */}
+            <DialogContent dividers sx={{ py: 1 }}>
               <TextField
                 fullWidth
-                margin="normal"
+                margin="dense"
                 label={
                   <>
                     Sector Name <RequiredStar />
@@ -712,14 +837,14 @@ const SectorOccupationIndex = () => {
                     }
                     name="isActive"
                     color="primary"
+                    size="small"
                   />
                 }
                 label="Active"
-                sx={{ mt: 1, mb: 2 }}
+                sx={{ mt: 0.5, mb: 1 }}
               />
 
-              {/* Occupations - Required */}
-              <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ mt: 1 }}>
                 Occupations <RequiredStar />
               </Typography>
               {formik.touched.occupations &&
@@ -731,11 +856,11 @@ const SectorOccupationIndex = () => {
                 )}
 
               <Box
-                sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}
+                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}
               >
                 <TextField
                   fullWidth
-                  margin="none"
+                  margin="dense"
                   label="Occupation Name"
                   name="newOccupationName"
                   size="small"
@@ -753,7 +878,7 @@ const SectorOccupationIndex = () => {
                 />
                 <TextField
                   fullWidth
-                  margin="none"
+                  margin="dense"
                   label="ISCO Code"
                   name="newIscoCode"
                   size="small"
@@ -777,10 +902,12 @@ const SectorOccupationIndex = () => {
                 <Button
                   variant="contained"
                   onClick={handleAddOccupation}
+                  size="small"
                   disabled={
                     formik.values.newOccupationName.trim() === "" ||
                     formik.values.newIscoCode.trim() === ""
                   }
+                  sx={{ mt: 0.5 }}
                 >
                   Add
                 </Button>
@@ -788,12 +915,13 @@ const SectorOccupationIndex = () => {
 
               <Box
                 sx={{
-                  p: 2,
-                  maxHeight: 300,
+                  p: 1,
+                  maxHeight: 250,
                   overflowY: "auto",
-                  minHeight: 100,
-                  border: "1px solid #ccc",
+                  minHeight: 80,
+                  border: `1px solid ${theme.palette.divider}`,
                   borderRadius: 1,
+                  backgroundColor: theme.palette.background.default,
                 }}
               >
                 {formik.values.occupations.length === 0 ? (
@@ -805,31 +933,38 @@ const SectorOccupationIndex = () => {
                     No occupations added yet
                   </Typography>
                 ) : (
-                  <Stack direction="column" spacing={1}>
+                  <Stack direction="column" spacing={0.5}>
                     {formik.values.occupations.map((occ, index) => (
                       <Box
-                        key={index} // Use index as key since new occupations won't have IDs
+                        key={occ.id || index}
                         sx={{
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
-                          p: 1,
-                          bgcolor: "background.paper",
+                          p: 0.5,
+                          bgcolor: theme.palette.background.paper,
                           borderRadius: 1,
-                          border: "1px solid #e0e0e0",
+                          border: `1px solid ${theme.palette.divider}`,
                         }}
                       >
                         <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
                           <Chip
                             label={occ.isActive ? "Active" : "Inactive"}
                             color={occ.isActive ? "success" : "default"}
                             size="small"
                             onClick={() => handleToggleOccupationActive(index)}
-                            sx={{ cursor: "pointer" }}
+                            sx={{
+                              cursor: "pointer",
+                              height: 20,
+                              fontSize: "0.65rem",
+                            }}
                           />
-                          <Typography variant="body2">
+                          <Typography
+                            variant="body2"
+                            sx={{ fontSize: "0.8rem" }}
+                          >
                             <strong>{occ.iscoCode}</strong> -{" "}
                             {occ.occupationName}
                           </Typography>
@@ -842,8 +977,12 @@ const SectorOccupationIndex = () => {
                               onClick={() =>
                                 handleOpenEditOccupation(occ, index)
                               }
+                              sx={{ padding: "2px" }}
                             >
-                              <EditIcon fontSize="small" />
+                              <EditIcon
+                                fontSize="small"
+                                sx={{ fontSize: "0.9rem" }}
+                              />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Remove Occupation">
@@ -851,8 +990,12 @@ const SectorOccupationIndex = () => {
                               size="small"
                               color="error"
                               onClick={() => handleRemoveOccupation(index)}
+                              sx={{ padding: "2px" }}
                             >
-                              <DeleteIcon fontSize="small" />
+                              <DeleteIcon
+                                fontSize="small"
+                                sx={{ fontSize: "0.9rem" }}
+                              />
                             </IconButton>
                           </Tooltip>
                         </Box>
@@ -862,7 +1005,7 @@ const SectorOccupationIndex = () => {
                 )}
               </Box>
             </DialogContent>
-            <DialogActions>
+            <DialogActions sx={{ py: 1 }}>
               <Button
                 color="error"
                 size="small"
@@ -889,8 +1032,13 @@ const SectorOccupationIndex = () => {
           onClose={handleCloseEditOccupation}
           fullWidth
           maxWidth="sm"
+          PaperProps={{
+            sx: {
+              backgroundColor: theme.palette.background.paper,
+            },
+          }}
         >
-          <DialogTitle>
+          <DialogTitle sx={{ fontSize: "1.1rem", py: 1.5 }}>
             Edit Occupation
             <IconButton
               sx={{ position: "absolute", right: 8, top: 8 }}
@@ -899,11 +1047,10 @@ const SectorOccupationIndex = () => {
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent dividers>
-            {/* Occupation Name - Required in edit dialog */}
+          <DialogContent dividers sx={{ py: 1 }}>
             <TextField
               fullWidth
-              margin="normal"
+              margin="dense"
               label={
                 <>
                   Occupation Name <RequiredStar />
@@ -915,10 +1062,9 @@ const SectorOccupationIndex = () => {
               }
               size="small"
             />
-            {/* ISCO Code - Required in edit dialog */}
             <TextField
               fullWidth
-              margin="normal"
+              margin="dense"
               label={
                 <>
                   ISCO Code <RequiredStar />
@@ -938,13 +1084,14 @@ const SectorOccupationIndex = () => {
                     handleEditOccupationChange("isActive", e.target.checked)
                   }
                   color="primary"
+                  size="small"
                 />
               }
               label="Active"
-              sx={{ mt: 2 }}
+              sx={{ mt: 1 }}
             />
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ py: 1 }}>
             <Button
               color="error"
               size="small"
@@ -969,10 +1116,17 @@ const SectorOccupationIndex = () => {
           onClose={handleCancelDelete}
           maxWidth="xs"
           fullWidth
+          PaperProps={{
+            sx: {
+              backgroundColor: theme.palette.background.paper,
+            },
+          }}
         >
-          <DialogTitle>Confirm Delete</DialogTitle>
-          <DialogContent>
-            <Typography>
+          <DialogTitle sx={{ fontSize: "1.1rem", py: 1.5 }}>
+            Confirm Delete
+          </DialogTitle>
+          <DialogContent sx={{ py: 1 }}>
+            <Typography variant="body2" color="text.primary">
               Are you sure you want to delete this sector?
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -980,7 +1134,7 @@ const SectorOccupationIndex = () => {
               cannot be undone.
             </Typography>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ py: 1 }}>
             <Button
               variant="contained"
               size="small"

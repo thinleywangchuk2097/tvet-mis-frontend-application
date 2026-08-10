@@ -812,7 +812,7 @@ const AccreditedCourseRegistration = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        Accredited Course Application
+        List of BQF Programmes
       </Typography>
 
       <Grid
@@ -847,7 +847,7 @@ const AccreditedCourseRegistration = () => {
             onClick={handleAdd}
             sx={{ height: "36px" }}
           >
-            Add Course
+            Add Programme
           </Button>
         </Grid>
       </Grid>
@@ -858,7 +858,7 @@ const AccreditedCourseRegistration = () => {
             <TableRow>
               <TableCell>#</TableCell>
               <TableCell>Application No</TableCell>
-              <TableCell>Course Title</TableCell>
+              <TableCell>Programme Title</TableCell>
               <TableCell>Sector</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Action</TableCell>
@@ -980,7 +980,7 @@ const AccreditedCourseRegistration = () => {
       >
         <DialogTitle>
           {dialogMode === "add"
-            ? "Apply for Course Accreditation"
+            ? "Accreditation of BQF Programme"
             : dialogMode === "renewal"
               ? "Renew Course Accreditation"
               : "Accreditation Application Details"}
@@ -1048,7 +1048,7 @@ const AccreditedCourseRegistration = () => {
                         fullWidth
                         label={
                           <>
-                            Curriculum <RequiredStar />
+                            Curriculum Title<RequiredStar />
                           </>
                         }
                         name="curriculumId"
@@ -1266,7 +1266,7 @@ const AccreditedCourseRegistration = () => {
                       {isBasicInfoReadOnly() ? (
                         <TextField
                           fullWidth
-                          label="Course"
+                          label="Programme Title"
                           name="courseName"
                           size="small"
                           value={formik.values.courseName}
@@ -1282,7 +1282,7 @@ const AccreditedCourseRegistration = () => {
                           fullWidth
                           label={
                             <>
-                              Course <RequiredStar />
+                              Programme Title <RequiredStar />
                             </>
                           }
                           name="courseId"

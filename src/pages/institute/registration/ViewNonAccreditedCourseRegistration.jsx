@@ -659,6 +659,7 @@ const PaymentInfoCard = ({ paymentStatus, onGeneratePayment }) => {
   );
 };
 
+// ==================== UPDATED TAB NAVIGATION COMPONENT ====================
 const TabNavigation = ({
   tabs,
   tabValue,
@@ -669,6 +670,7 @@ const TabNavigation = ({
   onPrevious,
   onNext,
   children,
+  actionButtons, // New prop for action buttons
 }) => (
   <>
     <Tabs
@@ -682,30 +684,47 @@ const TabNavigation = ({
       ))}
     </Tabs>
     {children}
-    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-      {!isFirstTab && (
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<SkipPreviousIcon />}
-          onClick={onPrevious}
-          sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
-        >
-          Previous
-        </Button>
-      )}
-      {!isLastTab && (
-        <Button
-          variant="contained"
-          color="primary"
-          size="small"
-          endIcon={<SkipNextIcon />}
-          onClick={onNext}
-          sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
-        >
-          Next
-        </Button>
-      )}
+
+    {/* Navigation and Action Buttons Container */}
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        mt: 3,
+      }}
+    >
+      {/* Left side - Previous button */}
+      <Box>
+        {!isFirstTab && (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<SkipPreviousIcon />}
+            onClick={onPrevious}
+            sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
+          >
+            Previous
+          </Button>
+        )}
+      </Box>
+
+      {/* Right side - Next button or Action buttons */}
+      <Box sx={{ display: "flex", gap: 2 }}>
+        {!isLastTab && (
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            endIcon={<SkipNextIcon />}
+            onClick={onNext}
+            sx={{ fontWeight: 600, textTransform: "none", px: 3, py: 0.5 }}
+          >
+            Next
+          </Button>
+        )}
+        {isLastTab && actionButtons}
+      </Box>
     </Box>
   </>
 );
@@ -913,6 +932,138 @@ const ViewApplyNonAccreditedCourse = () => {
   const isLastTab = tabValue === tabs.length - 1;
   const isFirstTab = tabValue === 0;
 
+  // Action buttons component
+  const ActionButtons = () => (
+    <>
+      {roleId === "7" && (
+        <>
+          <Tooltip
+            title={
+              !paymentHook.isPaymentPaid
+                ? "Payment must be completed before verification"
+                : ""
+            }
+            arrow
+          >
+            <span>
+              <Button
+                variant="contained"
+                color="success"
+                size="small"
+                startIcon={<CheckCircleIcon />}
+                onClick={() => dialogHook.openDialog(STATUS.VERIFY_QAS1)}
+                disabled={!paymentHook.isPaymentPaid}
+                sx={{
+                  px: 3,
+                  py: 0.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                }}
+              >
+                Verify
+              </Button>
+            </span>
+          </Tooltip>
+          <Button
+            variant="contained"
+            color="error"
+            size="small"
+            startIcon={<CancelIcon />}
+            onClick={() => dialogHook.openDialog(STATUS.REJECT)}
+            sx={{
+              px: 3,
+              py: 0.5,
+              fontWeight: 600,
+              textTransform: "none",
+            }}
+          >
+            Reject
+          </Button>
+        </>
+      )}
+      {roleId === "10" && (
+        <>
+          <Button
+            variant="contained"
+            color="success"
+            size="small"
+            startIcon={<CheckCircleIcon />}
+            onClick={() => dialogHook.openDialog(STATUS.VERIFY_QAS2)}
+            sx={{
+              px: 3,
+              py: 0.5,
+              fontWeight: 600,
+              textTransform: "none",
+            }}
+          >
+            Verify
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            size="small"
+            startIcon={<CancelIcon />}
+            onClick={() => dialogHook.openDialog(STATUS.REJECT_QAS2)}
+            sx={{
+              px: 3,
+              py: 0.5,
+              fontWeight: 600,
+              textTransform: "none",
+            }}
+          >
+            Reject
+          </Button>
+        </>
+      )}
+      {roleId === "23" && (
+        <Button
+          variant="contained"
+          color="primary"
+          size="small"
+          startIcon={<VerifiedIcon />}
+          onClick={() => dialogHook.openDialog(STATUS.ENDORSE_REC)}
+          sx={{
+            px: 3,
+            py: 0.5,
+            fontWeight: 600,
+            textTransform: "none",
+          }}
+        >
+          Endorse
+        </Button>
+      )}
+      {roleId === "22" && (
+        <Tooltip
+          title={
+            !paymentHook.isPaymentPaid
+              ? "Payment must be completed before approval"
+              : ""
+          }
+          arrow
+        >
+          <span>
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              startIcon={<CheckCircleIcon />}
+              onClick={() => dialogHook.openDialog(STATUS.APPROVE_DG)}
+              disabled={!paymentHook.isPaymentPaid}
+              sx={{
+                px: 3,
+                py: 0.5,
+                fontWeight: 600,
+                textTransform: "none",
+              }}
+            >
+              Approve
+            </Button>
+          </span>
+        </Tooltip>
+      )}
+    </>
+  );
+
   if (loading) {
     return (
       <Box sx={{ p: 1, minHeight: "100vh" }}>
@@ -959,66 +1110,132 @@ const ViewApplyNonAccreditedCourse = () => {
           isFirstTab={isFirstTab}
           onPrevious={() => setTabValue(tabValue - 1)}
           onNext={() => setTabValue(tabValue + 1)}
+          actionButtons={<ActionButtons />}
         >
           {/* Tab 0: Course Information */}
           {tabValue === 0 && (
             <Paper sx={{ p: 3, mb: 2 }} variant="outlined">
-              <SectionHeader title="Institute Information" />
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <ReadOnlyField
-                  label="Training Provider/Institution Name"
-                  value={data.proposed_institute_name}
-                />
-                <ReadOnlyField
-                  label="Registration Number"
-                  value={data.registration_no}
-                />
-              </Grid>
-              <Divider sx={{ my: 3 }} />
-              <SectionHeader title="Course Information" />
               <Grid container spacing={2}>
-                <ReadOnlyField label="Course Title" value={data.course_title} />
-                <ReadOnlyField
-                  label="Certificate Level"
-                  value={courseDataHook.getCertificateLevelName(
-                    data.certificate_level_id,
-                  )}
-                />
-                <ReadOnlyField
-                  label="Theory (Hours)"
-                  value={data.total_theory_duration}
-                  gridProps={{ xs: 12, md: 4 }}
-                />
-                <ReadOnlyField
-                  label="Practical (Hours)"
-                  value={data.total_practical_duration}
-                  gridProps={{ xs: 12, md: 4 }}
-                />
-                <ReadOnlyField
-                  label="OJT (Hours)"
-                  value={data.total_ojt_duration}
-                  gridProps={{ xs: 12, md: 4 }}
-                />
-                <ReadOnlyField
-                  label="Fees per trainee (RM)"
-                  value={data.fees_per_trainee}
-                  gridProps={{ xs: 12, md: 4 }}
-                />
-                <ReadOnlyField
-                  label="Enrollment capacity per batch"
-                  value={data.enrolment_capacity}
-                  gridProps={{ xs: 12, md: 4 }}
-                />
-                <ReadOnlyField
-                  label="Curriculum Type"
-                  value={data.curriculum_name}
-                  gridProps={{ xs: 12, md: 4 }}
-                />
+                {/* Institute Information - Registration No */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Registration No"
+                    value={data.registration_no || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Institute Information - Institute Name */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Training Provider/Institution Name"
+                    value={data.proposed_institute_name || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Course Title */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Course Title"
+                    value={data.course_title || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Certificate Level */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Certificate Level"
+                    value={courseDataHook.getCertificateLevelName(
+                      data.certificate_level_id,
+                    )}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Theory Duration */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Theory (Hours)"
+                    value={data.total_theory_duration || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Practical Duration */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Practical (Hours)"
+                    value={data.total_practical_duration || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* OJT Duration */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="OJT (Hours)"
+                    value={data.total_ojt_duration || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Fees per trainee */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Fees per trainee (Nu.)"
+                    value={data.fees_per_trainee || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Enrollment capacity */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Enrollment capacity per batch"
+                    value={data.enrolment_capacity || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Curriculum Type */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Curriculum Type"
+                    value={data.curriculum_name || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                {/* Application No */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Application No"
+                    value={data.application_no || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
               </Grid>
+              {/* Remarks/History section */}
               {data.remarks && (
                 <>
                   <Divider sx={{ my: 3 }} />
-                  <SectionHeader title="Remarks / History" />
+                  <Typography variant="subtitle2" fontWeight={600} mb={2}>
+                    Remarks / History
+                  </Typography>
                   <TextField
                     fullWidth
                     multiline
@@ -1114,147 +1331,6 @@ const ViewApplyNonAccreditedCourse = () => {
                 </Paper>
               </Grid>
             </Grid>
-          )}
-
-          {/* Action Buttons */}
-          {isLastTab && (
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 2,
-                mt: 3,
-              }}
-            >
-              {roleId === "7" && (
-                <>
-                  <Tooltip
-                    title={
-                      !paymentHook.isPaymentPaid
-                        ? "Payment must be completed before verification"
-                        : ""
-                    }
-                    arrow
-                  >
-                    <span>
-                      <Button
-                        variant="contained"
-                        color="success"
-                        size="small"
-                        startIcon={<CheckCircleIcon />}
-                        onClick={() =>
-                          dialogHook.openDialog(STATUS.VERIFY_QAS1)
-                        }
-                        disabled={!paymentHook.isPaymentPaid}
-                        sx={{
-                          px: 3,
-                          py: 0.5,
-                          fontWeight: 600,
-                          textTransform: "none",
-                        }}
-                      >
-                        Verify
-                      </Button>
-                    </span>
-                  </Tooltip>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    startIcon={<CancelIcon />}
-                    onClick={() => dialogHook.openDialog(STATUS.REJECT)}
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
-                  >
-                    Reject
-                  </Button>
-                </>
-              )}
-              {roleId === "10" && (
-                <>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    size="small"
-                    startIcon={<CheckCircleIcon />}
-                    onClick={() => dialogHook.openDialog(STATUS.VERIFY_QAS2)}
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
-                  >
-                    Verify
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    startIcon={<CancelIcon />}
-                    onClick={() => dialogHook.openDialog(STATUS.REJECT_QAS2)}
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
-                  >
-                    Reject
-                  </Button>
-                </>
-              )}
-              {roleId === "23" && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  startIcon={<VerifiedIcon />}
-                  onClick={() => dialogHook.openDialog(STATUS.ENDORSE_REC)}
-                  sx={{
-                    px: 3,
-                    py: 0.5,
-                    fontWeight: 600,
-                    textTransform: "none",
-                  }}
-                >
-                  Endorse
-                </Button>
-              )}
-              {roleId === "22" && (
-                <Tooltip
-                  title={
-                    !paymentHook.isPaymentPaid
-                      ? "Payment must be completed before approval"
-                      : ""
-                  }
-                  arrow
-                >
-                  <span>
-                    <Button
-                      variant="contained"
-                      color="success"
-                      size="small"
-                      startIcon={<CheckCircleIcon />}
-                      onClick={() => dialogHook.openDialog(STATUS.APPROVE_DG)}
-                      disabled={!paymentHook.isPaymentPaid}
-                      sx={{
-                        px: 3,
-                        py: 0.5,
-                        fontWeight: 600,
-                        textTransform: "none",
-                      }}
-                    >
-                      Approve
-                    </Button>
-                  </span>
-                </Tooltip>
-              )}
-            </Box>
           )}
         </TabNavigation>
       </Paper>

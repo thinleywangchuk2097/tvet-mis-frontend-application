@@ -956,7 +956,7 @@ const MonitoringAssessmentIndex = () => {
               type="submit"
               variant="contained"
               color="primary"
-              size="large"
+              size="small"
               startIcon={
                 submitting ? (
                   <CircularProgress size={20} />
@@ -965,7 +965,6 @@ const MonitoringAssessmentIndex = () => {
                 )
               }
               disabled={submitting || !isAllRadiosChecked}
-              sx={{ px: 4, py: 1 }}
             >
               {submitting ? "Submitting..." : "Submit"}
             </Button>
