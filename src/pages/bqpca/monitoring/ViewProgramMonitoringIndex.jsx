@@ -1,5 +1,10 @@
-// ViewProgramMonitoringIndex.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Paper,
   Typography,
@@ -26,12 +31,7 @@ import { useSelector } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
 import ProgramMonitoringService from "../../../api/services/internal/monitoring/ProgramMonitoringService";
 import CommonService from "../../../api/services/internal/common/CommonService";
-
-// ==================== CONSTANTS ====================
-const STATUS = {
-  APPROVED: 57,
-  RESUBMITTED: 104,
-};
+import FileDownload from "../../../components/file/FileDownload";
 
 const TABLE_STYLE = {
   border: "1px solid",
@@ -55,93 +55,229 @@ const TABLE_STYLE = {
   },
 };
 
-// ==================== UTILITY FUNCTIONS ====================
-const structureChecklistData = (data) => {
-  if (!data || data.length === 0) return [];
-
-  const mainCategories = data.filter(
-    (item) =>
-      (item.parentId === 0 || item.parentId === null || !item.parentId) &&
-      (!item.parent_id || item.parent_id === 0),
-  );
-
-  const subCategories = data.filter(
-    (item) =>
-      (item.parentId !== 0 && item.parentId) ||
-      (item.parent_id !== 0 && item.parent_id),
-  );
-
-  let structured = [];
-
-  if (mainCategories.length > 0) {
-    structured = mainCategories.map((category) => ({
-      id: category.id?.toString() || category.standard_id?.toString(),
-      title:
-        category.dropdownName ||
-        category.description ||
-        category.name ||
-        `Category ${category.id}`,
-      rows: subCategories
-        .filter(
-          (sub) =>
-            sub.parentId === category.id || sub.parent_id === category.id,
-        )
-        .map((sub) => ({
-          id: sub.id?.toString() || sub.standard_id?.toString(),
-          value:
-            sub.dropdownName ||
-            sub.description ||
-            sub.name ||
-            `Question ${sub.id}`,
-        })),
-    }));
-  } else {
-    structured = [
-      {
-        id: "1",
-        title: "Quality Standards Checklist",
-        rows: data.map((item) => ({
-          id: item.id?.toString() || item.standard_id?.toString(),
-          value:
-            item.dropdownName ||
-            item.description ||
-            item.name ||
-            `Question ${item.id}`,
-        })),
-      },
-    ];
-  }
-
-  return structured.filter((category) => category.rows.length > 0);
+// Status constants
+const STATUS = {
+  APPROVED: 57,
+  RESUBMITTED: 104,
 };
 
-// ==================== CUSTOM HOOKS ====================
-const useMonitoringChecklist = () => {
-  const [qualityData, setQualityData] = useState([]);
+const ViewProgramMonitoringIndex = () => {
+  const { applicationNo } = useParams();
+  const navigate = useNavigate();
+  const access_token = useSelector((state) => state.auth.accessToken);
+  const actionId = useSelector((state) => state.auth.id);
+  const currentRoleId = useSelector((state) => state.auth.current_roleId);
+
+  // State
+  const [selectedProgram, setSelectedProgram] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [description, setDescription] = useState("");
+  const [descriptionError, setDescriptionError] = useState("");
   const [qualityResponses, setQualityResponses] = useState({});
   const [qualityRemarks, setQualityRemarks] = useState({});
+  const [programMonitoringDetails, setProgramMonitoringDetails] = useState([]);
+  const [dzongkhagList, setDzongkhagList] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [qualityData, setQualityData] = useState([]);
+  const [qualityStandardsLoading, setQualityStandardsLoading] = useState(false);
+  const [qualityStandardsError, setQualityStandardsError] = useState(null);
+  const [courseTypesMap, setCourseTypesMap] = useState({});
+  const [courseNamesMap, setCourseNamesMap] = useState({});
 
-  const fetchQualityStandards = useCallback(async (serviceId) => {
-    setLoading(true);
-    setError(null);
+  // File upload state
+  const [documents, setDocuments] = useState([]);
+  const [newDocuments, setNewDocuments] = useState([]);
+
+  // Use ref to track if data has been fetched
+  const dataFetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (applicationNo && !dataFetchedRef.current) {
+      dataFetchedRef.current = true;
+      fetchProgramMonitoringAssessment();
+    }
+    fetchDzongkhagLists();
+    fetchCourseTypes();
+  }, [applicationNo]);
+
+  // Effect to parse checklists when quality data is loaded
+  useEffect(() => {
+    if (
+      selectedProgram &&
+      qualityData.length > 0 &&
+      selectedProgram.checklists
+    ) {
+      const { responses, remarks } = parseChecklistData(
+        selectedProgram.checklists,
+      );
+      setQualityResponses(responses);
+      setQualityRemarks(remarks);
+    }
+  }, [qualityData, selectedProgram]);
+
+  const fetchDzongkhagLists = async () => {
+    try {
+      const response = await CommonService.getAllDzongkhags();
+      setDzongkhagList(response.data || []);
+    } catch (error) {
+      console.error("Error fetching dzongkhag dropdown:", error);
+      toast.error("Failed to load dzongkhags");
+    }
+  };
+
+  const fetchCourseTypes = async () => {
+    try {
+      const response =
+        await ProgramMonitoringService.getCourseTypes(access_token);
+      const courseTypes = response.data || [];
+      const typesMap = {};
+      courseTypes.forEach((type) => {
+        typesMap[type.id] = type.service_name;
+      });
+      setCourseTypesMap(typesMap);
+    } catch (error) {
+      console.error("Error fetching course types:", error);
+    }
+  };
+
+  const fetchCourseNamesForProgram = async (program) => {
+    if (
+      !program?.course_id ||
+      !program?.institute_id ||
+      !program?.course_type_id
+    ) {
+      return;
+    }
+
+    try {
+      const response = await ProgramMonitoringService.getCourseByInstituteId(
+        program.institute_id,
+        program.course_type_id,
+        access_token,
+      );
+      const courses = response.data || [];
+      const newMap = { ...courseNamesMap };
+      courses.forEach((course) => {
+        const id = course.id || course.course_id;
+        newMap[id] = course.course_name;
+      });
+      setCourseNamesMap(newMap);
+    } catch (error) {
+      console.error("Error fetching course for program:", error);
+    }
+  };
+
+  const fetchQualityStandards = async (serviceId) => {
+    setQualityStandardsLoading(true);
+    setQualityStandardsError(null);
     try {
       const response = await CommonService.getAllQualitystandards(serviceId);
-      const structured = structureChecklistData(response.data || []);
-      setQualityData(structured);
-      if (structured.length === 0) {
-        setError("No quality standards found for this service");
+      const checklistData = response.data || [];
+      if (checklistData && checklistData.length > 0) {
+        const mainCategories = checklistData.filter(
+          (item) =>
+            (item.parentId === 0 || item.parentId === null || !item.parentId) &&
+            (!item.parent_id || item.parent_id === 0),
+        );
+
+        const subCategories = checklistData.filter(
+          (item) =>
+            (item.parentId !== 0 && item.parentId) ||
+            (item.parent_id !== 0 && item.parent_id),
+        );
+
+        let structured = [];
+
+        if (mainCategories.length > 0) {
+          structured = mainCategories.map((category) => ({
+            id: category.id?.toString() || category.standard_id?.toString(),
+            title:
+              category.dropdownName ||
+              category.description ||
+              category.name ||
+              `Category ${category.id}`,
+            rows: subCategories
+              .filter(
+                (sub) =>
+                  sub.parentId === category.id || sub.parent_id === category.id,
+              )
+              .map((sub) => ({
+                id: sub.id?.toString() || sub.standard_id?.toString(),
+                value:
+                  sub.dropdownName ||
+                  sub.description ||
+                  sub.name ||
+                  `Question ${sub.id}`,
+              })),
+          }));
+        } else {
+          structured = [
+            {
+              id: "1",
+              title: "Quality Standards Checklist",
+              rows: checklistData.map((item) => ({
+                id: item.id?.toString() || item.standard_id?.toString(),
+                value:
+                  item.dropdownName ||
+                  item.description ||
+                  item.name ||
+                  `Question ${item.id}`,
+              })),
+            },
+          ];
+        }
+
+        structured = structured.filter((category) => category.rows.length > 0);
+        setQualityData(structured);
+
+        if (structured.length === 0) {
+          setQualityStandardsError(
+            "No quality standards found for this service",
+          );
+        }
+      } else {
+        setQualityStandardsError(
+          "No quality standards available for this service",
+        );
+        setQualityData([]);
       }
     } catch (error) {
       console.error("Error fetching quality standards:", error);
-      setError(error.message || "Failed to load quality standards");
+      setQualityStandardsError(
+        error.message || "Failed to load quality standards",
+      );
       toast.error("Failed to load quality standards");
       setQualityData([]);
     } finally {
+      setQualityStandardsLoading(false);
+    }
+  };
+
+  const fetchProgramMonitoringAssessment = async () => {
+    setLoading(true);
+    try {
+      const response =
+        await ProgramMonitoringService.getProgramMonitoringByApplicationNo(
+          applicationNo,
+          access_token,
+        );
+      const data = Array.isArray(response.data)
+        ? response.data
+        : [response.data];
+      setProgramMonitoringDetails(data);
+      console.log("Program Monitoring Details:", data);
+
+      if (data && data.length > 0) {
+        // Call loadProgramData directly with the data
+        await loadProgramData(data[0]);
+      }
+    } catch (error) {
+      console.error("Error fetching Program Monitoring Details:", error);
+      toast.error("Failed to load Program Monitoring Details");
+    } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   const parseChecklistData = useCallback(
     (checklistString) => {
@@ -162,11 +298,20 @@ const useMonitoringChecklist = () => {
             }
           }
 
-          const categoryId = foundCategory?.id || "default";
-          if (!responses[categoryId]) responses[categoryId] = {};
-          if (!remarks[categoryId]) remarks[categoryId] = {};
-          responses[categoryId][item.standardId] = item.responseId;
-          remarks[categoryId][item.standardId] = item.remarks || "";
+          if (foundCategory) {
+            const categoryId = foundCategory.id;
+            if (!responses[categoryId]) responses[categoryId] = {};
+            if (!remarks[categoryId]) remarks[categoryId] = {};
+            responses[categoryId][item.standardId] = item.responseId;
+            remarks[categoryId][item.standardId] = item.remarks || "";
+          } else {
+            const defaultCategoryId = "default";
+            if (!responses[defaultCategoryId])
+              responses[defaultCategoryId] = {};
+            if (!remarks[defaultCategoryId]) remarks[defaultCategoryId] = {};
+            responses[defaultCategoryId][item.standardId] = item.responseId;
+            remarks[defaultCategoryId][item.standardId] = item.remarks || "";
+          }
         });
 
         return { responses, remarks };
@@ -178,424 +323,6 @@ const useMonitoringChecklist = () => {
     [qualityData],
   );
 
-  const handleQualityResponseChange = useCallback(
-    (categoryId, questionId, value) => {
-      setQualityResponses((prev) => {
-        const newResponses = { ...prev };
-        if (!newResponses[categoryId]) newResponses[categoryId] = {};
-        if (newResponses[categoryId][questionId] === value) {
-          delete newResponses[categoryId][questionId];
-          if (Object.keys(newResponses[categoryId]).length === 0) {
-            delete newResponses[categoryId];
-          }
-        } else {
-          newResponses[categoryId][questionId] = value;
-        }
-        return newResponses;
-      });
-    },
-    [],
-  );
-
-  const handleQualityRemarkChange = useCallback(
-    (categoryId, questionId, value) => {
-      setQualityRemarks((prev) => ({
-        ...prev,
-        [categoryId]: { ...prev[categoryId], [questionId]: value },
-      }));
-    },
-    [],
-  );
-
-  const isAllQuestionsAnswered = useMemo(() => {
-    if (qualityData.length === 0) return false;
-    let totalQuestions = 0;
-    let answeredQuestions = 0;
-
-    qualityData.forEach((category) => {
-      category.rows.forEach((row) => {
-        totalQuestions++;
-        const response = qualityResponses[category.id]?.[row.id];
-        if (response === "Y" || response === "N") answeredQuestions++;
-      });
-    });
-
-    return totalQuestions > 0 && answeredQuestions === totalQuestions;
-  }, [qualityData, qualityResponses]);
-
-  const getProgressText = useCallback(() => {
-    if (qualityData.length === 0) return "";
-    let totalQuestions = 0;
-    let answeredQuestions = 0;
-
-    qualityData.forEach((category) => {
-      category.rows.forEach(() => totalQuestions++);
-    });
-
-    Object.keys(qualityResponses).forEach((categoryId) => {
-      Object.keys(qualityResponses[categoryId] || {}).forEach((questionId) => {
-        const response = qualityResponses[categoryId][questionId];
-        if (response === "Y" || response === "N") answeredQuestions++;
-      });
-    });
-
-    return `${answeredQuestions}/${totalQuestions} questions answered`;
-  }, [qualityData, qualityResponses]);
-
-  const prepareQualityStandardsForUpdate = useCallback(
-    (selectedProgram) => {
-      const qualityStandardsData = [];
-      Object.keys(qualityResponses).forEach((categoryId) => {
-        Object.keys(qualityResponses[categoryId]).forEach((questionId) => {
-          const responseValue = qualityResponses[categoryId][questionId];
-          const remark = qualityRemarks[categoryId]?.[questionId] || "";
-          if (responseValue && responseValue !== "") {
-            let existingId = null;
-            if (selectedProgram?.checklists) {
-              try {
-                const existingItems = JSON.parse(selectedProgram.checklists);
-                const existingItem = existingItems.find(
-                  (item) => item.standardId === parseInt(questionId, 10),
-                );
-                if (existingItem) existingId = existingItem.id;
-              } catch (error) {
-                console.error("Error parsing existing checklists:", error);
-              }
-            }
-            qualityStandardsData.push({
-              id: existingId,
-              standardId: parseInt(questionId, 10),
-              responseId: responseValue,
-              remarks: remark,
-            });
-          }
-        });
-      });
-      return qualityStandardsData;
-    },
-    [qualityResponses, qualityRemarks],
-  );
-
-  const resetChecklist = useCallback(() => {
-    setQualityData([]);
-    setQualityResponses({});
-    setQualityRemarks({});
-    setError(null);
-  }, []);
-
-  return {
-    qualityData,
-    qualityResponses,
-    qualityRemarks,
-    loading,
-    error,
-    fetchQualityStandards,
-    parseChecklistData,
-    handleQualityResponseChange,
-    handleQualityRemarkChange,
-    isAllQuestionsAnswered,
-    getProgressText,
-    prepareQualityStandardsForUpdate,
-    resetChecklist,
-    setQualityResponses,
-    setQualityRemarks,
-  };
-};
-
-// ==================== REUSABLE COMPONENTS ====================
-const LoadingSpinner = ({ message = "Loading..." }) => (
-  <Box
-    display="flex"
-    justifyContent="center"
-    alignItems="center"
-    minHeight="400px"
-  >
-    <CircularProgress />
-  </Box>
-);
-
-const SectionHeader = ({ title, onBack }) => (
-  <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
-    {onBack && (
-      <IconButton onClick={onBack} sx={{ mr: 2 }} aria-label="back">
-        <ArrowBackIcon />
-      </IconButton>
-    )}
-    <Typography variant="h6">{title}</Typography>
-  </Box>
-);
-
-const ProgramInfoHeader = ({ program, getDzongkhagName }) => {
-  if (!program) return null;
-  return (
-    <Box sx={{ mb: 2, p: 2, bgcolor: "#f5f5f5", borderRadius: 1 }}>
-      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-        <strong>Institute:</strong> {program?.institute_name} |{" "}
-        <strong>Registration No:</strong> {program?.registration_no} |{" "}
-        <strong>Course Type:</strong> {program?.course_type_name} |{" "}
-        <strong>Course:</strong> {program?.course_name}
-      </Typography>
-      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-        <strong>Dzongkhag:</strong> {getDzongkhagName(program?.dzongkhag_id)} |{" "}
-        <strong>Monitoring Date:</strong> {program?.monitoring_date}
-      </Typography>
-      <Typography variant="subtitle2" color="text.secondary">
-        <strong>Current Status:</strong> {program?.status || "Pending Review"}
-      </Typography>
-    </Box>
-  );
-};
-
-const ProgressIndicator = ({ progressText, isComplete }) => (
-  <Box
-    sx={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      mb: 2,
-    }}
-  >
-    <Typography variant="caption" color="text.secondary">
-      {progressText}
-    </Typography>
-    <Typography variant="caption" color={isComplete ? "success.main" : "error"}>
-      {isComplete
-        ? "✓ All questions have been answered"
-        : "* Please answer all questions"}
-    </Typography>
-  </Box>
-);
-
-const ChecklistQuestion = ({
-  row,
-  index,
-  categoryId,
-  qualityResponses,
-  qualityRemarks,
-  onResponseChange,
-  onRemarkChange,
-}) => {
-  const selectedValue = qualityResponses[categoryId]?.[row.id];
-  const isYes = selectedValue === "Y";
-  const isNo = selectedValue === "N";
-  const remark = qualityRemarks[categoryId]?.[row.id] || "";
-
-  return (
-    <TableRow key={row.id}>
-      <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
-        {index + 1}
-      </TableCell>
-      <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
-        {row.value}
-      </TableCell>
-      <TableCell align="center" sx={{ p: "2px 4px" }}>
-        <Radio
-          size="small"
-          sx={{ p: 0, "& .MuiSvgIcon-root": { fontSize: "1rem" } }}
-          checked={isYes}
-          onChange={() => {
-            const newValue = isYes ? undefined : "Y";
-            onResponseChange(categoryId, row.id, newValue);
-          }}
-        />
-      </TableCell>
-      <TableCell align="center" sx={{ p: "2px 4px" }}>
-        <Radio
-          size="small"
-          sx={{ p: 0, "& .MuiSvgIcon-root": { fontSize: "1rem" } }}
-          checked={isNo}
-          onChange={() => {
-            const newValue = isNo ? undefined : "N";
-            onResponseChange(categoryId, row.id, newValue);
-          }}
-        />
-      </TableCell>
-      <TableCell sx={{ p: "4px 4px" }}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Remarks"
-          value={remark}
-          onChange={(e) => onRemarkChange(categoryId, row.id, e.target.value)}
-          slotProps={{
-            input: {
-              sx: { fontSize: "0.70rem", py: 0.5, "& textarea": { py: 0.5 } },
-            },
-          }}
-          multiline
-          rows={1}
-        />
-      </TableCell>
-    </TableRow>
-  );
-};
-
-const ChecklistCategory = ({
-  standard,
-  qualityResponses,
-  qualityRemarks,
-  onResponseChange,
-  onRemarkChange,
-}) => (
-  <Paper sx={{ p: 1.5, border: "1px solid", borderColor: "divider" }}>
-    <Typography sx={{ fontSize: "0.75rem", fontWeight: 600 }} mb={0.5}>
-      {standard.title}
-    </Typography>
-    <TableContainer>
-      <Table size="small" sx={TABLE_STYLE}>
-        <TableHead>
-          <TableRow>
-            <TableCell width="30" sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
-              Sl. No
-            </TableCell>
-            <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
-              Quality Indicator
-            </TableCell>
-            <TableCell
-              align="center"
-              width="60"
-              sx={{ fontSize: "0.70rem", p: "4px 4px" }}
-            >
-              YES
-            </TableCell>
-            <TableCell
-              align="center"
-              width="60"
-              sx={{ fontSize: "0.70rem", p: "4px 4px" }}
-            >
-              NO
-            </TableCell>
-            <TableCell width="200" sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
-              Remarks
-            </TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {standard.rows.map((row, index) => (
-            <ChecklistQuestion
-              key={row.id}
-              row={row}
-              index={index}
-              categoryId={standard.id}
-              qualityResponses={qualityResponses}
-              qualityRemarks={qualityRemarks}
-              onResponseChange={onResponseChange}
-              onRemarkChange={onRemarkChange}
-            />
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  </Paper>
-);
-
-const DescriptionField = ({ value, onChange, error, helperText }) => (
-  <Box sx={{ mt: 3 }}>
-    <Typography variant="subtitle1" gutterBottom>
-      Description / Remarks <span style={{ color: "red" }}>*</span>
-    </Typography>
-    <TextField
-      fullWidth
-      multiline
-      rows={4}
-      placeholder="Enter description or additional remarks about the program monitoring assessment..."
-      value={value}
-      onChange={onChange}
-      variant="outlined"
-      size="medium"
-      error={!!error}
-      helperText={helperText}
-      sx={{ "& .MuiInputBase-root": { fontSize: "0.875rem" } }}
-    />
-  </Box>
-);
-
-const ActionButtons = ({
-  onCancel,
-  onResubmit,
-  onApprove,
-  submitting,
-  isFormValid,
-}) => (
-  <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}>
-    <Button
-      onClick={onCancel}
-      color="secondary"
-      variant="outlined"
-      disabled={submitting}
-    >
-      Cancel
-    </Button>
-    <Button
-      onClick={onResubmit}
-      variant="contained"
-      startIcon={submitting ? <CircularProgress size={20} /> : <ReplayIcon />}
-      disabled={submitting || !isFormValid}
-      sx={{
-        backgroundColor: "#ff9800",
-        "&:hover": { backgroundColor: "#f57c00" },
-        "&.Mui-disabled": { backgroundColor: "#ffb74d", opacity: 0.7 },
-      }}
-    >
-      {submitting ? "Resubmitting..." : "Resubmit"}
-    </Button>
-    <Button
-      onClick={onApprove}
-      variant="contained"
-      color="success"
-      startIcon={
-        submitting ? <CircularProgress size={20} /> : <CheckCircleIcon />
-      }
-      disabled={submitting || !isFormValid}
-      sx={{
-        backgroundColor: "#4caf50",
-        "&:hover": { backgroundColor: "#45a049" },
-        "&.Mui-disabled": { backgroundColor: "#81c784", opacity: 0.7 },
-      }}
-    >
-      {submitting ? "Approving..." : "Approve"}
-    </Button>
-  </Box>
-);
-
-const EmptyState = ({ message }) => (
-  <Box sx={{ textAlign: "center", py: 4 }}>
-    <Typography color="text.secondary">{message}</Typography>
-  </Box>
-);
-
-// ==================== MAIN COMPONENT ====================
-const ViewProgramMonitoringIndex = () => {
-  const { applicationNo } = useParams();
-  const navigate = useNavigate();
-  const access_token = useSelector((state) => state.auth.accessToken);
-  const actionId = useSelector((state) => state.auth.id);
-  const currentRoleId = useSelector((state) => state.auth.current_roleId);
-
-  // Local state
-  const [selectedProgram, setSelectedProgram] = useState(null);
-  const [programMonitoringDetails, setProgramMonitoringDetails] = useState([]);
-  const [dzongkhagList, setDzongkhagList] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [description, setDescription] = useState("");
-  const [descriptionError, setDescriptionError] = useState("");
-
-  // Use custom hook for checklist management
-  const checklist = useMonitoringChecklist();
-
-  // Fetch dzongkhag list
-  const fetchDzongkhagLists = useCallback(async () => {
-    try {
-      const response = await CommonService.getAllDzongkhags();
-      setDzongkhagList(response.data || []);
-    } catch (error) {
-      console.error("Error fetching dzongkhag dropdown:", error);
-      toast.error("Failed to load dzongkhags");
-    }
-  }, []);
-
-  // Get dzongkhag name from ID
   const getDzongkhagName = useCallback(
     (dzongkhagId) => {
       const dzongkhag = dzongkhagList.find(
@@ -606,241 +333,633 @@ const ViewProgramMonitoringIndex = () => {
     [dzongkhagList],
   );
 
-  // Fetch program monitoring assessment
-  const fetchProgramMonitoringAssessment = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response =
-        await ProgramMonitoringService.getProgramMonitoringByApplicationNo(
-          applicationNo,
-          access_token,
-        );
-      const data = Array.isArray(response.data)
-        ? response.data
-        : [response.data];
-      setProgramMonitoringDetails(data);
+  const getCourseTypeName = useCallback(
+    (courseTypeId) => {
+      return courseTypesMap[courseTypeId] || courseTypeId || "-";
+    },
+    [courseTypesMap],
+  );
 
-      if (data && data.length > 0) {
-        const program = data[0];
-        setSelectedProgram(program);
-        setDescription(program.description || "");
-        setDescriptionError("");
+  const getCourseName = useCallback(
+    (courseId) => {
+      return courseNamesMap[courseId] || courseId || "-";
+    },
+    [courseNamesMap],
+  );
 
-        if (program.service_id) {
-          await checklist.fetchQualityStandards(program.service_id);
-          if (program.checklists) {
-            const { responses, remarks } = checklist.parseChecklistData(
-              program.checklists,
-            );
-            checklist.setQualityResponses(responses);
-            checklist.setQualityRemarks(remarks);
-          }
-        } else {
-          toast.error("Service ID not found for this program");
+  // Separate function to load program data without causing infinite loops
+  const loadProgramData = useCallback(async (program) => {
+    setSelectedProgram(program);
+    setDescription(program.description || "");
+    setDescriptionError("");
+    setQualityResponses({});
+    setQualityRemarks({});
+
+    // Fetch course name
+    await fetchCourseNamesForProgram(program);
+
+    // Parse existing documents
+    if (program.documents) {
+      try {
+        let parsedDocs =
+          typeof program.documents === "string"
+            ? JSON.parse(program.documents)
+            : program.documents;
+
+        if (Array.isArray(parsedDocs)) {
+          const formattedDocs = parsedDocs.map((doc) => ({
+            name: doc.documentName || doc.name || "Document",
+            url: doc.url || "",
+            id: doc.id,
+            filePath: doc.url,
+          }));
+          setDocuments(formattedDocs);
         }
+      } catch (e) {
+        console.error("Error parsing documents:", e);
+        setDocuments([]);
       }
-    } catch (error) {
-      console.error("Error fetching Program Monitoring Details:", error);
-      toast.error("Failed to load Program Monitoring Details");
-    } finally {
-      setLoading(false);
+    } else {
+      setDocuments([]);
     }
-  }, [applicationNo, access_token, checklist]);
+    setNewDocuments([]);
 
-  // Initial data fetch
-  useEffect(() => {
-    if (applicationNo) {
-      fetchProgramMonitoringAssessment();
+    if (program.service_id) {
+      await fetchQualityStandards(program.service_id);
+    } else {
+      toast.error("Service ID not found for this program");
+      setQualityData([]);
     }
-    fetchDzongkhagLists();
+  }, []);
 
-    return () => {
-      checklist.resetChecklist();
-    };
-  }, [
-    applicationNo,
-    fetchProgramMonitoringAssessment,
-    fetchDzongkhagLists,
-    checklist,
-  ]);
+  // Handle file upload for new documents
+  const handleFileUpload = useCallback((uploadedFiles) => {
+    setNewDocuments(uploadedFiles || []);
+  }, []);
 
-  // Handle description change
-  const handleDescriptionChange = useCallback((event) => {
+  const handleDescriptionChange = (event) => {
     setDescription(event.target.value);
     if (event.target.value.trim()) {
       setDescriptionError("");
     }
+  };
+
+  const handleQualityResponseChange = (categoryId, questionId, value) => {
+    setQualityResponses((prev) => {
+      const newResponses = { ...prev };
+
+      if (!newResponses[categoryId]) {
+        newResponses[categoryId] = {};
+      }
+
+      if (newResponses[categoryId][questionId] === value) {
+        delete newResponses[categoryId][questionId];
+        if (Object.keys(newResponses[categoryId]).length === 0) {
+          delete newResponses[categoryId];
+        }
+      } else {
+        newResponses[categoryId][questionId] = value;
+      }
+
+      return newResponses;
+    });
+  };
+
+  const handleQualityRemarkChange = (categoryId, questionId, value) => {
+    setQualityRemarks((prev) => ({
+      ...prev,
+      [categoryId]: {
+        ...prev[categoryId],
+        [questionId]: value,
+      },
+    }));
+  };
+
+  const isAllQuestionsAnswered = useMemo(() => {
+    if (qualityData.length === 0) return false;
+
+    let totalQuestions = 0;
+    let answeredQuestions = 0;
+
+    qualityData.forEach((category) => {
+      category.rows.forEach((row) => {
+        totalQuestions++;
+        const response = qualityResponses[category.id]?.[row.id];
+        if (response === "Y" || response === "N") {
+          answeredQuestions++;
+        }
+      });
+    });
+
+    return totalQuestions > 0 && answeredQuestions === totalQuestions;
+  }, [qualityData, qualityResponses]);
+
+  const isDescriptionFilled = useMemo(() => {
+    return description && description.trim().length > 0;
+  }, [description]);
+
+  const isFormValid = useMemo(() => {
+    return isAllQuestionsAnswered && isDescriptionFilled;
+  }, [isAllQuestionsAnswered, isDescriptionFilled]);
+
+  const getProgressText = useCallback(() => {
+    if (qualityData.length === 0) return "";
+
+    let totalQuestions = 0;
+    let answeredQuestions = 0;
+
+    qualityData.forEach((category) => {
+      category.rows.forEach(() => {
+        totalQuestions++;
+      });
+    });
+
+    Object.keys(qualityResponses).forEach((categoryId) => {
+      Object.keys(qualityResponses[categoryId] || {}).forEach((questionId) => {
+        const response = qualityResponses[categoryId][questionId];
+        if (response === "Y" || response === "N") {
+          answeredQuestions++;
+        }
+      });
+    });
+
+    return `${answeredQuestions}/${totalQuestions} questions answered`;
+  }, [qualityData, qualityResponses]);
+
+  const prepareQualityStandardsForUpdate = useCallback(() => {
+    const qualityStandardsData = [];
+
+    Object.keys(qualityResponses).forEach((categoryId) => {
+      Object.keys(qualityResponses[categoryId]).forEach((questionId) => {
+        const responseValue = qualityResponses[categoryId][questionId];
+        const remark = qualityRemarks[categoryId]?.[questionId] || "";
+
+        if (responseValue && responseValue !== "") {
+          let existingId = null;
+          if (selectedProgram?.checklists) {
+            try {
+              const existingItems = JSON.parse(selectedProgram.checklists);
+              const existingItem = existingItems.find(
+                (item) => item.standardId === parseInt(questionId, 10),
+              );
+              if (existingItem) {
+                existingId = existingItem.id;
+              }
+            } catch (error) {
+              console.error("Error parsing existing checklists:", error);
+            }
+          }
+
+          qualityStandardsData.push({
+            id: existingId,
+            standardId: parseInt(questionId, 10),
+            responseId: responseValue,
+            remarks: remark,
+          });
+        }
+      });
+    });
+
+    return qualityStandardsData;
+  }, [qualityResponses, qualityRemarks, selectedProgram]);
+
+  // File to base64 conversion
+  const fileToBase64 = useCallback((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () =>
+        resolve({
+          name: file.name,
+          content: reader.result.split(",")[1],
+          contentType: file.type || "application/octet-stream",
+        });
+      reader.onerror = reject;
+    });
   }, []);
 
-  // Check if form is valid for submission
-  const isFormValid = useMemo(() => {
-    return (
-      checklist.isAllQuestionsAnswered &&
-      description &&
-      description.trim().length > 0
-    );
-  }, [checklist.isAllQuestionsAnswered, description]);
+  // Single function to handle submission with dynamic statusId
+  const handleSubmit = async (statusId, actionType) => {
+    // Validate description before submission
+    if (!description || description.trim() === "") {
+      setDescriptionError(
+        `Description / Remarks is required for ${actionType}`,
+      );
+      toast.error(`Please enter Description / Remarks for ${actionType}`);
+      return;
+    }
 
-  // Submit handler
-  const handleSubmit = useCallback(
-    async (statusId, actionType) => {
-      if (!description || description.trim() === "") {
-        setDescriptionError(
-          `Description / Remarks is required for ${actionType}`,
-        );
-        toast.error(`Please enter Description / Remarks for ${actionType}`);
+    setSubmitting(true);
+
+    try {
+      const qualityStandardsData = prepareQualityStandardsForUpdate();
+
+      if (qualityStandardsData.length === 0) {
+        toast.error(`Please answer all questions before ${actionType}`);
+        setSubmitting(false);
         return;
       }
 
-      setSubmitting(true);
-      try {
-        const qualityStandardsData =
-          checklist.prepareQualityStandardsForUpdate(selectedProgram);
-
-        if (qualityStandardsData.length === 0) {
-          toast.error(`Please answer all questions before ${actionType}`);
-          setSubmitting(false);
-          return;
-        }
-
-        const payload = {
-          id: selectedProgram?.id,
-          instituteId: selectedProgram?.institute_id,
-          registrationNo: selectedProgram?.registration_no,
-          monitoringDate: selectedProgram?.monitoring_date,
-          dzongkhagId: parseInt(selectedProgram?.dzongkhag_id, 10),
-          exactLocation: selectedProgram?.exact_location,
-          applicationNo: selectedProgram?.application_no,
-          qualityStandards: qualityStandardsData,
-          statusId: statusId,
-          description: description.trim(),
-          updatedBy: actionId,
-          assignedRoleId: currentRoleId,
-          serviceId: 51,
-          courseTypeId: selectedProgram?.course_type_id,
-          courseId: selectedProgram?.course_id,
-        };
-
-        const response = await ProgramMonitoringService.updateProgramMonitoring(
-          payload,
-          access_token,
+      // Prepare documents payload
+      let documentsPayload = [];
+      if (newDocuments.length > 0) {
+        documentsPayload = await Promise.all(
+          newDocuments.map((file) => fileToBase64(file)),
         );
-
-        if (response.status === 200 || response.status === 201) {
-          toast.success(
-            <div>
-              <strong>Program Checklist {actionType}d Successfully!</strong>
-              <br />
-              Institute: {selectedProgram?.institute_name}
-              <br />
-              Course: {selectedProgram?.course_name}
-              <br />
-              Status: {actionType} (ID: {statusId})
-            </div>,
-            { position: "top-right", autoClose: 5000 },
-          );
-          setTimeout(() => navigate(-1), 2000);
-        }
-      } catch (error) {
-        console.error(`Error ${actionType} checklist:`, error);
-        toast.error(`Failed to ${actionType} checklist. Please try again.`);
-      } finally {
-        setSubmitting(false);
       }
-    },
-    [
-      description,
-      selectedProgram,
-      checklist,
-      actionId,
-      currentRoleId,
-      access_token,
-      navigate,
-    ],
-  );
+
+      const payload = {
+        id: selectedProgram?.id,
+        instituteId: selectedProgram?.institute_id,
+        registrationNo: selectedProgram?.registration_no,
+        monitoringDate: selectedProgram?.monitoring_date,
+        dzongkhagId: parseInt(selectedProgram?.dzongkhag_id, 10),
+        exactLocation: selectedProgram?.exact_location,
+        serviceId: 51,
+        applicationNo: selectedProgram?.application_no,
+        qualityStandards: qualityStandardsData,
+        statusId: statusId,
+        description: description.trim(),
+        updatedBy: actionId,
+        assignedRoleId: currentRoleId,
+        courseTypeId: selectedProgram?.course_type_id,
+        courseTypeName: getCourseTypeName(selectedProgram?.course_type_id),
+        courseId: selectedProgram?.course_id,
+        courseName: getCourseName(selectedProgram?.course_id),
+        documents: documentsPayload,
+      };
+      // Call API to update program monitoring assessment
+      const response = await ProgramMonitoringService.updateProgramMonitoring(
+        payload,
+        access_token,
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        toast.success(
+          "Program monitoring checklist Successfully" +
+            (actionType === "Approve" ? " Approved" : " Resubmitted"),
+        );
+        // Navigate back after successful submission
+        setTimeout(() => {
+          navigate(-1);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error(`Error ${actionType} checklist:`, error);
+      toast.error(`Failed to ${actionType} checklist. Please try again.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // Wrapper functions for specific actions
-  const handleApprove = useCallback(
-    () => handleSubmit(STATUS.APPROVED, "Approve"),
-    [handleSubmit],
-  );
-  const handleResubmit = useCallback(
-    () => handleSubmit(STATUS.RESUBMITTED, "Resubmit"),
-    [handleSubmit],
+  const handleApprove = () => handleSubmit(STATUS.APPROVED, "Approve");
+  const handleResubmit = () => handleSubmit(STATUS.RESUBMITTED, "Resubmit");
+
+  const renderChecklist = useCallback(
+    (standard) => {
+      const categoryResponses = qualityResponses[standard.id] || {};
+      const categoryRemarks = qualityRemarks[standard.id] || {};
+
+      return (
+        <Grid item size={{ xs: 12, md: 12 }} key={standard.id}>
+          <Paper sx={{ p: 1.5, border: "1px solid", borderColor: "divider" }}>
+            <Typography sx={{ fontSize: "0.75rem", fontWeight: 600 }} mb={0.5}>
+              {standard.title}
+            </Typography>
+            <TableContainer>
+              <Table size="small" sx={TABLE_STYLE}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      width="30"
+                      sx={{ fontSize: "0.70rem", p: "4px 4px" }}
+                    >
+                      Sl. No
+                    </TableCell>
+                    <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
+                      Quality Indicator
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      width="60"
+                      sx={{ fontSize: "0.70rem", p: "4px 4px" }}
+                    >
+                      YES
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      width="60"
+                      sx={{ fontSize: "0.70rem", p: "4px 4px" }}
+                    >
+                      NO
+                    </TableCell>
+                    <TableCell
+                      width="200"
+                      sx={{ fontSize: "0.70rem", p: "4px 4px" }}
+                    >
+                      Remarks
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {standard.rows.map((row, index) => {
+                    const selectedValue = categoryResponses[row.id];
+                    const isYes = selectedValue === "Y";
+                    const isNo = selectedValue === "N";
+                    const remark = categoryRemarks[row.id] || "";
+
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
+                          {index + 1}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: "0.70rem", p: "4px 4px" }}>
+                          {row.value}
+                        </TableCell>
+                        <TableCell align="center" sx={{ p: "2px 4px" }}>
+                          <Radio
+                            size="small"
+                            sx={{
+                              p: 0,
+                              "& .MuiSvgIcon-root": {
+                                fontSize: "1rem",
+                              },
+                            }}
+                            checked={isYes}
+                            onChange={() => {
+                              const newValue = isYes ? undefined : "Y";
+                              handleQualityResponseChange(
+                                standard.id,
+                                row.id,
+                                newValue,
+                              );
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center" sx={{ p: "2px 4px" }}>
+                          <Radio
+                            size="small"
+                            sx={{
+                              p: 0,
+                              "& .MuiSvgIcon-root": {
+                                fontSize: "1rem",
+                              },
+                            }}
+                            checked={isNo}
+                            onChange={() => {
+                              const newValue = isNo ? undefined : "N";
+                              handleQualityResponseChange(
+                                standard.id,
+                                row.id,
+                                newValue,
+                              );
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ p: "4px 4px" }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Remarks"
+                            value={remark}
+                            onChange={(e) =>
+                              handleQualityRemarkChange(
+                                standard.id,
+                                row.id,
+                                e.target.value,
+                              )
+                            }
+                            slotProps={{
+                              input: {
+                                sx: {
+                                  fontSize: "0.70rem",
+                                  py: 0.5,
+                                  "& textarea": {
+                                    py: 0.5,
+                                  },
+                                },
+                              },
+                            }}
+                            multiline
+                            rows={1}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Grid>
+      );
+    },
+    [qualityResponses, qualityRemarks],
   );
 
-  // Loading state
-  if (loading) return <LoadingSpinner />;
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Paper sx={{ p: 2, mt: 1 }}>
-      <SectionHeader
-        title={`Program Monitoring Checklist - Application No: ${applicationNo}`}
-        onBack={() => navigate(-1)}
-      />
+      <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+        <IconButton
+          onClick={() => navigate(-1)}
+          sx={{ mr: 2 }}
+          aria-label="back"
+        >
+          <ArrowBackIcon />
+        </IconButton>
+        <Typography variant="h6">
+          Program Monitoring Checklist - Application No: {applicationNo}
+        </Typography>
+      </Box>
 
       {selectedProgram ? (
         <Box>
-          <ProgramInfoHeader
-            program={selectedProgram}
-            getDzongkhagName={getDzongkhagName}
-          />
+          <Box sx={{ mb: 2, p: 2, bgcolor: "#f5f5f5", borderRadius: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              <strong>Institute:</strong> {selectedProgram?.institute_name} |{" "}
+              <strong>Registration No:</strong>{" "}
+              {selectedProgram?.registration_no} | <strong>Course:</strong>{" "}
+              {getCourseName(selectedProgram?.course_id)} (
+              {getCourseTypeName(selectedProgram?.course_type_id)}) |{" "}
+              <strong>Dzongkhag:</strong>{" "}
+              {getDzongkhagName(selectedProgram?.dzongkhag_id)} |{" "}
+              <strong>Monitoring Date:</strong>{" "}
+              {selectedProgram?.monitoring_date}
+            </Typography>
+            <Typography variant="subtitle2" color="text.secondary">
+              <strong>Current Status:</strong>{" "}
+              {selectedProgram?.status || "Pending Review"}
+            </Typography>
+          </Box>
 
-          {checklist.loading ? (
+          {qualityStandardsLoading ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
               <CircularProgress size={40} />
               <Typography sx={{ ml: 2 }}>
                 Loading quality standards...
               </Typography>
             </Box>
-          ) : checklist.error ? (
+          ) : qualityStandardsError ? (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {checklist.error}
+              {qualityStandardsError}
             </Alert>
-          ) : checklist.qualityData.length > 0 ? (
+          ) : qualityData.length > 0 ? (
             <>
-              <ProgressIndicator
-                progressText={checklist.getProgressText()}
-                isComplete={checklist.isAllQuestionsAnswered}
-              />
-
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  {getProgressText()}
+                </Typography>
+                {!isAllQuestionsAnswered && (
+                  <Typography variant="caption" color="error">
+                    * Please answer all questions
+                  </Typography>
+                )}
+                {isAllQuestionsAnswered && (
+                  <Typography variant="caption" color="success.main">
+                    ✓ All questions have been answered
+                  </Typography>
+                )}
+              </Box>
               <Grid container spacing={2}>
-                {checklist.qualityData.map((standard) => (
-                  <Grid item size={{ xs: 12, md: 12 }} key={standard.id}>
-                    <ChecklistCategory
-                      standard={standard}
-                      qualityResponses={checklist.qualityResponses}
-                      qualityRemarks={checklist.qualityRemarks}
-                      onResponseChange={checklist.handleQualityResponseChange}
-                      onRemarkChange={checklist.handleQualityRemarkChange}
-                    />
-                  </Grid>
-                ))}
+                {qualityData.map(renderChecklist)}
               </Grid>
 
-              <DescriptionField
-                value={description}
-                onChange={handleDescriptionChange}
-                error={descriptionError}
-                helperText={descriptionError}
-              />
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Description / Remarks <span style={{ color: "red" }}>*</span>
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  placeholder="Enter description or additional remarks about the program monitoring assessment..."
+                  value={description}
+                  onChange={handleDescriptionChange}
+                  variant="outlined"
+                  size="medium"
+                  error={!!descriptionError}
+                  helperText={descriptionError}
+                  sx={{
+                    "& .MuiInputBase-root": {
+                      fontSize: "0.875rem",
+                    },
+                  }}
+                />
+              </Box>
 
-              <ActionButtons
-                onCancel={() => navigate(-1)}
-                onResubmit={handleResubmit}
-                onApprove={handleApprove}
-                submitting={submitting}
-                isFormValid={isFormValid}
-              />
+              {/* File Download/Upload Section */}
+              <Box sx={{ mt: 3 }}>
+                <Paper
+                  sx={{ p: 3, border: "1px solid", borderColor: "divider" }}
+                >
+                  <Typography variant="subtitle1" gutterBottom>
+                    Supporting Documents
+                  </Typography>
+                  <FileDownload
+                    initialFiles={documents}
+                    onFileUpload={handleFileUpload}
+                    allowUpload={true}
+                  />
+                </Paper>
+              </Box>
+
+              <Box
+                sx={{
+                  mt: 3,
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 2,
+                }}
+              >
+                <Button
+                  onClick={() => navigate(-1)}
+                  color="secondary"
+                  variant="outlined"
+                  disabled={submitting}
+                  size="small"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleResubmit}
+                  variant="contained"
+                  startIcon={
+                    submitting ? <CircularProgress size={20} /> : <ReplayIcon />
+                  }
+                  size="small"
+                  disabled={submitting || !isFormValid}
+                  sx={{
+                    backgroundColor: "#ff9800",
+                    "&:hover": { backgroundColor: "#f57c00" },
+                    "&.Mui-disabled": {
+                      backgroundColor: "#ffb74d",
+                      opacity: 0.7,
+                    },
+                  }}
+                >
+                  {submitting ? "Resubmitting..." : "Resubmit"}
+                </Button>
+                <Button
+                  onClick={handleApprove}
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  startIcon={
+                    submitting ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <CheckCircleIcon />
+                    )
+                  }
+                  disabled={submitting || !isFormValid}
+                  sx={{
+                    backgroundColor: "#4caf50",
+                    "&:hover": { backgroundColor: "#45a049" },
+                    "&.Mui-disabled": {
+                      backgroundColor: "#81c784",
+                      opacity: 0.7,
+                    },
+                  }}
+                >
+                  {submitting ? "Approving..." : "Approve"}
+                </Button>
+              </Box>
             </>
           ) : (
-            <EmptyState message="No quality standards available for this service" />
+            <Box sx={{ textAlign: "center", py: 4 }}>
+              <Typography color="text.secondary">
+                No quality standards available
+              </Typography>
+            </Box>
           )}
         </Box>
       ) : (
-        <EmptyState
-          message={`No data found for application number: ${applicationNo}`}
-        />
+        <Box sx={{ textAlign: "center", py: 4 }}>
+          <Typography color="text.secondary">
+            No data found for application number: {applicationNo}
+          </Typography>
+        </Box>
       )}
     </Paper>
   );

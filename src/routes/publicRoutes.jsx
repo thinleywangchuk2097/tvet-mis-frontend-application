@@ -30,6 +30,7 @@ import CurriculumPublication from "../pages/report/CurriculumPublication";
 import FeedbackForm from "../pages/public/FeedbackForm";
 import ViewTracerSend from "../pages/dwps/tracer/ViewTracerSend";
 import PublicationIndex from "../pages/public/publication/PublicationIndex";
+import UploadFormIndex from "../pages/public/forms/UploadFormIndex";
 
 //public routes ..
 export const publicRoutes = [
@@ -49,7 +50,10 @@ export const publicRoutes = [
   {
     path: "proposal",
     children: [
-      { path: ":proposalType/:serviceId", element: <InstituteSesCentreAssessmentCentreProposal /> },
+      {
+        path: ":proposalType/:serviceId",
+        element: <InstituteSesCentreAssessmentCentreProposal />,
+      },
     ],
   },
   {
@@ -59,20 +63,18 @@ export const publicRoutes = [
         path: ":registrationType/:serviceId",
         element: <InstituteSesCentreAssessmentCentre />,
       },
-    
     ],
   },
-   {
+  {
     path: "renewal",
     children: [
       {
         path: ":renewalType/:serviceId",
         element: <AssessorAccreditorQMSAuditorRenewal />,
       },
-    
     ],
   },
-  
+
   {
     path: "registration",
     children: [
@@ -118,6 +120,10 @@ export const publicRoutes = [
   {
     path: "feedback",
     children: [{ path: "form", element: <FeedbackForm /> }],
+  },
+  {
+    path: "forms",
+    children: [{ path: "forms-index", element: <UploadFormIndex /> }],
   },
   {
     path: "tracer",

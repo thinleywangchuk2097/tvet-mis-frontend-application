@@ -241,7 +241,7 @@ const SearchBar = ({ value, onChange }) => (
   />
 );
 
-const AddButton = ({ onClick, label = "Add Course" }) => (
+const AddButton = ({ onClick, label = "Add Announcement" }) => (
   <Button
     variant="contained"
     color="primary"
@@ -715,7 +715,7 @@ const NonAccreditedCourse = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        Non Accredited Course
+        List of Non-BQF Programme Announcements
       </Typography>
 
       {/* Search + Add Course */}
@@ -753,7 +753,7 @@ const NonAccreditedCourse = () => {
         maxWidth="lg"
         fullWidth
       >
-        <DialogTitle>Create Non Accredited Course</DialogTitle>
+        <DialogTitle>Create Non-BQF Programme</DialogTitle>
         <Formik
           initialValues={initialValues}
           validationSchema={validationSchema}

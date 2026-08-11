@@ -29,7 +29,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import FacebookIcon from "@mui/icons-material/Facebook";
 import XIcon from "@mui/icons-material/X";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
-
+import FileCopyIcon from '@mui/icons-material/FileCopy';
 import ArticleIcon from "@mui/icons-material/Article";
 import BusinessIcon from "@mui/icons-material/Business";
 import ApartmentIcon from "@mui/icons-material/Apartment";
@@ -194,6 +194,11 @@ const NAV_MENU = [
     icon: <PublicIcon  sx={{ fontSize: 16 }} />,
     path: "/publication/publication-index",
   },
+    {
+    label: "Forms",
+    icon: <FileCopyIcon  sx={{ fontSize: 16 }} />,
+    path: "/forms/forms-index",
+  },
 ];
 
 // Paths that require a full page reload after navigation
@@ -203,10 +208,6 @@ const refreshPaths = [
   "/register/assessment-centre/4",
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
-// HoverMenu — MUI Menu with hover triggers (professional, portal-rendered,
-// correct z-index, escape-key + click-away built in).
-// ═══════════════════════════════════════════════════════════════════════════
 const HoverMenu = ({ item, onItemClick, navBtnSx, activeBtnSx }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const timerRef = useRef(null);
