@@ -1,12 +1,11 @@
 // src/api/axios.js
 import axios from "axios";
+// localhost environment
+const VITE_API_URL = import.meta.env.VITE_API_URL;
 
-// For local development
-const VITE_API_URL = "http://localhost:8080";
-
-// For Kubernetes (when deploying node ip)
-//const VITE_API_URL = 'http://172.30.3.10:30176';
-
+// production environment - uses runtime config from ConfigMap
+//const VITE_API_URL = window.__RUNTIME_CONFIG__?.VITE_API_URL
+                   
 const apiClient = axios.create({
   baseURL: VITE_API_URL,
   timeout: 10000,
