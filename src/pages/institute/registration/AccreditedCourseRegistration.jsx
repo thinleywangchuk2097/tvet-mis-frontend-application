@@ -769,7 +769,7 @@ const AccreditedCourseRegistration = () => {
           qualityStandards: qualityStandardsList,
           isRenewal: true,
         };
-       
+
         const response =
           await ApplyAccreditedCourseService.verifyAccreditedCourse(
             renewalData,
@@ -1048,7 +1048,8 @@ const AccreditedCourseRegistration = () => {
                         fullWidth
                         label={
                           <>
-                            Curriculum Title<RequiredStar />
+                            Curriculum Title
+                            <RequiredStar />
                           </>
                         }
                         name="curriculumId"
@@ -1394,7 +1395,7 @@ const AccreditedCourseRegistration = () => {
                     </Grid>
                   </Grid>
                 </Paper>
- {/* Container 1: Basic Information */}
+                {/* Container 2: Lead Trainer Information */}
                 <Paper
                   sx={{
                     p: 3,
@@ -1411,10 +1412,10 @@ const AccreditedCourseRegistration = () => {
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
-                        label="CID No."
-                        name="CID No."
+                        label="Lead Trainer CID No."
+                        name="LeadTrainerCidNo"
                         size="small"
-                        value={formik.values.registrationNo}
+                        value={formik.values.LeadTrainerCidNo}
                         slotProps={{
                           input: {
                             readOnly: true,
@@ -1425,10 +1426,10 @@ const AccreditedCourseRegistration = () => {
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
-                        label="Name"
-                        name="instituteName"
+                        label="Lead Trainer Name"
+                        name="leadTrainerName"
                         size="small"
-                        value={formik.values.instituteName}
+                        value={formik.values.leadTrainerName}
                         slotProps={{
                           input: {
                             readOnly: true,
@@ -1442,12 +1443,13 @@ const AccreditedCourseRegistration = () => {
                         fullWidth
                         label={
                           <>
-                            Gender<RequiredStar />
+                            Gender
+                            <RequiredStar />
                           </>
                         }
-                        name="curriculumId"
+                        name="genderId"
                         size="small"
-                        value={formik.values.curriculumId}
+                        value={formik.values.genderId}
                         onChange={(e) => {
                           const selectedId = e.target.value;
                           formik.handleChange(e);

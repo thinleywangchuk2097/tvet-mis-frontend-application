@@ -2038,7 +2038,7 @@ const CurriculumIndex = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        List of Institute's Curriculums
+        List of Programme's Curriculums
       </Typography>
 
       <Grid
