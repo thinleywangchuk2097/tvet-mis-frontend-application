@@ -80,7 +80,6 @@ const ApplyQmsCertification = () => {
               applications.map((app, index) => (
                 <TableRow key={index}>
                   <TableCell>{index + 1}</TableCell>
-                  <TableCell>{app.applicationNo}</TableCell>
                   <TableCell>{app.instituteName}</TableCell>
                   <TableCell>{app.remarks}</TableCell>
                   <TableCell>
@@ -119,7 +118,6 @@ const ApplyQmsCertification = () => {
 
         <Formik
           initialValues={{
-            applicationNo: `APP${Math.floor(Math.random() * 10000)}`,
             instituteName: "Robotics & IoT Training Institute",
             location:
               "Doendrup Lam SE, Sangay Enterprise Building , Third Floor.",

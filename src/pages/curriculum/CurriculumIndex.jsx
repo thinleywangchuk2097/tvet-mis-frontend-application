@@ -34,6 +34,7 @@ import FileUpload from "../../components/file/FileUpload";
 import CurriculumIndexService from "../../api/services/internal/course/CurriculumIndexService";
 import CommonService from "../../api/services/internal/common/CommonService";
 import InstituteRegistrationService from "../../api/services/internal/registration/InstituteRegistrationService";
+import NcsService from "../../api/services/internal/ncs/NcsService";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
@@ -74,7 +75,7 @@ const CurriculumIndex = () => {
   const [openEndorseDialog, setOpenEndorseDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedCurriculum, setSelectedCurriculum] = useState(null);
-  const [courseTypes, setCourseTypes] = useState([]);
+  const [programmeTypes, setProgrammeTypes] = useState([]);
   const [certificateLevels, setCertificateLevels] = useState([]);
   const [data, setData] = useState([]);
   const [instituteDetails, setInstituteDetails] = useState([]);
@@ -85,11 +86,21 @@ const CurriculumIndex = () => {
   const [curriculumTypes, setCurriculumTypes] = useState([]);
   const [isLoadingCertificateLevels, setIsLoadingCertificateLevels] =
     useState(false);
-  const [ncsData, setNcsData] = useState([]);
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
   const [dropdownData, setDropdownData] = useState([]);
+
+  // State for Sector and Occupation dropdowns
+  const [sectors, setSectors] = useState([]);
+  const [occupations, setOccupations] = useState([]);
+  const [loadingOccupations, setLoadingOccupations] = useState(false);
+  const [selectedSectorId, setSelectedSectorId] = useState("");
+
+  // State for checking existing NCS
+  const [checkingExisting, setCheckingExisting] = useState(false);
+  const [ncsExists, setNcsExists] = useState(false);
+  const [ncsData, setNcsData] = useState(null);
 
   const getStatusName = (statusId) => {
     if (!statusId) return "Pending";
@@ -151,19 +162,219 @@ const CurriculumIndex = () => {
     }
   };
 
-  const isSubmitDisabled = (values) => {
-    const totalDuration = extractNumericValue(values.totalProgramDuration);
-    return totalDuration < 140;
-  };
-
   useEffect(() => {
     fetchCurriculumTypes();
-    fetchCourseTypes();
-    fetchNcsDetails();
+    fetchProgrammeTypes();
     fetchInstituteDetails();
     fetchCurriculumData();
     fetchDropdownData();
+    fetchSectors();
   }, []);
+
+  // Fetch sectors
+  const fetchSectors = async () => {
+    try {
+      const response = await CommonService.getAllSectors();
+      console.log("Sectors Response:", response.data);
+      setSectors(response.data || []);
+    } catch (error) {
+      console.error("Error fetching sectors:", error);
+    }
+  };
+
+  // Fetch occupations by sector
+  const fetchOccupationsBySector = async (sectorId) => {
+    if (!sectorId) {
+      setOccupations([]);
+      return;
+    }
+    setLoadingOccupations(true);
+    try {
+      const sector = sectors.find(s => s.id === parseInt(sectorId));
+      console.log("Found sector for occupations:", sector);
+      
+      if (sector && sector.child && sector.child.length > 0) {
+        const occupationsData = sector.child.map(child => ({
+          id: child.id,
+          occupationName: child.occupationName || child.name || `Occupation ${child.id}`
+        }));
+        setOccupations(occupationsData);
+        console.log("Occupations from sector child:", occupationsData);
+      } else {
+        try {
+          const response = await CommonService.getOccupationsBySectorId(sectorId);
+          const occData = response.data || [];
+          setOccupations(occData);
+          console.log("Occupations from API:", occData);
+        } catch (apiError) {
+          console.error("API fallback failed:", apiError);
+          setOccupations([]);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching occupations:", error);
+      toast.error("Failed to fetch occupations");
+      setOccupations([]);
+    } finally {
+      setLoadingOccupations(false);
+    }
+  };
+
+  // Fetch programme title for endorse
+  const fetchProgrammeTitleForEndorse = async (programmeId, setFieldValue) => {
+    if (!programmeId) {
+      setFieldValue("programmeTitle", "");
+      return;
+    }
+
+    try {
+      const response = await NcsService.getProgrammeTitleById(
+        programmeId,
+        access_token,
+      );
+      console.log("Programme Title Response for Endorse:", response);
+      
+      if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
+        const item = response.data[0];
+        const title = item.programme_title || 
+                      item.courseName || 
+                      item.name || 
+                      item.occupationName ||
+                      item.title;
+        
+        if (title) {
+          setFieldValue("programmeTitle", title);
+          console.log("Programme Title set to:", title);
+          toast.info(`Programme Title auto-filled: ${title}`);
+        } else {
+          setFieldValue("programmeTitle", "");
+        }
+      } else if (response && response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+        const item = response.data;
+        const title = item.programme_title || 
+                      item.courseName || 
+                      item.name || 
+                      item.occupationName ||
+                      item.title;
+        
+        if (title) {
+          setFieldValue("programmeTitle", title);
+          toast.info(`Programme Title auto-filled: ${title}`);
+        } else {
+          setFieldValue("programmeTitle", "");
+        }
+      } else {
+        setFieldValue("programmeTitle", "");
+      }
+    } catch (error) {
+      console.error("Error fetching programme title:", error);
+      setFieldValue("programmeTitle", "");
+    }
+  };
+
+  // Fetch programme title for revision
+  const fetchProgrammeTitleForRevision = async (programmeId, setFieldValue) => {
+    if (!programmeId) {
+      return;
+    }
+
+    try {
+      const response = await NcsService.getProgrammeTitleById(
+        programmeId,
+        access_token,
+      );
+      console.log("Programme Title Response for Revision:", response);
+      
+      if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
+        const item = response.data[0];
+        const title = item.programme_title || 
+                      item.courseName || 
+                      item.name || 
+                      item.occupationName ||
+                      item.title;
+        
+        if (title) {
+          setFieldValue("programmeTitle", title);
+          console.log("Programme Title set to:", title);
+        }
+      } else if (response && response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+        const item = response.data;
+        const title = item.programme_title || 
+                      item.courseName || 
+                      item.name || 
+                      item.occupationName ||
+                      item.title;
+        
+        if (title) {
+          setFieldValue("programmeTitle", title);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching programme title for revision:", error);
+    }
+  };
+
+  // Function to check if NCS exists and auto-fill titles
+  const checkNcsExists = async (
+    sectorId,
+    occupationId,
+    certificationId,
+    setFieldValue,
+  ) => {
+    if (!sectorId || !occupationId || !certificationId) {
+      setNcsExists(false);
+      setNcsData(null);
+      setFieldValue("curriculumName", "");
+      setFieldValue("programmeTitle", "");
+      setFieldValue("ncsId", "");
+      return;
+    }
+
+    setCheckingExisting(true);
+    try {
+      const response = await NcsService.getAlreadyNcsDetailsExist(
+        sectorId,
+        occupationId,
+        certificationId,
+        access_token,
+      );
+      console.log("NCS Exists Check Response:", response);
+      console.log("Sector ID:", sectorId);
+      console.log("Occupation ID:", occupationId);
+      console.log("Certification ID:", certificationId);
+
+      if (response.data && response.data.length > 0) {
+        setNcsExists(true);
+        setNcsData(response.data[0]);
+        console.log("NCS combination exists:", response.data[0]);
+
+        if (response.data[0].programme_title) {
+          setFieldValue("curriculumName", response.data[0].programme_title);
+          setFieldValue("programmeTitle", response.data[0].programme_title);
+          setFieldValue("ncsId", response.data[0].id);
+          toast.info(
+            `Programme Title and Curriculum Title auto-filled with: ${response.data[0].programme_title}`,
+          );
+        }
+      } else {
+        setNcsExists(false);
+        setNcsData(null);
+        setFieldValue("curriculumName", "");
+        setFieldValue("programmeTitle", "");
+        setFieldValue("ncsId", "");
+        console.log("NCS combination does not exist - fields cleared");
+      }
+    } catch (error) {
+      console.error("Error checking NCS exists:", error);
+      setNcsExists(false);
+      setNcsData(null);
+      setFieldValue("curriculumName", "");
+      setFieldValue("programmeTitle", "");
+      setFieldValue("ncsId", "");
+    } finally {
+      setCheckingExisting(false);
+    }
+  };
 
   const fetchCurriculumTypes = async () => {
     try {
@@ -175,36 +386,24 @@ const CurriculumIndex = () => {
     }
   };
 
-  const fetchCourseTypes = async () => {
+  const fetchProgrammeTypes = async () => {
     try {
       const response = await CommonService.getByParentId(13);
-      console.log("Course Types Response:", response.data);
-      setCourseTypes(response.data);
+      console.log("Programme Types Response:", response.data);
+      setProgrammeTypes(response.data);
     } catch (error) {
-      console.error("Error fetching course types:", error);
+      console.error("Error fetching programme types:", error);
     }
   };
 
-  const fetchNcsDetails = async () => {
-    try {
-      const response = await CommonService.getAllOccupations();
-      const filteredNcs = response.data.filter(
-        (item) => item.courseName !== null,
-      );
-      setNcsData(filteredNcs);
-    } catch (error) {
-      console.error("Error fetching ncs data types:", error);
-    }
-  };
-
-  const fetchCertificateLevels = async (courseTypeId = null) => {
+  const fetchCertificateLevels = async (programmeTypeId = null) => {
     try {
       setIsLoadingCertificateLevels(true);
       let parentId;
 
-      if (courseTypeId === 41) {
+      if (programmeTypeId === 41) {
         parentId = 27;
-      } else if (courseTypeId === 42) {
+      } else if (programmeTypeId === 42) {
         parentId = 10;
       } else {
         setCertificateLevels([]);
@@ -311,12 +510,15 @@ const CurriculumIndex = () => {
       return {
         providerName: institute.proposed_institute_name || "",
         registrationNo: institute.registration_no || "",
-        curriculumTypeId: "25", // Curriculum Development
-        courseTypeId: "",
+        curriculumTypeId: "25",
+        programmeTypeId: "",
         curriculumName: "",
-        description: "",
+        programmeTitle: "",
         ncsId: "",
+        description: "",
         certificateLevelId: "",
+        sectorId: "",
+        occupationId: "",
         entryRequirement: "",
         totalTheoryDuration: "",
         totalPracticalDuration: "",
@@ -329,12 +531,16 @@ const CurriculumIndex = () => {
       return {
         providerName: institute.proposed_institute_name || "",
         registrationNo: institute.registration_no || "",
-        curriculumTypeId: "48", // Curriculum Endorsement
-        courseTypeId: "",
+        curriculumTypeId: "48",
+        programmeTypeId: "",
         curriculumName: "",
-        description: "",
+        endorseApplicationNo: "",
+        programmeTitle: "",
         ncsId: "",
+        description: "",
         certificateLevelId: "",
+        sectorId: "",
+        occupationId: "",
         entryRequirement: "",
         totalTheoryDuration: "",
         totalPracticalDuration: "",
@@ -344,7 +550,6 @@ const CurriculumIndex = () => {
       };
     }
     if (isRevision && curriculum) {
-      // For revision, pre-fill with existing data
       return {
         providerName:
           curriculum.proposed_institute_name ||
@@ -352,12 +557,15 @@ const CurriculumIndex = () => {
           "",
         registrationNo:
           curriculum.registration_no || institute.registration_no || "",
-        curriculumTypeId: "49", // Curriculum Revision
-        courseTypeId: curriculum.course_type_id || "",
+        curriculumTypeId: "49",
+        programmeTypeId: curriculum.programme_type_id || "",
         curriculumName: curriculum.curriculum_name || "",
+        programmeTitle: curriculum.programme_title || "",
+        ncsId: curriculum.ncs_id || curriculum.programme_id || "",
         description: curriculum.description || "",
-        ncsId: curriculum.ncs_id || "",
         certificateLevelId: curriculum.certificate_level_id || "",
+        sectorId: curriculum.sector_id || "",
+        occupationId: curriculum.occupation_id || "",
         entryRequirement: curriculum.entry_requirement || "",
         totalTheoryDuration: curriculum.total_theory_duration || "",
         totalPracticalDuration: curriculum.total_practical_duration || "",
@@ -375,11 +583,14 @@ const CurriculumIndex = () => {
         registrationNo:
           curriculum.registration_no || institute.registration_no || "",
         curriculumTypeId: curriculum.curriculum_type_id || "",
-        courseTypeId: curriculum.course_type_id || "",
+        programmeTypeId: curriculum.programme_type_id || "",
         curriculumName: curriculum.curriculum_name || "",
+        programmeTitle: curriculum.programme_title || "",
+        ncsId: curriculum.ncs_id || curriculum.programme_id || "",
         description: curriculum.description || "",
-        ncsId: curriculum.ncs_id || "",
         certificateLevelId: curriculum.certificate_level_id || "",
+        sectorId: curriculum.sector_id || "",
+        occupationId: curriculum.occupation_id || "",
         entryRequirement: curriculum.entry_requirement || "",
         totalTheoryDuration: curriculum.total_theory_duration || "",
         totalPracticalDuration: curriculum.total_practical_duration || "",
@@ -392,11 +603,14 @@ const CurriculumIndex = () => {
       providerName: institute.proposed_institute_name || "",
       registrationNo: institute.registration_no || "",
       curriculumTypeId: "",
-      courseTypeId: "",
+      programmeTypeId: "",
       curriculumName: "",
-      description: "",
+      programmeTitle: "",
       ncsId: "",
+      description: "",
       certificateLevelId: "",
+      sectorId: "",
+      occupationId: "",
       entryRequirement: "",
       totalTheoryDuration: "",
       totalPracticalDuration: "",
@@ -409,7 +623,7 @@ const CurriculumIndex = () => {
   // Custom validation function that checks if BQF Course rules should apply
   const validateDurationDistribution = (values) => {
     // Only apply rules for BQF Course (id: 41)
-    if (parseInt(values.courseTypeId) !== 41) {
+    if (parseInt(values.programmeTypeId) !== 41) {
       return null;
     }
 
@@ -422,9 +636,6 @@ const CurriculumIndex = () => {
       return null;
     }
 
-    const theoryPercentage = (theoryNum / totalNum) * 100;
-    const practicalOjtPercentage = ((practicalNum + ojtNum) / totalNum) * 100;
-
     const certificateLevel = certificateLevels.find(
       (level) => level.id === parseInt(values.certificateLevelId),
     );
@@ -435,31 +646,80 @@ const CurriculumIndex = () => {
 
     const levelName = certificateLevel.name.toLowerCase();
     const isDiploma = levelName.includes("diploma");
-    const requiredTheoryPercentage = isDiploma ? 40 : 20;
-    const requiredPracticalOjtPercentage = isDiploma ? 60 : 80;
+    const isAdvancedDiploma = levelName.includes("advanced diploma");
+    const isCertificate = levelName.includes("certificate");
 
-    if (theoryPercentage < requiredTheoryPercentage) {
-      return `Theory duration (${theoryPercentage.toFixed(1)}%) must be at least ${requiredTheoryPercentage}% of total program duration for ${certificateLevel.name}`;
+    let minTotalHours = 0;
+    let requiredTheoryPercentage = 0;
+    let requiredPracticalOjtPercentage = 0;
+
+    if (isDiploma || isAdvancedDiploma) {
+      minTotalHours = 2400;
+      requiredTheoryPercentage = 40;
+      requiredPracticalOjtPercentage = 60;
+    } else if (isCertificate) {
+      minTotalHours = 400;
+      requiredTheoryPercentage = 20;
+      requiredPracticalOjtPercentage = 80;
+    } else {
+      return null;
     }
 
-    if (practicalOjtPercentage > requiredPracticalOjtPercentage) {
-      return `Practical + OJT duration (${practicalOjtPercentage.toFixed(1)}%) must not exceed ${requiredPracticalOjtPercentage}% of total program duration for ${certificateLevel.name}`;
+    // Check minimum total hours
+    if (totalNum < minTotalHours) {
+      return `Total program duration (${totalNum} hours) must be at least ${minTotalHours} hours for ${certificateLevel.name}`;
+    }
+
+    const theoryPercentage = (theoryNum / totalNum) * 100;
+    const practicalOjtPercentage = ((practicalNum + ojtNum) / totalNum) * 100;
+
+    const tolerance = 0.5;
+
+    if (theoryPercentage < requiredTheoryPercentage - tolerance) {
+      return `Theory duration (${theoryPercentage.toFixed(1)}%) must be at least ${requiredTheoryPercentage}% of total program duration for ${certificateLevel.name}. Current theory: ${theoryNum} hours out of ${totalNum} total hours.`;
+    }
+
+    if (practicalOjtPercentage > requiredPracticalOjtPercentage + tolerance) {
+      return `Practical + OJT duration (${practicalOjtPercentage.toFixed(1)}%) must not exceed ${requiredPracticalOjtPercentage}% of total program duration for ${certificateLevel.name}. Current practical + OJT: ${practicalNum + ojtNum} hours out of ${totalNum} total hours.`;
     }
 
     return null;
   };
 
   // Create validation schema dynamically with certificateLevels
-  const getValidationSchema = () => {
+  // ncsId is only required for Add Curriculum
+  const getValidationSchema = (isAdd = false) => {
     return Yup.object().shape({
       curriculumTypeId: Yup.string().required("Curriculum Type is required"),
-      courseTypeId: Yup.string().required("Course Type is required"),
+      programmeTypeId: Yup.string().required("Programme Type is required"),
       curriculumName: Yup.string().required("Curriculum Name is required"),
+      programmeTitle: Yup.string().required("Programme Title is required"),
       description: Yup.string().required("Curriculum Description is required"),
-      ncsId: Yup.string().required("NCS Title is required"),
       certificateLevelId: Yup.string().required(
         "Certificate Level is required",
       ),
+      sectorId: Yup.string().when("programmeTypeId", {
+        is: "41",
+        then: (schema) =>
+          schema.required("Sector is required for BQF Programme"),
+        otherwise: (schema) => schema.notRequired(),
+      }),
+      occupationId: Yup.string().when("programmeTypeId", {
+        is: "41",
+        then: (schema) =>
+          schema.required("Occupation is required for BQF Programme"),
+        otherwise: (schema) => schema.notRequired(),
+      }),
+      ncsId: Yup.string().when("programmeTypeId", {
+        is: "41",
+        then: (schema) => {
+          if (isAdd) {
+            return schema.required("NCS selection is required for BQF Programme");
+          }
+          return schema.notRequired();
+        },
+        otherwise: (schema) => schema.notRequired(),
+      }),
       entryRequirement: Yup.string().required("Entry Requirement is required"),
       totalTheoryDuration: Yup.string()
         .required("Total Theory Duration is required")
@@ -509,11 +769,11 @@ const CurriculumIndex = () => {
             totalPracticalDuration,
             totalOjtDuration,
             certificateLevelId,
-            courseTypeId,
+            programmeTypeId,
           } = this.parent;
 
           // Only apply rules for BQF Course (id: 41)
-          if (parseInt(courseTypeId) !== 41) {
+          if (parseInt(programmeTypeId) !== 41) {
             return true;
           }
 
@@ -526,11 +786,6 @@ const CurriculumIndex = () => {
 
           if (totalNum === 0) return true;
 
-          const theoryPercentage = (theoryNum / totalNum) * 100;
-          const practicalOjtPercentage =
-            ((practicalNum + ojtNum) / totalNum) * 100;
-
-          // Use the certificateLevels from the component scope
           const certificateLevel = certificateLevels.find(
             (level) => level.id === parseInt(certificateLevelId),
           );
@@ -539,18 +794,36 @@ const CurriculumIndex = () => {
 
           const levelName = certificateLevel.name.toLowerCase();
           const isDiploma = levelName.includes("diploma");
-          const requiredTheoryPercentage = isDiploma ? 40 : 20;
-          const requiredPracticalOjtPercentage = isDiploma ? 60 : 80;
+          const isAdvancedDiploma = levelName.includes("advanced diploma");
+          const isCertificate = levelName.includes("certificate");
 
-          if (theoryPercentage < requiredTheoryPercentage) {
+          let requiredTheoryPercentage = 0;
+          let requiredPracticalOjtPercentage = 0;
+
+          if (isDiploma || isAdvancedDiploma) {
+            requiredTheoryPercentage = 40;
+            requiredPracticalOjtPercentage = 60;
+          } else if (isCertificate) {
+            requiredTheoryPercentage = 20;
+            requiredPracticalOjtPercentage = 80;
+          } else {
+            return true;
+          }
+
+          const theoryPercentage = (theoryNum / totalNum) * 100;
+          const practicalOjtPercentage = ((practicalNum + ojtNum) / totalNum) * 100;
+
+          const tolerance = 0.5;
+
+          if (theoryPercentage < requiredTheoryPercentage - tolerance) {
             return this.createError({
-              message: `Theory duration (${theoryPercentage.toFixed(1)}%) must be at least ${requiredTheoryPercentage}% of total program duration for ${certificateLevel.name}`,
+              message: `Theory duration (${theoryPercentage.toFixed(1)}%) must be at least ${requiredTheoryPercentage}% of total program duration for ${certificateLevel.name}. Current theory: ${theoryNum} hours out of ${totalNum} total hours.`,
             });
           }
 
-          if (practicalOjtPercentage > requiredPracticalOjtPercentage) {
+          if (practicalOjtPercentage > requiredPracticalOjtPercentage + tolerance) {
             return this.createError({
-              message: `Practical + OJT duration (${practicalOjtPercentage.toFixed(1)}%) must not exceed ${requiredPracticalOjtPercentage}% of total program duration for ${certificateLevel.name}`,
+              message: `Practical + OJT duration (${practicalOjtPercentage.toFixed(1)}%) must not exceed ${requiredPracticalOjtPercentage}% of total program duration for ${certificateLevel.name}. Current practical + OJT: ${practicalNum + ojtNum} hours out of ${totalNum} total hours.`,
             });
           }
 
@@ -579,9 +852,9 @@ const CurriculumIndex = () => {
     }
   };
 
-  // Find curriculum by name
-  const findCurriculumByName = (curriculumName) => {
-    return data.find((item) => item.curriculum_name === curriculumName);
+  // Find curriculum by application_no
+  const findCurriculumByApplicationNo = (applicationNo) => {
+    return data.find((item) => item.application_no === applicationNo);
   };
 
   // Single dynamic submit handler with unified payload
@@ -608,7 +881,6 @@ const CurriculumIndex = () => {
       return;
     }
 
-    // Set loading based on action type
     if (actionType === "add") setLoading(true);
     else if (actionType === "endorse") setEndorseLoading(true);
     else if (actionType === "revision") setEditLoading(true);
@@ -618,38 +890,38 @@ const CurriculumIndex = () => {
         values.files.map((file) => fileToBase64(file)),
       );
 
-      // Get curriculum type details for dynamic service_id and name
       const curriculumType = getCurriculumType(values.curriculumTypeId);
       const serviceName = curriculumType?.service_name || "Curriculum";
       const serviceId = curriculumType?.id || 25;
 
-      // Dynamic assignedRoleId based on action type
-      // Endorse: 14, otherwise: 21
       const assignedRoleId = actionType === "endorse" ? 14 : 21;
 
-      // Find the curriculum to get application_no for endorse
       let applicationNo = "";
       if (actionType === "endorse") {
-        // For endorse, find by curriculum name
-        const selected = findCurriculumByName(values.curriculumName);
-        if (selected) {
-          applicationNo = selected.application_no;
-        }
+        // Use the endorseApplicationNo from form values
+        applicationNo = values.endorseApplicationNo;
       } else if (actionType === "revision") {
-        // For revision, use the selected curriculum's application_no
         if (selectedCurriculum) {
           applicationNo = selectedCurriculum.application_no;
         }
       }
 
-      // Unified payload for all actions using submitCurriculum
       const payload = {
         applicationNo: applicationNo,
         curriculumName: values.curriculumName,
         curriculumTypeId: parseInt(values.curriculumTypeId),
-        courseTypeId: parseInt(values.courseTypeId),
+        programmeTypeId: parseInt(values.programmeTypeId),
         description: values.description,
-        ncsId: parseInt(values.ncsId),
+        // For BQF (41): send programmeId (NCS ID) only
+        // For Non-BQF (42): send programmeTitle only
+        ...(parseInt(values.programmeTypeId) === 41 && {
+          sectorId: parseInt(values.sectorId),
+          occupationId: parseInt(values.occupationId),
+          programmeId: values.ncsId ? parseInt(values.ncsId) : null,
+        }),
+        ...(parseInt(values.programmeTypeId) === 42 && {
+          programmeTitle: values.programmeTitle || "",
+        }),
         certificateLevelId: parseInt(values.certificateLevelId),
         entryRequirement: values.entryRequirement,
         totalTheoryDuration: values.totalTheoryDuration,
@@ -659,13 +931,12 @@ const CurriculumIndex = () => {
         instituteId: institute.institute_id || null,
         documents: documents,
         serviceId: serviceId,
-        assignedRoleId: assignedRoleId, // Dynamic assignedRoleId
+        assignedRoleId: assignedRoleId,
         statusId: 55,
         createdBy: actionId,
         submittedDate: new Date().toISOString(),
       };
 
-      // For revision, add id and update fields
       if (actionType === "revision") {
         payload.id = selectedCurriculum.id;
         payload.updatedBy = actionId;
@@ -674,7 +945,6 @@ const CurriculumIndex = () => {
 
       console.log("Submitting payload:", payload);
 
-      // Use the same service for all actions
       const response = await CurriculumIndexService.submitCurriculum(
         payload,
         access_token,
@@ -694,7 +964,6 @@ const CurriculumIndex = () => {
       await fetchCurriculumData();
       resetForm();
 
-      // Close dialog based on action type
       if (actionType === "add") {
         setOpenDialog(false);
       } else if (actionType === "endorse") {
@@ -704,6 +973,10 @@ const CurriculumIndex = () => {
         setSelectedCurriculum(null);
       }
       setCertificateLevels([]);
+      setSelectedSectorId("");
+      setOccupations([]);
+      setNcsExists(false);
+      setNcsData(null);
     } catch (error) {
       console.error("Error submitting curriculum:", error);
       const curriculumType = getCurriculumType(values.curriculumTypeId);
@@ -719,7 +992,6 @@ const CurriculumIndex = () => {
           `Failed to ${actionMessages[actionType]} ${serviceName}`,
       );
     } finally {
-      // Reset loading based on action type
       if (actionType === "add") setLoading(false);
       else if (actionType === "endorse") setEndorseLoading(false);
       else if (actionType === "revision") setEditLoading(false);
@@ -737,8 +1009,13 @@ const CurriculumIndex = () => {
     }
     setSelectedCurriculum(curriculum);
     // Fetch certificate levels based on course type
-    if (curriculum.course_type_id) {
-      fetchCertificateLevels(parseInt(curriculum.course_type_id));
+    if (curriculum.programme_type_id) {
+      fetchCertificateLevels(parseInt(curriculum.programme_type_id));
+    }
+    // If Sector has a value, fetch occupations for that sector
+    if (curriculum.sector_id) {
+      fetchOccupationsBySector(curriculum.sector_id);
+      setSelectedSectorId(curriculum.sector_id);
     }
     setOpenEditDialog(true);
   };
@@ -755,18 +1032,40 @@ const CurriculumIndex = () => {
     isAdd = false,
     isRevision = false,
   }) => {
-    // Handle curriculum name change for endorse
+    const isCurriculumTypeReadOnly = true;
+    const isBQFCourse = parseInt(formik.values.programmeTypeId) === 41;
+    const isNonBQFCourse = parseInt(formik.values.programmeTypeId) === 42;
+
+    // Fetch programme title for revision when dialog opens
+    useEffect(() => {
+      // For BQF Revision, fetch programme title if not already set
+      if (isRevision && isBQFCourse && formik.values.ncsId && !formik.values.programmeTitle) {
+        console.log("Fetching programme title for revision with ncsId:", formik.values.ncsId);
+        fetchProgrammeTitleForRevision(formik.values.ncsId, formik.setFieldValue);
+      }
+    }, [isRevision, isBQFCourse, formik.values.ncsId]);
+
+    // Handle curriculum selection for endorse - now using application_no
     const handleEndorseCurriculumChange = (e) => {
-      const selectedName = e.target.value;
+      const selectedApplicationNo = e.target.value;
       formik.handleChange(e);
 
-      // Find the selected curriculum
-      const selected = findCurriculumByName(selectedName);
+      // Find the selected curriculum by application_no
+      const selected = data.find((item) => item.application_no === selectedApplicationNo);
       if (selected) {
-        // Auto-fill all fields
-        formik.setFieldValue("courseTypeId", selected.course_type_id || "");
+        console.log("Selected curriculum for endorse:", selected);
+        
+        // Set the curriculumName to the actual curriculum name for the payload
+        formik.setFieldValue("curriculumName", selected.curriculum_name);
+        // Also set the endorseApplicationNo field in formik for the dropdown display
+        formik.setFieldValue("endorseApplicationNo", selectedApplicationNo);
+        
+        // Auto-fill all fields based on selected curriculum values
+        formik.setFieldValue(
+          "programmeTypeId",
+          selected.programme_type_id || "",
+        );
         formik.setFieldValue("description", selected.description || "");
-        formik.setFieldValue("ncsId", selected.ncs_id || "");
         formik.setFieldValue(
           "certificateLevelId",
           selected.certificate_level_id || "",
@@ -791,21 +1090,91 @@ const CurriculumIndex = () => {
           "totalProgramDuration",
           selected.total_program_duration || "",
         );
-
-        // Fetch certificate levels based on course type
-        if (selected.course_type_id) {
-          fetchCertificateLevels(parseInt(selected.course_type_id));
+        
+        // Auto-fill Sector and Occupation based on selected curriculum
+        const sectorId = selected.sector_id || "";
+        const occupationId = selected.occupation_id || "";
+        
+        formik.setFieldValue("sectorId", sectorId);
+        formik.setFieldValue("occupationId", occupationId);
+        
+        // Handle Programme Title and ncsId based on programme type
+        const programmeTypeId = parseInt(selected.programme_type_id);
+        if (programmeTypeId === 41 && selected.programme_id) {
+          // For BQF, set ncsId to programme_id (will be sent as programmeId in payload)
+          formik.setFieldValue("ncsId", selected.programme_id);
+          // Fetch the programme title for display
+          fetchProgrammeTitleForEndorse(selected.programme_id, formik.setFieldValue);
+        } else if (programmeTypeId === 42) {
+          // For Non-BQF, use programme_title directly
+          formik.setFieldValue("programmeTitle", selected.programme_title || "");
+          formik.setFieldValue("ncsId", "");
+        } else {
+          formik.setFieldValue("programmeTitle", "");
+          formik.setFieldValue("ncsId", "");
         }
 
-        toast.info("Curriculum details auto-filled successfully!");
+        console.log("Setting sectorId:", sectorId);
+        console.log("Setting occupationId:", occupationId);
+        console.log("Setting ncsId (programmeId):", selected.programme_id);
+
+        // If Sector has a value, fetch occupations for that sector
+        if (sectorId) {
+          fetchOccupationsBySector(sectorId);
+          setSelectedSectorId(sectorId);
+        } else {
+          // Clear occupations if no sector
+          setOccupations([]);
+          setSelectedSectorId("");
+        }
+
+        // Fetch certificate levels based on course type
+        if (selected.programme_type_id) {
+          fetchCertificateLevels(parseInt(selected.programme_type_id));
+        }
+
+        // Show appropriate message based on what was auto-filled
+        const filledFields = [];
+        if (sectorId) filledFields.push("Sector");
+        if (occupationId) filledFields.push("Occupation");
+        if (programmeTypeId === 41 && selected.programme_id) {
+          filledFields.push("Programme ID");
+          filledFields.push("Programme Title (fetching...)");
+        } else if (programmeTypeId === 42 && selected.programme_title) {
+          filledFields.push("Programme Title");
+        }
+        
+        if (filledFields.length >= 2) {
+          toast.success("Curriculum details auto-filled successfully!");
+        } else if (filledFields.length > 0) {
+          toast.info(`Auto-filled: ${filledFields.join(", ")}. Please fill in missing fields manually.`);
+        } else {
+          toast.warning("Curriculum details auto-filled. Please fill in missing fields manually.");
+        }
       }
     };
 
-    // Determine if curriculum type should be readonly (true for all dialogs)
-    const isCurriculumTypeReadOnly = true;
-
-    // Check if BQF Course is selected
-    const isBQFCourse = parseInt(formik.values.courseTypeId) === 41;
+    // Get minimum hours info for display
+    const getMinHoursInfo = () => {
+      if (isNonBQFCourse) {
+        return "Minimum 140 hours required";
+      }
+      if (isBQFCourse && formik.values.certificateLevelId) {
+        const level = certificateLevels.find(
+          (l) => l.id === parseInt(formik.values.certificateLevelId)
+        );
+        if (level) {
+          const levelName = level.name.toLowerCase();
+          if (levelName.includes("diploma") || levelName.includes("advanced diploma")) {
+            return "Minimum 2400 hours required for Diploma/Advanced Diploma";
+          }
+          if (levelName.includes("certificate")) {
+            return "Minimum 400 hours required for Certificate";
+          }
+        }
+      }
+      return "";
+    };
 
     return (
       <Grid container spacing={2}>
@@ -889,6 +1258,7 @@ const CurriculumIndex = () => {
           )}
         </Grid>
 
+        {/* Curriculum Title - Dropdown for Endorse, Readonly for Revision (no background) */}
         <Grid size={{ xs: 12, md: 6 }}>
           {isEndorse ? (
             <TextField
@@ -899,31 +1269,34 @@ const CurriculumIndex = () => {
                   Curriculum Title <RequiredStar />
                 </>
               }
-              name="curriculumName"
+              name="endorseApplicationNo"
               size="small"
-              value={formik.values.curriculumName}
+              value={formik.values.endorseApplicationNo || ""}
               onChange={handleEndorseCurriculumChange}
               onBlur={formik.handleBlur}
               error={
-                formik.touched.curriculumName &&
-                Boolean(formik.errors.curriculumName)
+                formik.touched.endorseApplicationNo &&
+                Boolean(formik.errors.endorseApplicationNo)
               }
               helperText={
-                formik.touched.curriculumName && formik.errors.curriculumName
+                formik.touched.endorseApplicationNo && formik.errors.endorseApplicationNo
               }
             >
               <MenuItem value="">-select-</MenuItem>
               {data
-                .filter(
-                  (item) => item.status_id === "57" || item.status_id === 57,
-                )
+                .filter((item) => {
+                  const statusId = parseInt(item.status_id);
+                  const curriculumTypeId = parseInt(item.curriculum_type_id);
+                  return statusId === 57 && curriculumTypeId === 25;
+                })
                 .map((item) => (
-                  <MenuItem key={item.id} value={item.curriculum_name}>
+                  <MenuItem key={item.id} value={item.application_no}>
                     {item.curriculum_name} ({item.application_no})
                   </MenuItem>
                 ))}
             </TextField>
-          ) : (
+          ) : isRevision ? (
+            // Revision - Readonly (no background color)
             <TextField
               fullWidth
               label={
@@ -933,9 +1306,28 @@ const CurriculumIndex = () => {
               }
               name="curriculumName"
               size="small"
-              value={formik.values.curriculumName}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
+              value={formik.values.curriculumName || ""}
+              slotProps={{
+                input: {
+                  readOnly: true,
+                },
+              }}
+              placeholder="Curriculum Title"
+            />
+          ) : (
+            // Add - Editable
+            <TextField
+              fullWidth
+              label={
+                <>
+                  Curriculum Title <RequiredStar />
+                </>
+              }
+              name="curriculumName"
+              size="small"
+              value={formik.values.curriculumName || ""}
+              onChange={isNonBQFCourse ? formik.handleChange : undefined}
+              onBlur={isNonBQFCourse ? formik.handleBlur : undefined}
               error={
                 formik.touched.curriculumName &&
                 Boolean(formik.errors.curriculumName)
@@ -943,6 +1335,34 @@ const CurriculumIndex = () => {
               helperText={
                 formik.touched.curriculumName && formik.errors.curriculumName
               }
+              slotProps={{
+                input: {
+                  readOnly: isBQFCourse ? true : false,
+                  sx: isBQFCourse
+                    ? {
+                        backgroundColor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(255, 255, 255, 0.05)"
+                            : "rgba(0, 0, 0, 0.04)",
+                      }
+                    : {},
+                },
+              }}
+              placeholder={
+                isBQFCourse
+                  ? "Auto-filled from NCS"
+                  : isNonBQFCourse
+                    ? "Enter Curriculum Title"
+                    : "Select Programme Type first"
+              }
+              helperText={
+                isBQFCourse
+                  ? "Auto-filled from NCS data"
+                  : isNonBQFCourse
+                    ? "Enter the curriculum title manually"
+                    : "Curriculum Title will be auto-filled for BQF or editable for Non-BQF"
+              }
+              disabled={!formik.values.programmeTypeId}
             />
           )}
         </Grid>
@@ -953,16 +1373,49 @@ const CurriculumIndex = () => {
             fullWidth
             label={
               <>
-                Course Type <RequiredStar />
+                Programme Type <RequiredStar />
               </>
             }
-            name="courseTypeId"
+            name="programmeTypeId"
             size="small"
-            value={formik.values.courseTypeId}
+            value={formik.values.programmeTypeId}
             onChange={(e) => {
               const value = e.target.value;
               formik.handleChange(e);
               formik.setFieldValue("certificateLevelId", "");
+
+              if (parseInt(value) === 41) {
+                formik.setFieldValue("curriculumName", "");
+                formik.setFieldValue("programmeTitle", "");
+                formik.setFieldValue("sectorId", "");
+                formik.setFieldValue("occupationId", "");
+                formik.setFieldValue("ncsId", "");
+                setSelectedSectorId("");
+                setOccupations([]);
+                setNcsExists(false);
+                setNcsData(null);
+              } else if (parseInt(value) === 42) {
+                formik.setFieldValue("sectorId", "");
+                formik.setFieldValue("occupationId", "");
+                formik.setFieldValue("curriculumName", "");
+                formik.setFieldValue("programmeTitle", "");
+                formik.setFieldValue("ncsId", "");
+                setSelectedSectorId("");
+                setOccupations([]);
+                setNcsExists(false);
+                setNcsData(null);
+              } else {
+                formik.setFieldValue("sectorId", "");
+                formik.setFieldValue("occupationId", "");
+                formik.setFieldValue("curriculumName", "");
+                formik.setFieldValue("programmeTitle", "");
+                formik.setFieldValue("ncsId", "");
+                setSelectedSectorId("");
+                setOccupations([]);
+                setNcsExists(false);
+                setNcsData(null);
+              }
+
               if (value) {
                 fetchCertificateLevels(parseInt(value));
               } else {
@@ -971,14 +1424,21 @@ const CurriculumIndex = () => {
             }}
             onBlur={formik.handleBlur}
             error={
-              formik.touched.courseTypeId && Boolean(formik.errors.courseTypeId)
+              formik.touched.programmeTypeId &&
+              Boolean(formik.errors.programmeTypeId)
             }
             helperText={
-              formik.touched.courseTypeId && formik.errors.courseTypeId
+              formik.touched.programmeTypeId && formik.errors.programmeTypeId
             }
+            slotProps={{
+              input: {
+                readOnly: isRevision ? true : false,
+              },
+            }}
+            disabled={isRevision}
           >
             <MenuItem value="">-select-</MenuItem>
-            {courseTypes.map((type) => (
+            {programmeTypes.map((type) => (
               <MenuItem key={type.id} value={type.id.toString()}>
                 {type.name}
               </MenuItem>
@@ -989,7 +1449,152 @@ const CurriculumIndex = () => {
               BQF Course selected - Duration distribution rules apply
             </Typography>
           )}
+          {isNonBQFCourse && (
+            <Typography variant="caption" color="info.main">
+              Non-BQF Course selected - Minimum 140 hours required
+            </Typography>
+          )}
+          {isRevision && (
+            <Typography variant="caption" color="textSecondary">
+              Programme Type cannot be changed in Revision
+            </Typography>
+          )}
         </Grid>
+
+        {/* Sector and Occupation dropdowns - only show for BQF Programme */}
+        {isBQFCourse && (
+          <>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                select
+                fullWidth
+                label={
+                  <>
+                    Sector <RequiredStar />
+                  </>
+                }
+                name="sectorId"
+                size="small"
+                value={formik.values.sectorId || ""}
+                onChange={async (e) => {
+                  const sectorId = e.target.value;
+                  formik.handleChange(e);
+                  setSelectedSectorId(sectorId);
+                  formik.setFieldValue("occupationId", "");
+                  formik.setFieldValue("curriculumName", "");
+                  formik.setFieldValue("programmeTitle", "");
+                  formik.setFieldValue("ncsId", "");
+                  setNcsExists(false);
+                  setNcsData(null);
+                  if (sectorId) {
+                    await fetchOccupationsBySector(sectorId);
+                  } else {
+                    setOccupations([]);
+                  }
+                }}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.sectorId && Boolean(formik.errors.sectorId)
+                }
+                helperText={formik.touched.sectorId && formik.errors.sectorId}
+                disabled={loading || endorseLoading || editLoading || isRevision}
+                slotProps={{
+                  input: {
+                    readOnly: isRevision ? true : false,
+                  },
+                }}
+              >
+                <MenuItem value="">Select Sector</MenuItem>
+                {sectors.map((sector) => (
+                  <MenuItem key={sector.id} value={sector.id}>
+                    {sector.sectorName}
+                  </MenuItem>
+                ))}
+              </TextField>
+              {isRevision && (
+                <Typography variant="caption" color="textSecondary">
+                  Sector cannot be changed in Revision
+                </Typography>
+              )}
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                select
+                fullWidth
+                label={
+                  <>
+                    Occupation <RequiredStar />
+                  </>
+                }
+                name="occupationId"
+                size="small"
+                value={formik.values.occupationId || ""}
+                onChange={async (e) => {
+                  const occupationId = e.target.value;
+                  formik.handleChange(e);
+                  setNcsExists(false);
+                  setNcsData(null);
+
+                  if (
+                    isAdd && // Only check NCS for Add
+                    formik.values.sectorId &&
+                    occupationId &&
+                    formik.values.certificateLevelId
+                  ) {
+                    await checkNcsExists(
+                      formik.values.sectorId,
+                      occupationId,
+                      formik.values.certificateLevelId,
+                      formik.setFieldValue,
+                    );
+                  } else {
+                    formik.setFieldValue("curriculumName", "");
+                    formik.setFieldValue("programmeTitle", "");
+                    formik.setFieldValue("ncsId", "");
+                  }
+                }}
+                onBlur={formik.handleBlur}
+                error={
+                  formik.touched.occupationId &&
+                  Boolean(formik.errors.occupationId)
+                }
+                helperText={
+                  formik.touched.occupationId && formik.errors.occupationId
+                }
+                disabled={
+                  loading ||
+                  endorseLoading ||
+                  editLoading ||
+                  loadingOccupations ||
+                  !formik.values.sectorId ||
+                  isRevision
+                }
+                slotProps={{
+                  input: {
+                    readOnly: isRevision ? true : false,
+                  },
+                }}
+              >
+                <MenuItem value="">
+                  {loadingOccupations
+                    ? "Loading occupations..."
+                    : "Select Occupation"}
+                </MenuItem>
+                {occupations.map((occ) => (
+                  <MenuItem key={occ.id} value={occ.id}>
+                    {occ.occupationName}
+                  </MenuItem>
+                ))}
+              </TextField>
+              {isRevision && (
+                <Typography variant="caption" color="textSecondary">
+                  Occupation cannot be changed in Revision
+                </Typography>
+              )}
+            </Grid>
+          </>
+        )}
 
         <Grid size={{ xs: 12, md: 6 }}>
           <TextField
@@ -1003,8 +1608,30 @@ const CurriculumIndex = () => {
             name="certificateLevelId"
             size="small"
             value={formik.values.certificateLevelId}
-            onChange={(e) => {
+            onChange={async (e) => {
+              const certificateLevelId = e.target.value;
               formik.handleChange(e);
+              setNcsExists(false);
+              setNcsData(null);
+
+              if (
+                isAdd && // Only check NCS for Add
+                isBQFCourse &&
+                formik.values.sectorId &&
+                formik.values.occupationId &&
+                certificateLevelId
+              ) {
+                await checkNcsExists(
+                  formik.values.sectorId,
+                  formik.values.occupationId,
+                  certificateLevelId,
+                  formik.setFieldValue,
+                );
+              } else {
+                formik.setFieldValue("curriculumName", "");
+                formik.setFieldValue("programmeTitle", "");
+                formik.setFieldValue("ncsId", "");
+              }
             }}
             onBlur={formik.handleBlur}
             error={
@@ -1015,7 +1642,14 @@ const CurriculumIndex = () => {
               formik.touched.certificateLevelId &&
               formik.errors.certificateLevelId
             }
-            disabled={isLoadingCertificateLevels || !formik.values.courseTypeId}
+            disabled={
+              isLoadingCertificateLevels || !formik.values.programmeTypeId || isRevision
+            }
+            slotProps={{
+              input: {
+                readOnly: isRevision ? true : false,
+              },
+            }}
           >
             <MenuItem value="">-select-</MenuItem>
             {certificateLevels.map((level) => (
@@ -1024,7 +1658,7 @@ const CurriculumIndex = () => {
               </MenuItem>
             ))}
           </TextField>
-          {!formik.values.courseTypeId && (
+          {!formik.values.programmeTypeId && (
             <Typography variant="caption" color="textSecondary">
               Please select a course type first
             </Typography>
@@ -1034,32 +1668,98 @@ const CurriculumIndex = () => {
               Loading certificate levels...
             </Typography>
           )}
+          {isRevision && (
+            <Typography variant="caption" color="textSecondary">
+              Certificate Level cannot be changed in Revision
+            </Typography>
+          )}
+          {/* NCS found message - only for Add Curriculum */}
+          {isAdd && isBQFCourse && ncsExists && ncsData && (
+            <Typography
+              variant="caption"
+              color="success"
+              sx={{ display: "block", mt: 0.5 }}
+            >
+              ✓ NCS found: "{ncsData.programme_title}" - Programme Title and
+              Curriculum Title auto-filled
+            </Typography>
+          )}
+          {/* No NCS found warning - only for Add Curriculum */}
+          {isAdd && isBQFCourse &&
+            !ncsExists &&
+            formik.values.sectorId &&
+            formik.values.occupationId &&
+            formik.values.certificateLevelId &&
+            !checkingExisting && (
+              <Typography
+                variant="caption"
+                color="warning"
+                sx={{ display: "block", mt: 0.5 }}
+              >
+                ⚠ No NCS found for this combination - Please select different values
+              </Typography>
+            )}
+          {isBQFCourse && checkingExisting && (
+            <Typography
+              variant="caption"
+              color="info"
+              sx={{ display: "block", mt: 0.5 }}
+            >
+              Checking if NCS combination exists...
+            </Typography>
+          )}
         </Grid>
 
+        {/* Programme Title - Readonly for BQF, Editable for Non-BQF */}
         <Grid size={{ xs: 12, md: 6 }}>
           <TextField
-            select
             fullWidth
             label={
               <>
-                NCS Title <RequiredStar />
+                Programme Title <RequiredStar />
               </>
             }
-            name="ncsId"
+            name="programmeTitle"
             size="small"
-            value={formik.values.ncsId}
-            onChange={formik.handleChange}
-            onBlur={formik.handleBlur}
-            error={formik.touched.ncsId && Boolean(formik.errors.ncsId)}
-            helperText={formik.touched.ncsId && formik.errors.ncsId}
-          >
-            <MenuItem value="">-select-</MenuItem>
-            {ncsData.map((ncs) => (
-              <MenuItem key={ncs.id} value={ncs.id.toString()}>
-                {ncs.courseName || ncs.occupationName}
-              </MenuItem>
-            ))}
-          </TextField>
+            value={formik.values.programmeTitle || ""}
+            onChange={isNonBQFCourse ? formik.handleChange : undefined}
+            onBlur={isNonBQFCourse ? formik.handleBlur : undefined}
+            error={
+              formik.touched.programmeTitle &&
+              Boolean(formik.errors.programmeTitle)
+            }
+            helperText={
+              formik.touched.programmeTitle && formik.errors.programmeTitle
+            }
+            slotProps={{
+              input: {
+                readOnly: isBQFCourse ? true : false,
+                sx: isBQFCourse
+                  ? {
+                      backgroundColor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.05)"
+                          : "rgba(0, 0, 0, 0.04)",
+                    }
+                  : {},
+              },
+            }}
+            placeholder={
+              isBQFCourse
+                ? "Auto-filled from NCS"
+                : isNonBQFCourse
+                  ? "Enter Programme Title"
+                  : "Select Programme Type first"
+            }
+            helperText={
+              isBQFCourse
+                ? "Auto-filled from NCS data"
+                : isNonBQFCourse
+                  ? "Enter the programme title manually"
+                  : "Programme Title will be auto-filled for BQF or editable for Non-BQF"
+            }
+            disabled={!formik.values.programmeTypeId}
+          />
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
@@ -1180,7 +1880,7 @@ const CurriculumIndex = () => {
               },
             }}
             placeholder="Will be auto-calculated"
-            helperText="Automatically calculated from Theory + Practical + OJT durations"
+            helperText={`Auto-calculated from Theory + Practical + OJT durations ${getMinHoursInfo() ? `- ${getMinHoursInfo()}` : ''}`}
           />
         </Grid>
 
@@ -1189,61 +1889,68 @@ const CurriculumIndex = () => {
             formik.values.totalTheoryDuration &&
             formik.values.totalPracticalDuration &&
             formik.values.totalOjtDuration &&
-            extractNumericValue(formik.values.totalProgramDuration) < 140 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  bgcolor: "#ffebee",
-                  color: "#c62828",
-                  borderRadius: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  border: "1px solid #ef9a9a",
-                }}
-              >
-                <Typography variant="body2" fontWeight="bold">
-                  Warning:
-                </Typography>
-                <Typography variant="body2">
-                  Your curriculum development total is{" "}
-                  {formik.values.totalProgramDuration}, which is less than 140
-                  hours. Please ensure the total duration is at least 140 hours.
-                </Typography>
-              </Paper>
-            )}
+            (() => {
+              const totalNum = extractNumericValue(formik.values.totalProgramDuration);
+              const isBQF = parseInt(formik.values.programmeTypeId) === 41;
+              const isNonBQF = parseInt(formik.values.programmeTypeId) === 42;
+              
+              let isValid = false;
+              let message = "";
+              let color = "";
+              
+              if (isNonBQF) {
+                isValid = totalNum >= 140;
+                message = isValid 
+                  ? `✅ Valid: ${formik.values.totalProgramDuration} meets the minimum requirement of 140 hours for Non-BQF Programme`
+                  : `⚠️ Warning: ${formik.values.totalProgramDuration} is less than 140 hours. Non-BQF Programme must be at least 140 hours.`;
+                color = isValid ? "#2e7d32" : "#c62828";
+              } else if (isBQF && formik.values.certificateLevelId) {
+                const level = certificateLevels.find(
+                  (l) => l.id === parseInt(formik.values.certificateLevelId)
+                );
+                if (level) {
+                  const levelName = level.name.toLowerCase();
+                  let minHours = 0;
+                  if (levelName.includes("diploma") || levelName.includes("advanced diploma")) {
+                    minHours = 2400;
+                  } else if (levelName.includes("certificate")) {
+                    minHours = 400;
+                  }
+                  isValid = totalNum >= minHours;
+                  message = isValid 
+                    ? `✅ Valid: ${formik.values.totalProgramDuration} meets the minimum requirement of ${minHours} hours for ${level.name}`
+                    : `⚠️ Warning: ${formik.values.totalProgramDuration} is less than ${minHours} hours. ${level.name} must be at least ${minHours} hours.`;
+                  color = isValid ? "#2e7d32" : "#c62828";
+                } else {
+                  message = "Please select a valid certificate level";
+                  color = "#e65100";
+                }
+              } else {
+                message = "Please select Programme Type and Certificate Level";
+                color = "#e65100";
+              }
+              
+              return (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    bgcolor: color === "#2e7d32" ? "#e8f5e9" : color === "#c62828" ? "#ffebee" : "#fff3e0",
+                    color: color,
+                    borderRadius: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    border: `1px solid ${color === "#2e7d32" ? "#a5d6a7" : color === "#c62828" ? "#ef9a9a" : "#ffccbc"}`,
+                  }}
+                >
+                  <Typography variant="body2" fontWeight="bold">
+                    {message}
+                  </Typography>
+                </Paper>
+              );
+            })()}
 
-          {formik.values.totalProgramDuration &&
-            formik.values.totalTheoryDuration &&
-            formik.values.totalPracticalDuration &&
-            formik.values.totalOjtDuration &&
-            extractNumericValue(formik.values.totalProgramDuration) >= 140 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  bgcolor: "#e8f5e9",
-                  color: "#2e7d32",
-                  borderRadius: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  border: "1px solid #a5d6a7",
-                }}
-              >
-                <Typography variant="body2" fontWeight="bold">
-                  Valid:
-                </Typography>
-                <Typography variant="body2">
-                  Your curriculum development total is{" "}
-                  {formik.values.totalProgramDuration}, which meets the minimum
-                  requirement of 140 hours.
-                </Typography>
-              </Paper>
-            )}
-
-          {/* Show duration distribution error from Formik - only for BQF Course */}
           {isBQFCourse &&
             formik.errors.totalProgramDuration &&
             formik.errors.totalProgramDuration.includes("Theory duration") && (
@@ -1331,7 +2038,7 @@ const CurriculumIndex = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        Curriculum Management
+        List of Institute's Curriculums
       </Typography>
 
       <Grid
@@ -1545,6 +2252,10 @@ const CurriculumIndex = () => {
         onClose={() => {
           setOpenDialog(false);
           setCertificateLevels([]);
+          setSelectedSectorId("");
+          setOccupations([]);
+          setNcsExists(false);
+          setNcsData(null);
         }}
         maxWidth="lg"
         fullWidth
@@ -1552,11 +2263,12 @@ const CurriculumIndex = () => {
         <DialogTitle>Curriculum Development</DialogTitle>
         <Formik
           initialValues={getInitialValues(null, false, true, false)}
-          validationSchema={getValidationSchema()}
+          validationSchema={getValidationSchema(true)}
           onSubmit={(values, helpers) =>
             handleFormSubmit(values, helpers, "add")
           }
           enableReinitialize={true}
+          validateOnMount={true}
         >
           {(formik) => (
             <Form>
@@ -1576,6 +2288,10 @@ const CurriculumIndex = () => {
                   onClick={() => {
                     setOpenDialog(false);
                     setCertificateLevels([]);
+                    setSelectedSectorId("");
+                    setOccupations([]);
+                    setNcsExists(false);
+                    setNcsData(null);
                   }}
                   disabled={loading}
                 >
@@ -1586,7 +2302,7 @@ const CurriculumIndex = () => {
                   type="submit"
                   variant="contained"
                   color="primary"
-                  disabled={loading || !formik.isValid || !formik.dirty}
+                  disabled={loading || !formik.isValid}
                 >
                   {loading ? "Saving..." : "Submit"}
                 </Button>
@@ -1602,6 +2318,10 @@ const CurriculumIndex = () => {
         onClose={() => {
           setOpenEndorseDialog(false);
           setCertificateLevels([]);
+          setSelectedSectorId("");
+          setOccupations([]);
+          setNcsExists(false);
+          setNcsData(null);
         }}
         maxWidth="lg"
         fullWidth
@@ -1609,11 +2329,12 @@ const CurriculumIndex = () => {
         <DialogTitle>Curriculum Endorsement</DialogTitle>
         <Formik
           initialValues={getInitialValues(null, true, false, false)}
-          validationSchema={getValidationSchema()}
+          validationSchema={getValidationSchema(false)}
           onSubmit={(values, helpers) =>
             handleFormSubmit(values, helpers, "endorse")
           }
           enableReinitialize={true}
+          validateOnMount={true}
         >
           {(formik) => (
             <Form>
@@ -1633,6 +2354,10 @@ const CurriculumIndex = () => {
                   onClick={() => {
                     setOpenEndorseDialog(false);
                     setCertificateLevels([]);
+                    setSelectedSectorId("");
+                    setOccupations([]);
+                    setNcsExists(false);
+                    setNcsData(null);
                   }}
                   disabled={endorseLoading}
                 >
@@ -1643,7 +2368,7 @@ const CurriculumIndex = () => {
                   type="submit"
                   variant="contained"
                   color="success"
-                  disabled={endorseLoading || !formik.isValid || !formik.dirty}
+                  disabled={endorseLoading || !formik.isValid}
                 >
                   {endorseLoading ? "Endorsing..." : "Submit"}
                 </Button>
@@ -1660,6 +2385,10 @@ const CurriculumIndex = () => {
           setOpenEditDialog(false);
           setSelectedCurriculum(null);
           setCertificateLevels([]);
+          setSelectedSectorId("");
+          setOccupations([]);
+          setNcsExists(false);
+          setNcsData(null);
         }}
         maxWidth="lg"
         fullWidth
@@ -1672,11 +2401,12 @@ const CurriculumIndex = () => {
             false,
             true,
           )}
-          validationSchema={getValidationSchema()}
+          validationSchema={getValidationSchema(false)}
           onSubmit={(values, helpers) =>
             handleFormSubmit(values, helpers, "revision")
           }
           enableReinitialize={true}
+          validateOnMount={true}
         >
           {(formik) => (
             <Form>
@@ -1697,6 +2427,10 @@ const CurriculumIndex = () => {
                     setOpenEditDialog(false);
                     setSelectedCurriculum(null);
                     setCertificateLevels([]);
+                    setSelectedSectorId("");
+                    setOccupations([]);
+                    setNcsExists(false);
+                    setNcsData(null);
                   }}
                   disabled={editLoading}
                 >
@@ -1707,7 +2441,7 @@ const CurriculumIndex = () => {
                   type="submit"
                   variant="contained"
                   color="primary"
-                  disabled={editLoading || !formik.isValid || !formik.dirty}
+                  disabled={editLoading || !formik.isValid}
                 >
                   {editLoading ? "Revising..." : "Revise"}
                 </Button>

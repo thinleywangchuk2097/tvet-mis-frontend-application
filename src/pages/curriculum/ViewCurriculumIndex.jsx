@@ -26,6 +26,7 @@ import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import CommonService from "../../api/services/internal/common/CommonService";
 import FileDownload from "../../components/file/FileDownload";
 import CurriculumIndexService from "../../api/services/internal/course/CurriculumIndexService";
+import NcsService from "../../api/services/internal/ncs/NcsService";
 
 const ViewCurriculumIndex = () => {
   const { applicationNo } = useParams();
@@ -36,13 +37,20 @@ const ViewCurriculumIndex = () => {
   const [documents, setDocuments] = useState([]);
   const [newDocuments, setNewDocuments] = useState([]);
   const [curriculumTypes, setCurriculumTypes] = useState([]);
-  const [ncsData, setNcsData] = useState([]);
-  const [courseTypes, setCourseTypes] = useState([]);
+  const [programmeTypes, setProgrammeTypes] = useState([]);
   const [certificateLevels, setCertificateLevels] = useState([]);
   const [dropdownData, setDropdownData] = useState([]);
   const [remarksInput, setRemarksInput] = useState("");
   const [remarksError, setRemarksError] = useState("");
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
+
+  // State for Sector and Occupation dropdowns
+  const [sectors, setSectors] = useState([]);
+  const [occupations, setOccupations] = useState([]);
+
+  // State for Programme Title
+  const [programmeTitle, setProgrammeTitle] = useState("");
+  const [loadingProgrammeTitle, setLoadingProgrammeTitle] = useState(false);
 
   // Dialog states
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
@@ -63,10 +71,11 @@ const ViewCurriculumIndex = () => {
       await Promise.all([
         fetchCurriculumDetails(),
         fetchCurriculumTypes(),
-        fetchNcsDetails(),
-        fetchCourseTypes(),
+        fetchProgrammeTypes(),
         fetchCertificateLevels(),
         fetchDropdownData(),
+        fetchSectors(),
+        fetchAllOccupations(),
       ]);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -85,21 +94,12 @@ const ViewCurriculumIndex = () => {
     }
   };
 
-  const fetchNcsDetails = async () => {
-    try {
-      const response = await CommonService.getAllOccupations();
-      setNcsData(response.data);
-    } catch (error) {
-      console.error("Error fetching NCS data:", error);
-    }
-  };
-
-  const fetchCourseTypes = async () => {
+  const fetchProgrammeTypes = async () => {
     try {
       const response = await CommonService.getByParentId(13);
-      setCourseTypes(response.data);
+      setProgrammeTypes(response.data);
     } catch (error) {
-      console.error("Error fetching course types:", error);
+      console.error("Error fetching programme types:", error);
     }
   };
 
@@ -121,6 +121,106 @@ const ViewCurriculumIndex = () => {
     }
   };
 
+  // Fetch sectors
+  const fetchSectors = async () => {
+    try {
+      const response = await CommonService.getAllSectors();
+      setSectors(response.data || []);
+    } catch (error) {
+      console.error("Error fetching sectors:", error);
+    }
+  };
+
+  // Fetch all occupations
+  const fetchAllOccupations = async () => {
+    try {
+      const sectorsResponse = await CommonService.getAllSectors();
+      const sectorsData = sectorsResponse.data || [];
+
+      let allOccs = [];
+      for (const sector of sectorsData) {
+        try {
+          const occResponse = await CommonService.getOccupationsBySectorId(
+            sector.id,
+          );
+          const occData = occResponse.data || [];
+          allOccs = [...allOccs, ...occData];
+        } catch (e) {
+          console.error(
+            `Error fetching occupations for sector ${sector.id}:`,
+            e,
+          );
+        }
+      }
+
+      const uniqueOccs = allOccs.filter(
+        (occ, index, self) => index === self.findIndex((o) => o.id === occ.id),
+      );
+      setOccupations(uniqueOccs);
+    } catch (error) {
+      console.error("Error fetching all occupations:", error);
+    }
+  };
+
+  // Fetch programme title by ID using NcsService
+  const fetchProgrammeTitleById = async (programmeId) => {
+    if (!programmeId) {
+      setProgrammeTitle("N/A");
+      return;
+    }
+
+    setLoadingProgrammeTitle(true);
+    try {
+      const response = await NcsService.getProgrammeTitleById(
+        programmeId,
+        access_token,
+      );
+      console.log("Programme Title Response:", response);
+      console.log("Programme Title Response Data:", response.data);
+      
+      // Check if response.data is an array and has elements
+      if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
+        const item = response.data[0];
+        // Try to get the programme title from various possible field names
+        const title = item.programme_title || 
+                      item.courseName || 
+                      item.name || 
+                      item.occupationName ||
+                      item.title;
+        
+        if (title) {
+          setProgrammeTitle(title);
+          console.log("Programme Title set to:", title);
+        } else {
+          console.warn("No title found in response data:", item);
+          setProgrammeTitle(`Programme ID: ${programmeId}`);
+        }
+      } else if (response && response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+        // If it's a single object (not an array)
+        const item = response.data;
+        const title = item.programme_title || 
+                      item.courseName || 
+                      item.name || 
+                      item.occupationName ||
+                      item.title;
+        
+        if (title) {
+          setProgrammeTitle(title);
+        } else {
+          setProgrammeTitle(`Programme ID: ${programmeId}`);
+        }
+      } else {
+        console.warn("Unexpected response format:", response);
+        setProgrammeTitle(`Programme ID: ${programmeId}`);
+      }
+    } catch (error) {
+      console.error("Error fetching programme title:", error);
+      setProgrammeTitle(`Programme ID: ${programmeId}`);
+    } finally {
+      setLoadingProgrammeTitle(false);
+    }
+  };
+
   const fetchCurriculumDetails = async () => {
     try {
       const response =
@@ -135,6 +235,20 @@ const ViewCurriculumIndex = () => {
       }
 
       setCurriculumData(data);
+
+      // If BQF Programme, fetch programme title by programme_id
+      if (
+        data &&
+        parseInt(data.programme_type_id) === 41 &&
+        data.programme_id
+      ) {
+        await fetchProgrammeTitleById(data.programme_id);
+      } else if (data && parseInt(data.programme_type_id) === 42) {
+        // For Non-BQF, use programme_title directly
+        setProgrammeTitle(data.programme_title || "N/A");
+      } else {
+        setProgrammeTitle("N/A");
+      }
 
       if (data.remarks) {
         setRemarksInput(data.remarks);
@@ -218,27 +332,15 @@ const ViewCurriculumIndex = () => {
   };
 
   const getCourseTypeName = () => {
-    if (!curriculumData?.course_type_id) return "N/A";
-    if (courseTypes.length === 0) return "Loading...";
+    if (!curriculumData?.programme_type_id) return "N/A";
+    if (programmeTypes.length === 0) return "Loading...";
 
-    const courseType = courseTypes.find((type) => {
+    const programmeType = programmeTypes.find((type) => {
       const typeId = parseInt(type.id);
-      const courseTypeId = parseInt(curriculumData.course_type_id);
-      return typeId === courseTypeId;
+      const programmeTypeId = parseInt(curriculumData.programme_type_id);
+      return typeId === programmeTypeId;
     });
-    return courseType ? courseType.name : "N/A";
-  };
-
-  const getNcsTitle = () => {
-    if (!curriculumData?.ncs_id) return "N/A";
-    if (ncsData.length === 0) return "Loading...";
-
-    const ncs = ncsData.find((item) => {
-      const itemId = parseInt(item.id);
-      const ncsId = parseInt(curriculumData.ncs_id);
-      return itemId === ncsId;
-    });
-    return ncs ? ncs.courseName || ncs.name : "N/A";
+    return programmeType ? programmeType.name : "N/A";
   };
 
   const getCertificateLevelName = () => {
@@ -253,6 +355,38 @@ const ViewCurriculumIndex = () => {
     return level ? level.name : "N/A";
   };
 
+  // Get sector name by ID
+  const getSectorName = () => {
+    if (!curriculumData?.sector_id) return "N/A";
+    if (sectors.length === 0) return "Loading...";
+
+    const sector = sectors.find((item) => {
+      const itemId = parseInt(item.id);
+      const sectorId = parseInt(curriculumData.sector_id);
+      return itemId === sectorId;
+    });
+    return sector ? sector.sectorName : "N/A";
+  };
+
+  // Get occupation name by ID
+  const getOccupationName = () => {
+    if (!curriculumData?.occupation_id) return "N/A";
+    if (occupations.length === 0) return "Loading...";
+
+    const occupation = occupations.find((item) => {
+      const itemId = parseInt(item.id);
+      const occupationId = parseInt(curriculumData.occupation_id);
+      return itemId === occupationId;
+    });
+    return occupation ? occupation.occupationName : "N/A";
+  };
+
+  // Get programme title
+  const getProgrammeTitle = () => {
+    if (loadingProgrammeTitle) return "Loading...";
+    return programmeTitle || "N/A";
+  };
+
   // Helper function to check if curriculum type matches allowed types
   const isCurriculumTypeAllowed = (allowedTypes) => {
     if (!curriculumData?.curriculum_type_id) {
@@ -263,6 +397,11 @@ const ViewCurriculumIndex = () => {
       (type) => parseInt(type) === curriculumTypeId,
     );
     return isAllowed;
+  };
+
+  // Check if this is a BQF Programme
+  const isBQFCourse = () => {
+    return parseInt(curriculumData?.programme_type_id) === 41;
   };
 
   // Check if action buttons should be shown based on role and curriculum type
@@ -672,7 +811,7 @@ const ViewCurriculumIndex = () => {
             <Grid item size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
-                label="Course Type"
+                label="Programme Type"
                 value={getCourseTypeName()}
                 size="small"
                 slotProps={{
@@ -685,8 +824,8 @@ const ViewCurriculumIndex = () => {
             <Grid item size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
-                label="NCS Title"
-                value={getNcsTitle()}
+                label="Programme Title"
+                value={getProgrammeTitle()}
                 size="small"
                 slotProps={{
                   input: {
@@ -695,6 +834,39 @@ const ViewCurriculumIndex = () => {
                 }}
               />
             </Grid>
+
+            {/* BQF Course specific fields - Sector and Occupation */}
+            {isBQFCourse() && (
+              <>
+                <Grid item size={{ xs: 12, md: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="Sector"
+                    value={getSectorName()}
+                    size="small"
+                    slotProps={{
+                      input: {
+                        readOnly: true,
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item size={{ xs: 12, md: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="Occupation"
+                    value={getOccupationName()}
+                    size="small"
+                    slotProps={{
+                      input: {
+                        readOnly: true,
+                      },
+                    }}
+                  />
+                </Grid>
+              </>
+            )}
+
             <Grid item size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
