@@ -1394,7 +1394,400 @@ const AccreditedCourseRegistration = () => {
                     </Grid>
                   </Grid>
                 </Paper>
+ {/* Container 1: Basic Information */}
+                <Paper
+                  sx={{
+                    p: 3,
+                    mb: 3,
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography fontWeight={600} gutterBottom>
+                    Lead Trainer Information
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={2}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        label="CID No."
+                        name="CID No."
+                        size="small"
+                        value={formik.values.registrationNo}
+                        slotProps={{
+                          input: {
+                            readOnly: true,
+                          },
+                        }}
+                      />
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        label="Name"
+                        name="instituteName"
+                        size="small"
+                        value={formik.values.instituteName}
+                        slotProps={{
+                          input: {
+                            readOnly: true,
+                          },
+                        }}
+                      />
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={
+                          <>
+                            Gender<RequiredStar />
+                          </>
+                        }
+                        name="curriculumId"
+                        size="small"
+                        value={formik.values.curriculumId}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          formik.handleChange(e);
 
+                          if (selectedId && !isBasicInfoReadOnly()) {
+                            const selectedCurriculum = curriculumTypes.find(
+                              (curriculum) => curriculum.id == selectedId,
+                            );
+                            if (selectedCurriculum) {
+                              const details = {
+                                totalProgramDuration:
+                                  selectedCurriculum.total_program_duration ||
+                                  0,
+                                totalTheoryDuration:
+                                  selectedCurriculum.total_theory_duration || 0,
+                                totalPracticalDuration:
+                                  selectedCurriculum.total_practical_duration ||
+                                  0,
+                                totalOjtDuration:
+                                  selectedCurriculum.total_ojt_duration || 0,
+                                certificateLevelId:
+                                  selectedCurriculum.certificate_level_id || "",
+                              };
+                              setSelectedCurriculumDetails(details);
+
+                              // Set form values
+                              formik.setFieldValue(
+                                "totalProgramDuration",
+                                details.totalProgramDuration,
+                              );
+                              formik.setFieldValue(
+                                "totalTheoryDuration",
+                                details.totalTheoryDuration,
+                              );
+                              formik.setFieldValue(
+                                "totalPracticalDuration",
+                                details.totalPracticalDuration,
+                              );
+                              formik.setFieldValue(
+                                "totalOjtDuration",
+                                details.totalOjtDuration,
+                              );
+                              formik.setFieldValue(
+                                "certificateLevel",
+                                details.certificateLevelId,
+                              );
+                            }
+                          } else if (!selectedId && !isBasicInfoReadOnly()) {
+                            setSelectedCurriculumDetails(null);
+                            formik.setFieldValue("totalProgramDuration", "");
+                            formik.setFieldValue("totalTheoryDuration", "");
+                            formik.setFieldValue("totalPracticalDuration", "");
+                            formik.setFieldValue("totalOjtDuration", "");
+                            formik.setFieldValue("certificateLevel", "");
+                          }
+                        }}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.curriculumId &&
+                          Boolean(formik.errors.curriculumId)
+                        }
+                        helperText={
+                          formik.touched.curriculumId &&
+                          formik.errors.curriculumId
+                        }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {loadingCurriculumTypes ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={20} /> Loading...
+                          </MenuItem>
+                        ) : (
+                          curriculumTypes.map((curriculum) => (
+                            <MenuItem key={curriculum.id} value={curriculum.id}>
+                              {curriculum.curriculum_name}
+                            </MenuItem>
+                          ))
+                        )}
+                      </TextField>
+                    </Grid>
+
+                    {/* Curriculum Details Fields - Only show when curriculum is selected */}
+                    {selectedCurriculumDetails && (
+                      <>
+                        <Grid item size={{ xs: 12, md: 3 }}>
+                          <TextField
+                            fullWidth
+                            label="Total Program D"
+                            name="totalProgramDuration"
+                            type="number"
+                            size="small"
+                            value={formik.values.totalProgramDuration}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 3 }}>
+                          <TextField
+                            fullWidth
+                            label="Theory Duration (Hours)"
+                            name="totalTheoryDuration"
+                            type="number"
+                            size="small"
+                            value={formik.values.totalTheoryDuration}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 3 }}>
+                          <TextField
+                            fullWidth
+                            label="Practical Duration (Hours)"
+                            name="totalPracticalDuration"
+                            type="number"
+                            size="small"
+                            value={formik.values.totalPracticalDuration}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 3 }}>
+                          <TextField
+                            fullWidth
+                            label="OJT Duration (Hours)"
+                            name="totalOjtDuration"
+                            type="number"
+                            size="small"
+                            value={formik.values.totalOjtDuration}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            label="Certificate Level"
+                            name="certificateLevel"
+                            size="small"
+                            value={getCertificateLevelName(
+                              formik.values.certificateLevel,
+                            )}
+                            slotProps={{
+                              input: {
+                                readOnly: true,
+                              },
+                            }}
+                          />
+                        </Grid>
+                      </>
+                    )}
+
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        label={
+                          <>
+                            Qualification <RequiredStar />
+                          </>
+                        }
+                        name="sectorId"
+                        size="small"
+                        value={formik.values.sectorId}
+                        onChange={(e) => {
+                          formik.handleChange(e);
+                          if (!isBasicInfoReadOnly()) {
+                            setSelectedSectorId(e.target.value);
+                          }
+                        }}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.sectorId &&
+                          Boolean(formik.errors.sectorId)
+                        }
+                        helperText={
+                          formik.touched.sectorId && formik.errors.sectorId
+                        }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {sectors.map((sector) => (
+                          <MenuItem key={sector.id} value={sector.id}>
+                            {sector.sectorName}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      {isBasicInfoReadOnly() ? (
+                        <TextField
+                          fullWidth
+                          label="Professional Experience"
+                          name="courseName"
+                          size="small"
+                          value={formik.values.courseName}
+                          slotProps={{
+                            input: {
+                              readOnly: true,
+                            },
+                          }}
+                        />
+                      ) : (
+                        <TextField
+                          select
+                          fullWidth
+                          label={
+                            <>
+                              Professional Experience <RequiredStar />
+                            </>
+                          }
+                          name="courseId"
+                          size="small"
+                          value={formik.values.courseId}
+                          onChange={(e) => {
+                            formik.handleChange(e);
+                            const selectedCourseObj = occupations.find(
+                              (occ) => occ.id == e.target.value,
+                            );
+                            if (selectedCourseObj) {
+                              formik.setFieldValue(
+                                "courseName",
+                                selectedCourseObj.occupationName ||
+                                  selectedCourseObj.name,
+                              );
+                            }
+                          }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.courseId &&
+                            Boolean(formik.errors.courseId)
+                          }
+                          helperText={
+                            formik.touched.courseId && formik.errors.courseId
+                          }
+                          disabled={!formik.values.sectorId}
+                        >
+                          <MenuItem value="">-select-</MenuItem>
+                          {loadingOccupations ? (
+                            <MenuItem disabled>
+                              <CircularProgress size={20} /> Loading courses...
+                            </MenuItem>
+                          ) : (
+                            occupations.map((occupation) => (
+                              <MenuItem
+                                key={occupation.id}
+                                value={occupation.id}
+                              >
+                                {occupation.occupationName ||
+                                  occupation.title ||
+                                  occupation.name}
+                              </MenuItem>
+                            ))
+                          )}
+                        </TextField>
+                      )}
+                    </Grid>
+                    {/* New Fields: Fees per trainee and Enrollment capacity */}
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        label={
+                          <>
+                            Fees per trainee (Nu.) <RequiredStar />
+                          </>
+                        }
+                        name="feesPerTrainee"
+                        type="number"
+                        size="small"
+                        value={formik.values.feesPerTrainee}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.feesPerTrainee &&
+                          Boolean(formik.errors.feesPerTrainee)
+                        }
+                        helperText={
+                          formik.touched.feesPerTrainee &&
+                          formik.errors.feesPerTrainee
+                        }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
+                        inputProps={{ min: 1 }}
+                      />
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        label={
+                          <>
+                            Enrollment capacity per batch <RequiredStar />
+                          </>
+                        }
+                        name="enrolmentCapacity"
+                        type="number"
+                        size="small"
+                        value={formik.values.enrolmentCapacity}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.enrolmentCapacity &&
+                          Boolean(formik.errors.enrolmentCapacity)
+                        }
+                        helperText={
+                          formik.touched.enrolmentCapacity &&
+                          formik.errors.enrolmentCapacity
+                        }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
+                        inputProps={{ min: 1 }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Paper>
                 {/* Container 2: Quality Standards */}
                 <Paper
                   sx={{

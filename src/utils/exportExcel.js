@@ -1,20 +1,25 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
-export const exportToExcel = (data, fileName = "Report") => {
-    const worksheet = XLSX.utils.json_to_sheet(data);
+export const exportToExcel = async (data, fileName = "Report") => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Sheet1");
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  // Add headers and data
+  if (data && data.length > 0) {
+    const headers = Object.keys(data[0]);
+    worksheet.addRow(headers);
 
-    const buffer = XLSX.write(workbook, {
-        bookType: "xlsx",
-        type: "array",
+    data.forEach((item) => {
+      worksheet.addRow(headers.map((header) => item[header] ?? ""));
     });
+  }
 
-    const blob = new Blob([buffer], {
-        type: "application/octet-stream",
-    });
+  const buffer = await workbook.xlsx.writeBuffer();
 
-    saveAs(blob, `${fileName}.xlsx`);
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+
+  saveAs(blob, `${fileName}.xlsx`);
 };
