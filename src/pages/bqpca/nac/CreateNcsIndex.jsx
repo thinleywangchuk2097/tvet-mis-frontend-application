@@ -84,6 +84,112 @@ const parseDocuments = (documentsStr) => {
   }
 };
 
+// ==================== EXTRACTED HELPER FUNCTIONS ====================
+
+// Process documents for submission
+const processDocuments = async (documents) => {
+  return await Promise.all(
+    documents.map(async (file) => {
+      if (file.content) {
+        return {
+          name: file.name,
+          content: file.content,
+          contentType: file.type || "application/octet-stream",
+        };
+      }
+      const result = await fileToBase64(file);
+      return {
+        name: result.name,
+        content: result.content,
+        contentType: result.contentType,
+      };
+    }),
+  );
+};
+
+// Build payload for submission
+const buildPayload = (values, editingId, editData, actionId) => {
+  if (editingId) {
+    return {
+      applicationNo: editData?.applicationNo || "",
+      validityDate: values.validityDate,
+      programmeTitle: values.programmeTitle,
+      units: values.units,
+      documents: values.documents,
+      updatedBy: actionId,
+      serviceId: 21,
+    };
+  }
+
+  return {
+    applicationNo: "",
+    occupationId: parseInt(values.occupationId),
+    certificationId: parseInt(values.certificationId),
+    sectorId: parseInt(values.sectorId),
+    validityDate: values.validityDate,
+    programmeTitle: values.programmeTitle,
+    units: values.units,
+    serviceId: 21,
+    documents: values.documents,
+    createdBy: actionId,
+    updatedBy: actionId,
+  };
+};
+
+// Check if duplicate exists
+const performDuplicateCheck = async (values, editingId, checkExistingNcsFn) => {
+  if (editingId) return false;
+
+  const exists = await checkExistingNcsFn(
+    values.sectorId,
+    values.occupationId,
+    values.certificationId,
+  );
+
+  return exists;
+};
+
+// Create field change handler for form fields
+const createFieldChangeHandler = (
+  formik,
+  setSelectedSectorId,
+  setIsDuplicate,
+  checkExistingNcsFn,
+  editingId,
+) => {
+  return async (fieldName, value) => {
+    formik.handleChange({ target: { name: fieldName, value } });
+    formik.setFieldValue(fieldName, value);
+    setIsDuplicate(false);
+
+    if (fieldName === "sectorId") {
+      setSelectedSectorId(value);
+      if (!editingId) formik.setFieldValue("occupationId", "");
+    }
+
+    const { sectorId, occupationId, certificationId } = formik.values;
+    const updatedValues = {
+      sectorId: fieldName === "sectorId" ? value : sectorId,
+      occupationId: fieldName === "occupationId" ? value : occupationId,
+      certificationId:
+        fieldName === "certificationId" ? value : certificationId,
+    };
+
+    if (
+      !editingId &&
+      updatedValues.sectorId &&
+      updatedValues.occupationId &&
+      updatedValues.certificationId
+    ) {
+      await checkExistingNcsFn(
+        updatedValues.sectorId,
+        updatedValues.occupationId,
+        updatedValues.certificationId,
+      );
+    }
+  };
+};
+
 const CreateNcsIndex = () => {
   // State for search and pagination
   const [search, setSearch] = useState("");
@@ -98,7 +204,6 @@ const CreateNcsIndex = () => {
   // State for editing
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState(null);
-  const [existingFiles, setExistingFiles] = useState([]);
 
   // State for loading
   const [loading, setLoading] = useState(false);
@@ -485,6 +590,61 @@ const CreateNcsIndex = () => {
     }
   };
 
+  // ==================== REFACTORED SUBMIT HANDLER ====================
+
+  const handleSubmit = async (values, { resetForm, setSubmitting }) => {
+    // Check for existing NCS only when creating (not editing)
+    const exists = await performDuplicateCheck(
+      values,
+      editingId,
+      checkExistingNcs,
+    );
+    if (exists) {
+      setSubmitting(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Process documents
+      const processedDocuments = await processDocuments(values.documents);
+      values.documents = editingId
+        ? processedDocuments.filter(
+            (doc) => doc.content && doc.content.length > 0,
+          )
+        : processedDocuments;
+
+      // Build payload
+      const payload = buildPayload(values, editingId, editData, actionId);
+
+      console.log("Submitting payload:", payload);
+
+      // Submit
+      const response = editingId
+        ? await NcsService.updateNcs(editingId, payload, access_token)
+        : await NcsService.submitNcs(payload, access_token);
+
+      if (response.status === 200 || response.status === 201) {
+        toast.success(
+          editingId ? "NCS updated successfully!" : "NCS created successfully!",
+        );
+        resetForm();
+        setOpenDialog(false);
+        await fetchNcsData();
+      }
+    } catch (error) {
+      console.error("Error submitting NCS:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to submit NCS",
+      );
+    } finally {
+      setLoading(false);
+      setSubmitting(false);
+    }
+  };
+
   // ==================== LOAD DATA ON MOUNT ====================
 
   useEffect(() => {
@@ -540,7 +700,6 @@ const CreateNcsIndex = () => {
     if (item) {
       setEditingId(item.id);
       setEditData(item);
-      setExistingFiles(item.documents || []);
       if (item.sectorId) {
         setSelectedSectorId(item.sectorId);
         fetchOccupationsBySector(item.sectorId);
@@ -548,7 +707,6 @@ const CreateNcsIndex = () => {
     } else {
       setEditingId(null);
       setEditData(null);
-      setExistingFiles([]);
       setSelectedSectorId("");
       setOccupations([]);
       occupationsRef.current = [];
@@ -561,7 +719,6 @@ const CreateNcsIndex = () => {
     setOpenDialog(false);
     setEditingId(null);
     setEditData(null);
-    setExistingFiles([]);
     setSelectedSectorId("");
     setOccupations([]);
     occupationsRef.current = [];
@@ -655,104 +812,6 @@ const CreateNcsIndex = () => {
         .min(1, "At least one unit is required"),
       documents: Yup.array(),
     });
-  };
-
-  // ==================== SUBMIT HANDLER ====================
-
-  const handleSubmit = async (values, { resetForm, setSubmitting }) => {
-    // Check for existing NCS only when creating (not editing)
-    if (!editingId) {
-      const exists = await checkExistingNcs(
-        values.sectorId,
-        values.occupationId,
-        values.certificationId,
-      );
-
-      if (exists) {
-        setSubmitting(false);
-        return;
-      }
-    }
-
-    setLoading(true);
-    try {
-      let documentsToSend = [];
-
-      const allDocuments = await Promise.all(
-        values.documents.map(async (file) => {
-          if (file.content) {
-            return {
-              name: file.name,
-              content: file.content,
-              contentType: file.type || "application/octet-stream",
-            };
-          }
-          const result = await fileToBase64(file);
-          return {
-            name: result.name,
-            content: result.content,
-            contentType: result.contentType,
-          };
-        }),
-      );
-
-      documentsToSend = editingId
-        ? allDocuments.filter((doc) => doc.content && doc.content.length > 0)
-        : allDocuments;
-
-      let payload;
-
-      if (editingId) {
-        payload = {
-          applicationNo: editData?.applicationNo || "",
-          validityDate: values.validityDate,
-          programmeTitle: values.programmeTitle,
-          units: values.units,
-          documents: documentsToSend,
-          updatedBy: actionId,
-          serviceId: 21,
-        };
-      } else {
-        payload = {
-          applicationNo: "",
-          occupationId: parseInt(values.occupationId),
-          certificationId: parseInt(values.certificationId),
-          sectorId: parseInt(values.sectorId),
-          validityDate: values.validityDate,
-          programmeTitle: values.programmeTitle,
-          units: values.units,
-          serviceId: 21,
-          documents: documentsToSend,
-          createdBy: actionId,
-          updatedBy: actionId,
-        };
-      }
-
-      console.log("Submitting payload:", payload);
-
-      const response = editingId
-        ? await NcsService.updateNcs(editingId, payload, access_token)
-        : await NcsService.submitNcs(payload, access_token);
-
-      if (response.status === 200 || response.status === 201) {
-        toast.success(
-          editingId ? "NCS updated successfully!" : "NCS created successfully!",
-        );
-        resetForm();
-        setOpenDialog(false);
-        await fetchNcsData();
-      }
-    } catch (error) {
-      console.error("Error submitting NCS:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to submit NCS",
-      );
-    } finally {
-      setLoading(false);
-      setSubmitting(false);
-    }
   };
 
   // ==================== RENDER FUNCTIONS ====================
@@ -1127,551 +1186,532 @@ const CreateNcsIndex = () => {
           validationSchema={getValidationSchema()}
           onSubmit={handleSubmit}
         >
-          {(formik) => (
-            <Form>
-              <DialogContent dividers>
-                <Grid container spacing={2}>
-                  {/* Sector */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Tooltip
-                      title={editingId ? "Sector cannot be changed" : ""}
-                      placement="top"
-                      arrow
-                    >
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("Sector")}
-                        name="sectorId"
-                        size="small"
-                        value={formik.values.sectorId || ""}
-                        onChange={async (e) => {
-                          const sectorId = e.target.value;
-                          formik.handleChange(e);
-                          setSelectedSectorId(sectorId);
-                          formik.setFieldValue("occupationId", "");
-                          setIsDuplicate(false);
+          {(formik) => {
+            // Create field change handler for this form instance
+            const fieldChangeHandler = createFieldChangeHandler(
+              formik,
+              setSelectedSectorId,
+              setIsDuplicate,
+              checkExistingNcs,
+              editingId,
+            );
 
-                          if (
-                            sectorId &&
-                            formik.values.occupationId &&
-                            formik.values.certificationId &&
-                            !editingId
-                          ) {
-                            await checkExistingNcs(
-                              sectorId,
-                              formik.values.occupationId,
-                              formik.values.certificationId,
-                            );
+            return (
+              <Form>
+                <DialogContent dividers>
+                  <Grid container spacing={2}>
+                    {/* Sector */}
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <Tooltip
+                        title={editingId ? "Sector cannot be changed" : ""}
+                        placement="top"
+                        arrow
+                      >
+                        <TextField
+                          select
+                          fullWidth
+                          label={requiredLabel("Sector")}
+                          name="sectorId"
+                          size="small"
+                          value={formik.values.sectorId || ""}
+                          onChange={async (e) => {
+                            const sectorId = e.target.value;
+                            await fieldChangeHandler("sectorId", sectorId);
+                          }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.sectorId &&
+                            Boolean(formik.errors.sectorId)
                           }
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.sectorId &&
-                          Boolean(formik.errors.sectorId)
-                        }
-                        helperText={
-                          formik.touched.sectorId && formik.errors.sectorId
-                        }
-                        disabled={loading || checkingExisting}
-                        slotProps={{
-                          input: {
-                            readOnly: editingId ? true : false,
-                          },
-                        }}
-                      >
-                        <MenuItem value="">Select Sector</MenuItem>
-                        {sectors.map((sec) => (
-                          <MenuItem key={sec.id} value={sec.id}>
-                            {sec.sectorName}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Tooltip>
-                  </Grid>
-
-                  {/* Occupation */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Tooltip
-                      title={editingId ? "Occupation cannot be changed" : ""}
-                      placement="top"
-                      arrow
-                    >
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("Occupation")}
-                        name="occupationId"
-                        size="small"
-                        value={formik.values.occupationId || ""}
-                        onChange={async (e) => {
-                          const occupationId = e.target.value;
-                          formik.handleChange(e);
-                          setIsDuplicate(false);
-
-                          if (
-                            formik.values.sectorId &&
-                            occupationId &&
-                            formik.values.certificationId &&
-                            !editingId
-                          ) {
-                            await checkExistingNcs(
-                              formik.values.sectorId,
-                              occupationId,
-                              formik.values.certificationId,
-                            );
-                          }
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.occupationId &&
-                          Boolean(formik.errors.occupationId)
-                        }
-                        helperText={
-                          formik.touched.occupationId &&
-                          formik.errors.occupationId
-                        }
-                        disabled={
-                          loading ||
-                          loadingOccupations ||
-                          !formik.values.sectorId ||
-                          checkingExisting
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: editingId ? true : false,
-                          },
-                        }}
-                      >
-                        <MenuItem value="">
-                          {loadingOccupations
-                            ? "Loading occupations..."
-                            : "Select Occupation"}
-                        </MenuItem>
-                        {occupations.map((occ) => (
-                          <MenuItem key={occ.id} value={occ.id}>
-                            {occ.occupationName}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Tooltip>
-                  </Grid>
-
-                  {/* BQF Level */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Tooltip
-                      title={
-                        editingId
-                          ? "BQF Certificate Level cannot be changed"
-                          : ""
-                      }
-                      placement="top"
-                      arrow
-                    >
-                      <TextField
-                        select
-                        fullWidth
-                        label={requiredLabel("BQF Certificate Level")}
-                        name="certificationId"
-                        size="small"
-                        value={formik.values.certificationId || ""}
-                        onChange={async (e) => {
-                          const certificationId = e.target.value;
-                          formik.handleChange(e);
-                          setIsDuplicate(false);
-
-                          if (
-                            formik.values.sectorId &&
-                            formik.values.occupationId &&
-                            certificationId &&
-                            !editingId
-                          ) {
-                            await checkExistingNcs(
-                              formik.values.sectorId,
-                              formik.values.occupationId,
-                              certificationId,
-                            );
-                          }
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.certificationId &&
-                          Boolean(formik.errors.certificationId)
-                        }
-                        helperText={
-                          formik.touched.certificationId &&
-                          formik.errors.certificationId
-                        }
-                        disabled={loading || checkingExisting}
-                        slotProps={{
-                          input: {
-                            readOnly: editingId ? true : false,
-                          },
-                        }}
-                      >
-                        <MenuItem value="">
-                          Select BQF Certificate Level
-                        </MenuItem>
-                        {certificationLevels.map((lvl) => (
-                          <MenuItem key={lvl.id} value={lvl.id}>
-                            {lvl.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Tooltip>
-                  </Grid>
-
-                  {/* Validity Date */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      type="date"
-                      label={requiredLabel("Validity Date")}
-                      name="validityDate"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      value={formik.values.validityDate || ""}
-                      onChange={(e) =>
-                        formik.setFieldValue("validityDate", e.target.value)
-                      }
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.validityDate &&
-                        Boolean(formik.errors.validityDate)
-                      }
-                      helperText={
-                        formik.touched.validityDate &&
-                        formik.errors.validityDate
-                      }
-                      disabled={loading || checkingExisting}
-                    />
-                  </Grid>
-
-                  {/* Programme Title */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      type="text"
-                      label={requiredLabel("Programme Title")}
-                      name="programmeTitle"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      value={formik.values.programmeTitle}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      error={
-                        formik.touched.programmeTitle &&
-                        Boolean(formik.errors.programmeTitle)
-                      }
-                      helperText={
-                        formik.touched.programmeTitle &&
-                        formik.errors.programmeTitle
-                      }
-                      disabled={loading || checkingExisting}
-                    />
-                  </Grid>
-
-                  {/* Unit Details */}
-                  <Grid size={{ xs: 12 }}>
-                    <Paper
-                      sx={{
-                        p: 2,
-                        mb: 2,
-                        borderRadius: 1,
-                        border: "1px solid #e0e0e0",
-                      }}
-                    >
-                      <Typography
-                        variant="subtitle2"
-                        fontWeight={600}
-                        sx={{ mb: 1 }}
-                      >
-                        Unit Details
-                      </Typography>
-
-                      <FieldArray name="units">
-                        {({ push, remove, form }) => {
-                          const lastIndex = form.values.units.length - 1;
-                          const lastUnit = form.values.units[lastIndex];
-                          const hasErrors =
-                            lastUnit &&
-                            (!lastUnit.unitTitle || !lastUnit.unitCode);
-
-                          const hasTouchedErrors =
-                            formik.touched.units &&
-                            formik.touched.units.some((touched, index) => {
-                              return (
-                                touched &&
-                                ((touched.unitTitle &&
-                                  formik.errors.units?.[index]?.unitTitle) ||
-                                  (touched.unitCode &&
-                                    formik.errors.units?.[index]?.unitCode))
-                              );
-                            });
-
-                          const canAddMore = !hasErrors && !hasTouchedErrors;
-
-                          return (
-                            <>
-                              {form.values.units.map((unit, index) => (
-                                <Box
-                                  key={index}
-                                  sx={{
-                                    display: "flex",
-                                    gap: 1,
-                                    alignItems: "flex-start",
-                                    mb: 1,
-                                  }}
-                                >
-                                  <Box sx={{ flex: 2 }}>
-                                    <TextField
-                                      size="small"
-                                      placeholder="Unit Title"
-                                      name={`units.${index}.unitTitle`}
-                                      value={unit.unitTitle}
-                                      onChange={formik.handleChange}
-                                      onBlur={formik.handleBlur}
-                                      error={
-                                        formik.touched.units?.[index]
-                                          ?.unitTitle &&
-                                        Boolean(
-                                          formik.errors.units?.[index]
-                                            ?.unitTitle,
-                                        )
-                                      }
-                                      helperText={
-                                        formik.touched.units?.[index]
-                                          ?.unitTitle &&
-                                        formik.errors.units?.[index]?.unitTitle
-                                      }
-                                      disabled={loading || checkingExisting}
-                                      fullWidth
-                                      FormHelperTextProps={{
-                                        sx: {
-                                          minHeight: "20px",
-                                          marginTop: "3px",
-                                        },
-                                      }}
-                                    />
-                                  </Box>
-                                  <Box sx={{ flex: 1 }}>
-                                    <TextField
-                                      size="small"
-                                      placeholder="Unit Code"
-                                      name={`units.${index}.unitCode`}
-                                      value={unit.unitCode}
-                                      onChange={formik.handleChange}
-                                      onBlur={formik.handleBlur}
-                                      error={
-                                        formik.touched.units?.[index]
-                                          ?.unitCode &&
-                                        Boolean(
-                                          formik.errors.units?.[index]
-                                            ?.unitCode,
-                                        )
-                                      }
-                                      helperText={
-                                        formik.touched.units?.[index]
-                                          ?.unitCode &&
-                                        formik.errors.units?.[index]?.unitCode
-                                      }
-                                      disabled={loading || checkingExisting}
-                                      fullWidth
-                                      FormHelperTextProps={{
-                                        sx: {
-                                          minHeight: "20px",
-                                          marginTop: "3px",
-                                        },
-                                      }}
-                                    />
-                                  </Box>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      pt: "4px",
-                                      minWidth: "40px",
-                                    }}
-                                  >
-                                    <IconButton
-                                      size="small"
-                                      color="error"
-                                      onClick={() => remove(index)}
-                                      disabled={
-                                        loading ||
-                                        form.values.units.length <= 1 ||
-                                        checkingExisting
-                                      }
-                                    >
-                                      <RemoveCircleOutlineIcon fontSize="small" />
-                                    </IconButton>
-                                  </Box>
-                                </Box>
-                              ))}
-
-                              <Button
-                                type="button"
-                                variant="outlined"
-                                size="small"
-                                startIcon={<AddIcon />}
-                                onClick={() => {
-                                  const lastIdx = form.values.units.length - 1;
-                                  const lastUnit = form.values.units[lastIdx];
-                                  if (lastUnit.unitTitle && lastUnit.unitCode) {
-                                    push({ unitCode: "", unitTitle: "" });
-                                  } else {
-                                    formik.setFieldTouched(
-                                      `units.${lastIdx}.unitTitle`,
-                                      true,
-                                    );
-                                    formik.setFieldTouched(
-                                      `units.${lastIdx}.unitCode`,
-                                      true,
-                                    );
-                                    toast.warning(
-                                      "Please fill the current unit details before adding a new one",
-                                    );
-                                  }
-                                }}
-                                disabled={
-                                  loading || !canAddMore || checkingExisting
-                                }
-                                fullWidth
-                                sx={{ mt: 1, py: 0.5 }}
-                              >
-                                Add Unit
-                              </Button>
-
-                              {!canAddMore && form.values.units.length > 0 && (
-                                <Typography
-                                  color="warning"
-                                  variant="caption"
-                                  sx={{ display: "block", mt: 0.5 }}
-                                >
-                                  Please fill the current unit details before
-                                  adding a new unit
-                                </Typography>
-                              )}
-
-                              {formik.touched.units && formik.errors.units && (
-                                <Typography
-                                  color="error"
-                                  variant="caption"
-                                  sx={{ display: "block", mt: 0.5 }}
-                                >
-                                  {typeof formik.errors.units === "string"
-                                    ? formik.errors.units
-                                    : "Fill all unit details"}
-                                </Typography>
-                              )}
-                            </>
-                          );
-                        }}
-                      </FieldArray>
-                    </Paper>
-                  </Grid>
-
-                  {/* Documents Upload */}
-                  <Grid size={{ xs: 12 }}>
-                    <Paper
-                      sx={{
-                        p: { xs: 2, md: 3 },
-                        mb: 2,
-                        borderRadius: 2,
-                        border: "1px solid #e0e0e0",
-                      }}
-                    >
-                      <Typography
-                        variant="subtitle1"
-                        fontWeight={600}
-                        sx={{ mb: 2 }}
-                      >
-                        Supporting Documents
-                      </Typography>
-                      <Divider sx={{ mb: 3 }} />
-
-                      <Box
-                        sx={{
-                          p: 2,
-                          border: "1px dashed #bdbdbd",
-                          borderRadius: 2,
-                          minHeight: 100,
-                        }}
-                      >
-                        <FileUpload
-                          files={formik.values.documents}
-                          onFilesChange={(files) =>
-                            formik.setFieldValue("documents", files)
+                          helperText={
+                            formik.touched.sectorId && formik.errors.sectorId
                           }
                           disabled={loading || checkingExisting}
-                        />
-                      </Box>
+                          slotProps={{
+                            input: {
+                              readOnly: editingId ? true : false,
+                            },
+                          }}
+                        >
+                          <MenuItem value="">Select Sector</MenuItem>
+                          {sectors.map((sec) => (
+                            <MenuItem key={sec.id} value={sec.id}>
+                              {sec.sectorName}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Tooltip>
+                    </Grid>
 
-                      {formik.touched.documents && formik.errors.documents && (
+                    {/* Occupation */}
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <Tooltip
+                        title={editingId ? "Occupation cannot be changed" : ""}
+                        placement="top"
+                        arrow
+                      >
+                        <TextField
+                          select
+                          fullWidth
+                          label={requiredLabel("Occupation")}
+                          name="occupationId"
+                          size="small"
+                          value={formik.values.occupationId || ""}
+                          onChange={async (e) => {
+                            const occupationId = e.target.value;
+                            await fieldChangeHandler(
+                              "occupationId",
+                              occupationId,
+                            );
+                          }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.occupationId &&
+                            Boolean(formik.errors.occupationId)
+                          }
+                          helperText={
+                            formik.touched.occupationId &&
+                            formik.errors.occupationId
+                          }
+                          disabled={
+                            loading ||
+                            loadingOccupations ||
+                            !formik.values.sectorId ||
+                            checkingExisting
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: editingId ? true : false,
+                            },
+                          }}
+                        >
+                          <MenuItem value="">
+                            {loadingOccupations
+                              ? "Loading occupations..."
+                              : "Select Occupation"}
+                          </MenuItem>
+                          {occupations.map((occ) => (
+                            <MenuItem key={occ.id} value={occ.id}>
+                              {occ.occupationName}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Tooltip>
+                    </Grid>
+
+                    {/* BQF Level */}
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <Tooltip
+                        title={
+                          editingId
+                            ? "BQF Certificate Level cannot be changed"
+                            : ""
+                        }
+                        placement="top"
+                        arrow
+                      >
+                        <TextField
+                          select
+                          fullWidth
+                          label={requiredLabel("BQF Certificate Level")}
+                          name="certificationId"
+                          size="small"
+                          value={formik.values.certificationId || ""}
+                          onChange={async (e) => {
+                            const certificationId = e.target.value;
+                            await fieldChangeHandler(
+                              "certificationId",
+                              certificationId,
+                            );
+                          }}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.certificationId &&
+                            Boolean(formik.errors.certificationId)
+                          }
+                          helperText={
+                            formik.touched.certificationId &&
+                            formik.errors.certificationId
+                          }
+                          disabled={loading || checkingExisting}
+                          slotProps={{
+                            input: {
+                              readOnly: editingId ? true : false,
+                            },
+                          }}
+                        >
+                          <MenuItem value="">
+                            Select BQF Certificate Level
+                          </MenuItem>
+                          {certificationLevels.map((lvl) => (
+                            <MenuItem key={lvl.id} value={lvl.id}>
+                              {lvl.name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Tooltip>
+                    </Grid>
+
+                    {/* Validity Date */}
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        fullWidth
+                        type="date"
+                        label={requiredLabel("Validity Date")}
+                        name="validityDate"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={formik.values.validityDate || ""}
+                        onChange={(e) =>
+                          formik.setFieldValue("validityDate", e.target.value)
+                        }
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.validityDate &&
+                          Boolean(formik.errors.validityDate)
+                        }
+                        helperText={
+                          formik.touched.validityDate &&
+                          formik.errors.validityDate
+                        }
+                        disabled={loading || checkingExisting}
+                      />
+                    </Grid>
+
+                    {/* Programme Title */}
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        fullWidth
+                        type="text"
+                        label={requiredLabel("Programme Title")}
+                        name="programmeTitle"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={formik.values.programmeTitle}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.programmeTitle &&
+                          Boolean(formik.errors.programmeTitle)
+                        }
+                        helperText={
+                          formik.touched.programmeTitle &&
+                          formik.errors.programmeTitle
+                        }
+                        disabled={loading || checkingExisting}
+                      />
+                    </Grid>
+
+                    {/* Unit Details */}
+                    <Grid size={{ xs: 12 }}>
+                      <Paper
+                        sx={{
+                          p: 2,
+                          mb: 2,
+                          borderRadius: 1,
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
                         <Typography
-                          color="error"
+                          variant="subtitle2"
+                          fontWeight={600}
+                          sx={{ mb: 1 }}
+                        >
+                          Unit Details
+                        </Typography>
+
+                        <FieldArray name="units">
+                          {({ push, remove, form }) => {
+                            const lastIndex = form.values.units.length - 1;
+                            const lastUnit = form.values.units[lastIndex];
+                            const hasErrors =
+                              lastUnit &&
+                              (!lastUnit.unitTitle || !lastUnit.unitCode);
+
+                            const hasTouchedErrors =
+                              formik.touched.units &&
+                              formik.touched.units.some((touched, index) => {
+                                return (
+                                  touched &&
+                                  ((touched.unitTitle &&
+                                    formik.errors.units?.[index]?.unitTitle) ||
+                                    (touched.unitCode &&
+                                      formik.errors.units?.[index]?.unitCode))
+                                );
+                              });
+
+                            const canAddMore = !hasErrors && !hasTouchedErrors;
+
+                            return (
+                              <>
+                                {form.values.units.map((unit, index) => (
+                                  <Box
+                                    key={index}
+                                    sx={{
+                                      display: "flex",
+                                      gap: 1,
+                                      alignItems: "flex-start",
+                                      mb: 1,
+                                    }}
+                                  >
+                                    <Box sx={{ flex: 2 }}>
+                                      <TextField
+                                        size="small"
+                                        placeholder="Unit Title"
+                                        name={`units.${index}.unitTitle`}
+                                        value={unit.unitTitle}
+                                        onChange={formik.handleChange}
+                                        onBlur={formik.handleBlur}
+                                        error={
+                                          formik.touched.units?.[index]
+                                            ?.unitTitle &&
+                                          Boolean(
+                                            formik.errors.units?.[index]
+                                              ?.unitTitle,
+                                          )
+                                        }
+                                        helperText={
+                                          formik.touched.units?.[index]
+                                            ?.unitTitle &&
+                                          formik.errors.units?.[index]
+                                            ?.unitTitle
+                                        }
+                                        disabled={loading || checkingExisting}
+                                        fullWidth
+                                        FormHelperTextProps={{
+                                          sx: {
+                                            minHeight: "20px",
+                                            marginTop: "3px",
+                                          },
+                                        }}
+                                      />
+                                    </Box>
+                                    <Box sx={{ flex: 1 }}>
+                                      <TextField
+                                        size="small"
+                                        placeholder="Unit Code"
+                                        name={`units.${index}.unitCode`}
+                                        value={unit.unitCode}
+                                        onChange={formik.handleChange}
+                                        onBlur={formik.handleBlur}
+                                        error={
+                                          formik.touched.units?.[index]
+                                            ?.unitCode &&
+                                          Boolean(
+                                            formik.errors.units?.[index]
+                                              ?.unitCode,
+                                          )
+                                        }
+                                        helperText={
+                                          formik.touched.units?.[index]
+                                            ?.unitCode &&
+                                          formik.errors.units?.[index]?.unitCode
+                                        }
+                                        disabled={loading || checkingExisting}
+                                        fullWidth
+                                        FormHelperTextProps={{
+                                          sx: {
+                                            minHeight: "20px",
+                                            marginTop: "3px",
+                                          },
+                                        }}
+                                      />
+                                    </Box>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        pt: "4px",
+                                        minWidth: "40px",
+                                      }}
+                                    >
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => remove(index)}
+                                        disabled={
+                                          loading ||
+                                          form.values.units.length <= 1 ||
+                                          checkingExisting
+                                        }
+                                      >
+                                        <RemoveCircleOutlineIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </Box>
+                                ))}
+
+                                <Button
+                                  type="button"
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={<AddIcon />}
+                                  onClick={() => {
+                                    const lastIdx =
+                                      form.values.units.length - 1;
+                                    const lastUnit = form.values.units[lastIdx];
+                                    if (
+                                      lastUnit.unitTitle &&
+                                      lastUnit.unitCode
+                                    ) {
+                                      push({ unitCode: "", unitTitle: "" });
+                                    } else {
+                                      formik.setFieldTouched(
+                                        `units.${lastIdx}.unitTitle`,
+                                        true,
+                                      );
+                                      formik.setFieldTouched(
+                                        `units.${lastIdx}.unitCode`,
+                                        true,
+                                      );
+                                      toast.warning(
+                                        "Please fill the current unit details before adding a new one",
+                                      );
+                                    }
+                                  }}
+                                  disabled={
+                                    loading || !canAddMore || checkingExisting
+                                  }
+                                  fullWidth
+                                  sx={{ mt: 1, py: 0.5 }}
+                                >
+                                  Add Unit
+                                </Button>
+
+                                {!canAddMore &&
+                                  form.values.units.length > 0 && (
+                                    <Typography
+                                      color="warning"
+                                      variant="caption"
+                                      sx={{ display: "block", mt: 0.5 }}
+                                    >
+                                      Please fill the current unit details
+                                      before adding a new unit
+                                    </Typography>
+                                  )}
+
+                                {formik.touched.units &&
+                                  formik.errors.units && (
+                                    <Typography
+                                      color="error"
+                                      variant="caption"
+                                      sx={{ display: "block", mt: 0.5 }}
+                                    >
+                                      {typeof formik.errors.units === "string"
+                                        ? formik.errors.units
+                                        : "Fill all unit details"}
+                                    </Typography>
+                                  )}
+                              </>
+                            );
+                          }}
+                        </FieldArray>
+                      </Paper>
+                    </Grid>
+
+                    {/* Documents Upload */}
+                    <Grid size={{ xs: 12 }}>
+                      <Paper
+                        sx={{
+                          p: { xs: 2, md: 3 },
+                          mb: 2,
+                          borderRadius: 2,
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
+                        <Typography
+                          variant="subtitle1"
+                          fontWeight={600}
+                          sx={{ mb: 2 }}
+                        >
+                          Supporting Documents
+                        </Typography>
+                        <Divider sx={{ mb: 3 }} />
+
+                        <Box
+                          sx={{
+                            p: 2,
+                            border: "1px dashed #bdbdbd",
+                            borderRadius: 2,
+                            minHeight: 100,
+                          }}
+                        >
+                          <FileUpload
+                            files={formik.values.documents}
+                            onFilesChange={(files) =>
+                              formik.setFieldValue("documents", files)
+                            }
+                            disabled={loading || checkingExisting}
+                          />
+                        </Box>
+
+                        {formik.touched.documents &&
+                          formik.errors.documents && (
+                            <Typography
+                              color="error"
+                              variant="caption"
+                              sx={{ display: "block", mt: 1 }}
+                            >
+                              {formik.errors.documents}
+                            </Typography>
+                          )}
+
+                        <Typography
                           variant="caption"
+                          color="textSecondary"
                           sx={{ display: "block", mt: 1 }}
                         >
-                          {formik.errors.documents}
+                          Total files: {formik.values.documents?.length || 0}
                         </Typography>
-                      )}
-
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        sx={{ display: "block", mt: 1 }}
-                      >
-                        Total files: {formik.values.documents?.length || 0}
-                      </Typography>
-                    </Paper>
+                      </Paper>
+                    </Grid>
                   </Grid>
-                </Grid>
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="error"
-                  onClick={handleCloseDialog}
-                  disabled={loading || checkingExisting}
-                >
-                  Cancel
-                </Button>
-                <Tooltip
-                  title={
-                    isDuplicate && !editingId
-                      ? "This NCS combination already exists"
-                      : ""
-                  }
-                  placement="top"
-                  arrow
-                >
-                  <span>
-                    <Button
-                      size="small"
-                      type="submit"
-                      variant="contained"
-                      color="primary"
-                      disabled={
-                        loading ||
-                        checkingExisting ||
-                        (isDuplicate && !editingId)
-                      }
-                    >
-                      {loading
-                        ? "Submitting..."
-                        : checkingExisting
-                          ? "Checking..."
-                          : editingId
-                            ? "Update"
-                            : "Submit"}
-                    </Button>
-                  </span>
-                </Tooltip>
-              </DialogActions>
-            </Form>
-          )}
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    onClick={handleCloseDialog}
+                    disabled={loading || checkingExisting}
+                  >
+                    Cancel
+                  </Button>
+                  <Tooltip
+                    title={
+                      isDuplicate && !editingId
+                        ? "This NCS combination already exists"
+                        : ""
+                    }
+                    placement="top"
+                    arrow
+                  >
+                    <span>
+                      <Button
+                        size="small"
+                        type="submit"
+                        variant="contained"
+                        color="primary"
+                        disabled={
+                          loading ||
+                          checkingExisting ||
+                          (isDuplicate && !editingId)
+                        }
+                      >
+                        {loading
+                          ? "Submitting..."
+                          : checkingExisting
+                            ? "Checking..."
+                            : editingId
+                              ? "Update"
+                              : "Submit"}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </DialogActions>
+              </Form>
+            );
+          }}
         </Formik>
       </Dialog>
     </Paper>

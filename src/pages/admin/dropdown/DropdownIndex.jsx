@@ -63,10 +63,84 @@ const dropdownSchema = Yup.object().shape({
   newOption: Yup.string(),
 });
 
+// ==================== EXTRACTED HELPER FUNCTIONS ====================
+
+// Transform dropdown data from API response
+const transformDropdownData = (data) => {
+  return data.body.map((dropdown) => ({
+    id: dropdown.id,
+    dropdownName: dropdown.dropdownName,
+    description: dropdown.description,
+    dropdownChild: dropdown.dropdownChild.map((child) => ({
+      id: child.id,
+      designation: child.designation || child.name || child.label || "",
+    })),
+  }));
+};
+
+// Check if dropdown matches search term
+const matchesSearchTerm = (dropdown, searchTerm) => {
+  const term = searchTerm.toLowerCase();
+  return (
+    dropdown.dropdownName.toLowerCase().includes(term) ||
+    dropdown.description.toLowerCase().includes(term) ||
+    dropdown.id.toString().includes(term)
+  );
+};
+
+// Filter dropdowns by search term
+const filterDropdowns = (dropdowns, searchTerm) => {
+  if (searchTerm.trim() === "") {
+    return dropdowns;
+  }
+  return dropdowns.filter((dropdown) =>
+    matchesSearchTerm(dropdown, searchTerm),
+  );
+};
+
+// Check if child options have changed
+const hasChildOptionsChanged = (currentChild, originalChild) => {
+  if (currentChild.length !== originalChild.length) return true;
+
+  return !currentChild.every((child, index) => {
+    const original = originalChild[index];
+    return (
+      original &&
+      child.id === original.id &&
+      child.designation === original.designation
+    );
+  });
+};
+
+// Check if form has changes in edit mode
+const checkForChanges = (values, originalValues) => {
+  const nameChanged = values.dropdownName !== originalValues.dropdownName;
+  const descriptionChanged = values.description !== originalValues.description;
+  const childChanged = hasChildOptionsChanged(
+    values.dropdownChild,
+    originalValues.dropdownChild,
+  );
+
+  return nameChanged || descriptionChanged || childChanged;
+};
+
+// Create new option object
+const createNewOption = (designation, currentOptions) => {
+  const maxId =
+    currentOptions.length > 0
+      ? Math.max(...currentOptions.map((o) => o.id))
+      : 0;
+  return {
+    id: maxId + 1,
+    designation: designation.trim(),
+  };
+};
+
+// ==================== MAIN COMPONENT ====================
+
 const DropdownIndex = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
   const access_token = useSelector((state) => state.auth.accessToken);
   const [dropdowns, setDropdowns] = useState([]);
@@ -90,51 +164,8 @@ const DropdownIndex = () => {
   });
   const [hasChanges, setHasChanges] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const response =
-        await DropdownManagementService.getAllDropdownLists(access_token);
-      const transformedData = response.data.body.map((dropdown) => ({
-        id: dropdown.id,
-        dropdownName: dropdown.dropdownName,
-        description: dropdown.description,
-        dropdownChild: dropdown.dropdownChild.map((child) => ({
-          id: child.id,
-          designation: child.designation || child.designation,
-        })),
-      }));
-      setDropdowns(transformedData);
-      setFilteredDropdowns(transformedData);
-    };
-    fetchData();
-  }, [access_token]);
+  // ==================== FORMIK SETUP ====================
 
-  // Update rows per page on screen size change
-  useEffect(() => {
-    setRowsPerPage(isMobile ? 5 : 10);
-  }, [isMobile]);
-
-  // Search filtering
-  useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setFilteredDropdowns(dropdowns);
-    } else {
-      const filtered = dropdowns.filter(
-        (dropdown) =>
-          dropdown.dropdownName
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          dropdown.description
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          dropdown.id.toString().includes(searchTerm),
-      );
-      setFilteredDropdowns(filtered);
-    }
-    setPage(0);
-  }, [searchTerm, dropdowns]);
-
-  // Formik form
   const formik = useFormik({
     initialValues: {
       dropdownName: "",
@@ -149,28 +180,42 @@ const DropdownIndex = () => {
     enableReinitialize: true,
   });
 
-  // Track changes in edit mode
+  // ==================== DATA FETCHING ====================
+
+  const fetchDropdownData = async () => {
+    const response =
+      await DropdownManagementService.getAllDropdownLists(access_token);
+    const transformedData = transformDropdownData(response.data);
+    setDropdowns(transformedData);
+    setFilteredDropdowns(transformedData);
+  };
+
   useEffect(() => {
-    if (editMode && currentDropdown) {
-      const nameChanged =
-        formik.values.dropdownName !== originalValues.dropdownName;
-      const descriptionChanged =
-        formik.values.description !== originalValues.description;
-      const childChanged =
-        formik.values.dropdownChild.length !==
-          originalValues.dropdownChild.length ||
-        !formik.values.dropdownChild.every(
-          (child, index) =>
-            originalValues.dropdownChild[index] &&
-            child.id === originalValues.dropdownChild[index].id &&
-            child.designation ===
-              originalValues.dropdownChild[index].designation,
-        );
-      setHasChanges(nameChanged || descriptionChanged || childChanged);
+    fetchDropdownData();
+  }, [access_token]);
+
+  // Update rows per page on screen size change
+  useEffect(() => {
+    setRowsPerPage(isMobile ? 5 : 10);
+  }, [isMobile]);
+
+  // Search filtering
+  useEffect(() => {
+    const filtered = filterDropdowns(dropdowns, searchTerm);
+    setFilteredDropdowns(filtered);
+    setPage(0);
+  }, [searchTerm, dropdowns]);
+
+  // Track changes in edit mode - MOVED AFTER formik is defined
+  useEffect(() => {
+    if (editMode && currentDropdown && formik.values) {
+      const hasChangesDetected = checkForChanges(formik.values, originalValues);
+      setHasChanges(hasChangesDetected);
     }
   }, [formik.values, originalValues, editMode, currentDropdown]);
 
-  // Pagination handlers
+  // ==================== PAGINATION HANDLERS ====================
+
   const handleChangePage = (event, newPage) => setPage(newPage);
 
   const handleChangeRowsPerPage = (event) => {
@@ -178,28 +223,28 @@ const DropdownIndex = () => {
     setPage(0);
   };
 
-  // Search input
+  // ==================== SEARCH HANDLER ====================
+
   const handleSearchChange = (event) => setSearchTerm(event.target.value);
 
-  // Add child option
+  // ==================== OPTION HANDLERS ====================
+
   const handleAddOption = () => {
-    if (formik.values.newOption.trim() !== "") {
-      const newOption = {
-        id:
-          formik.values.dropdownChild.length > 0
-            ? Math.max(...formik.values.dropdownChild.map((o) => o.id)) + 1
-            : 1,
-        designation: formik.values.newOption.trim(),
-      };
-      const updatedChildOptions = [...formik.values.dropdownChild, newOption];
-      formik.setFieldValue("dropdownChild", updatedChildOptions, true);
-      formik.setFieldTouched("dropdownChild", true, false);
-      formik.setFieldValue("newOption", "", false);
-      formik.validateForm();
-    }
+    const newOptionText = formik.values.newOption.trim();
+    if (newOptionText === "") return;
+
+    const newOption = createNewOption(
+      newOptionText,
+      formik.values.dropdownChild,
+    );
+    const updatedChildOptions = [...formik.values.dropdownChild, newOption];
+
+    formik.setFieldValue("dropdownChild", updatedChildOptions, true);
+    formik.setFieldTouched("dropdownChild", true, false);
+    formik.setFieldValue("newOption", "", false);
+    formik.validateForm();
   };
 
-  // Remove child option
   const handleRemoveOption = (optionId) => {
     const newOptions = formik.values.dropdownChild.filter(
       (option) => option.id !== optionId,
@@ -209,7 +254,8 @@ const DropdownIndex = () => {
     formik.validateForm();
   };
 
-  // Add/Edit dropdown dialogs
+  // ==================== DIALOG HANDLERS ====================
+
   const handleAddDropdown = () => {
     setEditMode(false);
     setCurrentDropdown(null);
@@ -237,7 +283,8 @@ const DropdownIndex = () => {
     setOpen(true);
   };
 
-  // Save dropdown
+  // ==================== SAVE HANDLER ====================
+
   const handleSaveDropdown = async (values) => {
     try {
       if (editMode && currentDropdown) {
@@ -248,11 +295,11 @@ const DropdownIndex = () => {
         );
         setDropdowns(updatedDropdowns);
         setFilteredDropdowns(updatedDropdowns);
-        const data = await DropdownManagementService.updateDropdown(
+        await DropdownManagementService.updateDropdown(
           { id: currentDropdown.id, ...values },
           access_token,
         );
-        toast.success(data.message || "Data edited successfully");
+        toast.success("Data edited successfully");
       } else {
         const newDropdown = {
           id: Math.max(...dropdowns.map((d) => d.id), 0) + 1,
@@ -261,11 +308,11 @@ const DropdownIndex = () => {
         const updatedDropdowns = [...dropdowns, newDropdown];
         setDropdowns(updatedDropdowns);
         setFilteredDropdowns(updatedDropdowns);
-        const data = await DropdownManagementService.createDropdown(
+        await DropdownManagementService.createDropdown(
           newDropdown,
           access_token,
         );
-        toast.success(data.message || "Data saved successfully");
+        toast.success("Data saved successfully");
       }
       setOpen(false);
     } catch (error) {
@@ -273,11 +320,13 @@ const DropdownIndex = () => {
     }
   };
 
-  // Delete handlers
+  // ==================== DELETE HANDLERS ====================
+
   const handleDeleteClick = (id) => {
     setDropdownToDelete(id);
     setDeleteConfirmOpen(true);
   };
+
   const handleConfirmDelete = async () => {
     try {
       const updatedDropdowns = dropdowns.filter(
@@ -296,26 +345,32 @@ const DropdownIndex = () => {
       toast.error("Failed to delete dropdown");
     }
   };
+
   const handleCancelDelete = () => {
     setDeleteConfirmOpen(false);
     setDropdownToDelete(null);
   };
 
-  // Form validity check
+  // ==================== FORM VALIDITY CHECK ====================
+
   const isFormValid = () => {
     const hasErrors = Object.keys(formik.errors).length > 0;
     const hasRequiredValues =
       formik.values.dropdownName.trim() !== "" &&
       formik.values.description.trim() !== "" &&
       formik.values.dropdownChild.length > 0;
-    return editMode
-      ? !hasErrors && hasRequiredValues && hasChanges
-      : !hasErrors && hasRequiredValues;
+
+    if (editMode) {
+      return !hasErrors && hasRequiredValues && hasChanges;
+    }
+    return !hasErrors && hasRequiredValues;
   };
 
   useEffect(() => {
     if (open) formik.validateForm();
   }, [open, formik.values]);
+
+  // ==================== RENDER FUNCTIONS ====================
 
   // Render mobile card view
   const renderMobileCard = (dropdown) => (
@@ -562,6 +617,8 @@ const DropdownIndex = () => {
       />
     </TableContainer>
   );
+
+  // ==================== MAIN RENDER ====================
 
   return (
     <Paper sx={{ p: { xs: 1, sm: 1.5, md: 2 }, mt: 1 }}>
