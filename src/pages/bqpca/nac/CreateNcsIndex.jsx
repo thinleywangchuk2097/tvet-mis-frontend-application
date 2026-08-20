@@ -32,6 +32,7 @@ import {
   Alert,
   AlertTitle,
 } from "@mui/material";
+
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -43,7 +44,6 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ImageIcon from "@mui/icons-material/Image";
 import DescriptionIcon from "@mui/icons-material/Description";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
-import CloseIcon from "@mui/icons-material/Close";
 import WarningIcon from "@mui/icons-material/Warning";
 import { Formik, Form, FieldArray } from "formik";
 import * as Yup from "yup";
@@ -53,25 +53,32 @@ import { toast } from "react-toastify";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
 
+// ==================== GENERAL HELPERS ====================
+
 // Helper function to convert file to Base64
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
+
     reader.readAsDataURL(file);
+
     reader.onload = () =>
       resolve({
         name: file.name,
         content: reader.result.split(",")[1],
         contentType: file.type || "application/octet-stream",
       });
+
     reader.onerror = reject;
   });
 
 // Helper function to parse documents from JSON string
 const parseDocuments = (documentsStr) => {
   if (!documentsStr) return [];
+
   try {
     const docs = JSON.parse(documentsStr);
+
     return docs.map((doc) => ({
       id: doc.id || doc.documentId,
       name: doc.documentName || doc.name || "Unnamed file",
@@ -84,9 +91,8 @@ const parseDocuments = (documentsStr) => {
   }
 };
 
-// ==================== EXTRACTED HELPER FUNCTIONS ====================
+// ==================== DOCUMENT HELPERS ====================
 
-// Process documents for submission
 const processDocuments = async (documents) => {
   return await Promise.all(
     documents.map(async (file) => {
@@ -97,7 +103,9 @@ const processDocuments = async (documents) => {
           contentType: file.type || "application/octet-stream",
         };
       }
+
       const result = await fileToBase64(file);
+
       return {
         name: result.name,
         content: result.content,
@@ -107,7 +115,8 @@ const processDocuments = async (documents) => {
   );
 };
 
-// Build payload for submission
+// ==================== PAYLOAD HELPERS ====================
+
 const buildPayload = (values, editingId, editData, actionId) => {
   if (editingId) {
     return {
@@ -136,7 +145,8 @@ const buildPayload = (values, editingId, editData, actionId) => {
   };
 };
 
-// Check if duplicate exists
+// ==================== DUPLICATE CHECK HELPERS ====================
+
 const performDuplicateCheck = async (values, editingId, checkExistingNcsFn) => {
   if (editingId) return false;
 
@@ -149,7 +159,45 @@ const performDuplicateCheck = async (values, editingId, checkExistingNcsFn) => {
   return exists;
 };
 
-// Create field change handler for form fields
+// ==================== FIELD CHANGE HELPERS ====================
+
+const updateSectorSelection = (
+  fieldName,
+  value,
+  formik,
+  setSelectedSectorId,
+  editingId,
+) => {
+  if (fieldName !== "sectorId") {
+    return;
+  }
+
+  setSelectedSectorId(value);
+
+  if (!editingId) {
+    formik.setFieldValue("occupationId", "");
+  }
+};
+
+const getUpdatedFieldValues = (formik, fieldName, value) => {
+  const { sectorId, occupationId, certificationId } = formik.values;
+
+  return {
+    sectorId: fieldName === "sectorId" ? value : sectorId,
+    occupationId: fieldName === "occupationId" ? value : occupationId,
+    certificationId: fieldName === "certificationId" ? value : certificationId,
+  };
+};
+
+const shouldCheckDuplicate = (values, editingId) => {
+  return (
+    !editingId &&
+    Boolean(values.sectorId) &&
+    Boolean(values.occupationId) &&
+    Boolean(values.certificationId)
+  );
+};
+
 const createFieldChangeHandler = (
   formik,
   setSelectedSectorId,
@@ -158,90 +206,103 @@ const createFieldChangeHandler = (
   editingId,
 ) => {
   return async (fieldName, value) => {
-    formik.handleChange({ target: { name: fieldName, value } });
+    formik.handleChange({
+      target: {
+        name: fieldName,
+        value,
+      },
+    });
+
     formik.setFieldValue(fieldName, value);
     setIsDuplicate(false);
 
-    if (fieldName === "sectorId") {
-      setSelectedSectorId(value);
-      if (!editingId) formik.setFieldValue("occupationId", "");
+    updateSectorSelection(
+      fieldName,
+      value,
+      formik,
+      setSelectedSectorId,
+      editingId,
+    );
+
+    const updatedValues = getUpdatedFieldValues(formik, fieldName, value);
+
+    if (!shouldCheckDuplicate(updatedValues, editingId)) {
+      return;
     }
 
-    const { sectorId, occupationId, certificationId } = formik.values;
-    const updatedValues = {
-      sectorId: fieldName === "sectorId" ? value : sectorId,
-      occupationId: fieldName === "occupationId" ? value : occupationId,
-      certificationId:
-        fieldName === "certificationId" ? value : certificationId,
-    };
-
-    if (
-      !editingId &&
-      updatedValues.sectorId &&
-      updatedValues.occupationId &&
-      updatedValues.certificationId
-    ) {
-      await checkExistingNcsFn(
-        updatedValues.sectorId,
-        updatedValues.occupationId,
-        updatedValues.certificationId,
-      );
-    }
+    await checkExistingNcsFn(
+      updatedValues.sectorId,
+      updatedValues.occupationId,
+      updatedValues.certificationId,
+    );
   };
 };
 
+// ==================== COMPONENT ====================
+
 const CreateNcsIndex = () => {
-  // State for search and pagination
+  // ==================== SEARCH / PAGINATION ====================
+
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // State for dialogs
+  // ==================== DIALOG STATE ====================
+
   const [openDialog, setOpenDialog] = useState(false);
   const [openFileDialog, setOpenFileDialog] = useState(false);
   const [openDuplicateDialog, setOpenDuplicateDialog] = useState(false);
 
-  // State for editing
+  // ==================== EDITING STATE ====================
+
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState(null);
 
-  // State for loading
+  // ==================== LOADING STATE ====================
+
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [loadingOccupations, setLoadingOccupations] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(false);
 
-  // State for file dialog
+  // ==================== FILE STATE ====================
+
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [selectedItemTitle, setSelectedItemTitle] = useState("");
 
-  // Redux state
+  // ==================== REDUX STATE ====================
+
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
 
-  // State for dropdown data
+  // ==================== DROPDOWN STATE ====================
+
   const [sectors, setSectors] = useState([]);
   const [certificationLevels, setCertificationLevels] = useState([]);
   const [occupations, setOccupations] = useState([]);
   const [allOccupations, setAllOccupations] = useState([]);
   const [selectedSectorId, setSelectedSectorId] = useState("");
 
-  // Refs for synchronous data access
+  // ==================== REFS ====================
+
   const sectorsRef = useRef([]);
   const certificationsRef = useRef([]);
   const occupationsRef = useRef([]);
   const allOccupationsRef = useRef([]);
 
-  // State for NCS data
+  // ==================== NCS DATA ====================
+
   const [data, setData] = useState([]);
 
-  // State for duplicate check
+  // ==================== DUPLICATE STATE ====================
+
   const [duplicateCheckData, setDuplicateCheckData] = useState({
     sectorId: "",
     occupationId: "",
     certificationId: "",
   });
+
   const [isDuplicate, setIsDuplicate] = useState(false);
 
   // ==================== API CALLS ====================
@@ -278,7 +339,6 @@ const CreateNcsIndex = () => {
     try {
       const sectorsResponse = await CommonService.getAllSectors();
       const sectorsData = sectorsResponse.data || [];
-
       let allOccs = [];
       for (const sector of sectorsData) {
         try {
@@ -287,20 +347,22 @@ const CreateNcsIndex = () => {
           );
           const occData = occResponse.data || [];
           allOccs = [...allOccs, ...occData];
-        } catch (e) {
+        } catch (error) {
           console.error(
             `Error fetching occupations for sector ${sector.id}:`,
-            e,
+            error,
           );
         }
       }
 
       const uniqueOccs = allOccs.filter(
-        (occ, index, self) => index === self.findIndex((o) => o.id === occ.id),
+        (occ, index, self) =>
+          index === self.findIndex((item) => item.id === occ.id),
       );
 
       setAllOccupations(uniqueOccs);
       allOccupationsRef.current = uniqueOccs;
+
       return uniqueOccs;
     } catch (error) {
       console.error("Error fetching all occupations:", error);
@@ -330,7 +392,7 @@ const CreateNcsIndex = () => {
     }
   };
 
-  // ==================== HELPER FUNCTIONS ====================
+  // ==================== DISPLAY HELPERS ====================
 
   const requiredLabel = (label) => (
     <>
@@ -343,10 +405,17 @@ const CreateNcsIndex = () => {
 
   const formatDateForInput = (dateString) => {
     if (!dateString) return "";
-    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) return dateString;
+
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return dateString;
+    }
+
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return "";
+
+      if (isNaN(date.getTime())) {
+        return "";
+      }
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
@@ -360,31 +429,44 @@ const CreateNcsIndex = () => {
     if (!sectorId) return "N/A";
     const dataToUse =
       sectorsRef.current.length > 0 ? sectorsRef.current : sectors;
-    if (!dataToUse || dataToUse.length === 0) return "Loading...";
-    const sector = dataToUse.find((s) => Number(s.id) === Number(sectorId));
+    if (!dataToUse || dataToUse.length === 0) {
+      return "Loading...";
+    }
+
+    const sector = dataToUse.find(
+      (item) => Number(item.id) === Number(sectorId),
+    );
+
     return sector?.sectorName || `Sector ${sectorId}`;
   };
 
   const getOccupationName = (occupationId) => {
     if (!occupationId) return "N/A";
-
     const allData =
       allOccupationsRef.current.length > 0
         ? allOccupationsRef.current
         : allOccupations;
+
     if (allData && allData.length > 0) {
       const occupation = allData.find(
-        (o) => Number(o.id) === Number(occupationId),
+        (item) => Number(item.id) === Number(occupationId),
       );
-      if (occupation) return occupation.occupationName;
+      if (occupation) {
+        return occupation.occupationName;
+      }
     }
 
     const dataToUse =
       occupationsRef.current.length > 0 ? occupationsRef.current : occupations;
-    if (!dataToUse || dataToUse.length === 0) return "Loading...";
+
+    if (!dataToUse || dataToUse.length === 0) {
+      return "Loading...";
+    }
+
     const occupation = dataToUse.find(
-      (o) => Number(o.id) === Number(occupationId),
+      (item) => Number(item.id) === Number(occupationId),
     );
+
     return occupation?.occupationName || `Occupation ${occupationId}`;
   };
 
@@ -394,23 +476,40 @@ const CreateNcsIndex = () => {
       certificationsRef.current.length > 0
         ? certificationsRef.current
         : certificationLevels;
-    if (!dataToUse || dataToUse.length === 0) return "Loading...";
+    if (!dataToUse || dataToUse.length === 0) {
+      return "Loading...";
+    }
+
     const certification = dataToUse.find(
-      (c) => Number(c.id) === Number(certificationId),
+      (item) => Number(item.id) === Number(certificationId),
     );
+
     return certification?.name || `Certification ${certificationId}`;
   };
 
   const getFileIcon = (fileName) => {
-    if (!fileName) return <InsertDriveFileIcon />;
+    if (!fileName) {
+      return <InsertDriveFileIcon />;
+    }
+
     const extension = fileName.split(".").pop()?.toLowerCase();
-    if (extension === "pdf") return <PictureAsPdfIcon color="error" />;
-    if (["jpg", "jpeg", "png", "gif", "bmp", "svg"].includes(extension))
+
+    if (extension === "pdf") {
+      return <PictureAsPdfIcon color="error" />;
+    }
+
+    if (["jpg", "jpeg", "png", "gif", "bmp", "svg"].includes(extension)) {
       return <ImageIcon color="primary" />;
-    if (["doc", "docx"].includes(extension))
+    }
+
+    if (["doc", "docx"].includes(extension)) {
       return <DescriptionIcon color="primary" />;
-    if (["xls", "xlsx"].includes(extension))
+    }
+
+    if (["xls", "xlsx"].includes(extension)) {
       return <DescriptionIcon color="success" />;
+    }
+
     return <InsertDriveFileIcon />;
   };
 
@@ -426,10 +525,12 @@ const CreateNcsIndex = () => {
 
   const getDocumentLinks = (documents) => {
     if (!documents) return [];
+
     try {
       if (typeof documents === "string") {
         return parseDocuments(documents);
       }
+
       if (Array.isArray(documents)) {
         return documents.map((doc) => ({
           id: doc.id || doc.documentId,
@@ -440,6 +541,7 @@ const CreateNcsIndex = () => {
           createdAt: doc.createdAt,
         }));
       }
+
       return [];
     } catch (error) {
       console.error("Error parsing documents:", error);
@@ -454,23 +556,32 @@ const CreateNcsIndex = () => {
     }
 
     setDownloading(true);
+
     try {
       const response = await CommonService.fetchDocument(file.name, file.url);
+
       const contentType = response.headers["content-type"];
+
       const blob = new Blob([response.data], { type: contentType });
+
       const url = window.URL.createObjectURL(blob);
 
       const link = document.createElement("a");
+
       link.href = url;
       link.download = file.name;
+
       document.body.appendChild(link);
+
       link.click();
       link.remove();
 
       setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+
       toast.success("File downloaded successfully!");
     } catch (error) {
       console.error("Error downloading file:", error);
+
       toast.error(
         error.response?.data?.message ||
           "Failed to download file. Please try again.",
@@ -497,6 +608,7 @@ const CreateNcsIndex = () => {
       window.open(file.url, "_blank");
     } catch (error) {
       console.error("Error viewing file:", error);
+
       toast.error("Failed to view file");
     }
   };
@@ -506,51 +618,56 @@ const CreateNcsIndex = () => {
   const fetchNcsData = async () => {
     try {
       const response = await NcsService.getNcsDetails(access_token);
+
       console.log("Fetched NCS data:", response.data);
-      if (response.status === 200 || response.status === 201) {
-        const transformedData = response.data.map((item) => {
-          let units = [];
-          try {
-            units =
-              typeof item.units === "string"
-                ? JSON.parse(item.units)
-                : item.units || [];
-          } catch {
-            units = [];
-          }
 
-          const documents = getDocumentLinks(item.documents);
-
-          const sectorId = item.sector_id || item.sectorId;
-          const occupationId = item.occupation_id || item.occupationId;
-          const certificationId = item.certification_id || item.certificationId;
-
-          return {
-            id: item.id || item.publicationId,
-            applicationNo: item.application_no || "",
-            sector: getSectorName(sectorId),
-            occupation: getOccupationName(occupationId),
-            bqfLevel: getCertificationName(certificationId),
-            validityDate: item.validity_date || item.validityDate || "N/A",
-            programmeTitle:
-              item.programme_title || item.programmeTitle || "N/A",
-            units,
-            documents,
-            sectorId,
-            occupationId,
-            certificationId,
-          };
-        });
-
-        setData(transformedData);
+      if (response.status !== 200 && response.status !== 201) {
+        return;
       }
+
+      const transformedData = response.data.map((item) => {
+        let units = [];
+
+        try {
+          units =
+            typeof item.units === "string"
+              ? JSON.parse(item.units)
+              : item.units || [];
+        } catch {
+          units = [];
+        }
+
+        const documents = getDocumentLinks(item.documents);
+
+        const sectorId = item.sector_id || item.sectorId;
+        const occupationId = item.occupation_id || item.occupationId;
+        const certificationId = item.certification_id || item.certificationId;
+
+        return {
+          id: item.id || item.publicationId,
+          applicationNo: item.application_no || "",
+          sector: getSectorName(sectorId),
+          occupation: getOccupationName(occupationId),
+          bqfLevel: getCertificationName(certificationId),
+          validityDate: item.validity_date || item.validityDate || "N/A",
+          programmeTitle: item.programme_title || item.programmeTitle || "N/A",
+          units,
+          documents,
+          sectorId,
+          occupationId,
+          certificationId,
+        };
+      });
+
+      setData(transformedData);
     } catch (error) {
       console.error("Error fetching NCS data:", error);
+
       toast.error("Failed to fetch NCS data");
     }
   };
 
-  // ==================== CHECK EXISTING NCS ====================
+  // ==================== DUPLICATE CHECK ====================
 
   const checkExistingNcs = async (sectorId, occupationId, certificationId) => {
     if (!sectorId || !occupationId || !certificationId) {
@@ -559,6 +676,7 @@ const CreateNcsIndex = () => {
     }
 
     setCheckingExisting(true);
+
     try {
       const response = await NcsService.getAlreadyNcsDetailsExist(
         sectorId,
@@ -566,60 +684,66 @@ const CreateNcsIndex = () => {
         certificationId,
         access_token,
       );
+
       console.log("Check existing NCS response:", response);
 
       if (response.data && response.data.length > 0) {
         setIsDuplicate(true);
-        // Show popup dialog
+
         setDuplicateCheckData({
           sectorId,
           occupationId,
           certificationId,
         });
+
         setOpenDuplicateDialog(true);
-        return true; // Exists
+
+        return true;
       }
+
       setIsDuplicate(false);
-      return false; // Does not exist
+
+      return false;
     } catch (error) {
       console.error("Error checking existing NCS:", error);
+
       setIsDuplicate(false);
+
       return false;
     } finally {
       setCheckingExisting(false);
     }
   };
 
-  // ==================== REFACTORED SUBMIT HANDLER ====================
+  // ==================== SUBMIT ====================
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
-    // Check for existing NCS only when creating (not editing)
     const exists = await performDuplicateCheck(
       values,
       editingId,
       checkExistingNcs,
     );
+
     if (exists) {
       setSubmitting(false);
       return;
     }
 
     setLoading(true);
+
     try {
-      // Process documents
       const processedDocuments = await processDocuments(values.documents);
+
       values.documents = editingId
         ? processedDocuments.filter(
             (doc) => doc.content && doc.content.length > 0,
           )
         : processedDocuments;
 
-      // Build payload
       const payload = buildPayload(values, editingId, editData, actionId);
 
       console.log("Submitting payload:", payload);
 
-      // Submit
       const response = editingId
         ? await NcsService.updateNcs(editingId, payload, access_token)
         : await NcsService.submitNcs(payload, access_token);
@@ -628,12 +752,16 @@ const CreateNcsIndex = () => {
         toast.success(
           editingId ? "NCS updated successfully!" : "NCS created successfully!",
         );
+
         resetForm();
+
         setOpenDialog(false);
+
         await fetchNcsData();
       }
     } catch (error) {
       console.error("Error submitting NCS:", error);
+
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -645,11 +773,12 @@ const CreateNcsIndex = () => {
     }
   };
 
-  // ==================== LOAD DATA ON MOUNT ====================
+  // ==================== INITIAL DATA ====================
 
   useEffect(() => {
     const loadAllData = async () => {
       setFetchingData(true);
+
       try {
         const [sectorsData, certData] = await Promise.all([
           fetchSectors(),
@@ -660,7 +789,9 @@ const CreateNcsIndex = () => {
 
         if (sectorsData?.length > 0) {
           const defaultSector =
-            sectorsData.find((s) => Number(s.id) === 1) || sectorsData[0];
+            sectorsData.find((sector) => Number(sector.id) === 1) ||
+            sectorsData[0];
+
           if (defaultSector) {
             await fetchOccupationsBySector(defaultSector.id);
           }
@@ -669,6 +800,7 @@ const CreateNcsIndex = () => {
         await fetchNcsData();
       } catch (error) {
         console.error("Error loading data:", error);
+
         toast.error("Failed to load data");
       } finally {
         setFetchingData(false);
@@ -681,18 +813,22 @@ const CreateNcsIndex = () => {
   useEffect(() => {
     if (selectedSectorId) {
       fetchOccupationsBySector(selectedSectorId);
-    } else {
-      setOccupations([]);
-      occupationsRef.current = [];
+      return;
     }
+
+    setOccupations([]);
+    occupationsRef.current = [];
   }, [selectedSectorId]);
 
   // ==================== HANDLERS ====================
 
-  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangePage = (_, newPage) => {
+    setPage(newPage);
+  };
 
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(+event.target.value);
+
     setPage(0);
   };
 
@@ -700,8 +836,10 @@ const CreateNcsIndex = () => {
     if (item) {
       setEditingId(item.id);
       setEditData(item);
+
       if (item.sectorId) {
         setSelectedSectorId(item.sectorId);
+
         fetchOccupationsBySector(item.sectorId);
       }
     } else {
@@ -712,6 +850,7 @@ const CreateNcsIndex = () => {
       occupationsRef.current = [];
       setIsDuplicate(false);
     }
+
     setOpenDialog(true);
   };
 
@@ -755,22 +894,33 @@ const CreateNcsIndex = () => {
         units:
           editData.units?.length > 0
             ? editData.units
-            : [{ unitCode: "", unitTitle: "" }],
+            : [
+                {
+                  unitCode: "",
+                  unitTitle: "",
+                },
+              ],
         documents: [],
       };
     }
+
     return {
       sectorId: "",
       occupationId: "",
       certificationId: "",
       validityDate: "",
       programmeTitle: "",
-      units: [{ unitCode: "", unitTitle: "" }],
+      units: [
+        {
+          unitCode: "",
+          unitTitle: "",
+        },
+      ],
       documents: [],
     };
   };
 
-  // ==================== VALIDATION SCHEMA ====================
+  // ==================== VALIDATION ====================
 
   const getValidationSchema = () => {
     if (editingId) {
@@ -792,6 +942,7 @@ const CreateNcsIndex = () => {
         documents: Yup.array(),
       });
     }
+
     return Yup.object().shape({
       sectorId: Yup.string().required("Sector is required"),
       occupationId: Yup.string().required("Occupation is required"),
@@ -814,34 +965,40 @@ const CreateNcsIndex = () => {
     });
   };
 
-  // ==================== RENDER FUNCTIONS ====================
+  // ==================== RENDER HELPERS ====================
 
   const renderUnitCodes = (units) => {
-    if (!units?.length) return "N/A";
-    return units.map((unit, idx) => (
-      <Box key={`code-${idx}`} sx={{ mb: 0.5 }}>
+    if (!units?.length) {
+      return "N/A";
+    }
+
+    return units.map((unit, index) => (
+      <Box key={`code-${index}`} sx={{ mb: 0.5 }}>
         <Chip
           label={unit.unitCode}
           size="small"
           color="secondary"
           variant="outlined"
         />
-        {idx < units.length - 1 && <Divider sx={{ my: 0.5 }} />}
+
+        {index < units.length - 1 && <Divider sx={{ my: 0.5 }} />}
       </Box>
     ));
   };
 
   const renderUnitTitles = (units) => {
-    if (!units?.length) return "N/A";
-    return units.map((unit, idx) => (
-      <Box key={`title-${idx}`} sx={{ mb: 0.5 }}>
+    if (!units?.length) {
+      return "N/A";
+    }
+
+    return units.map((unit, index) => (
+      <Box key={`title-${index}`} sx={{ mb: 0.5 }}>
         <Typography variant="body2">{unit.unitTitle}</Typography>
-        {idx < units.length - 1 && <Divider sx={{ my: 0.5 }} />}
+
+        {index < units.length - 1 && <Divider sx={{ my: 0.5 }} />}
       </Box>
     ));
   };
-
-  // ==================== RENDER FILE ATTACHMENTS ====================
 
   const renderFileAttachments = (documents) => {
     if (!documents?.length) {
@@ -851,10 +1008,12 @@ const CreateNcsIndex = () => {
         </Typography>
       );
     }
+
     return (
       <Stack direction="column" spacing={0.5}>
         {documents.map((file, index) => {
           const fileName = file.name || `File ${index + 1}`;
+
           return (
             <Box key={index}>
               <Tooltip title={fileName} placement="top" arrow>
@@ -901,13 +1060,51 @@ const CreateNcsIndex = () => {
   const tableStyle = {
     border: "1px solid",
     borderColor: "divider",
+
     "& th, & td": {
       border: "1px solid",
       borderColor: "divider",
     },
   };
 
-  // ==================== LOADING STATE ====================
+  // ==================== FORM RENDER HELPERS ====================
+
+  const hasFieldError = (formik, field) => {
+    return formik.touched[field] && Boolean(formik.errors[field]);
+  };
+
+  const getFieldError = (formik, field) => {
+    return formik.touched[field] && formik.errors[field];
+  };
+
+  const isFormDisabled = () => {
+    return loading || checkingExisting;
+  };
+
+  const isReadOnly = () => {
+    return editingId ? true : false;
+  };
+
+  const isOccupationDisabled = (formik) => {
+    return (
+      loading ||
+      loadingOccupations ||
+      !formik.values.sectorId ||
+      checkingExisting
+    );
+  };
+
+  const isSubmitDisabled = () => {
+    return loading || checkingExisting || (isDuplicate && !editingId);
+  };
+
+  const getSubmitButtonText = () => {
+    if (loading) return "Submitting...";
+    if (checkingExisting) return "Checking...";
+    return editingId ? "Update" : "Submit";
+  };
+
+  // ==================== LOADING ====================
 
   if (fetchingData) {
     return (
@@ -932,12 +1129,16 @@ const CreateNcsIndex = () => {
         List of National Competency Standards (NCS)
       </Typography>
 
-      {/* Search + Add Button */}
+      {/* Search + Create */}
+
       <Grid
         container
         spacing={1}
         alignItems="center"
-        sx={{ justifyContent: "flex-end", mb: 2 }}
+        sx={{
+          justifyContent: "flex-end",
+          mb: 2,
+        }}
       >
         <Grid size={{ xs: 12, md: 4 }}>
           <TextField
@@ -950,11 +1151,15 @@ const CreateNcsIndex = () => {
             sx={{
               "& .MuiOutlinedInput-root": {
                 height: "36px",
-                "& input": { padding: "8px 12px" },
+
+                "& input": {
+                  padding: "8px 12px",
+                },
               },
             }}
           />
         </Grid>
+
         <Grid size={{ xs: 12, md: 2 }}>
           <Button
             variant="contained"
@@ -970,6 +1175,7 @@ const CreateNcsIndex = () => {
       </Grid>
 
       {/* Table */}
+
       <TableContainer component={Paper} elevation={1}>
         <Table size="small" sx={tableStyle}>
           <TableHead>
@@ -986,6 +1192,7 @@ const CreateNcsIndex = () => {
               <TableCell>Action</TableCell>
             </TableRow>
           </TableHead>
+
           <TableBody>
             {filteredData.length > 0 ? (
               filteredData
@@ -993,8 +1200,11 @@ const CreateNcsIndex = () => {
                 .map((item, index) => (
                   <TableRow key={item.id}>
                     <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
+
                     <TableCell>{item.sector}</TableCell>
+
                     <TableCell>{item.occupation}</TableCell>
+
                     <TableCell>
                       <Chip
                         label={item.bqfLevel}
@@ -1003,13 +1213,19 @@ const CreateNcsIndex = () => {
                         variant="outlined"
                       />
                     </TableCell>
+
                     <TableCell>{item.validityDate}</TableCell>
+
                     <TableCell>{item.programmeTitle}</TableCell>
+
                     <TableCell>{renderUnitCodes(item.units)}</TableCell>
+
                     <TableCell>{renderUnitTitles(item.units)}</TableCell>
+
                     <TableCell>
                       {renderFileAttachments(item.documents)}
                     </TableCell>
+
                     <TableCell>
                       <Stack direction="row" spacing={0.5}>
                         <Tooltip title="Edit">
@@ -1021,6 +1237,7 @@ const CreateNcsIndex = () => {
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+
                         <Tooltip title="NCS cannot be deleted">
                           <span>
                             <IconButton size="small" color="disabled" disabled>
@@ -1041,6 +1258,7 @@ const CreateNcsIndex = () => {
             )}
           </TableBody>
         </Table>
+
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
@@ -1053,6 +1271,7 @@ const CreateNcsIndex = () => {
       </TableContainer>
 
       {/* File Attachment Dialog */}
+
       <Dialog
         open={openFileDialog}
         onClose={handleCloseFileDialog}
@@ -1065,6 +1284,7 @@ const CreateNcsIndex = () => {
             Attachments - {selectedItemTitle}
           </Box>
         </DialogTitle>
+
         <DialogContent dividers>
           {selectedFiles?.length > 0 ? (
             <List>
@@ -1083,6 +1303,7 @@ const CreateNcsIndex = () => {
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
+
                       <Tooltip title="Download">
                         <IconButton
                           edge="end"
@@ -1097,6 +1318,7 @@ const CreateNcsIndex = () => {
                   }
                 >
                   <ListItemIcon>{getFileIcon(file.name)}</ListItemIcon>
+
                   <ListItemText
                     primary={file.name || `File ${index + 1}`}
                     secondary={file.contentType || "Unknown type"}
@@ -1105,13 +1327,19 @@ const CreateNcsIndex = () => {
               ))}
             </List>
           ) : (
-            <Box sx={{ textAlign: "center", py: 4 }}>
+            <Box
+              sx={{
+                textAlign: "center",
+                py: 4,
+              }}
+            >
               <Typography color="textSecondary">
                 No attachments available
               </Typography>
             </Box>
           )}
         </DialogContent>
+
         <DialogActions>
           <Button
             onClick={handleCloseFileDialog}
@@ -1125,40 +1353,54 @@ const CreateNcsIndex = () => {
       </Dialog>
 
       {/* Duplicate NCS Warning Dialog */}
+
       <Dialog
         open={openDuplicateDialog}
         onClose={handleCloseDuplicateDialog}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
           <WarningIcon color="warning" />
+
           <Typography variant="h6">Duplicate NCS Combination</Typography>
         </DialogTitle>
+
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
             <AlertTitle>Warning</AlertTitle>
             This NCS combination already exists in the system.
           </Alert>
+
           <Box sx={{ mt: 2 }}>
             <Typography variant="body2">
               <strong>Sector:</strong>{" "}
               {getSectorName(duplicateCheckData.sectorId)}
             </Typography>
+
             <Typography variant="body2" sx={{ mt: 1 }}>
               <strong>Occupation:</strong>{" "}
               {getOccupationName(duplicateCheckData.occupationId)}
             </Typography>
+
             <Typography variant="body2" sx={{ mt: 1 }}>
               <strong>BQF Certificate Level:</strong>{" "}
               {getCertificationName(duplicateCheckData.certificationId)}
             </Typography>
           </Box>
+
           <Typography variant="body2" color="error" sx={{ mt: 2 }}>
             Please select a different combination of Sector, Occupation, and BQF
             Certificate Level.
           </Typography>
         </DialogContent>
+
         <DialogActions>
           <Button
             onClick={handleCloseDuplicateDialog}
@@ -1171,6 +1413,7 @@ const CreateNcsIndex = () => {
       </Dialog>
 
       {/* Add/Edit NCS Dialog */}
+
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
@@ -1180,6 +1423,7 @@ const CreateNcsIndex = () => {
         <DialogTitle>
           {editingId ? "Edit NCS Details" : "Create New NCS"}
         </DialogTitle>
+
         <Formik
           enableReinitialize
           initialValues={getInitialValues()}
@@ -1215,25 +1459,23 @@ const CreateNcsIndex = () => {
                           size="small"
                           value={formik.values.sectorId || ""}
                           onChange={async (e) => {
-                            const sectorId = e.target.value;
-                            await fieldChangeHandler("sectorId", sectorId);
+                            await fieldChangeHandler(
+                              "sectorId",
+                              e.target.value,
+                            );
                           }}
                           onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.sectorId &&
-                            Boolean(formik.errors.sectorId)
-                          }
-                          helperText={
-                            formik.touched.sectorId && formik.errors.sectorId
-                          }
-                          disabled={loading || checkingExisting}
+                          error={hasFieldError(formik, "sectorId")}
+                          helperText={getFieldError(formik, "sectorId")}
+                          disabled={isFormDisabled()}
                           slotProps={{
                             input: {
-                              readOnly: editingId ? true : false,
+                              readOnly: isReadOnly(),
                             },
                           }}
                         >
                           <MenuItem value="">Select Sector</MenuItem>
+
                           {sectors.map((sec) => (
                             <MenuItem key={sec.id} value={sec.id}>
                               {sec.sectorName}
@@ -1258,30 +1500,18 @@ const CreateNcsIndex = () => {
                           size="small"
                           value={formik.values.occupationId || ""}
                           onChange={async (e) => {
-                            const occupationId = e.target.value;
                             await fieldChangeHandler(
                               "occupationId",
-                              occupationId,
+                              e.target.value,
                             );
                           }}
                           onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.occupationId &&
-                            Boolean(formik.errors.occupationId)
-                          }
-                          helperText={
-                            formik.touched.occupationId &&
-                            formik.errors.occupationId
-                          }
-                          disabled={
-                            loading ||
-                            loadingOccupations ||
-                            !formik.values.sectorId ||
-                            checkingExisting
-                          }
+                          error={hasFieldError(formik, "occupationId")}
+                          helperText={getFieldError(formik, "occupationId")}
+                          disabled={isOccupationDisabled(formik)}
                           slotProps={{
                             input: {
-                              readOnly: editingId ? true : false,
+                              readOnly: isReadOnly(),
                             },
                           }}
                         >
@@ -1290,6 +1520,7 @@ const CreateNcsIndex = () => {
                               ? "Loading occupations..."
                               : "Select Occupation"}
                           </MenuItem>
+
                           {occupations.map((occ) => (
                             <MenuItem key={occ.id} value={occ.id}>
                               {occ.occupationName}
@@ -1318,34 +1549,28 @@ const CreateNcsIndex = () => {
                           size="small"
                           value={formik.values.certificationId || ""}
                           onChange={async (e) => {
-                            const certificationId = e.target.value;
                             await fieldChangeHandler(
                               "certificationId",
-                              certificationId,
+                              e.target.value,
                             );
                           }}
                           onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.certificationId &&
-                            Boolean(formik.errors.certificationId)
-                          }
-                          helperText={
-                            formik.touched.certificationId &&
-                            formik.errors.certificationId
-                          }
-                          disabled={loading || checkingExisting}
+                          error={hasFieldError(formik, "certificationId")}
+                          helperText={getFieldError(formik, "certificationId")}
+                          disabled={isFormDisabled()}
                           slotProps={{
                             input: {
-                              readOnly: editingId ? true : false,
+                              readOnly: isReadOnly(),
                             },
                           }}
                         >
                           <MenuItem value="">
                             Select BQF Certificate Level
                           </MenuItem>
-                          {certificationLevels.map((lvl) => (
-                            <MenuItem key={lvl.id} value={lvl.id}>
-                              {lvl.name}
+
+                          {certificationLevels.map((level) => (
+                            <MenuItem key={level.id} value={level.id}>
+                              {level.name}
                             </MenuItem>
                           ))}
                         </TextField>
@@ -1360,21 +1585,19 @@ const CreateNcsIndex = () => {
                         label={requiredLabel("Validity Date")}
                         name="validityDate"
                         size="small"
-                        InputLabelProps={{ shrink: true }}
+                        slotProps={{
+                          inputLabel: {
+                            shrink: true,
+                          },
+                        }}
                         value={formik.values.validityDate || ""}
                         onChange={(e) =>
                           formik.setFieldValue("validityDate", e.target.value)
                         }
                         onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.validityDate &&
-                          Boolean(formik.errors.validityDate)
-                        }
-                        helperText={
-                          formik.touched.validityDate &&
-                          formik.errors.validityDate
-                        }
-                        disabled={loading || checkingExisting}
+                        error={hasFieldError(formik, "validityDate")}
+                        helperText={getFieldError(formik, "validityDate")}
+                        disabled={isFormDisabled()}
                       />
                     </Grid>
 
@@ -1386,19 +1609,17 @@ const CreateNcsIndex = () => {
                         label={requiredLabel("Programme Title")}
                         name="programmeTitle"
                         size="small"
-                        InputLabelProps={{ shrink: true }}
+                        slotProps={{
+                          inputLabel: {
+                            shrink: true,
+                          },
+                        }}
                         value={formik.values.programmeTitle}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.programmeTitle &&
-                          Boolean(formik.errors.programmeTitle)
-                        }
-                        helperText={
-                          formik.touched.programmeTitle &&
-                          formik.errors.programmeTitle
-                        }
-                        disabled={loading || checkingExisting}
+                        error={hasFieldError(formik, "programmeTitle")}
+                        helperText={getFieldError(formik, "programmeTitle")}
+                        disabled={isFormDisabled()}
                       />
                     </Grid>
 
@@ -1415,7 +1636,9 @@ const CreateNcsIndex = () => {
                         <Typography
                           variant="subtitle2"
                           fontWeight={600}
-                          sx={{ mb: 1 }}
+                          sx={{
+                            mb: 1,
+                          }}
                         >
                           Unit Details
                         </Typography>
@@ -1423,22 +1646,23 @@ const CreateNcsIndex = () => {
                         <FieldArray name="units">
                           {({ push, remove, form }) => {
                             const lastIndex = form.values.units.length - 1;
+
                             const lastUnit = form.values.units[lastIndex];
+
                             const hasErrors =
                               lastUnit &&
                               (!lastUnit.unitTitle || !lastUnit.unitCode);
 
                             const hasTouchedErrors =
                               formik.touched.units &&
-                              formik.touched.units.some((touched, index) => {
-                                return (
+                              formik.touched.units.some(
+                                (touched, index) =>
                                   touched &&
                                   ((touched.unitTitle &&
                                     formik.errors.units?.[index]?.unitTitle) ||
                                     (touched.unitCode &&
-                                      formik.errors.units?.[index]?.unitCode))
-                                );
-                              });
+                                      formik.errors.units?.[index]?.unitCode)),
+                              );
 
                             const canAddMore = !hasErrors && !hasTouchedErrors;
 
@@ -1454,7 +1678,11 @@ const CreateNcsIndex = () => {
                                       mb: 1,
                                     }}
                                   >
-                                    <Box sx={{ flex: 2 }}>
+                                    <Box
+                                      sx={{
+                                        flex: 2,
+                                      }}
+                                    >
                                       <TextField
                                         size="small"
                                         placeholder="Unit Title"
@@ -1476,17 +1704,24 @@ const CreateNcsIndex = () => {
                                           formik.errors.units?.[index]
                                             ?.unitTitle
                                         }
-                                        disabled={loading || checkingExisting}
+                                        disabled={isFormDisabled()}
                                         fullWidth
-                                        FormHelperTextProps={{
-                                          sx: {
-                                            minHeight: "20px",
-                                            marginTop: "3px",
+                                        slotProps={{
+                                          formHelperText: {
+                                            sx: {
+                                              minHeight: "20px",
+                                              marginTop: "3px",
+                                            },
                                           },
                                         }}
                                       />
                                     </Box>
-                                    <Box sx={{ flex: 1 }}>
+
+                                    <Box
+                                      sx={{
+                                        flex: 1,
+                                      }}
+                                    >
                                       <TextField
                                         size="small"
                                         placeholder="Unit Code"
@@ -1507,16 +1742,19 @@ const CreateNcsIndex = () => {
                                             ?.unitCode &&
                                           formik.errors.units?.[index]?.unitCode
                                         }
-                                        disabled={loading || checkingExisting}
+                                        disabled={isFormDisabled()}
                                         fullWidth
-                                        FormHelperTextProps={{
-                                          sx: {
-                                            minHeight: "20px",
-                                            marginTop: "3px",
+                                        slotProps={{
+                                          formHelperText: {
+                                            sx: {
+                                              minHeight: "20px",
+                                              marginTop: "3px",
+                                            },
                                           },
                                         }}
                                       />
                                     </Box>
+
                                     <Box
                                       sx={{
                                         display: "flex",
@@ -1530,9 +1768,8 @@ const CreateNcsIndex = () => {
                                         color="error"
                                         onClick={() => remove(index)}
                                         disabled={
-                                          loading ||
-                                          form.values.units.length <= 1 ||
-                                          checkingExisting
+                                          isFormDisabled() ||
+                                          form.values.units.length <= 1
                                         }
                                       >
                                         <RemoveCircleOutlineIcon fontSize="small" />
@@ -1549,31 +1786,41 @@ const CreateNcsIndex = () => {
                                   onClick={() => {
                                     const lastIdx =
                                       form.values.units.length - 1;
+
                                     const lastUnit = form.values.units[lastIdx];
+
                                     if (
                                       lastUnit.unitTitle &&
                                       lastUnit.unitCode
                                     ) {
-                                      push({ unitCode: "", unitTitle: "" });
-                                    } else {
-                                      formik.setFieldTouched(
-                                        `units.${lastIdx}.unitTitle`,
-                                        true,
-                                      );
-                                      formik.setFieldTouched(
-                                        `units.${lastIdx}.unitCode`,
-                                        true,
-                                      );
-                                      toast.warning(
-                                        "Please fill the current unit details before adding a new one",
-                                      );
+                                      push({
+                                        unitCode: "",
+                                        unitTitle: "",
+                                      });
+
+                                      return;
                                     }
+
+                                    formik.setFieldTouched(
+                                      `units.${lastIdx}.unitTitle`,
+                                      true,
+                                    );
+
+                                    formik.setFieldTouched(
+                                      `units.${lastIdx}.unitCode`,
+                                      true,
+                                    );
+
+                                    toast.warning(
+                                      "Please fill the current unit details before adding a new one",
+                                    );
                                   }}
-                                  disabled={
-                                    loading || !canAddMore || checkingExisting
-                                  }
+                                  disabled={isFormDisabled() || !canAddMore}
                                   fullWidth
-                                  sx={{ mt: 1, py: 0.5 }}
+                                  sx={{
+                                    mt: 1,
+                                    py: 0.5,
+                                  }}
                                 >
                                   Add Unit
                                 </Button>
@@ -1583,7 +1830,10 @@ const CreateNcsIndex = () => {
                                     <Typography
                                       color="warning"
                                       variant="caption"
-                                      sx={{ display: "block", mt: 0.5 }}
+                                      sx={{
+                                        display: "block",
+                                        mt: 0.5,
+                                      }}
                                     >
                                       Please fill the current unit details
                                       before adding a new unit
@@ -1595,7 +1845,10 @@ const CreateNcsIndex = () => {
                                     <Typography
                                       color="error"
                                       variant="caption"
-                                      sx={{ display: "block", mt: 0.5 }}
+                                      sx={{
+                                        display: "block",
+                                        mt: 0.5,
+                                      }}
                                     >
                                       {typeof formik.errors.units === "string"
                                         ? formik.errors.units
@@ -1609,7 +1862,7 @@ const CreateNcsIndex = () => {
                       </Paper>
                     </Grid>
 
-                    {/* Documents Upload */}
+                    {/* Documents */}
                     <Grid size={{ xs: 12 }}>
                       <Paper
                         sx={{
@@ -1622,11 +1875,18 @@ const CreateNcsIndex = () => {
                         <Typography
                           variant="subtitle1"
                           fontWeight={600}
-                          sx={{ mb: 2 }}
+                          sx={{
+                            mb: 2,
+                          }}
                         >
                           Supporting Documents
                         </Typography>
-                        <Divider sx={{ mb: 3 }} />
+
+                        <Divider
+                          sx={{
+                            mb: 3,
+                          }}
+                        />
 
                         <Box
                           sx={{
@@ -1641,7 +1901,7 @@ const CreateNcsIndex = () => {
                             onFilesChange={(files) =>
                               formik.setFieldValue("documents", files)
                             }
-                            disabled={loading || checkingExisting}
+                            disabled={isFormDisabled()}
                           />
                         </Box>
 
@@ -1650,7 +1910,10 @@ const CreateNcsIndex = () => {
                             <Typography
                               color="error"
                               variant="caption"
-                              sx={{ display: "block", mt: 1 }}
+                              sx={{
+                                display: "block",
+                                mt: 1,
+                              }}
                             >
                               {formik.errors.documents}
                             </Typography>
@@ -1659,7 +1922,10 @@ const CreateNcsIndex = () => {
                         <Typography
                           variant="caption"
                           color="textSecondary"
-                          sx={{ display: "block", mt: 1 }}
+                          sx={{
+                            display: "block",
+                            mt: 1,
+                          }}
                         >
                           Total files: {formik.values.documents?.length || 0}
                         </Typography>
@@ -1667,16 +1933,18 @@ const CreateNcsIndex = () => {
                     </Grid>
                   </Grid>
                 </DialogContent>
+
                 <DialogActions>
                   <Button
                     size="small"
                     variant="contained"
                     color="error"
                     onClick={handleCloseDialog}
-                    disabled={loading || checkingExisting}
+                    disabled={isFormDisabled()}
                   >
                     Cancel
                   </Button>
+
                   <Tooltip
                     title={
                       isDuplicate && !editingId
@@ -1692,19 +1960,9 @@ const CreateNcsIndex = () => {
                         type="submit"
                         variant="contained"
                         color="primary"
-                        disabled={
-                          loading ||
-                          checkingExisting ||
-                          (isDuplicate && !editingId)
-                        }
+                        disabled={isSubmitDisabled()}
                       >
-                        {loading
-                          ? "Submitting..."
-                          : checkingExisting
-                            ? "Checking..."
-                            : editingId
-                              ? "Update"
-                              : "Submit"}
+                        {getSubmitButtonText()}
                       </Button>
                     </span>
                   </Tooltip>

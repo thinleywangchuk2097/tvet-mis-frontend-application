@@ -236,7 +236,7 @@ const NonAccreditedCourseRegistration = () => {
             enrolmentCapacity: item.enrolment_capacity || 0,
             certificateLevelId: certificateLevelId,
             curriculumId: item.curriculum_id || "",
-            curriculumName: curriculumType?.curriculum_name || "",
+            curriculumName: curriculumType?.curriculum_title || "",
             attachment: item.attachment || "",
             application_no: item.application_no || "",
             qualityStandards: item.quality_standards || [],
@@ -541,7 +541,7 @@ const NonAccreditedCourseRegistration = () => {
             ? String(curriculum.certificate_level_id)
             : values.certificateLevelId,
           curriculumId: values.curriculumId,
-          curriculumName: curriculum?.curriculum_name || "",
+          curriculumName: curriculum?.curriculum_title || "",
           attachment: values.files.map((file) => file.name).join(", "),
           application_no: response.data?.application_no || "",
           statusName: "submitted",
@@ -612,7 +612,7 @@ const NonAccreditedCourseRegistration = () => {
       );
     }
 
-    return curriculum?.curriculum_name || curriculumId;
+    return curriculum?.curriculum_title || curriculumId;
   };
 
   // Auto-fill function
@@ -1159,7 +1159,7 @@ const NonAccreditedCourseRegistration = () => {
                         <MenuItem value="">-select-</MenuItem>
                         {curriculumTypes.map((type) => (
                           <MenuItem key={type.id} value={type.id}>
-                            {type.curriculum_name}
+                            {type.curriculum_title}
                           </MenuItem>
                         ))}
                       </TextField>
