@@ -66,6 +66,149 @@ const extractNumericValue = (durationString) => {
   return match ? parseFloat(match[0]) : 0;
 };
 
+// ==================== DURATION VALIDATION HELPERS ====================
+
+// Helper to get minimum hours based on certificate level
+const getMinHoursForCertificateLevel = (levelName) => {
+  if (!levelName) return 0;
+  const lowerName = levelName.toLowerCase();
+  if (lowerName.includes("diploma") || lowerName.includes("advanced diploma")) {
+    return 2400;
+  }
+  if (lowerName.includes("certificate")) {
+    return 400;
+  }
+  return 0;
+};
+
+// Helper to determine if all durations are present
+const areAllDurationsPresent = (values) => {
+  const {
+    totalProgramDuration,
+    totalTheoryDuration,
+    totalPracticalDuration,
+    totalOjtDuration,
+  } = values;
+  return !!(
+    totalProgramDuration &&
+    totalTheoryDuration &&
+    totalPracticalDuration &&
+    totalOjtDuration
+  );
+};
+
+// Helper to get BQF validation result
+const getBQFValidationResult = (
+  totalNum,
+  certificateLevelId,
+  certificateLevels,
+) => {
+  if (!certificateLevelId) {
+    return {
+      isValid: false,
+      message: "Please select a valid certificate level",
+      color: "#e65100",
+    };
+  }
+
+  const level = certificateLevels.find(
+    (l) => l.id === parseInt(certificateLevelId),
+  );
+
+  if (!level) {
+    return {
+      isValid: false,
+      message: "Please select a valid certificate level",
+      color: "#e65100",
+    };
+  }
+
+  const minHours = getMinHoursForCertificateLevel(level.name);
+
+  if (minHours === 0) {
+    return {
+      isValid: false,
+      message: `No minimum hours defined for ${level.name}`,
+      color: "#e65100",
+    };
+  }
+
+  const isValid = totalNum >= minHours;
+  const message = isValid
+    ? `✅ Valid: ${totalNum} hours meets the minimum requirement of ${minHours} hours for ${level.name}`
+    : `⚠️ Warning: ${totalNum} hours is less than ${minHours} hours. ${level.name} must be at least ${minHours} hours.`;
+  const color = isValid ? "#2e7d32" : "#c62828";
+
+  return { isValid, message, color };
+};
+
+// Helper to get Non-BQF validation result
+const getNonBQFValidationResult = (totalNum) => {
+  const isValid = totalNum >= 140;
+  const message = isValid
+    ? `✅ Valid: ${totalNum} hours meets the minimum requirement of 140 hours for Non-BQF Programme`
+    : `⚠️ Warning: ${totalNum} hours is less than 140 hours. Non-BQF Programme must be at least 140 hours.`;
+  const color = isValid ? "#2e7d32" : "#c62828";
+  return { isValid, message, color };
+};
+
+// Helper to get default validation result
+const getDefaultValidationResult = () => ({
+  isValid: false,
+  message: "Please select Programme Type and Certificate Level",
+  color: "#e65100",
+});
+
+// Helper to determine programme type
+const getProgrammeType = (programmeTypeId) => {
+  const id = parseInt(programmeTypeId);
+  if (id === 41) return "BQF";
+  if (id === 42) return "NON_BQF";
+  return "UNKNOWN";
+};
+
+// Helper to get background color based on validation color
+const getBackgroundColor = (color) => {
+  if (color === "#2e7d32") return "#e8f5e9";
+  if (color === "#c62828") return "#ffebee";
+  return "#fff3e0";
+};
+
+// Helper to get border color based on validation color
+const getBorderColor = (color) => {
+  if (color === "#2e7d32") return "#a5d6a7";
+  if (color === "#c62828") return "#ef9a9a";
+  return "#ffccbc";
+};
+
+// Helper to get validation result based on programme type
+const getValidationResult = (
+  programmeType,
+  totalNum,
+  certificateLevelId,
+  certificateLevels,
+) => {
+  switch (programmeType) {
+    case "BQF":
+      return getBQFValidationResult(
+        totalNum,
+        certificateLevelId,
+        certificateLevels,
+      );
+    case "NON_BQF":
+      return getNonBQFValidationResult(totalNum);
+    default:
+      return getDefaultValidationResult();
+  }
+};
+
+// Helper to get paper styles
+const getPaperStyles = (color) => ({
+  bgcolor: getBackgroundColor(color),
+  color: color,
+  border: `1px solid ${getBorderColor(color)}`,
+});
+
 // ==================== EXTRACTED HELPER FUNCTIONS ====================
 
 // Populate curriculum fields for endorse
@@ -80,8 +223,7 @@ const populateEndorseFields = (
 ) => {
   if (!selected) return;
 
-  // Set basic fields
-  formik.setFieldValue("curriculumName", selected.curriculum_name);
+  formik.setFieldValue("curriculumTitle", selected.curriculum_title);
   formik.setFieldValue("endorseApplicationNo", selected.application_no);
   formik.setFieldValue("programmeTypeId", selected.programme_type_id || "");
   formik.setFieldValue("description", selected.description || "");
@@ -104,16 +246,13 @@ const populateEndorseFields = (
     selected.total_program_duration || "",
   );
 
-  // Handle sector and occupation
   const sectorId = selected.sector_id || "";
   const occupationId = selected.occupation_id || "";
   formik.setFieldValue("sectorId", sectorId);
   formik.setFieldValue("occupationId", occupationId);
 
-  // Handle programme type specific fields
   populateProgrammeTypeFields(selected, formik, fetchProgrammeTitleForEndorse);
 
-  // Fetch related data
   fetchRelatedData(
     sectorId,
     selected,
@@ -123,7 +262,6 @@ const populateEndorseFields = (
     fetchCertificateLevels,
   );
 
-  // Show success message
   showAutoFillSuccessMessage(sectorId, occupationId, selected);
 };
 
@@ -136,11 +274,9 @@ const populateProgrammeTypeFields = (
   const programmeTypeId = parseInt(selected.programme_type_id);
 
   if (programmeTypeId === 41 && selected.programme_id) {
-    // BQF Course
     formik.setFieldValue("ncsId", selected.programme_id);
     fetchProgrammeTitleForEndorse(selected.programme_id, formik.setFieldValue);
   } else if (programmeTypeId === 42) {
-    // Non-BQF Course
     formik.setFieldValue("programmeTitle", selected.programme_title || "");
     formik.setFieldValue("ncsId", "");
   } else {
@@ -209,7 +345,7 @@ const resetProgrammeTypeFields = (
   formik.setFieldValue("certificateLevelId", "");
   formik.setFieldValue("sectorId", "");
   formik.setFieldValue("occupationId", "");
-  formik.setFieldValue("curriculumName", "");
+  formik.setFieldValue("curriculumTitle", "");
   formik.setFieldValue("programmeTitle", "");
   formik.setFieldValue("ncsId", "");
   setSelectedSectorId("");
@@ -221,7 +357,7 @@ const resetProgrammeTypeFields = (
 // Reset sector fields
 const resetSectorFields = (formik, setNcsExists, setNcsData) => {
   formik.setFieldValue("occupationId", "");
-  formik.setFieldValue("curriculumName", "");
+  formik.setFieldValue("curriculumTitle", "");
   formik.setFieldValue("programmeTitle", "");
   formik.setFieldValue("ncsId", "");
   setNcsExists(false);
@@ -256,7 +392,7 @@ const shouldCheckNcsForCertificate = (
 
 // Clear NCS fields
 const clearNcsFields = (formik) => {
-  formik.setFieldValue("curriculumName", "");
+  formik.setFieldValue("curriculumTitle", "");
   formik.setFieldValue("programmeTitle", "");
   formik.setFieldValue("ncsId", "");
 };
@@ -473,6 +609,45 @@ const CurriculumForm = ({
     return "";
   };
 
+  // Render duration validation message - REFACTORED
+  const renderDurationValidation = () => {
+    const { programmeTypeId, certificateLevelId } = formik.values;
+
+    if (!areAllDurationsPresent(formik.values)) {
+      return null;
+    }
+
+    const totalNum = extractNumericValue(formik.values.totalProgramDuration);
+    const programmeType = getProgrammeType(programmeTypeId);
+
+    const { message, color } = getValidationResult(
+      programmeType,
+      totalNum,
+      certificateLevelId,
+      certificateLevels,
+    );
+
+    const paperStyles = getPaperStyles(color);
+
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          borderRadius: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          ...paperStyles,
+        }}
+      >
+        <Typography variant="body2" fontWeight="bold">
+          {message}
+        </Typography>
+      </Paper>
+    );
+  };
+
   // Render curriculum title field
   const renderCurriculumTitleField = () => {
     if (isEndorse) {
@@ -516,7 +691,7 @@ const CurriculumForm = ({
         })
         .map((item) => (
           <MenuItem key={item.id} value={item.application_no}>
-            {item.curriculum_name} ({item.application_no})
+            {item.curriculum_title} ({item.application_no})
           </MenuItem>
         ))}
     </TextField>
@@ -530,9 +705,9 @@ const CurriculumForm = ({
           Curriculum Title <RequiredStar />
         </>
       }
-      name="curriculumName"
+      name="curriculumTitle"
       size="small"
-      value={formik.values.curriculumName || ""}
+      value={formik.values.curriculumTitle || ""}
       slotProps={{
         input: {
           readOnly: true,
@@ -550,26 +725,20 @@ const CurriculumForm = ({
           Curriculum Title <RequiredStar />
         </>
       }
-      name="curriculumName"
+      name="curriculumTitle"
       size="small"
-      value={formik.values.curriculumName || ""}
+      value={formik.values.curriculumTitle || ""}
       onChange={isNonBQFCourse ? formik.handleChange : undefined}
       onBlur={isNonBQFCourse ? formik.handleBlur : undefined}
       error={
-        formik.touched.curriculumName && Boolean(formik.errors.curriculumName)
+        formik.touched.curriculumTitle && Boolean(formik.errors.curriculumTitle)
       }
-      helperText={formik.touched.curriculumName && formik.errors.curriculumName}
+      helperText={
+        formik.touched.curriculumTitle && formik.errors.curriculumTitle
+      }
       slotProps={{
         input: {
           readOnly: isBQFCourse ? true : false,
-          sx: isBQFCourse
-            ? {
-                backgroundColor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.05)"
-                    : "rgba(0, 0, 0, 0.04)",
-              }
-            : {},
         },
       }}
       placeholder={
@@ -579,13 +748,6 @@ const CurriculumForm = ({
             ? "Enter Curriculum Title"
             : "Select Programme Type first"
       }
-      helperText={
-        isBQFCourse
-          ? "Auto-filled from NCS data"
-          : isNonBQFCourse
-            ? "Enter the curriculum title manually"
-            : "Curriculum Title will be auto-filled for BQF or editable for Non-BQF"
-      }
       disabled={!formik.values.programmeTypeId}
     />
   );
@@ -593,6 +755,8 @@ const CurriculumForm = ({
   // Render sector and occupation fields
   const renderSectorAndOccupationFields = () => {
     if (!isBQFCourse) return null;
+
+    const isReadonly = isRevision || isEndorse;
 
     return (
       <>
@@ -612,10 +776,9 @@ const CurriculumForm = ({
             onBlur={formik.handleBlur}
             error={formik.touched.sectorId && Boolean(formik.errors.sectorId)}
             helperText={formik.touched.sectorId && formik.errors.sectorId}
-            disabled={loading || endorseLoading || editLoading || isRevision}
             slotProps={{
               input: {
-                readOnly: isRevision ? true : false,
+                readOnly: isReadonly ? true : false,
               },
             }}
           >
@@ -626,9 +789,11 @@ const CurriculumForm = ({
               </MenuItem>
             ))}
           </TextField>
-          {isRevision && (
+          {isReadonly && (
             <Typography variant="caption" color="textSecondary">
-              Sector cannot be changed in Revision
+              {isEndorse
+                ? "Sector cannot be changed in Endorsement"
+                : "Sector cannot be changed in Revision"}
             </Typography>
           )}
         </Grid>
@@ -653,17 +818,9 @@ const CurriculumForm = ({
             helperText={
               formik.touched.occupationId && formik.errors.occupationId
             }
-            disabled={
-              loading ||
-              endorseLoading ||
-              editLoading ||
-              loadingOccupations ||
-              !formik.values.sectorId ||
-              isRevision
-            }
             slotProps={{
               input: {
-                readOnly: isRevision ? true : false,
+                readOnly: isReadonly ? true : false,
               },
             }}
           >
@@ -678,108 +835,15 @@ const CurriculumForm = ({
               </MenuItem>
             ))}
           </TextField>
-          {isRevision && (
+          {isReadonly && (
             <Typography variant="caption" color="textSecondary">
-              Occupation cannot be changed in Revision
+              {isEndorse
+                ? "Occupation cannot be changed in Endorsement"
+                : "Occupation cannot be changed in Revision"}
             </Typography>
           )}
         </Grid>
       </>
-    );
-  };
-
-  // Render duration validation message
-  const renderDurationValidation = () => {
-    const {
-      totalProgramDuration,
-      totalTheoryDuration,
-      totalPracticalDuration,
-      totalOjtDuration,
-      programmeTypeId,
-      certificateLevelId,
-    } = formik.values;
-
-    if (
-      !totalProgramDuration ||
-      !totalTheoryDuration ||
-      !totalPracticalDuration ||
-      !totalOjtDuration
-    ) {
-      return null;
-    }
-
-    const totalNum = extractNumericValue(totalProgramDuration);
-    const isBQF = parseInt(programmeTypeId) === 41;
-    const isNonBQF = parseInt(programmeTypeId) === 42;
-
-    let isValid = false;
-    let message = "";
-    let color = "";
-
-    if (isNonBQF) {
-      isValid = totalNum >= 140;
-      message = isValid
-        ? `✅ Valid: ${totalProgramDuration} meets the minimum requirement of 140 hours for Non-BQF Programme`
-        : `⚠️ Warning: ${totalProgramDuration} is less than 140 hours. Non-BQF Programme must be at least 140 hours.`;
-      color = isValid ? "#2e7d32" : "#c62828";
-    } else if (isBQF && certificateLevelId) {
-      const level = certificateLevels.find(
-        (l) => l.id === parseInt(certificateLevelId),
-      );
-      if (level) {
-        const levelName = level.name.toLowerCase();
-        let minHours = 0;
-        if (
-          levelName.includes("diploma") ||
-          levelName.includes("advanced diploma")
-        ) {
-          minHours = 2400;
-        } else if (levelName.includes("certificate")) {
-          minHours = 400;
-        }
-        isValid = totalNum >= minHours;
-        message = isValid
-          ? `✅ Valid: ${totalProgramDuration} meets the minimum requirement of ${minHours} hours for ${level.name}`
-          : `⚠️ Warning: ${totalProgramDuration} is less than ${minHours} hours. ${level.name} must be at least ${minHours} hours.`;
-        color = isValid ? "#2e7d32" : "#c62828";
-      } else {
-        message = "Please select a valid certificate level";
-        color = "#e65100";
-      }
-    } else {
-      message = "Please select Programme Type and Certificate Level";
-      color = "#e65100";
-    }
-
-    return (
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          bgcolor:
-            color === "#2e7d32"
-              ? "#e8f5e9"
-              : color === "#c62828"
-                ? "#ffebee"
-                : "#fff3e0",
-          color: color,
-          borderRadius: 1,
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          border: `1px solid ${
-            color === "#2e7d32"
-              ? "#a5d6a7"
-              : color === "#c62828"
-                ? "#ef9a9a"
-                : "#ffccbc"
-          }`,
-        }}
-      >
-        <Typography variant="body2" fontWeight="bold">
-          {message}
-        </Typography>
-      </Paper>
     );
   };
 
@@ -962,10 +1026,9 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isRevision ? true : false,
+              readOnly: isRevision || isEndorse ? true : false,
             },
           }}
-          disabled={isRevision}
         >
           <MenuItem value="">-select-</MenuItem>
           {programmeTypes.map((type) => (
@@ -975,9 +1038,11 @@ const CurriculumForm = ({
           ))}
         </TextField>
         {renderProgrammeTypeHelperText()}
-        {isRevision && (
+        {(isRevision || isEndorse) && (
           <Typography variant="caption" color="textSecondary">
-            Programme Type cannot be changed in Revision
+            {isEndorse
+              ? "Programme Type cannot be changed in Endorsement"
+              : "Programme Type cannot be changed in Revision"}
           </Typography>
         )}
       </Grid>
@@ -1008,14 +1073,9 @@ const CurriculumForm = ({
             formik.touched.certificateLevelId &&
             formik.errors.certificateLevelId
           }
-          disabled={
-            isLoadingCertificateLevels ||
-            !formik.values.programmeTypeId ||
-            isRevision
-          }
           slotProps={{
             input: {
-              readOnly: isRevision ? true : false,
+              readOnly: isRevision || isEndorse ? true : false,
             },
           }}
         >
@@ -1036,9 +1096,11 @@ const CurriculumForm = ({
             Loading certificate levels...
           </Typography>
         )}
-        {isRevision && (
+        {(isRevision || isEndorse) && (
           <Typography variant="caption" color="textSecondary">
-            Certificate Level cannot be changed in Revision
+            {isEndorse
+              ? "Certificate Level cannot be changed in Endorsement"
+              : "Certificate Level cannot be changed in Revision"}
           </Typography>
         )}
         {renderNcsStatusMessage()}
@@ -1056,8 +1118,16 @@ const CurriculumForm = ({
           name="programmeTitle"
           size="small"
           value={formik.values.programmeTitle || ""}
-          onChange={isNonBQFCourse ? formik.handleChange : undefined}
-          onBlur={isNonBQFCourse ? formik.handleBlur : undefined}
+          onChange={
+            isNonBQFCourse && !isEndorse && !isRevision
+              ? formik.handleChange
+              : undefined
+          }
+          onBlur={
+            isNonBQFCourse && !isEndorse && !isRevision
+              ? formik.handleBlur
+              : undefined
+          }
           error={
             formik.touched.programmeTitle &&
             Boolean(formik.errors.programmeTitle)
@@ -1067,15 +1137,7 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isBQFCourse ? true : false,
-              sx: isBQFCourse
-                ? {
-                    backgroundColor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255, 255, 255, 0.05)"
-                        : "rgba(0, 0, 0, 0.04)",
-                  }
-                : {},
+              readOnly: isBQFCourse || isEndorse || isRevision ? true : false,
             },
           }}
           placeholder={
@@ -1085,15 +1147,14 @@ const CurriculumForm = ({
                 ? "Enter Programme Title"
                 : "Select Programme Type first"
           }
-          helperText={
-            isBQFCourse
-              ? "Auto-filled from NCS data"
-              : isNonBQFCourse
-                ? "Enter the programme title manually"
-                : "Programme Title will be auto-filled for BQF or editable for Non-BQF"
-          }
-          disabled={!formik.values.programmeTypeId}
         />
+        {(isEndorse || isRevision) && (
+          <Typography variant="caption" color="textSecondary">
+            {isEndorse
+              ? "Programme Title cannot be changed in Endorsement"
+              : "Programme Title cannot be changed in Revision"}
+          </Typography>
+        )}
       </Grid>
 
       {/* Duration Fields */}
@@ -1110,7 +1171,13 @@ const CurriculumForm = ({
           placeholder="e.g., 120 hours"
           value={formik.values.totalTheoryDuration}
           onChange={(e) =>
-            handleDurationChange("totalTheoryDuration", e.target.value, formik)
+            !isEndorse && !isRevision
+              ? handleDurationChange(
+                  "totalTheoryDuration",
+                  e.target.value,
+                  formik,
+                )
+              : undefined
           }
           onBlur={formik.handleBlur}
           error={
@@ -1121,7 +1188,19 @@ const CurriculumForm = ({
             formik.touched.totalTheoryDuration &&
             formik.errors.totalTheoryDuration
           }
+          slotProps={{
+            input: {
+              readOnly: isEndorse || isRevision ? true : false,
+            },
+          }}
         />
+        {(isEndorse || isRevision) && (
+          <Typography variant="caption" color="textSecondary">
+            {isEndorse
+              ? "Total Theory Duration cannot be changed in Endorsement"
+              : "Total Theory Duration cannot be changed in Revision"}
+          </Typography>
+        )}
       </Grid>
       <Grid size={{ xs: 12, md: 3 }}>
         <TextField
@@ -1136,11 +1215,13 @@ const CurriculumForm = ({
           placeholder="e.g., 80 hours"
           value={formik.values.totalPracticalDuration}
           onChange={(e) =>
-            handleDurationChange(
-              "totalPracticalDuration",
-              e.target.value,
-              formik,
-            )
+            !isEndorse && !isRevision
+              ? handleDurationChange(
+                  "totalPracticalDuration",
+                  e.target.value,
+                  formik,
+                )
+              : undefined
           }
           onBlur={formik.handleBlur}
           error={
@@ -1151,7 +1232,19 @@ const CurriculumForm = ({
             formik.touched.totalPracticalDuration &&
             formik.errors.totalPracticalDuration
           }
+          slotProps={{
+            input: {
+              readOnly: isEndorse || isRevision ? true : false,
+            },
+          }}
         />
+        {(isEndorse || isRevision) && (
+          <Typography variant="caption" color="textSecondary">
+            {isEndorse
+              ? "Total Practical Duration cannot be changed in Endorsement"
+              : "Total Practical Duration cannot be changed in Revision"}
+          </Typography>
+        )}
       </Grid>
       <Grid size={{ xs: 12, md: 3 }}>
         <TextField
@@ -1166,7 +1259,9 @@ const CurriculumForm = ({
           placeholder="e.g., 40 hours"
           value={formik.values.totalOjtDuration}
           onChange={(e) =>
-            handleDurationChange("totalOjtDuration", e.target.value, formik)
+            !isEndorse && !isRevision
+              ? handleDurationChange("totalOjtDuration", e.target.value, formik)
+              : undefined
           }
           onBlur={formik.handleBlur}
           error={
@@ -1176,7 +1271,19 @@ const CurriculumForm = ({
           helperText={
             formik.touched.totalOjtDuration && formik.errors.totalOjtDuration
           }
+          slotProps={{
+            input: {
+              readOnly: isEndorse || isRevision ? true : false,
+            },
+          }}
         />
+        {(isEndorse || isRevision) && (
+          <Typography variant="caption" color="textSecondary">
+            {isEndorse
+              ? "Total OJT Duration cannot be changed in Endorsement"
+              : "Total OJT Duration cannot be changed in Revision"}
+          </Typography>
+        )}
       </Grid>
 
       {/* Total Program Duration */}
@@ -1190,12 +1297,6 @@ const CurriculumForm = ({
           slotProps={{
             input: {
               readOnly: true,
-              sx: {
-                backgroundColor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.05)"
-                    : "rgba(0, 0, 0, 0.04)",
-              },
             },
           }}
           placeholder="Will be auto-calculated"
@@ -1231,7 +1332,17 @@ const CurriculumForm = ({
           helperText={
             formik.touched.entryRequirement && formik.errors.entryRequirement
           }
+          slotProps={{
+            input: {
+              readOnly: isEndorse ? true : false,
+            },
+          }}
         />
+        {isEndorse && (
+          <Typography variant="caption" color="textSecondary">
+            Entry Requirement cannot be changed in Endorsement
+          </Typography>
+        )}
       </Grid>
 
       {/* Description */}
@@ -1254,7 +1365,17 @@ const CurriculumForm = ({
             formik.touched.description && Boolean(formik.errors.description)
           }
           helperText={formik.touched.description && formik.errors.description}
+          slotProps={{
+            input: {
+              readOnly: isEndorse ? true : false,
+            },
+          }}
         />
+        {isEndorse && (
+          <Typography variant="caption" color="textSecondary">
+            Description cannot be changed in Endorsement
+          </Typography>
+        )}
       </Grid>
 
       {/* File Upload */}
@@ -1573,7 +1694,7 @@ const CurriculumIndex = () => {
     if (!sectorId || !occupationId || !certificationId) {
       setNcsExists(false);
       setNcsData(null);
-      setFieldValue("curriculumName", "");
+      setFieldValue("curriculumTitle", "");
       setFieldValue("programmeTitle", "");
       setFieldValue("ncsId", "");
       return;
@@ -1595,7 +1716,7 @@ const CurriculumIndex = () => {
         console.log("NCS combination exists:", response.data[0]);
 
         if (response.data[0].programme_title) {
-          setFieldValue("curriculumName", response.data[0].programme_title);
+          setFieldValue("curriculumTitle", response.data[0].programme_title);
           setFieldValue("programmeTitle", response.data[0].programme_title);
           setFieldValue("ncsId", response.data[0].id);
           toast.info(
@@ -1605,7 +1726,7 @@ const CurriculumIndex = () => {
       } else {
         setNcsExists(false);
         setNcsData(null);
-        setFieldValue("curriculumName", "");
+        setFieldValue("curriculumTitle", "");
         setFieldValue("programmeTitle", "");
         setFieldValue("ncsId", "");
         console.log("NCS combination does not exist - fields cleared");
@@ -1614,7 +1735,7 @@ const CurriculumIndex = () => {
       console.error("Error checking NCS exists:", error);
       setNcsExists(false);
       setNcsData(null);
-      setFieldValue("curriculumName", "");
+      setFieldValue("curriculumTitle", "");
       setFieldValue("programmeTitle", "");
       setFieldValue("ncsId", "");
     } finally {
@@ -1655,7 +1776,7 @@ const CurriculumIndex = () => {
   const filteredData = data.filter((item) => {
     const matchesSearch =
       item.application_no?.includes(search) ||
-      item.curriculum_name?.toLowerCase().includes(search.toLowerCase()) ||
+      item.curriculum_title?.toLowerCase().includes(search.toLowerCase()) ||
       item.description?.toLowerCase().includes(search.toLowerCase());
 
     const matchesCurriculumType =
@@ -1691,7 +1812,7 @@ const CurriculumIndex = () => {
         registrationNo: institute.registration_no || "",
         curriculumTypeId: "25",
         programmeTypeId: "",
-        curriculumName: "",
+        curriculumTitle: "",
         programmeTitle: "",
         ncsId: "",
         description: "",
@@ -1712,7 +1833,7 @@ const CurriculumIndex = () => {
         registrationNo: institute.registration_no || "",
         curriculumTypeId: "48",
         programmeTypeId: "",
-        curriculumName: "",
+        curriculumTitle: "",
         endorseApplicationNo: "",
         programmeTitle: "",
         ncsId: "",
@@ -1738,7 +1859,7 @@ const CurriculumIndex = () => {
           curriculum.registration_no || institute.registration_no || "",
         curriculumTypeId: "49",
         programmeTypeId: curriculum.programme_type_id || "",
-        curriculumName: curriculum.curriculum_name || "",
+        curriculumTitle: curriculum.curriculum_title || "",
         programmeTitle: curriculum.programme_title || "",
         ncsId: curriculum.ncs_id || curriculum.programme_id || "",
         description: curriculum.description || "",
@@ -1763,7 +1884,7 @@ const CurriculumIndex = () => {
           curriculum.registration_no || institute.registration_no || "",
         curriculumTypeId: curriculum.curriculum_type_id || "",
         programmeTypeId: curriculum.programme_type_id || "",
-        curriculumName: curriculum.curriculum_name || "",
+        curriculumTitle: curriculum.curriculum_title || "",
         programmeTitle: curriculum.programme_title || "",
         ncsId: curriculum.ncs_id || curriculum.programme_id || "",
         description: curriculum.description || "",
@@ -1783,7 +1904,7 @@ const CurriculumIndex = () => {
       registrationNo: institute.registration_no || "",
       curriculumTypeId: "",
       programmeTypeId: "",
-      curriculumName: "",
+      curriculumTitle: "",
       programmeTitle: "",
       ncsId: "",
       description: "",
@@ -1805,26 +1926,31 @@ const CurriculumIndex = () => {
     return Yup.object().shape({
       curriculumTypeId: Yup.string().required("Curriculum Type is required"),
       programmeTypeId: Yup.string().required("Programme Type is required"),
-      curriculumName: Yup.string().required("Curriculum Name is required"),
-      programmeTitle: Yup.string().required("Programme Title is required"),
+      curriculumTitle: Yup.string().required("Curriculum Title is required"),
+      programmeTitle: Yup.string().when("programmeTypeId", {
+        is: (val) => val && parseInt(val) === 42, // Non-BQF Course
+        then: (schema) =>
+          schema.required("Programme Title is required for Non-BQF Programme"),
+        otherwise: (schema) => schema.notRequired(),
+      }),
       description: Yup.string().required("Curriculum Description is required"),
       certificateLevelId: Yup.string().required(
         "Certificate Level is required",
       ),
       sectorId: Yup.string().when("programmeTypeId", {
-        is: "41",
+        is: (val) => val && parseInt(val) === 41, // BQF Course
         then: (schema) =>
           schema.required("Sector is required for BQF Programme"),
         otherwise: (schema) => schema.notRequired(),
       }),
       occupationId: Yup.string().when("programmeTypeId", {
-        is: "41",
+        is: (val) => val && parseInt(val) === 41, // BQF Course
         then: (schema) =>
           schema.required("Occupation is required for BQF Programme"),
         otherwise: (schema) => schema.notRequired(),
       }),
       ncsId: Yup.string().when("programmeTypeId", {
-        is: "41",
+        is: (val) => val && parseInt(val) === 41, // BQF Course
         then: (schema) => {
           if (isAdd) {
             return schema.required(
@@ -1887,6 +2013,7 @@ const CurriculumIndex = () => {
             programmeTypeId,
           } = this.parent;
 
+          // Only validate for BQF courses
           if (parseInt(programmeTypeId) !== 41) {
             return true;
           }
@@ -2001,7 +2128,7 @@ const CurriculumIndex = () => {
 
       const payload = {
         applicationNo: applicationNo,
-        curriculumName: values.curriculumName,
+        curriculumTitle: values.curriculumTitle,
         curriculumTypeId: parseInt(values.curriculumTypeId),
         programmeTypeId: parseInt(values.programmeTypeId),
         description: values.description,
@@ -2228,7 +2355,7 @@ const CurriculumIndex = () => {
                     <TableRow key={item.id}>
                       <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
                       <TableCell>{item.application_no}</TableCell>
-                      <TableCell>{item.curriculum_name}</TableCell>
+                      <TableCell>{item.curriculum_title}</TableCell>
                       <TableCell>
                         {getCurriculumTypeName(item.curriculum_type_id)}
                       </TableCell>

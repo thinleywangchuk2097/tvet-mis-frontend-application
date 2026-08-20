@@ -798,8 +798,8 @@ const ViewCurriculumIndex = () => {
             <Grid item size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
-                label="Curriculum Name"
-                value={curriculumData.curriculum_name || "N/A"}
+                label="Curriculum Title"
+                value={curriculumData.curriculum_title || "N/A"}
                 size="small"
                 slotProps={{
                   input: {
