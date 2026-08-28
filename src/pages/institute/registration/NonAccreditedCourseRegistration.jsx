@@ -22,6 +22,8 @@ import {
   Divider,
   Box,
   Chip,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -105,10 +107,13 @@ const NonAccreditedCourseRegistration = () => {
   const [instituteDetails, setInstituteDetails] = useState(null);
   const [courses, setCourses] = useState([]);
   const [selectedCurriculumId, setSelectedCurriculumId] = useState(null);
-
+  const [programmeTypes, setProgrammeTypes] = useState([]);
   // Quality Standards State
   const [qualityData, setQualityData] = useState([]);
   const [qualitySelections, setQualitySelections] = useState({});
+  // Curriculum Duplication Check State
+  const [curriculumDuplicateError, setCurriculumDuplicateError] = useState("");
+  const [checkingCurriculum, setCheckingCurriculum] = useState(false);
 
   // Formik ref for auto-fill functionality
   const formikRef = useRef(null);
@@ -118,6 +123,7 @@ const NonAccreditedCourseRegistration = () => {
     fetchCertificateLevels();
     fetchInstituteDetails();
     fetchQualityStandards();
+    fetchProgrammeTypes();
   }, []);
 
   // Fetch courses after curriculumTypes is loaded
@@ -126,6 +132,17 @@ const NonAccreditedCourseRegistration = () => {
       fetchNonAccreditedCourseDetails();
     }
   }, [curriculumTypes]);
+
+  // Effect to populate quality selections when qualityData is loaded and a course is being viewed
+  useEffect(() => {
+    if (
+      qualityData.length > 0 &&
+      openView &&
+      selectedCourse?.qualityStandards?.length > 0
+    ) {
+      populateQualitySelections(selectedCourse.qualityStandards);
+    }
+  }, [qualityData, openView, selectedCourse]);
 
   const fetchQualityStandards = async () => {
     try {
@@ -164,6 +181,16 @@ const NonAccreditedCourseRegistration = () => {
     }
   };
 
+  const fetchProgrammeTypes = async () => {
+    try {
+      const response = await CommonService.getByParentId(32);
+      setProgrammeTypes(response.data);
+      console.log("Programme Types:", response.data);
+    } catch (error) {
+      console.error("Error fetching programme types:", error);
+    }
+  };
+
   const fetchInstituteDetails = async () => {
     try {
       const response =
@@ -190,6 +217,69 @@ const NonAccreditedCourseRegistration = () => {
       console.log("Curriculum Types:", response.data);
     } catch (error) {
       console.error("Error fetching curriculum types:", error);
+    }
+  };
+
+  // Check if curriculum already exists for this institute
+  const checkCurriculumExists = async (curriculumId) => {
+    if (!curriculumId) {
+      setCurriculumDuplicateError("");
+      return false;
+    }
+
+    setCheckingCurriculum(true);
+    setCurriculumDuplicateError("");
+
+    try {
+      const response =
+        await ApplyNonAccreditedCourseService.curriculumAlreadyExist(
+          curriculumId,
+          registration_no,
+          access_token,
+        );
+
+      console.log("Curriculum existence check response:", response.data);
+
+      // Check if the response indicates the curriculum already exists
+      // The response is an array of objects with curriculum_id when exists
+      if (
+        response.data &&
+        Array.isArray(response.data) &&
+        response.data.length > 0
+      ) {
+        // Check if any item in the array has the matching curriculum_id
+        const exists = response.data.some(
+          (item) => String(item.curriculum_id) === String(curriculumId),
+        );
+
+        if (exists) {
+          setCurriculumDuplicateError(
+            "This curriculum has already been registered for your institute. Please select a different curriculum.",
+          );
+          // Clear the curriculum selection fields
+          if (formikRef.current) {
+            formikRef.current.setFieldValue("curriculumId", "");
+            formikRef.current.setFieldValue("theoryHour", "");
+            formikRef.current.setFieldValue("practicalHour", "");
+            formikRef.current.setFieldValue("ojtHour", "");
+            formikRef.current.setFieldValue("certificateLevelId", "");
+          }
+          setSelectedCurriculumId(null);
+          return true;
+        }
+      }
+
+      setCurriculumDuplicateError("");
+      return false;
+    } catch (error) {
+      console.error("Error checking curriculum existence:", error);
+      toast.warning(
+        "Could not verify curriculum duplication. Please proceed with caution.",
+      );
+      setCurriculumDuplicateError("");
+      return false;
+    } finally {
+      setCheckingCurriculum(false);
     }
   };
 
@@ -225,27 +315,76 @@ const NonAccreditedCourseRegistration = () => {
             ? String(curriculumType.certificate_level_id)
             : item.certificate_level_id || "";
 
+          // Parse quality standards from the response
+          let qualityStandards = [];
+          if (item.quality_standard_responses) {
+            try {
+              // If it's a string, parse it
+              if (typeof item.quality_standard_responses === "string") {
+                qualityStandards = JSON.parse(item.quality_standard_responses);
+              } else if (Array.isArray(item.quality_standard_responses)) {
+                qualityStandards = item.quality_standard_responses;
+              }
+            } catch (e) {
+              console.error("Error parsing quality standards:", e);
+            }
+          }
+
+          // Parse documents if it's a string
+          let documents = [];
+          if (item.documents) {
+            try {
+              if (typeof item.documents === "string") {
+                documents = JSON.parse(item.documents);
+              } else if (Array.isArray(item.documents)) {
+                documents = item.documents;
+              }
+            } catch (e) {
+              console.error("Error parsing documents:", e);
+            }
+          }
+
+          // Get programme type name
+          const programmeType = programmeTypes.find(
+            (pt) => String(pt.id) === String(item.programme_type_id),
+          );
+
           return {
             id: item.id || index + 1,
-            courseTitle: item.course_title || "",
+            programmeTitle: item.programme_title || "",
+            programmeTypeId: item.programme_type_id || "",
+            programmeTypeName: programmeType?.name || "",
             theoryHour: theoryHour,
             practicalHour: practicalHour,
             ojtHour: ojtHour,
             statusName: item.status_name || "",
-            feesPerTrainee: item.fees_per_trainee || 0,
-            enrolmentCapacity: item.enrolment_capacity || 0,
+            feesPerTrainee: item.fees_per_trainee
+              ? parseInt(item.fees_per_trainee)
+              : 0,
+            enrolmentCapacity: item.enrolment_capacity
+              ? parseInt(item.enrolment_capacity)
+              : 0,
             certificateLevelId: certificateLevelId,
             curriculumId: item.curriculum_id || "",
-            curriculumName: curriculumType?.curriculum_name || "",
-            attachment: item.attachment || "",
+            curriculumName: curriculumType?.curriculum_title || "",
+            attachment: item.documents || "",
             application_no: item.application_no || "",
-            qualityStandards: item.quality_standards || [],
+            qualityStandards: qualityStandards,
+            documents: documents,
+            statusId: item.status_id || "",
+            registrationDate: item.registration_date || "",
+            validityDate: item.validity_date || "",
           };
         });
         setCourses(transformedCourses);
         console.log(
-          "Transformed courses with curriculum names and hours:",
-          transformedCourses,
+          "Transformed courses with quality standards:",
+          transformedCourses.map((c) => ({
+            id: c.id,
+            programmeTitle: c.programmeTitle,
+            programmeTypeName: c.programmeTypeName,
+            qualityStandardsCount: c.qualityStandards?.length || 0,
+          })),
         );
       }
     } catch (error) {
@@ -255,23 +394,69 @@ const NonAccreditedCourseRegistration = () => {
   };
 
   const populateQualitySelections = (qualityStandards) => {
-    if (!qualityStandards || !Array.isArray(qualityStandards)) return;
+    console.log("Populating quality selections with:", qualityStandards);
+
+    if (
+      !qualityStandards ||
+      !Array.isArray(qualityStandards) ||
+      qualityStandards.length === 0
+    ) {
+      console.log("No quality standards to populate");
+      return;
+    }
 
     const selections = {};
-    qualityStandards.forEach((qs) => {
-      const subQuestionId = qs.standardId.toString();
-      const responseValue = qs.responseId;
 
+    qualityStandards.forEach((qs) => {
+      // The standardId could be at different paths in the object
+      let subQuestionId = null;
+      let responseValue = null;
+
+      // Check different possible property names
+      if (qs.standardId) {
+        subQuestionId = qs.standardId.toString();
+        responseValue = qs.responseId || qs.responseValue;
+      } else if (qs.standard_id) {
+        subQuestionId = qs.standard_id.toString();
+        responseValue = qs.response_id || qs.responseValue;
+      } else if (qs.id && qs.standardId) {
+        subQuestionId = qs.standardId.toString();
+        responseValue = qs.responseId;
+      }
+
+      // If we couldn't find standardId, try using qs.id if it's the standardId
+      if (!subQuestionId && qs.id) {
+        // Check if this id matches any standard id in qualityData
+        const found = qualityData.some((cat) =>
+          cat.rows.some((row) => row.id === qs.id.toString()),
+        );
+        if (found) {
+          subQuestionId = qs.id.toString();
+          responseValue = qs.responseId || qs.responseValue || qs.response_id;
+        }
+      }
+
+      if (!subQuestionId) {
+        console.log("Could not find standardId for:", qs);
+        return;
+      }
+
+      // Find which category this sub-question belongs to
       const category = qualityData.find((cat) =>
         cat.rows.some((row) => row.id === subQuestionId),
       );
+
       if (category) {
         if (!selections[category.id]) {
           selections[category.id] = {};
         }
         selections[category.id][subQuestionId] = responseValue;
+      } else {
+        console.log(`Could not find category for standardId: ${subQuestionId}`);
       }
     });
+
+    console.log("Populated quality selections:", selections);
     setQualitySelections(selections);
   };
 
@@ -282,16 +467,42 @@ const NonAccreditedCourseRegistration = () => {
   };
 
   const filteredCourses = courses.filter((c) =>
-    c.courseTitle?.toLowerCase().includes(search.toLowerCase()),
+    c.programmeTitle?.toLowerCase().includes(search.toLowerCase()),
   );
 
   const handleView = (course) => {
+    console.log("Viewing course:", course);
+    console.log("Quality standards:", course.qualityStandards);
+
     // When viewing, make sure we have the latest curriculum name
     const curriculumName = getCurriculumTypeName(course.curriculumId);
     setSelectedCourse({
       ...course,
       curriculumDisplayName: curriculumName,
     });
+
+    // Populate quality selections for viewing
+    if (course.qualityStandards && course.qualityStandards.length > 0) {
+      // Wait for qualityData to be available
+      if (qualityData.length > 0) {
+        populateQualitySelections(course.qualityStandards);
+      } else {
+        // If qualityData is not loaded yet, set a timeout to retry
+        const checkQualityData = setInterval(() => {
+          if (qualityData.length > 0) {
+            populateQualitySelections(course.qualityStandards);
+            clearInterval(checkQualityData);
+          }
+        }, 100);
+
+        // Clear interval after 5 seconds to prevent infinite loop
+        setTimeout(() => clearInterval(checkQualityData), 5000);
+      }
+    } else {
+      // Reset selections if no quality standards
+      setQualitySelections({});
+    }
+
     setOpenView(true);
   };
 
@@ -365,7 +576,102 @@ const NonAccreditedCourseRegistration = () => {
     }));
   };
 
-  // Render quality standards - taking full width of container
+  // Render quality standards for viewing (read-only)
+  const renderViewChecklist = (standard) => {
+    return (
+      <Grid item xs={12} key={standard.id} sx={{ width: "100%" }}>
+        <Paper
+          sx={{
+            p: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            width: "100%",
+          }}
+        >
+          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
+            {standard.title}
+          </Typography>
+          <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
+            <Table
+              size="small"
+              sx={{ ...TABLE_STYLE, width: "100%", minWidth: "100%" }}
+            >
+              <TableHead>
+                <TableRow>
+                  <TableCell width="60" sx={{ width: "60px" }}>
+                    Sl. No
+                  </TableCell>
+                  <TableCell sx={{ width: "auto" }}>
+                    Quality Indicator
+                  </TableCell>
+                  <TableCell align="center" width="100" sx={{ width: "100px" }}>
+                    YES
+                  </TableCell>
+                  <TableCell align="center" width="100" sx={{ width: "100px" }}>
+                    NO
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {standard.rows.map((row, index) => {
+                  const selectedValue =
+                    qualitySelections[standard.id]?.[row.id];
+                  // Check if selected value is YES (case insensitive)
+                  const isYes =
+                    selectedValue &&
+                    (selectedValue === "Y" ||
+                      selectedValue === "YES" ||
+                      selectedValue === "Yes" ||
+                      selectedValue === "y" ||
+                      selectedValue === "yes" ||
+                      selectedValue === true ||
+                      selectedValue === "1" ||
+                      selectedValue === 1);
+
+                  // Check if selected value is NO (case insensitive)
+                  const isNo =
+                    selectedValue &&
+                    (selectedValue === "N" ||
+                      selectedValue === "NO" ||
+                      selectedValue === "No" ||
+                      selectedValue === "n" ||
+                      selectedValue === "no" ||
+                      selectedValue === false ||
+                      selectedValue === "0" ||
+                      selectedValue === 0);
+
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{row.value}</TableCell>
+                      <TableCell align="center">
+                        <Radio
+                          size="small"
+                          sx={{ p: 0.25 }}
+                          checked={!!isYes}
+                          disabled={true}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Radio
+                          size="small"
+                          sx={{ p: 0.25 }}
+                          checked={!!isNo}
+                          disabled={true}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Grid>
+    );
+  };
+
+  // Render quality standards - taking full width of container (for add/edit)
   const renderChecklist = (standard) => {
     return (
       <Grid item xs={12} key={standard.id} sx={{ width: "100%" }}>
@@ -443,7 +749,8 @@ const NonAccreditedCourseRegistration = () => {
   const initialValues = {
     instituteName: instituteDetails?.proposed_institute_name || "",
     registrationNo: instituteDetails?.registration_no || "",
-    courseTitle: "",
+    programmeTypeId: "",
+    programmeTitle: "",
     theoryHour: "",
     practicalHour: "",
     ojtHour: "",
@@ -455,16 +762,30 @@ const NonAccreditedCourseRegistration = () => {
   };
 
   const validationSchema = Yup.object().shape({
-    courseTitle: Yup.string().required("Course Title is required"),
-    theoryHour: Yup.number()
-      .required("Theory hours are required")
-      .positive("Must be positive"),
-    practicalHour: Yup.number()
-      .required("Practical hours are required")
-      .positive("Must be positive"),
-    ojtHour: Yup.number()
-      .required("OJT hours are required")
-      .positive("Must be positive"),
+    programmeTypeId: Yup.string().required("Programme Type is required"),
+    programmeTitle: Yup.string().required("Programme Title is required"),
+    theoryHour: Yup.number().when("programmeTypeId", {
+      is: (val) => val && val !== "137",
+      then: (schema) =>
+        schema
+          .required("Theory hours are required")
+          .positive("Must be positive"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
+    practicalHour: Yup.number().when("programmeTypeId", {
+      is: (val) => val && val !== "137",
+      then: (schema) =>
+        schema
+          .required("Practical hours are required")
+          .positive("Must be positive"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
+    ojtHour: Yup.number().when("programmeTypeId", {
+      is: (val) => val && val !== "137",
+      then: (schema) =>
+        schema.required("OJT hours are required").positive("Must be positive"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
     feesPerTrainee: Yup.number()
       .required("Fee is required")
       .positive("Must be positive"),
@@ -472,35 +793,65 @@ const NonAccreditedCourseRegistration = () => {
       .required("Capacity is required")
       .positive("Must be positive")
       .integer("Must be a whole number"),
-    certificateLevelId: Yup.string().required("Certificate level is required"),
-    curriculumId: Yup.string().required("Curriculum type is required"),
+    certificateLevelId: Yup.string().when("programmeTypeId", {
+      is: (val) => val && val !== "137",
+      then: (schema) => schema.required("Certificate level is required"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
+    curriculumId: Yup.string().when("programmeTypeId", {
+      is: (val) => val && val !== "137",
+      then: (schema) => schema.required("Curriculum type is required"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
     files: Yup.array().min(1, "Please upload supporting documents"),
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
+    // Final check before submission
+    if (curriculumDuplicateError) {
+      toast.error(
+        "Please select a different curriculum. This one is already registered.",
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const documents = await Promise.all(
         values.files.map((file) => fileToBase64(file)),
       );
 
-      // Find the selected curriculum by id
-      const selectedCurriculum = curriculumTypes.find(
-        (t) => String(t.id) === String(values.curriculumId),
-      );
+      // Find the selected curriculum by id (only if curriculumId is provided)
+      const selectedCurriculum = values.curriculumId
+        ? curriculumTypes.find(
+            (t) => String(t.id) === String(values.curriculumId),
+          )
+        : null;
 
       const qualityStandardsList = transformQualityStandards(qualitySelections);
 
       const payload = {
-        courseTitle: values.courseTitle,
+        programmeTitle: values.programmeTitle,
         applicantName: values.instituteName,
-        theoryHour: parseInt(values.theoryHour),
-        practicalHour: parseInt(values.practicalHour),
-        ojtHour: parseInt(values.ojtHour),
+        theoryHour:
+          values.programmeTypeId === "137"
+            ? 0
+            : parseInt(values.theoryHour) || 0,
+        practicalHour:
+          values.programmeTypeId === "137"
+            ? 0
+            : parseInt(values.practicalHour) || 0,
+        ojtHour:
+          values.programmeTypeId === "137" ? 0 : parseInt(values.ojtHour) || 0,
         feesPerTrainee: parseInt(values.feesPerTrainee),
         enrolmentCapacity: parseInt(values.enrolmentCapacity),
-        certificateLevelId: values.certificateLevelId,
-        curriculumId: parseInt(values.curriculumId),
+        certificateLevelId:
+          values.programmeTypeId === "137" ? "" : values.certificateLevelId,
+        curriculumId:
+          values.programmeTypeId === "137"
+            ? null
+            : parseInt(values.curriculumId),
+        programmeTypeId: parseInt(values.programmeTypeId),
         instituteId: instituteDetails?.institute_id || "",
         serviceId: 13,
         assignedRoleId: 7,
@@ -518,33 +869,58 @@ const NonAccreditedCourseRegistration = () => {
         );
 
       if (response.status === 200 || response.status === 201) {
-        // Get curriculum hours for the new course
-        const curriculum = curriculumTypes.find(
-          (t) => String(t.id) === String(values.curriculumId),
+        // Get curriculum hours for the new course (only if curriculum exists)
+        const curriculum = values.curriculumId
+          ? curriculumTypes.find(
+              (t) => String(t.id) === String(values.curriculumId),
+            )
+          : null;
+
+        const programmeType = programmeTypes.find(
+          (pt) => String(pt.id) === String(values.programmeTypeId),
         );
 
         const newCourse = {
           id: response.data?.id || courses.length + 1,
-          courseTitle: values.courseTitle,
-          theoryHour: curriculum?.total_theory_duration
-            ? parseInt(curriculum.total_theory_duration)
-            : parseInt(values.theoryHour),
-          practicalHour: curriculum?.total_practical_duration
-            ? parseInt(curriculum.total_practical_duration)
-            : parseInt(values.practicalHour),
-          ojtHour: curriculum?.total_ojt_duration
-            ? parseInt(curriculum.total_ojt_duration)
-            : parseInt(values.ojtHour),
+          programmeTitle: values.programmeTitle,
+          programmeTypeId: values.programmeTypeId,
+          programmeTypeName: programmeType?.name || "",
+          theoryHour:
+            values.programmeTypeId === "137"
+              ? 0
+              : curriculum?.total_theory_duration
+                ? parseInt(curriculum.total_theory_duration)
+                : parseInt(values.theoryHour) || 0,
+          practicalHour:
+            values.programmeTypeId === "137"
+              ? 0
+              : curriculum?.total_practical_duration
+                ? parseInt(curriculum.total_practical_duration)
+                : parseInt(values.practicalHour) || 0,
+          ojtHour:
+            values.programmeTypeId === "137"
+              ? 0
+              : curriculum?.total_ojt_duration
+                ? parseInt(curriculum.total_ojt_duration)
+                : parseInt(values.ojtHour) || 0,
           feesPerTrainee: parseInt(values.feesPerTrainee),
           enrolmentCapacity: parseInt(values.enrolmentCapacity),
-          certificateLevelId: curriculum?.certificate_level_id
-            ? String(curriculum.certificate_level_id)
-            : values.certificateLevelId,
-          curriculumId: values.curriculumId,
-          curriculumName: curriculum?.curriculum_name || "",
+          certificateLevelId:
+            values.programmeTypeId === "137"
+              ? ""
+              : curriculum?.certificate_level_id
+                ? String(curriculum.certificate_level_id)
+                : values.certificateLevelId,
+          curriculumId:
+            values.programmeTypeId === "137" ? "" : values.curriculumId,
+          curriculumName:
+            values.programmeTypeId === "137"
+              ? "Less than 140 hours"
+              : curriculum?.curriculum_title || "",
           attachment: values.files.map((file) => file.name).join(", "),
           application_no: response.data?.application_no || "",
           statusName: "submitted",
+          qualityStandards: qualityStandardsList,
         };
 
         setCourses([...courses, newCourse]);
@@ -552,13 +928,14 @@ const NonAccreditedCourseRegistration = () => {
         resetForm();
         setQualitySelections({});
         setSelectedCurriculumId(null);
+        setCurriculumDuplicateError("");
         setOpenAdd(false);
 
         await fetchNonAccreditedCourseDetails();
       }
     } catch (error) {
       console.error("Error submitting course:", error);
-      toast.error("Failed to submit course");
+      toast.error(error.response?.data?.message || "Failed to submit course");
     } finally {
       setLoading(false);
       setSubmitting(false);
@@ -568,15 +945,17 @@ const NonAccreditedCourseRegistration = () => {
   const handleReset = () => {
     setQualitySelections({});
     setSelectedCurriculumId(null);
+    setCurriculumDuplicateError("");
     if (formikRef.current) {
       formikRef.current.setFieldValue("theoryHour", "");
       formikRef.current.setFieldValue("practicalHour", "");
       formikRef.current.setFieldValue("ojtHour", "");
       formikRef.current.setFieldValue("curriculumId", "");
       formikRef.current.setFieldValue("certificateLevelId", "");
-      formikRef.current.setFieldValue("courseTitle", "");
+      formikRef.current.setFieldValue("programmeTitle", "");
       formikRef.current.setFieldValue("feesPerTrainee", "");
       formikRef.current.setFieldValue("enrolmentCapacity", "");
+      formikRef.current.setFieldValue("programmeTypeId", "");
       formikRef.current.setFieldValue("files", []);
     }
   };
@@ -612,7 +991,7 @@ const NonAccreditedCourseRegistration = () => {
       );
     }
 
-    return curriculum?.curriculum_name || curriculumId;
+    return curriculum?.curriculum_title || "-";
   };
 
   // Auto-fill function
@@ -729,6 +1108,7 @@ const NonAccreditedCourseRegistration = () => {
               <TableCell>#</TableCell>
               <TableCell>Application No.</TableCell>
               <TableCell>Programme Title</TableCell>
+              <TableCell>Programme Type</TableCell>
               <TableCell>Fees Per Trainee (Nu.)</TableCell>
               <TableCell>Theory (Hrs)</TableCell>
               <TableCell>Practical (Hrs)</TableCell>
@@ -747,7 +1127,8 @@ const NonAccreditedCourseRegistration = () => {
                   <TableRow key={course.id}>
                     <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
                     <TableCell>{course.application_no || "-"}</TableCell>
-                    <TableCell>{course.courseTitle}</TableCell>
+                    <TableCell>{course.programmeTitle}</TableCell>
+                    <TableCell>{course.programmeTypeName || "-"}</TableCell>
                     <TableCell>{course.feesPerTrainee}</TableCell>
                     <TableCell>{course.theoryHour || 0}</TableCell>
                     <TableCell>{course.practicalHour || 0}</TableCell>
@@ -756,8 +1137,7 @@ const NonAccreditedCourseRegistration = () => {
                       {getCertificateLevelName(course.certificateLevelId)}
                     </TableCell>
                     <TableCell>
-                      {course.curriculumName ||
-                        getCurriculumTypeName(course.curriculumId)}
+                      {getCurriculumTypeName(course.curriculumId) || "-"}
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -769,7 +1149,9 @@ const NonAccreditedCourseRegistration = () => {
                               ? "#2196f3"
                               : course.statusName === "Verified"
                                 ? "#4caf50"
-                                : "#ff9800",
+                                : course.statusName === "Approved"
+                                  ? "#4caf50"
+                                  : "#ff9800",
                           color: "white",
                           fontWeight: "medium",
                           minWidth: "100px",
@@ -805,7 +1187,7 @@ const NonAccreditedCourseRegistration = () => {
                 ))
             ) : (
               <TableRow>
-                <TableCell colSpan={11} align="center">
+                <TableCell colSpan={12} align="center">
                   No data available in table
                 </TableCell>
               </TableRow>
@@ -826,11 +1208,14 @@ const NonAccreditedCourseRegistration = () => {
       {/* View Course Dialog */}
       <Dialog
         open={openView}
-        onClose={() => setOpenView(false)}
-        maxWidth="lg"
+        onClose={() => {
+          setOpenView(false);
+          setQualitySelections({});
+        }}
+        maxWidth="xl"
         fullWidth
       >
-        <DialogTitle>Course Details</DialogTitle>
+        <DialogTitle>Non BQF Programme Details</DialogTitle>
         <DialogContent dividers>
           {selectedCourse && (
             <Grid container spacing={2}>
@@ -876,9 +1261,28 @@ const NonAccreditedCourseRegistration = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
+                  label="Programme Type"
+                  size="small"
+                  value={
+                    programmeTypes.find(
+                      (pt) =>
+                        String(pt.id) ===
+                        String(selectedCourse.programmeTypeId),
+                    )?.name || "-"
+                  }
+                  slotProps={{
+                    input: {
+                      readOnly: true,
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid item size={{ xs: 12, md: 4 }}>
+                <TextField
+                  fullWidth
                   label="Programme Title"
                   size="small"
-                  value={selectedCourse.courseTitle}
+                  value={selectedCourse.programmeTitle}
                   slotProps={{
                     input: {
                       readOnly: true,
@@ -886,45 +1290,81 @@ const NonAccreditedCourseRegistration = () => {
                   }}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Theory (Hours)"
-                  size="small"
-                  value={selectedCourse.theoryHour}
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                    },
-                  }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Practical (Hours)"
-                  size="small"
-                  value={selectedCourse.practicalHour}
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                    },
-                  }}
-                />
-              </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="OJT (Hours)"
-                  size="small"
-                  value={selectedCourse.ojtHour}
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                    },
-                  }}
-                />
-              </Grid>
+              {selectedCourse.programmeTypeId !== "137" && (
+                <>
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Theory (Hours)"
+                      size="small"
+                      value={selectedCourse.theoryHour}
+                      slotProps={{
+                        input: {
+                          readOnly: true,
+                        },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Practical (Hours)"
+                      size="small"
+                      value={selectedCourse.practicalHour}
+                      slotProps={{
+                        input: {
+                          readOnly: true,
+                        },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="OJT (Hours)"
+                      size="small"
+                      value={selectedCourse.ojtHour}
+                      slotProps={{
+                        input: {
+                          readOnly: true,
+                        },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Certificate Level"
+                      size="small"
+                      value={getCertificateLevelName(
+                        selectedCourse.certificateLevelId,
+                      )}
+                      slotProps={{
+                        input: {
+                          readOnly: true,
+                        },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Curriculum Title"
+                      size="small"
+                      value={
+                        selectedCourse.curriculumDisplayName ||
+                        selectedCourse.curriculumName ||
+                        getCurriculumTypeName(selectedCourse.curriculumId)
+                      }
+                      slotProps={{
+                        input: {
+                          readOnly: true,
+                        },
+                      }}
+                    />
+                  </Grid>
+                </>
+              )}
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
@@ -954,11 +1394,9 @@ const NonAccreditedCourseRegistration = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label="Certificate Level"
+                  label="Status"
                   size="small"
-                  value={getCertificateLevelName(
-                    selectedCourse.certificateLevelId,
-                  )}
+                  value={selectedCourse.statusName || "-"}
                   slotProps={{
                     input: {
                       readOnly: true,
@@ -966,22 +1404,26 @@ const NonAccreditedCourseRegistration = () => {
                   }}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Curriculum Title"
-                  size="small"
-                  value={
-                    selectedCourse.curriculumDisplayName ||
-                    selectedCourse.curriculumName ||
-                    getCurriculumTypeName(selectedCourse.curriculumId)
-                  }
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                    },
+
+              {/* Quality Standards - Read Only View */}
+              <Grid item xs={12}>
+                <Paper
+                  sx={{
+                    p: 3,
+                    mt: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    width: "100%",
                   }}
-                />
+                >
+                  <Typography fontWeight={600} gutterBottom>
+                    Quality Standards
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={2} sx={{ width: "100%", margin: 0 }}>
+                    {qualityData.map(renderViewChecklist)}
+                  </Grid>
+                </Paper>
               </Grid>
             </Grid>
           )}
@@ -990,7 +1432,10 @@ const NonAccreditedCourseRegistration = () => {
           <Button
             size="small"
             variant="contained"
-            onClick={() => setOpenView(false)}
+            onClick={() => {
+              setOpenView(false);
+              setQualitySelections({});
+            }}
           >
             Close
           </Button>
@@ -1048,431 +1493,494 @@ const NonAccreditedCourseRegistration = () => {
           onSubmit={handleSubmit}
           enableReinitialize={true}
         >
-          {(formik) => (
-            <Form>
-              <DialogContent dividers>
-                {/* Container 1: Basic Information */}
-                <Paper
-                  sx={{
-                    p: 3,
-                    mb: 3,
-                    border: "1px solid",
-                    borderColor: "divider",
-                  }}
-                >
-                  <Typography fontWeight={600} gutterBottom>
-                    Basic Information
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Grid container spacing={2}>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label="Name of Training Provider/Institution"
-                        name="instituteName"
-                        size="small"
-                        value={formik.values.instituteName}
-                        slotProps={{
-                          input: {
-                            readOnly: true,
-                          },
-                        }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label="Registration No"
-                        name="registrationNo"
-                        size="small"
-                        value={formik.values.registrationNo}
-                        slotProps={{
-                          input: {
-                            readOnly: true,
-                          },
-                        }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={
-                          <>
-                            Programme Type <RequiredStar />
-                          </>
-                        }
-                        name="curriculumId"
-                        size="small"
-                        value={formik.values.curriculumId}
-                        onChange={(e) => {
-                          const selectedId = e.target.value;
-                          formik.handleChange(e);
-                          setSelectedCurriculumId(selectedId);
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.curriculumId &&
-                          Boolean(formik.errors.curriculumId)
-                        }
-                        helperText={
-                          formik.touched.curriculumId &&
-                          formik.errors.curriculumId
-                        }
-                      >
-                        <MenuItem value="">-select-</MenuItem>
-                        <MenuItem value="1">
-                          Non-BQF Programme more than 140 hours
-                        </MenuItem>
-                        <MenuItem value="2">
-                          Non-BQF Programme less than 140 hours
-                        </MenuItem>
-                      </TextField>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={
-                          <>
-                            Curriculum Title <RequiredStar />
-                          </>
-                        }
-                        name="curriculumId"
-                        size="small"
-                        value={formik.values.curriculumId}
-                        onChange={(e) => {
-                          const selectedId = e.target.value;
-                          formik.handleChange(e);
-                          setSelectedCurriculumId(selectedId);
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.curriculumId &&
-                          Boolean(formik.errors.curriculumId)
-                        }
-                        helperText={
-                          formik.touched.curriculumId &&
-                          formik.errors.curriculumId
-                        }
-                      >
-                        <MenuItem value="">-select-</MenuItem>
-                        {curriculumTypes.map((type) => (
-                          <MenuItem key={type.id} value={type.id}>
-                            {type.curriculum_name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
+          {(formik) => {
+            // Check if programme type is "less than 140 hours"
+            const isLessThan140 = formik.values.programmeTypeId === "137";
 
-                    {/* Duration Fields - Only show when curriculum is selected */}
-                    {selectedCurriculumId && (
-                      <>
-                        <Grid item size={{ xs: 12, md: 4 }}>
-                          <TextField
-                            fullWidth
-                            label={
-                              <>
-                                Theory (Hours) <RequiredStar />
-                              </>
-                            }
-                            name="theoryHour"
-                            type="number"
-                            size="small"
-                            value={formik.values.theoryHour}
-                            onChange={formik.handleChange}
-                            onBlur={formik.handleBlur}
-                            error={
-                              formik.touched.theoryHour &&
-                              Boolean(formik.errors.theoryHour)
-                            }
-                            helperText={
-                              formik.touched.theoryHour &&
-                              formik.errors.theoryHour
-                            }
-                            slotProps={{
-                              input: {
-                                readOnly: true,
-                              },
-                            }}
-                            InputLabelProps={{
-                              shrink: true,
-                            }}
-                          />
-                        </Grid>
-                        <Grid item size={{ xs: 12, md: 4 }}>
-                          <TextField
-                            fullWidth
-                            label={
-                              <>
-                                Practical (Hours) <RequiredStar />
-                              </>
-                            }
-                            name="practicalHour"
-                            type="number"
-                            size="small"
-                            value={formik.values.practicalHour}
-                            onChange={formik.handleChange}
-                            onBlur={formik.handleBlur}
-                            error={
-                              formik.touched.practicalHour &&
-                              Boolean(formik.errors.practicalHour)
-                            }
-                            helperText={
-                              formik.touched.practicalHour &&
-                              formik.errors.practicalHour
-                            }
-                            slotProps={{
-                              input: {
-                                readOnly: true,
-                              },
-                            }}
-                            InputLabelProps={{
-                              shrink: true,
-                            }}
-                          />
-                        </Grid>
-                        <Grid item size={{ xs: 12, md: 4 }}>
-                          <TextField
-                            fullWidth
-                            label={
-                              <>
-                                OJT (Hours) <RequiredStar />
-                              </>
-                            }
-                            name="ojtHour"
-                            type="number"
-                            size="small"
-                            value={formik.values.ojtHour}
-                            onChange={formik.handleChange}
-                            onBlur={formik.handleBlur}
-                            error={
-                              formik.touched.ojtHour &&
-                              Boolean(formik.errors.ojtHour)
-                            }
-                            helperText={
-                              formik.touched.ojtHour && formik.errors.ojtHour
-                            }
-                            slotProps={{
-                              input: {
-                                readOnly: true,
-                              },
-                            }}
-                            InputLabelProps={{
-                              shrink: true,
-                            }}
-                          />
-                        </Grid>
-                      </>
-                    )}
-
-                    {/* Certificate Level - Only show when curriculum is selected */}
-                    {selectedCurriculumId && (
+            return (
+              <Form>
+                <DialogContent dividers>
+                  {/* Container 1: Basic Information */}
+                  <Paper
+                    sx={{
+                      p: 3,
+                      mb: 3,
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography fontWeight={600} gutterBottom>
+                      Basic Information
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Grid container spacing={2}>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label="Name of Training Provider/Institution"
+                          name="instituteName"
+                          size="small"
+                          value={formik.values.instituteName}
+                          slotProps={{
+                            input: {
+                              readOnly: true,
+                            },
+                          }}
+                        />
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label="Registration No"
+                          name="registrationNo"
+                          size="small"
+                          value={formik.values.registrationNo}
+                          slotProps={{
+                            input: {
+                              readOnly: true,
+                            },
+                          }}
+                        />
+                      </Grid>
                       <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           select
                           fullWidth
                           label={
                             <>
-                              Certificate Level <RequiredStar />
+                              Programme Type <RequiredStar />
                             </>
                           }
-                          name="certificateLevelId"
+                          name="programmeTypeId"
                           size="small"
-                          value={formik.values.certificateLevelId}
-                          onChange={formik.handleChange}
+                          value={formik.values.programmeTypeId || ""}
+                          onChange={(e) => {
+                            const selectedId = e.target.value;
+                            formik.handleChange(e);
+                            // If "less than 140 hours" is selected, clear curriculum related fields
+                            if (selectedId === "137") {
+                              formik.setFieldValue("curriculumId", "");
+                              formik.setFieldValue("theoryHour", "");
+                              formik.setFieldValue("practicalHour", "");
+                              formik.setFieldValue("ojtHour", "");
+                              formik.setFieldValue("certificateLevelId", "");
+                              setSelectedCurriculumId(null);
+                              setCurriculumDuplicateError("");
+                            }
+                          }}
                           onBlur={formik.handleBlur}
                           error={
-                            formik.touched.certificateLevelId &&
-                            Boolean(formik.errors.certificateLevelId)
+                            formik.touched.programmeTypeId &&
+                            Boolean(formik.errors.programmeTypeId)
                           }
                           helperText={
-                            formik.touched.certificateLevelId &&
-                            formik.errors.certificateLevelId
+                            formik.touched.programmeTypeId &&
+                            formik.errors.programmeTypeId
                           }
-                          slotProps={{
-                            input: {
-                              readOnly: true,
-                            },
-                          }}
                         >
                           <MenuItem value="">-select-</MenuItem>
-                          {certificateLevels.map((level) => (
-                            <MenuItem key={level.id} value={level.id}>
-                              {level.name ||
-                                level.value ||
-                                level.certificate_level_name}
+                          {programmeTypes.map((type) => (
+                            <MenuItem key={type.id} value={String(type.id)}>
+                              {type.name}
                             </MenuItem>
                           ))}
                         </TextField>
                       </Grid>
-                    )}
 
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={
-                          <>
-                            Programme Title <RequiredStar />
-                          </>
-                        }
-                        name="courseTitle"
-                        size="small"
-                        value={formik.values.courseTitle}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.courseTitle &&
-                          Boolean(formik.errors.courseTitle)
-                        }
-                        helperText={
-                          formik.touched.courseTitle &&
-                          formik.errors.courseTitle
-                        }
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={
-                          <>
-                            Fees per trainee (Nu) <RequiredStar />
-                          </>
-                        }
-                        name="feesPerTrainee"
-                        type="number"
-                        size="small"
-                        value={formik.values.feesPerTrainee}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.feesPerTrainee &&
-                          Boolean(formik.errors.feesPerTrainee)
-                        }
-                        helperText={
-                          formik.touched.feesPerTrainee &&
-                          formik.errors.feesPerTrainee
-                        }
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                      <TextField
-                        fullWidth
-                        label={
-                          <>
-                            Enrollment capacity per batch <RequiredStar />
-                          </>
-                        }
-                        name="enrolmentCapacity"
-                        type="number"
-                        size="small"
-                        value={formik.values.enrolmentCapacity}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.enrolmentCapacity &&
-                          Boolean(formik.errors.enrolmentCapacity)
-                        }
-                        helperText={
-                          formik.touched.enrolmentCapacity &&
-                          formik.errors.enrolmentCapacity
-                        }
-                      />
-                    </Grid>
-                  </Grid>
-                </Paper>
+                      {/* Only show Curriculum fields if programme type is NOT "less than 140 hours" */}
+                      {!isLessThan140 && (
+                        <>
+                          <Grid item size={{ xs: 12, md: 4 }}>
+                            <TextField
+                              select
+                              fullWidth
+                              label={
+                                <>
+                                  Curriculum Title <RequiredStar />
+                                </>
+                              }
+                              name="curriculumId"
+                              size="small"
+                              value={formik.values.curriculumId}
+                              onChange={async (e) => {
+                                const selectedId = e.target.value;
+                                formik.handleChange(e);
+                                setSelectedCurriculumId(selectedId);
 
-                {/* Container 2: Quality Standards - Full width tables */}
-                <Paper
-                  sx={{
-                    p: 3,
-                    mb: 3,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    width: "100%",
-                  }}
-                >
-                  <Typography fontWeight={600} gutterBottom>
-                    Quality Standards <RequiredStar />
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Grid container spacing={2} sx={{ width: "100%", margin: 0 }}>
-                    {qualityData.map(renderChecklist)}
-                  </Grid>
-                </Paper>
+                                // Check for duplication when curriculum is selected
+                                if (selectedId) {
+                                  const exists =
+                                    await checkCurriculumExists(selectedId);
+                                  if (exists) {
+                                    // If duplicate found, the checkCurriculumExists function already cleared the fields
+                                    setSelectedCurriculumId(null);
+                                  }
+                                } else {
+                                  setCurriculumDuplicateError("");
+                                }
+                              }}
+                              onBlur={formik.handleBlur}
+                              error={
+                                (formik.touched.curriculumId &&
+                                  Boolean(formik.errors.curriculumId)) ||
+                                !!curriculumDuplicateError
+                              }
+                              helperText={
+                                (formik.touched.curriculumId &&
+                                  formik.errors.curriculumId) ||
+                                curriculumDuplicateError ||
+                                undefined
+                              }
+                            >
+                              <MenuItem value="">-select-</MenuItem>
+                              {curriculumTypes.map((type) => (
+                                <MenuItem key={type.id} value={String(type.id)}>
+                                  {type.curriculum_title}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                            {checkingCurriculum && (
+                              <Typography variant="caption" color="info.main">
+                                Checking curriculum availability...
+                              </Typography>
+                            )}
+                            {curriculumDuplicateError && (
+                              <Alert
+                                severity="error"
+                                sx={{ mt: 1 }}
+                                size="small"
+                              >
+                                {curriculumDuplicateError}
+                              </Alert>
+                            )}
+                          </Grid>
 
-                {/* Container 3: Supporting Documents */}
-                <Paper
-                  sx={{ p: 3, border: "1px solid", borderColor: "divider" }}
-                >
-                  <Typography variant="h6" fontWeight={600} gutterBottom>
-                    Supporting Documents <RequiredStar />
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box
-                    component="ol"
+                          {/* Duration Fields - Only show when curriculum is selected */}
+                          {selectedCurriculumId &&
+                            !curriculumDuplicateError && (
+                              <>
+                                <Grid item size={{ xs: 12, md: 4 }}>
+                                  <TextField
+                                    fullWidth
+                                    label={
+                                      <>
+                                        Theory (Hours) <RequiredStar />
+                                      </>
+                                    }
+                                    name="theoryHour"
+                                    type="number"
+                                    size="small"
+                                    value={formik.values.theoryHour}
+                                    onChange={formik.handleChange}
+                                    onBlur={formik.handleBlur}
+                                    error={
+                                      formik.touched.theoryHour &&
+                                      Boolean(formik.errors.theoryHour)
+                                    }
+                                    helperText={
+                                      formik.touched.theoryHour &&
+                                      formik.errors.theoryHour
+                                    }
+                                    slotProps={{
+                                      input: {
+                                        readOnly: true,
+                                      },
+                                    }}
+                                    InputLabelProps={{
+                                      shrink: true,
+                                    }}
+                                  />
+                                </Grid>
+                                <Grid item size={{ xs: 12, md: 4 }}>
+                                  <TextField
+                                    fullWidth
+                                    label={
+                                      <>
+                                        Practical (Hours) <RequiredStar />
+                                      </>
+                                    }
+                                    name="practicalHour"
+                                    type="number"
+                                    size="small"
+                                    value={formik.values.practicalHour}
+                                    onChange={formik.handleChange}
+                                    onBlur={formik.handleBlur}
+                                    error={
+                                      formik.touched.practicalHour &&
+                                      Boolean(formik.errors.practicalHour)
+                                    }
+                                    helperText={
+                                      formik.touched.practicalHour &&
+                                      formik.errors.practicalHour
+                                    }
+                                    slotProps={{
+                                      input: {
+                                        readOnly: true,
+                                      },
+                                    }}
+                                    InputLabelProps={{
+                                      shrink: true,
+                                    }}
+                                  />
+                                </Grid>
+                                <Grid item size={{ xs: 12, md: 4 }}>
+                                  <TextField
+                                    fullWidth
+                                    label={
+                                      <>
+                                        OJT (Hours) <RequiredStar />
+                                      </>
+                                    }
+                                    name="ojtHour"
+                                    type="number"
+                                    size="small"
+                                    value={formik.values.ojtHour}
+                                    onChange={formik.handleChange}
+                                    onBlur={formik.handleBlur}
+                                    error={
+                                      formik.touched.ojtHour &&
+                                      Boolean(formik.errors.ojtHour)
+                                    }
+                                    helperText={
+                                      formik.touched.ojtHour &&
+                                      formik.errors.ojtHour
+                                    }
+                                    slotProps={{
+                                      input: {
+                                        readOnly: true,
+                                      },
+                                    }}
+                                    InputLabelProps={{
+                                      shrink: true,
+                                    }}
+                                  />
+                                </Grid>
+                              </>
+                            )}
+
+                          {/* Certificate Level - Only show when curriculum is selected */}
+                          {selectedCurriculumId &&
+                            !curriculumDuplicateError && (
+                              <Grid item size={{ xs: 12, md: 4 }}>
+                                <TextField
+                                  select
+                                  fullWidth
+                                  label={
+                                    <>
+                                      Certificate Level <RequiredStar />
+                                    </>
+                                  }
+                                  name="certificateLevelId"
+                                  size="small"
+                                  value={formik.values.certificateLevelId}
+                                  onChange={formik.handleChange}
+                                  onBlur={formik.handleBlur}
+                                  error={
+                                    formik.touched.certificateLevelId &&
+                                    Boolean(formik.errors.certificateLevelId)
+                                  }
+                                  helperText={
+                                    formik.touched.certificateLevelId &&
+                                    formik.errors.certificateLevelId
+                                  }
+                                  slotProps={{
+                                    input: {
+                                      readOnly: true,
+                                    },
+                                  }}
+                                >
+                                  <MenuItem value="">-select-</MenuItem>
+                                  {certificateLevels.map((level) => (
+                                    <MenuItem
+                                      key={level.id}
+                                      value={String(level.id)}
+                                    >
+                                      {level.name ||
+                                        level.value ||
+                                        level.certificate_level_name}
+                                    </MenuItem>
+                                  ))}
+                                </TextField>
+                              </Grid>
+                            )}
+                        </>
+                      )}
+
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label={
+                            <>
+                              Programme Title <RequiredStar />
+                            </>
+                          }
+                          name="programmeTitle"
+                          size="small"
+                          value={formik.values.programmeTitle}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.programmeTitle &&
+                            Boolean(formik.errors.programmeTitle)
+                          }
+                          helperText={
+                            formik.touched.programmeTitle &&
+                            formik.errors.programmeTitle
+                          }
+                        />
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label={
+                            <>
+                              Fees per trainee (Nu) <RequiredStar />
+                            </>
+                          }
+                          name="feesPerTrainee"
+                          type="number"
+                          size="small"
+                          value={formik.values.feesPerTrainee}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.feesPerTrainee &&
+                            Boolean(formik.errors.feesPerTrainee)
+                          }
+                          helperText={
+                            formik.touched.feesPerTrainee &&
+                            formik.errors.feesPerTrainee
+                          }
+                        />
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label={
+                            <>
+                              Enrollment capacity per batch <RequiredStar />
+                            </>
+                          }
+                          name="enrolmentCapacity"
+                          type="number"
+                          size="small"
+                          value={formik.values.enrolmentCapacity}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.enrolmentCapacity &&
+                            Boolean(formik.errors.enrolmentCapacity)
+                          }
+                          helperText={
+                            formik.touched.enrolmentCapacity &&
+                            formik.errors.enrolmentCapacity
+                          }
+                        />
+                      </Grid>
+                    </Grid>
+                  </Paper>
+
+                  {/* Container 2: Quality Standards - Full width tables */}
+                  <Paper
                     sx={{
-                      pl: 3,
-                      mb: 2,
-                      "& li": {
-                        fontSize: "0.85rem",
-                        fontStyle: "italic",
-                        mb: 0.5,
-                      },
+                      p: 3,
+                      mb: 3,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      width: "100%",
                     }}
                   >
-                    <li>Trainer CV</li>
-                    <li>Curriculum Endorsement letter/ Certificate </li>
-                  </Box>
-                  <FileUpload
-                    files={formik.values.files}
-                    onFilesChange={(files) =>
-                      formik.setFieldValue("files", files)
+                    <Typography fontWeight={600} gutterBottom>
+                      Quality Standards <RequiredStar />
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Grid
+                      container
+                      spacing={2}
+                      sx={{ width: "100%", margin: 0 }}
+                    >
+                      {qualityData.map(renderChecklist)}
+                    </Grid>
+                  </Paper>
+
+                  {/* Container 3: Supporting Documents */}
+                  <Paper
+                    sx={{ p: 3, border: "1px solid", borderColor: "divider" }}
+                  >
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      Supporting Documents <RequiredStar />
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Box
+                      component="ol"
+                      sx={{
+                        pl: 3,
+                        mb: 2,
+                        "& li": {
+                          fontSize: "0.85rem",
+                          fontStyle: "italic",
+                          mb: 0.5,
+                        },
+                      }}
+                    >
+                      <li>Trainer CV</li>
+                      <li>Curriculum Endorsement letter/ Certificate </li>
+                    </Box>
+                    <FileUpload
+                      files={formik.values.files}
+                      onFilesChange={(files) =>
+                        formik.setFieldValue("files", files)
+                      }
+                      error={
+                        formik.touched.files && Boolean(formik.errors.files)
+                      }
+                      helperText={formik.touched.files && formik.errors.files}
+                    />
+                  </Paper>
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    onClick={() => {
+                      setOpenAdd(false);
+                      handleReset();
+                    }}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="secondary"
+                    onClick={handleReset}
+                    startIcon={<RotateLeftIcon />}
+                    disabled={loading}
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    size="small"
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    disabled={
+                      loading ||
+                      !areAllQualityStandardsYes ||
+                      formik.values.files.length === 0 ||
+                      !!curriculumDuplicateError ||
+                      checkingCurriculum ||
+                      (!isLessThan140 && !formik.values.curriculumId)
                     }
-                    error={formik.touched.files && Boolean(formik.errors.files)}
-                    helperText={formik.touched.files && formik.errors.files}
-                  />
-                </Paper>
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="error"
-                  onClick={() => {
-                    setOpenAdd(false);
-                    handleReset();
-                  }}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="secondary"
-                  onClick={handleReset}
-                  startIcon={<RotateLeftIcon />}
-                  disabled={loading}
-                >
-                  Reset
-                </Button>
-                <Button
-                  size="small"
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  disabled={
-                    loading ||
-                    !areAllQualityStandardsYes ||
-                    formik.values.files.length === 0
-                  }
-                >
-                  {loading ? "Saving..." : "Submit"}
-                </Button>
-              </DialogActions>
-            </Form>
-          )}
+                  >
+                    {loading ? "Saving..." : "Submit"}
+                  </Button>
+                </DialogActions>
+              </Form>
+            );
+          }}
         </Formik>
       </Dialog>
     </Paper>

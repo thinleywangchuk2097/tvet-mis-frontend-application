@@ -81,6 +81,20 @@ class ApplyAccreditedCourseService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  curriculumExistAlready(curriculumId, registration_no, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/accredited-course/get-curriculum-exist/${curriculumId}/${registration_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new ApplyAccreditedCourseService();

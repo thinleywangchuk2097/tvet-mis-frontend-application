@@ -69,6 +69,20 @@ class ApplyNonAccreditedCourseService {
       .catch((error) => error);
   }
 
+   curriculumAlreadyExist(curriculumId,registration_no, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/non-accredited-course/curriculum-already-exist/${curriculumId}/${registration_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
 }
 
 export default new ApplyNonAccreditedCourseService();

@@ -173,13 +173,13 @@ const AccreditatedCourse = () => {
 
   const filteredCourses = courses.filter(
     (course) =>
-      course.course_name?.toLowerCase().includes(search.toLowerCase()) ||
+      course.programme_title?.toLowerCase().includes(search.toLowerCase()) ||
       course.application_no?.toLowerCase().includes(search.toLowerCase()),
   );
 
   const initialValues = {
     instituteId: institute.institute_id || "",
-    courseId: "",
+    programmeId: "",
     feesPerTrainee: "",
     enrollmentCapacity: "",
     applicationStartDate: "",
@@ -194,7 +194,7 @@ const AccreditatedCourse = () => {
   };
 
   const validationSchema = Yup.object().shape({
-    courseId: Yup.string().required("Course Name is required"),
+    programmeId: Yup.string().required("Programme Title is required"),
     feesPerTrainee: Yup.number()
       .typeError("Must be a number")
       .required("Fees per trainee is required"),
@@ -251,7 +251,7 @@ const AccreditatedCourse = () => {
 
       const payload = {
         instituteId: values.instituteId,
-        courseId: values.courseId,
+        programmeId: values.programmeId,
         feesPerTrainee: values.feesPerTrainee,
         enrollmentCapacity: values.enrollmentCapacity,
         applicationStartDate: values.applicationStartDate,
@@ -328,10 +328,10 @@ const AccreditatedCourse = () => {
   };
 
   // Helper function to get course name by ID
-  const getCourseName = (courseId) => {
-    if (!courseId) return "N/A";
-    const course = approvedCourses.find((c) => c.id === courseId);
-    return course ? course.course_name : courseId;
+  const getCourseName = (programmeId) => {
+    if (!programmeId) return "N/A";
+    const course = approvedCourses.find((c) => c.id === programmeId);
+    return course ? course.programme_title : programmeId;
   };
 
   // Helper function to get certification level name by ID
@@ -408,13 +408,13 @@ const AccreditatedCourse = () => {
             <TableRow>
               <TableCell>#</TableCell>
               <TableCell>Application No</TableCell>
-              <TableCell>Course</TableCell>
+              <TableCell>Programme</TableCell>
               <TableCell>Fees per Trainee (Nu.)</TableCell>
               <TableCell>Enrollment Capacity</TableCell>
               <TableCell>Certification Level</TableCell>
               <TableCell>Funding Source</TableCell>
               <TableCell>Application Period</TableCell>
-              <TableCell>Course Period</TableCell>
+              <TableCell>Programme Period</TableCell>
               <TableCell>Training Location</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Action</TableCell>
@@ -428,7 +428,7 @@ const AccreditatedCourse = () => {
                   <TableRow key={course.id || index}>
                     <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
                     <TableCell>{course.application_no || "N/A"}</TableCell>
-                    <TableCell>{getCourseName(course.course_id)}</TableCell>
+                    <TableCell>{getCourseName(course.programme_id)}</TableCell>
                     <TableCell>
                       Nu. {course.fees_per_trainee || course.course_fee}
                     </TableCell>
@@ -523,17 +523,17 @@ const AccreditatedCourse = () => {
           {(formik) => {
             // Handle course selection - auto-fill fields
             const handleCourseChange = (event) => {
-              const courseId = event.target.value;
+              const programmeId = event.target.value;
 
-              if (courseId) {
+              if (programmeId) {
                 // Find the selected course from approvedCourses
                 const selectedCourse = approvedCourses.find(
-                  (course) => course.id === courseId,
+                  (course) => course.id === programmeId,
                 );
 
                 if (selectedCourse) {
                   // Set all fields at once without marking them as touched
-                  formik.setFieldValue("courseId", courseId, false);
+                  formik.setFieldValue("programmeId", programmeId, false);
                   formik.setFieldValue(
                     "feesPerTrainee",
                     selectedCourse.fees_per_trainee || "",
@@ -552,7 +552,7 @@ const AccreditatedCourse = () => {
                 }
               } else {
                 // Clear fields if no course selected
-                formik.setFieldValue("courseId", "", false);
+                formik.setFieldValue("programmeId", "", false);
                 formik.setFieldValue("feesPerTrainee", "", false);
                 formik.setFieldValue("enrollmentCapacity", "", false);
                 formik.setFieldValue("certificationLevelId", "", false);
@@ -568,27 +568,28 @@ const AccreditatedCourse = () => {
                         fullWidth
                         label={
                           <>
-                            Course Name <RequiredStar />
+                            Programme Title <RequiredStar />
                           </>
                         }
-                        name="courseId"
+                        name="programmeId"
                         size="small"
                         select
-                        value={formik.values.courseId}
+                        value={formik.values.programmeId}
                         onChange={handleCourseChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.courseId &&
-                          Boolean(formik.errors.courseId)
+                          formik.touched.programmeId &&
+                          Boolean(formik.errors.programmeId)
                         }
                         helperText={
-                          formik.touched.courseId && formik.errors.courseId
+                          formik.touched.programmeId &&
+                          formik.errors.programmeId
                         }
                       >
                         <MenuItem value="">-select-</MenuItem>
                         {approvedCourses.map((course) => (
                           <MenuItem key={course.id} value={course.id}>
-                            {course.course_name}
+                            {course.programme_title}
                           </MenuItem>
                         ))}
                       </TextField>

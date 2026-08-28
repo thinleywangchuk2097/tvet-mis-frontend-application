@@ -31,7 +31,6 @@ import {
 } from "@mui/material";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import BusinessIcon from "@mui/icons-material/Business";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -128,6 +127,7 @@ const useCourseData = (applicationNo, access_token) => {
   const [courseData, setCourseData] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [certificateLevels, setCertificateLevels] = useState([]);
+  const [programmeTypes, setProgrammeTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchCertificateLevels = useCallback(async () => {
@@ -139,6 +139,15 @@ const useCourseData = (applicationNo, access_token) => {
     }
   }, []);
 
+  const fetchProgrammeTypes = useCallback(async () => {
+    try {
+      const response = await CommonService.getByParentId(32);
+      setProgrammeTypes(response.data || []);
+    } catch (error) {
+      console.error("Error fetching programme types:", error);
+    }
+  }, []);
+
   const fetchCourseDetails = useCallback(async () => {
     try {
       const response =
@@ -146,6 +155,7 @@ const useCourseData = (applicationNo, access_token) => {
           applicationNo,
           access_token,
         );
+      console.log("Non-BQF Programme details response:", response.data);
       let data = response.data;
       if (Array.isArray(data) && data.length > 0) data = data[0];
 
@@ -161,14 +171,18 @@ const useCourseData = (applicationNo, access_token) => {
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      await Promise.all([fetchCourseDetails(), fetchCertificateLevels()]);
+      await Promise.all([
+        fetchCourseDetails(),
+        fetchCertificateLevels(),
+        fetchProgrammeTypes(),
+      ]);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load course data");
     } finally {
       setLoading(false);
     }
-  }, [fetchCourseDetails, fetchCertificateLevels]);
+  }, [fetchCourseDetails, fetchCertificateLevels, fetchProgrammeTypes]);
 
   const getCertificateLevelName = useCallback(
     (id) => {
@@ -179,14 +193,25 @@ const useCourseData = (applicationNo, access_token) => {
     [certificateLevels],
   );
 
+  const getProgrammeTypeName = useCallback(
+    (id) => {
+      if (!id) return "N/A";
+      const type = programmeTypes.find((t) => String(t.id) === String(id));
+      return type ? type.name || "N/A" : id;
+    },
+    [programmeTypes],
+  );
+
   return {
     courseData,
     documents,
     certificateLevels,
+    programmeTypes,
     loading,
     fetchAllData,
     fetchCourseDetails,
     getCertificateLevelName,
+    getProgrammeTypeName,
     setDocuments,
   };
 };
@@ -659,7 +684,7 @@ const PaymentInfoCard = ({ paymentStatus, onGeneratePayment }) => {
   );
 };
 
-// ==================== UPDATED TAB NAVIGATION COMPONENT ====================
+// ==================== TAB NAVIGATION COMPONENT ====================
 const TabNavigation = ({
   tabs,
   tabValue,
@@ -670,7 +695,7 @@ const TabNavigation = ({
   onPrevious,
   onNext,
   children,
-  actionButtons, // New prop for action buttons
+  actionButtons,
 }) => (
   <>
     <Tabs
@@ -857,7 +882,7 @@ const ViewApplyNonAccreditedCourse = () => {
 
   const tabs = useMemo(() => {
     const baseTabs = [
-      { icon: <BusinessIcon />, label: "Course Information" },
+      { icon: <BusinessIcon />, label: "Programme Information" },
       { icon: <VerifiedIcon />, label: "Quality Standards" },
       { icon: <FileOpenIcon />, label: "Supporting Documents" },
     ];
@@ -885,7 +910,7 @@ const ViewApplyNonAccreditedCourse = () => {
             <strong>Application No: {applicationNo}</strong>
             <br />
             <strong>
-              Course Title: {courseDataHook.courseData?.course_title}
+              Programme Title: {courseDataHook.courseData?.programme_title}
             </strong>
           </DialogContentText>
           <TextField
@@ -922,7 +947,7 @@ const ViewApplyNonAccreditedCourse = () => {
           <strong>Application No: {applicationNo}</strong>
           <br />
           <strong>
-            Course Title: {courseDataHook.courseData?.course_title}
+            Programme Title: {courseDataHook.courseData?.programme_title}
           </strong>
         </DialogContentText>
       );
@@ -1080,10 +1105,10 @@ const ViewApplyNonAccreditedCourse = () => {
       <Box sx={{ m: 3 }}>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-            Non-Accredited Course Details
+            Non-BQF Programme Details
           </Typography>
           <Alert severity="error">
-            Non-Accredited Course with Application No:{" "}
+            Non-BQF Programme with Application No:{" "}
             <strong>{applicationNo}</strong> not found
           </Alert>
         </Paper>
@@ -1093,11 +1118,14 @@ const ViewApplyNonAccreditedCourse = () => {
 
   const data = courseDataHook.courseData;
 
+  // Determine if programme type is "less than 140 hours"
+  const isLessThan140 = data.programme_type_id === "137";
+
   return (
     <Box>
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-          Non-Accredited Course Details
+          Non-BQF Programme Details
         </Typography>
         <Divider />
 
@@ -1112,7 +1140,7 @@ const ViewApplyNonAccreditedCourse = () => {
           onNext={() => setTabValue(tabValue + 1)}
           actionButtons={<ActionButtons />}
         >
-          {/* Tab 0: Course Information */}
+          {/* Tab 0: Programme Information */}
           {tabValue === 0 && (
             <Paper sx={{ p: 3, mb: 2 }} variant="outlined">
               <Grid container spacing={2}>
@@ -1136,58 +1164,90 @@ const ViewApplyNonAccreditedCourse = () => {
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
-                {/* Course Title */}
+                {/* Programme Type */}
                 <Grid size={{ xs: 12, md: 3 }}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="Course Title"
-                    value={data.course_title || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
-                {/* Certificate Level */}
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Certificate Level"
-                    value={courseDataHook.getCertificateLevelName(
-                      data.certificate_level_id,
+                    label="Programme Type"
+                    value={courseDataHook.getProgrammeTypeName(
+                      data.programme_type_id,
                     )}
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
-                {/* Theory Duration */}
+                {/* Curriculum Title - Only show if not less than 140 hours */}
+                {!isLessThan140 && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Curriculum Title"
+                      value={data.curriculum_title || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
+                {/* Programme Title */}
                 <Grid size={{ xs: 12, md: 3 }}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="Theory (Hours)"
-                    value={data.total_theory_duration || "N/A"}
+                    label="Programme Title"
+                    value={data.programme_title || "N/A"}
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
-                {/* Practical Duration */}
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Practical (Hours)"
-                    value={data.total_practical_duration || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
-                {/* OJT Duration */}
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="OJT (Hours)"
-                    value={data.total_ojt_duration || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
+                {/* Certificate Level - Only show if not less than 140 hours */}
+                {!isLessThan140 && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Certificate Level"
+                      value={courseDataHook.getCertificateLevelName(
+                        data.certificate_level_id,
+                      )}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
+                {/* Theory Duration - Only show if not less than 140 hours */}
+                {!isLessThan140 && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Theory (Hours)"
+                      value={data.total_theory_duration || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
+                {/* Practical Duration - Only show if not less than 140 hours */}
+                {!isLessThan140 && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Practical (Hours)"
+                      value={data.total_practical_duration || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
+                {/* OJT Duration - Only show if not less than 140 hours */}
+                {!isLessThan140 && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="OJT (Hours)"
+                      value={data.total_ojt_duration || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
                 {/* Fees per trainee */}
                 <Grid size={{ xs: 12, md: 3 }}>
                   <TextField
@@ -1205,16 +1265,6 @@ const ViewApplyNonAccreditedCourse = () => {
                     size="small"
                     label="Enrollment capacity per batch"
                     value={data.enrolment_capacity || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
-                {/* Curriculum Type */}
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Curriculum Type"
-                    value={data.curriculum_name || "N/A"}
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
@@ -1294,10 +1344,8 @@ const ViewApplyNonAccreditedCourse = () => {
                       },
                     }}
                   >
-                    <li>Course curriculum and syllabus</li>
-                    <li>Trainer qualifications and certifications</li>
-                    <li>Facility and infrastructure documents</li>
-                    <li>Other supporting documents as required</li>
+                    <li>Trainer CV</li>
+                    <li>Curriculum Endorsement letter/ Certificate</li>
                   </Box>
                   <FileDownload
                     initialFiles={courseDataHook.documents}

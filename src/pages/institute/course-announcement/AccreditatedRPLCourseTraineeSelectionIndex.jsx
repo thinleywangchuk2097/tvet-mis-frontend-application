@@ -24,6 +24,10 @@ import {
   Select,
   FormControl,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -32,11 +36,17 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import CloseIcon from "@mui/icons-material/Close";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import PersonIcon from "@mui/icons-material/Person";
+import SchoolIcon from "@mui/icons-material/School";
+import GradeIcon from "@mui/icons-material/Grade";
 import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
 import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
+import FileDownload from "../../../components/file/FileDownload";
 
 const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
@@ -50,6 +60,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [searchPending, setSearchPending] = useState("");
   const [searchSelected, setSearchSelected] = useState("");
   const [statusList, setStatusList] = useState([]);
+  const [traineeDetails, setTraineeDetails] = useState(null);
+
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   //Store status IDs for pending and selected
@@ -97,6 +109,16 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   // Create competency map for lookup
   const [competencyMap, setCompetencyMap] = useState({});
 
+  // Dialog states
+  const [openTraineeDialog, setOpenTraineeDialog] = useState(false);
+  const [selectedTraineeId, setSelectedTraineeId] = useState(null);
+  const [traineeDetailsLoading, setTraineeDetailsLoading] = useState(false);
+
+  // State for documents in dialog
+  const [traineeDocuments, setTraineeDocuments] = useState([]);
+  // State for trainee marks in dialog
+  const [traineeMarks, setTraineeMarks] = useState([]);
+
   // Check if CA dates exist
   const hasCADates = courseDetails?.ca_start_date && courseDetails?.ca_end_date;
 
@@ -109,14 +131,19 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     return levelId === "111" || levelId === "112";
   };
 
+  // Helper function to check if application is endorsed (status_id === 59)
+  const isApplicationEndorsed = () => {
+    return courseDetails?.application_status_id === "59";
+  };
+
   // Check if payment is paid
   const isPaymentPaid =
     paymentStatusDetails?.paymentStatus?.toLowerCase() === "paid";
 
   // Check if any trainee has assessments (theory/practical for normal, viva/practical for service_id 39)
-  // Only show assessments if payment is paid
+  // Only show assessments if application is endorsed
   const hasAssessments =
-    isPaymentPaid &&
+    isApplicationEndorsed() &&
     selectedTrainees.some((trainee) => {
       if (isServiceId39) {
         return (
@@ -131,9 +158,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       }
     });
 
-  // Check if any trainee has result status - only show if payment is paid
+  // Check if any trainee has result status - only show if application is endorsed
   const hasResultStatus =
-    isPaymentPaid &&
+    isApplicationEndorsed() &&
     selectedTrainees.some((trainee) => trainee.result_status_id);
 
   // Fetch academic qualifications and status list on component mount
@@ -143,8 +170,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     fetchAcademicCompetency();
     fetchPaymentDetail();
   }, []);
-
-  // REMOVED: Automatic payment tab opening useEffect
 
   // Fetch course details and applied trainees when dependencies are ready
   useEffect(() => {
@@ -164,10 +189,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     academicCompetency,
   ]);
 
-  // Check for assessment values whenever they change
+  // Check for assessment values whenever they change (only if endorsed)
   useEffect(() => {
-    // Only check if payment is paid
-    if (isPaymentPaid) {
+    if (isApplicationEndorsed()) {
       const hasValues = selectedTrainees.some((trainee) => {
         if (isServiceId39) {
           return (
@@ -199,7 +223,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     traineeVivaAssessments,
     traineeVivaPracticalAssessments,
     isServiceId39,
-    isPaymentPaid,
+    courseDetails?.application_status_id,
   ]);
 
   const fetchAcademicQualification = async () => {
@@ -308,8 +332,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     try {
       const response =
         await CommonService.getCourseAnnouncementByApplicationNo(applicationNo);
-        console.log("course details : ", response.data)
-        
+      console.log("course details : ", response.data);
+
       const courseData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
@@ -328,7 +352,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         await CourseEnrollmentService.getCourseAppliedTraineesByApplicationNo(
           applicationNo,
         );
-      console.log("Applied Trainees Response:", response);
+      console.log("Applied Trainees Response:", response.data);
       const trainees = response.data || [];
       setAllTrainees(trainees);
 
@@ -378,6 +402,90 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to fetch trainee details for dialog
+  const fetchTraineeDetails = async (traineeId) => {
+    try {
+      setTraineeDetailsLoading(true);
+      const response = await CourseEnrollmentService.getTraineeDetailsById(
+        traineeId,
+        access_token,
+      );
+      // Check if response.data is an array and get the first item
+      const details = Array.isArray(response.data)
+        ? response.data[0]
+        : response.data;
+      setTraineeDetails(details);
+      console.log("Trainee Details:", details);
+
+      // Parse documents if they exist
+      if (details?.documents) {
+        try {
+          const parsedDocs =
+            typeof details.documents === "string"
+              ? JSON.parse(details.documents)
+              : details.documents;
+
+          if (Array.isArray(parsedDocs)) {
+            const formattedDocs = parsedDocs.map((doc) => ({
+              name: doc.documentName || doc.name || "Document",
+              url: doc.url || doc.filePath || "",
+              id: doc.id,
+              filePath: doc.url || doc.filePath,
+            }));
+            setTraineeDocuments(formattedDocs);
+          }
+        } catch (e) {
+          console.error("Error parsing documents:", e);
+          setTraineeDocuments([]);
+        }
+      } else {
+        setTraineeDocuments([]);
+      }
+
+      // Parse trainee marks if they exist
+      if (details?.trainee_marks) {
+        try {
+          const parsedMarks =
+            typeof details.trainee_marks === "string"
+              ? JSON.parse(details.trainee_marks)
+              : details.trainee_marks;
+
+          if (Array.isArray(parsedMarks) && parsedMarks.length > 0) {
+            setTraineeMarks(parsedMarks);
+          } else {
+            setTraineeMarks([]);
+          }
+        } catch (e) {
+          console.error("Error parsing trainee marks:", e);
+          setTraineeMarks([]);
+        }
+      } else {
+        setTraineeMarks([]);
+      }
+    } catch (error) {
+      console.error("Error fetching trainee details:", error);
+      toast.error("Failed to fetch trainee details");
+    } finally {
+      setTraineeDetailsLoading(false);
+    }
+  };
+
+  // Function to handle opening the dialog
+  const handleViewMore = (traineeId) => {
+    setSelectedTraineeId(traineeId);
+    setOpenTraineeDialog(true);
+    fetchTraineeDetails(traineeId);
+  };
+
+  // Function to handle closing the dialog
+  const handleCloseDialog = () => {
+    setOpenTraineeDialog(false);
+    setSelectedTraineeId(null);
+    setTraineeDetails(null);
+    setTraineeDocuments([]);
+    setTraineeMarks([]);
   };
 
   // Helper function to format date
@@ -614,8 +722,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       return;
     }
 
-    // Check if any trainee has assessment values
-    if (isPaymentPaid) {
+    // Check if any trainee has assessment values (only if endorsed)
+    if (isApplicationEndorsed()) {
       const hasValues = selectedTrainees.some((trainee) => {
         if (isServiceId39) {
           return (
@@ -824,7 +932,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       padding: "8px",
     },
     "& th": {
-      fontWeight: 600,
+      fontWeight: 400,
     },
   };
 
@@ -842,17 +950,17 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     let cols = 8; // checkbox, #, name, cid, contact, email, qualification, status
 
     if (hasCADates) cols++;
-    // Only add assessment columns if payment is paid
-    if (isPaymentPaid && hasAssessments) {
+    // Only add assessment columns if application is endorsed
+    if (isApplicationEndorsed() && hasAssessments) {
       if (isServiceId39) {
         cols += 2; // viva and practical for service_id 39
       } else {
         cols += 2; // theory and practical for other services
       }
     }
-    // Add result status column if payment is paid and any trainee has result_status_id
+    // Add result status column if endorsed and any trainee has result_status_id
     if (
-      isPaymentPaid &&
+      isApplicationEndorsed() &&
       selectedTrainees.some((trainee) => trainee.result_status_id)
     ) {
       cols++;
@@ -860,15 +968,25 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     return cols;
   };
 
-  // Render assessment columns (read-only) based on service type
+  // Render assessment columns (read-only) based on service type - only if endorsed
   const renderAssessmentColumns = (trainee) => {
+    // Only render if application is endorsed
+    if (!isApplicationEndorsed()) return null;
+
     if (isServiceId39) {
-      // For service_id 39: Show Viva and Practical columns (read-only)
+      // For service_id 39: Show Viva and Practical columns (read-only with tooltip)
       return (
         <>
           {/* Viva Assessment Column */}
           <TableCell>
-            {isNumericCertificationLevel() ? (
+            <Tooltip
+              title={
+                traineeVivaAssessments[trainee.id]
+                  ? `Viva Assessment: ${traineeVivaAssessments[trainee.id]}`
+                  : "No viva assessment available"
+              }
+              arrow
+            >
               <TextField
                 type="number"
                 size="small"
@@ -884,30 +1002,19 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                   backgroundColor: "#f5f5f5",
                 }}
               />
-            ) : (
-              <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                <Select
-                  value={traineeVivaAssessments[trainee.id] || ""}
-                  displayEmpty
-                  readOnly
-                  sx={{ backgroundColor: "#f5f5f5" }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>Select Competency</em>
-                  </MenuItem>
-                  {academicCompetency.map((competency) => (
-                    <MenuItem key={competency.id} value={competency.id}>
-                      {competency.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
+            </Tooltip>
           </TableCell>
 
           {/* Practical Assessment Column for service_id 39 */}
           <TableCell>
-            {isNumericCertificationLevel() ? (
+            <Tooltip
+              title={
+                traineeVivaPracticalAssessments[trainee.id]
+                  ? `Practical Assessment: ${traineeVivaPracticalAssessments[trainee.id]}`
+                  : "No practical assessment available"
+              }
+              arrow
+            >
               <TextField
                 type="number"
                 size="small"
@@ -923,35 +1030,24 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                   backgroundColor: "#f5f5f5",
                 }}
               />
-            ) : (
-              <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                <Select
-                  value={traineeVivaPracticalAssessments[trainee.id] || ""}
-                  displayEmpty
-                  readOnly
-                  sx={{ backgroundColor: "#f5f5f5" }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>Select Competency</em>
-                  </MenuItem>
-                  {academicCompetency.map((competency) => (
-                    <MenuItem key={competency.id} value={competency.id}>
-                      {competency.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
+            </Tooltip>
           </TableCell>
         </>
       );
     } else {
-      // For other services: Show Theory and Practical columns (read-only)
+      // For other services: Show Theory and Practical columns (read-only with tooltip)
       return (
         <>
           {/* Theory Assessment Column */}
           <TableCell>
-            {isNumericCertificationLevel() ? (
+            <Tooltip
+              title={
+                traineeTheoryAssessments[trainee.id]
+                  ? `Theory Assessment: ${traineeTheoryAssessments[trainee.id]}`
+                  : "No theory assessment available"
+              }
+              arrow
+            >
               <TextField
                 type="number"
                 size="small"
@@ -967,30 +1063,19 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                   backgroundColor: "#f5f5f5",
                 }}
               />
-            ) : (
-              <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                <Select
-                  value={traineeTheoryAssessments[trainee.id] || ""}
-                  displayEmpty
-                  readOnly
-                  sx={{ backgroundColor: "#f5f5f5" }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>Select Competency</em>
-                  </MenuItem>
-                  {academicCompetency.map((competency) => (
-                    <MenuItem key={competency.id} value={competency.id}>
-                      {competency.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
+            </Tooltip>
           </TableCell>
 
           {/* Practical Assessment Column for other services */}
           <TableCell>
-            {isNumericCertificationLevel() ? (
+            <Tooltip
+              title={
+                traineePracticalAssessments[trainee.id]
+                  ? `Practical Assessment: ${traineePracticalAssessments[trainee.id]}`
+                  : "No practical assessment available"
+              }
+              arrow
+            >
               <TextField
                 type="number"
                 size="small"
@@ -1006,25 +1091,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                   backgroundColor: "#f5f5f5",
                 }}
               />
-            ) : (
-              <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                <Select
-                  value={traineePracticalAssessments[trainee.id] || ""}
-                  displayEmpty
-                  readOnly
-                  sx={{ backgroundColor: "#f5f5f5" }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>Select Competency</em>
-                  </MenuItem>
-                  {academicCompetency.map((competency) => (
-                    <MenuItem key={competency.id} value={competency.id}>
-                      {competency.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
+            </Tooltip>
           </TableCell>
         </>
       );
@@ -1045,7 +1112,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   }
 
   return (
-    <Paper elevation={3} style={{ padding: 20, margin: 2 }}>
+    <Paper elevation={3} sx={{ p: 2, m: 1 }}>
       {/* Header */}
       <Box
         display="flex"
@@ -1054,7 +1121,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         mb={3}
       >
         <Typography variant="h5" gutterBottom>
-          Trainee Selection for Course
+          Trainee Selection for Programme
         </Typography>
         <IconButton
           onClick={handleRefresh}
@@ -1072,8 +1139,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           sx={{
             mb: 3,
             p: 2,
-            bgcolor: "#fff3cd",
-            border: "1px solid #ffc107",
+            bgcolor: "warning.light",
+            border: "1px solid",
+            borderColor: "warning.main",
             borderRadius: 1,
             display: "flex",
             alignItems: "center",
@@ -1116,8 +1184,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           sx={{
             mb: 3,
             p: 2,
-            bgcolor: "#d4edda",
-            border: "1px solid #28a745",
+            bgcolor: "success.light",
+            border: "1px solid",
+            borderColor: "success.main",
             borderRadius: 1,
             display: "flex",
             alignItems: "center",
@@ -1178,7 +1247,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Fees Per Trainee 
+                  Fees Per Trainee
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
                   Nu. {courseDetails.fees_per_trainee}
@@ -1256,8 +1325,10 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
               value={searchSelected}
               onChange={(e) => setSearchSelected(e.target.value)}
               sx={{ mb: 2, ...textFieldStyle }}
-              InputProps={{
-                startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+              slotProps={{
+                input: {
+                  startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+                },
               }}
             />
 
@@ -1288,8 +1359,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                     <TableCell>Status</TableCell>
                     {/* Only show CA Mark/Competency column if CA dates exist */}
                     {hasCADates && <TableCell>CA Mark/Competency</TableCell>}
-                    {/* Show assessment columns ONLY if payment is paid */}
-                    {isPaymentPaid && hasAssessments && (
+                    {/* Show assessment columns ONLY if application is endorsed */}
+                    {isApplicationEndorsed() && hasAssessments && (
                       <>
                         <TableCell>
                           {isServiceId39
@@ -1299,8 +1370,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                         <TableCell>Practical Assessment</TableCell>
                       </>
                     )}
-                    {/* Result Status Column - ONLY if payment is paid */}
-                    {isPaymentPaid &&
+                    {/* Result Status Column - ONLY if application is endorsed */}
+                    {isApplicationEndorsed() &&
                       selectedTrainees.some(
                         (trainee) => trainee.result_status_id,
                       ) && <TableCell>Result Status</TableCell>}
@@ -1365,8 +1436,10 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                                     )
                                   }
                                   fullWidth
-                                  InputProps={{
-                                    inputProps: { min: 0, max: 100 },
+                                  slotProps={{
+                                    input: {
+                                      inputProps: { min: 0, max: 100 },
+                                    },
                                   }}
                                   sx={{ minWidth: 120 }}
                                 />
@@ -1405,24 +1478,32 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                               )}
                             </TableCell>
                           )}
-                          {/* Show assessment columns (read-only) ONLY if payment is paid */}
-                          {isPaymentPaid &&
+                          {/* Show assessment columns (read-only with tooltip) ONLY if application is endorsed */}
+                          {isApplicationEndorsed() &&
                             hasAssessments &&
                             renderAssessmentColumns(trainee)}
-                          {/* Result Status Cell - ONLY if payment is paid */}
-                          {isPaymentPaid && trainee.result_status_id && (
-                            <TableCell>
-                              <Chip
-                                label={getResultStatusName(
-                                  trainee.result_status_id,
-                                )}
-                                size="small"
-                                sx={getResultStatusColor(
-                                  trainee.result_status_id,
-                                )}
-                              />
-                            </TableCell>
-                          )}
+                          {/* Result Status Cell - ONLY if application is endorsed */}
+                          {isApplicationEndorsed() &&
+                            trainee.result_status_id && (
+                              <TableCell>
+                                <Tooltip
+                                  title={`Result Status: ${getResultStatusName(
+                                    trainee.result_status_id,
+                                  )}`}
+                                  arrow
+                                >
+                                  <Chip
+                                    label={getResultStatusName(
+                                      trainee.result_status_id,
+                                    )}
+                                    size="small"
+                                    sx={getResultStatusColor(
+                                      trainee.result_status_id,
+                                    )}
+                                  />
+                                </Tooltip>
+                              </TableCell>
+                            )}
                         </TableRow>
                       ))
                   ) : (
@@ -1475,7 +1556,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                 </Button>
                 <Tooltip
                   title={
-                    hasAssessmentValues
+                    isApplicationEndorsed() && hasAssessmentValues
                       ? "Cannot submit when trainees have assessment marks or result status. Please clear all assessment values first."
                       : ""
                   }
@@ -1490,7 +1571,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                         loading ||
                         submitting ||
                         selectedTrainees.length === 0 ||
-                        hasAssessmentValues
+                        (isApplicationEndorsed() && hasAssessmentValues)
                       }
                       startIcon={
                         submitting ? (
@@ -1536,8 +1617,10 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
               value={searchPending}
               onChange={(e) => setSearchPending(e.target.value)}
               sx={{ mb: 2, ...textFieldStyle }}
-              InputProps={{
-                startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+              slotProps={{
+                input: {
+                  startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+                },
               }}
             />
 
@@ -1565,6 +1648,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>Qualification</TableCell>
                     <TableCell>Status</TableCell>
+                    <TableCell align="center">Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1605,11 +1689,32 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                               sx={getStatusColor(trainee.status_id)}
                             />
                           </TableCell>
+                          <TableCell align="center">
+                            <Tooltip title="View trainee details" arrow>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                color="primary"
+                                onClick={() => handleViewMore(trainee.id)}
+                                startIcon={
+                                  <VisibilityIcon sx={{ fontSize: 16 }} />
+                                }
+                                sx={{
+                                  py: 0.25,
+                                  px: 1,
+                                  fontSize: "0.7rem",
+                                  minWidth: "auto",
+                                }}
+                              >
+                                View
+                              </Button>
+                            </Tooltip>
+                          </TableCell>
                         </TableRow>
                       ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={9} align="center">
                         No pending trainees found
                       </TableCell>
                     </TableRow>
@@ -1655,6 +1760,337 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Trainee Details Dialog */}
+      <Dialog
+        open={openTraineeDialog}
+        onClose={handleCloseDialog}
+        maxWidth="lg"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 2,
+              maxHeight: "80vh",
+            },
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            borderBottom: "1px solid",
+            borderColor: "divider",
+            pb: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Typography variant="h6" fontWeight="bold">
+            Trainee Details
+          </Typography>
+          <IconButton onClick={handleCloseDialog} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 3 }}>
+          {traineeDetailsLoading ? (
+            <Box
+              display="flex"
+              justifyContent="center"
+              alignItems="center"
+              minHeight="200px"
+            >
+              <CircularProgress />
+            </Box>
+          ) : traineeDetails ? (
+            <Box>
+              {/* Personal Information Table */}
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <PersonIcon color="primary" />
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  color="primary"
+                >
+                  Personal Information
+                </Typography>
+              </Box>
+              <TableContainer
+                component={Paper}
+                sx={{
+                  mb: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <Table size="small">
+                  <TableBody>
+                    <TableRow>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          fontWeight: 400,
+                          width: "35%",
+                          bgcolor: "action.hover",
+                        }}
+                      >
+                        Applicant Name
+                      </TableCell>
+                      <TableCell>
+                        {traineeDetails.applicant_name || "N/A"}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          fontWeight: 400,
+                          bgcolor: "action.hover",
+                        }}
+                      >
+                        CID Number
+                      </TableCell>
+                      <TableCell>{traineeDetails.cid_no || "N/A"}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          fontWeight: 400,
+                          bgcolor: "action.hover",
+                        }}
+                      >
+                        Mobile Number
+                      </TableCell>
+                      <TableCell>{traineeDetails.mobile_no || "N/A"}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          fontWeight: 400,
+                          bgcolor: "action.hover",
+                        }}
+                      >
+                        Email Address
+                      </TableCell>
+                      <TableCell>{traineeDetails.email_id || "N/A"}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          fontWeight: 400,
+                          bgcolor: "action.hover",
+                        }}
+                      >
+                        Guardian Name
+                      </TableCell>
+                      <TableCell>
+                        {traineeDetails.guardian_name || "N/A"}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          fontWeight: 400,
+                          bgcolor: "action.hover",
+                        }}
+                      >
+                        Guardian Mobile Number
+                      </TableCell>
+                      <TableCell>
+                        {traineeDetails.guardian_mobile_no || "N/A"}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* Academic Information Table */}
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <SchoolIcon color="primary" />
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  color="primary"
+                >
+                  Academic Information
+                </Typography>
+              </Box>
+              <TableContainer
+                component={Paper}
+                sx={{
+                  mb: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <Table size="small">
+                  <TableBody>
+                    <TableRow>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          fontWeight: 400,
+                          width: "35%",
+                          bgcolor: "action.hover",
+                        }}
+                      >
+                        Academic Qualification
+                      </TableCell>
+                      <TableCell>
+                        {getQualificationName(
+                          traineeDetails.academic_qualification_id,
+                        ) || "N/A"}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          fontWeight: 400,
+                          bgcolor: "action.hover",
+                        }}
+                      >
+                        Trainee ID
+                      </TableCell>
+                      <TableCell>{traineeDetails.id || "N/A"}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* Trainee Marks Table - Only show if marks exist */}
+              {traineeMarks.length > 0 && (
+                <>
+                  <Box display="flex" alignItems="center" gap={1} mb={2}>
+                    <GradeIcon color="primary" />
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight="bold"
+                      color="primary"
+                    >
+                      Trainee Marks
+                    </Typography>
+                  </Box>
+                  <TableContainer
+                    component={Paper}
+                    sx={{
+                      mb: 3,
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: "action.hover" }}>
+                          <TableCell sx={{ fontWeight: 400 }}>#</TableCell>
+                          <TableCell sx={{ fontWeight: 400 }}>
+                            Subject
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 400 }} align="right">
+                            Marks
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {traineeMarks.map((mark, index) => (
+                          <TableRow key={mark.id || index}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{mark.subject || "N/A"}</TableCell>
+                            <TableCell align="right">
+                              <Chip
+                                label={mark.markScore || "N/A"}
+                                size="small"
+                                color={
+                                  parseInt(mark.markScore) >= 50
+                                    ? "success"
+                                    : "error"
+                                }
+                                sx={{ fontWeight: 500, minWidth: 50 }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {/* Total Row */}
+                        <TableRow sx={{ bgcolor: "action.hover" }}>
+                          <TableCell colSpan={2} sx={{ fontWeight: 600 }}>
+                            Total Marks
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>
+                            {traineeMarks.reduce(
+                              (total, mark) =>
+                                total + parseInt(mark.markScore || 0),
+                              0,
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+
+              {/* Documents Section using FileDownload component */}
+              {traineeDocuments.length > 0 && (
+                <>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight="bold"
+                    color="primary"
+                    sx={{ mb: 2 }}
+                  >
+                    Documents
+                  </Typography>
+                  <FileDownload
+                    initialFiles={traineeDocuments}
+                    onFileUpload={() => {}}
+                    allowUpload={false}
+                  />
+                </>
+              )}
+            </Box>
+          ) : (
+            <Box
+              display="flex"
+              justifyContent="center"
+              alignItems="center"
+              minHeight="200px"
+            >
+              <Typography color="textSecondary">No data available</Typography>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            borderTop: "1px solid",
+            borderColor: "divider",
+            pt: 2,
+            px: 3,
+          }}
+        >
+          <Button
+            onClick={handleCloseDialog}
+            variant="outlined"
+            color="secondary"
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };
