@@ -22,18 +22,11 @@ import {
   DialogActions,
   CircularProgress,
   Radio,
-  RadioGroup,
-  FormControlLabel,
-  FormControl,
-  FormLabel,
-  Select,
-  MenuItem,
   Chip,
   Card,
   CardContent,
   Alert,
   Stack,
-  InputLabel,
   Autocomplete,
   Tooltip,
 } from "@mui/material";
@@ -51,6 +44,7 @@ import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
 import PaymentIcon from "@mui/icons-material/Payment";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
 import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
+import CheckIcon from "@mui/icons-material/Check";
 import FileDownload from "../../../components/file/FileDownload";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -62,7 +56,6 @@ import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPayme
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import CurriculumIndexService from "../../../api/services/internal/course/CurriculumIndexService";
 
-// Constant service code
 const SERVICE_CODE = 100578;
 
 const TABLE_STYLE = {
@@ -89,244 +82,174 @@ const ViewAccreditedCourseRegistration = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
-  const [instituteData, setInstituteData] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState(null);
-  const [curriculumTypes, setCurriculumTypes] = useState(null);
+
+  // State
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [courseData, setCourseData] = useState(null);
+  const [currentStatusId, setCurrentStatusId] = useState(null);
+  const [instituteData, setInstituteData] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState(null);
+  const [curriculumTypes, setCurriculumTypes] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [newDocuments, setNewDocuments] = useState([]);
-  const [currentStatusId, setCurrentStatusId] = useState(null);
 
-  // Master data states
+  // Master data
   const [sectors, setSectors] = useState([]);
   const [occupations, setOccupations] = useState([]);
+  const [occupationMap, setOccupationMap] = useState({});
   const [qualityData, setQualityData] = useState([]);
   const [qualityResponses, setQualityResponses] = useState({});
   const [qualityRemarks, setQualityRemarks] = useState({});
   const [rawQualityStandards, setRawQualityStandards] = useState(null);
   const [certificateLevels, setCertificateLevels] = useState([]);
+  const [genderList, setGenderList] = useState([]);
+  const [qualificationList, setQualificationList] = useState([]);
 
-  // REC assignment states
+  // Assignment states
   const [recList, setRecList] = useState([]);
   const [selectedRec, setSelectedRec] = useState("");
   const [assignedRecs, setAssignedRecs] = useState([]);
-
-  // Accreditor assignment states
   const [accreditorList, setAccreditorList] = useState([]);
   const [selectedAccreditor, setSelectedAccreditor] = useState("");
   const [assignedAccreditors, setAssignedAccreditors] = useState([]);
 
-  // Delete confirmation dialog
+  // Dialog states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recToDelete, setRecToDelete] = useState(null);
   const [accreditorToDelete, setAccreditorToDelete] = useState(null);
-
-  // Dialog states
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [remarks, setRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
 
   const roleId = currentRoleId?.toString();
-
-  // Check if currentRoleId is 7 for REC tab
-  const showRecTab = currentRoleId == 7;
-  const showAccreditorTab = currentRoleId == 7;
-  const showGeneratePANumberTab = currentRoleId == 7;
-
-  // Check if user is role 23 (read-only mode for quality checklist and assignments)
+  const isRole7 = currentRoleId == 7;
   const isRole23 = currentRoleId == 23;
 
-  // Helper function to check if payment is completed
+  // Helper functions
   const isPaymentCompleted = useCallback(() => {
-    return paymentStatus && paymentStatus.paymentStatus === "paid";
+    return paymentStatus?.paymentStatus === "paid";
   }, [paymentStatus]);
 
-  useEffect(() => {
-    if (applicationNo) {
-      fetchAllData();
-      if (showRecTab) {
-        fetchRecUsers();
-      }
-      if (showAccreditorTab) {
-        fetchAccreditorUsers();
-      }
-    }
-    fetchPaymentStatus();
-    fetchCertificateLevels();
-  }, [applicationNo]);
+  const getCertificateLevelName = useCallback(
+    (id) => {
+      if (!id) return "N/A";
+      const level = certificateLevels.find((l) => l.id == id);
+      return level?.name || "N/A";
+    },
+    [certificateLevels],
+  );
 
-  // Fetch curriculum data when courseData is available
-  useEffect(() => {
-    if (courseData?.curriculum_id) {
-      fetchCurriculum(courseData.curriculum_id);
-    }
-  }, [courseData]);
+  const getGenderName = useCallback(
+    (id) => {
+      if (!id) return "N/A";
+      const gender = genderList.find((g) => g.id == id);
+      return gender?.name || "N/A";
+    },
+    [genderList],
+  );
 
-  // Fetch institute data when courseData is available
-  useEffect(() => {
-    if (courseData?.registration_no) {
-      fetchInstituteData();
-    }
-  }, [courseData]);
+  const getQualificationName = useCallback(
+    (id) => {
+      if (!id) return "N/A";
+      const qualification = qualificationList.find((q) => q.id == id);
+      return qualification?.name || "N/A";
+    },
+    [qualificationList],
+  );
 
-  useEffect(() => {
-    if (qualityData.length > 0 && rawQualityStandards) {
-      const { responses, remarks } = parseQualityStandardsWithData(
-        rawQualityStandards,
-        qualityData,
+  const getSectorName = useCallback(
+    (id) => {
+      if (!id) return "N/A";
+      const sector = sectors.find((s) => String(s.id) === String(id));
+      return sector?.sectorName || sector?.name || id;
+    },
+    [sectors],
+  );
+
+  const getOccupationName = useCallback(
+    (id) => {
+      if (!id) return "N/A";
+      if (occupationMap[id]) return occupationMap[id];
+
+      const occupation = occupations.find(
+        (occ) => String(occ.id) === String(id),
       );
-      setQualityResponses(responses);
-      setQualityRemarks(remarks);
-    }
-  }, [qualityData, rawQualityStandards]);
+      if (occupation) {
+        return (
+          occupation.occupationName ||
+          occupation.name ||
+          occupation.title ||
+          occupation.occupation_title ||
+          occupation.occupation_name ||
+          `Occupation ${id}`
+        );
+      }
+      return `ID: ${id}`;
+    },
+    [occupations, occupationMap],
+  );
 
-  const fetchPaymentStatus = async () => {
-    try {
-      const response =
-        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
-      setPaymentStatus(response.data);
-      console.log("Payment status fetched:", response.data);
-    } catch (error) {
-      console.error("Error fetching payment status:", error);
-      setPaymentStatus(null);
-    }
-  };
-
+  // Data fetching
   const fetchCertificateLevels = async () => {
     try {
       const response = await CommonService.getByParentId(27);
-      setCertificateLevels(response.data);
-      console.log("Certificate Levels:", response.data);
+      setCertificateLevels(response.data || []);
     } catch (error) {
       console.error("Error fetching certificate levels:", error);
     }
   };
 
-  const fetchCurriculum = async (curriculumId) => {
+  const fetchGenderList = async () => {
     try {
-      const curriculumDtls = await CurriculumIndexService.getCurriculumById(
-        curriculumId,
-        access_token,
-      );
-      console.log("Curriculum data:", curriculumDtls.data);
-
-      // Handle both array and single object response
-      const curriculumData = Array.isArray(curriculumDtls.data)
-        ? curriculumDtls.data[0]
-        : curriculumDtls.data;
-
-      setCurriculumTypes(curriculumData);
+      const response = await CommonService.getByParentId(8);
+      setGenderList(response.data || []);
     } catch (error) {
-      console.error("Error fetching curriculum:", error);
+      console.error("Error fetching gender list:", error);
     }
   };
 
-  const getCertificateLevelName = (certificateLevelId) => {
-    if (!certificateLevelId) return "N/A";
-    const level = certificateLevels.find((l) => l.id == certificateLevelId);
-    return level ? level.name : "N/A";
-  };
-
-  const fetchInstituteData = async () => {
+  const fetchQualificationList = async () => {
     try {
-      if (!courseData?.registration_no) {
-        console.log("No registration number available yet");
-        return;
-      }
-      const response = await InstituteRegistrationService.getInstituteDetails(
-        courseData.registration_no,
-      );
-      // Check if response.data is an array and get the first element
-      const data =
-        Array.isArray(response.data) && response.data.length > 0
-          ? response.data[0]
-          : response.data;
-      setInstituteData(data);
-      console.log("Institute data fetched:", data);
+      const response = await CommonService.getByParentId(18);
+      setQualificationList(response.data || []);
     } catch (error) {
-      console.error("Error fetching institute data:", error);
-      setInstituteData(null);
+      console.error("Error fetching qualification list:", error);
     }
   };
 
-  const fetchRecUsers = async () => {
+  const fetchSectors = async () => {
     try {
-      const response =
-        await UserRoleManagementService.getActiveRecUsers(access_token);
-
-      const mappedRecList = response.data.map((user) => ({
-        id: user.id,
-        userId: user.user_id,
-        name: `${user.first_name} ${user.middle_name ? user.middle_name + " " : ""}${user.last_name}`,
-        email: user.email_id,
-        mobileNo: user.mobile_no,
-        designation: user.current_role || "REC Member",
-        department: user.location_id || "N/A",
-      }));
-
-      setRecList(mappedRecList);
-      console.log("Mapped REC list:", mappedRecList);
+      const response = await CommonService.getAllSectors();
+      setSectors(response.data || []);
     } catch (error) {
-      console.error("Error fetching rec user:", error);
-      toast.error("Failed to load REC members");
+      console.error("Error fetching sectors:", error);
     }
   };
 
-  const fetchAccreditorUsers = async () => {
+  const fetchOccupations = async () => {
     try {
-      const response =
-        await UserRoleManagementService.getActiveAccreditorUsers(access_token);
-      console.log("Accreditor users response:", response.data);
-
-      const mappedAccreditorList = response.data.map((user) => ({
-        id: user.id,
-        userId: user.user_id,
-        name: `${user.first_name} ${user.middle_name ? user.middle_name + " " : ""}${user.last_name}`,
-        email: user.email_id,
-        mobileNo: user.mobile_no,
-        designation: user.current_role || "Accreditor",
-        department: user.location_id || "N/A",
-      }));
-
-      setAccreditorList(mappedAccreditorList);
-      console.log("Mapped Accreditor list:", mappedAccreditorList);
+      const response = await CommonService.getAllOccupations();
+      setOccupations(response.data || []);
     } catch (error) {
-      console.error("Error fetching accreditor users:", error);
-      toast.error("Failed to load Accreditor members");
-    }
-  };
-
-  const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        fetchCourseDetails(),
-        fetchSectors(),
-        fetchOccupations(),
-        fetchQualityStandards(),
-      ]);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Failed to load course data");
-    } finally {
-      setLoading(false);
+      console.error("Error fetching occupations:", error);
+      setOccupations([]);
     }
   };
 
   const fetchQualityStandards = async () => {
     try {
       const response = await CommonService.getAllQualitystandards(26);
-      if (response.data && response.data.length > 0) {
+      if (response.data?.length) {
         const mainCategories = response.data.filter(
           (item) => item.parentId === 0,
         );
         const subCategories = response.data.filter(
           (item) => item.parentId !== 0,
         );
+
         const structured = mainCategories.map((category) => ({
           id: category.id.toString(),
           title: category.dropdownName || category.description,
@@ -344,63 +267,85 @@ const ViewAccreditedCourseRegistration = () => {
     }
   };
 
-  const parseQualityStandardsWithData = (qualityStr, qualityDataRef) => {
+  const fetchCurriculum = async (curriculumId) => {
     try {
-      if (!qualityStr) return { responses: {}, remarks: {} };
+      const response = await CurriculumIndexService.getCurriculumById(
+        curriculumId,
+        access_token,
+      );
+      const curriculumData = Array.isArray(response.data)
+        ? response.data[0]
+        : response.data;
+      setCurriculumTypes(curriculumData);
+    } catch (error) {
+      console.error("Error fetching curriculum:", error);
+    }
+  };
 
+  const fetchInstituteData = async () => {
+    try {
+      if (!courseData?.registration_no) return;
+      const response = await InstituteRegistrationService.getInstituteDetails(
+        courseData.registration_no,
+      );
       const data =
-        typeof qualityStr === "string" ? JSON.parse(qualityStr) : qualityStr;
-
-      const responseMap = {};
-      const remarksMap = {};
-
-      data.forEach((item) => {
-        const subQuestionId = item.standardId?.toString();
-        const responseValue = item.responseId;
-        const remarkValue = item.remarks || "";
-
-        let categoryId = null;
-        for (const category of qualityDataRef) {
-          const foundRow = category.rows.find(
-            (row) => row.id === subQuestionId,
-          );
-          if (foundRow) {
-            categoryId = category.id;
-            break;
-          }
-        }
-
-        if (categoryId && subQuestionId) {
-          if (!responseMap[categoryId]) responseMap[categoryId] = {};
-          if (!remarksMap[categoryId]) remarksMap[categoryId] = {};
-
-          responseMap[categoryId][subQuestionId] = responseValue;
-          remarksMap[categoryId][subQuestionId] = remarkValue;
-        }
-      });
-
-      return { responses: responseMap, remarks: remarksMap };
+        Array.isArray(response.data) && response.data.length > 0
+          ? response.data[0]
+          : response.data;
+      setInstituteData(data);
     } catch (error) {
-      console.error("Error parsing quality standards:", error);
-      return { responses: {}, remarks: {} };
+      console.error("Error fetching institute data:", error);
     }
   };
 
-  const fetchSectors = async () => {
+  const fetchPaymentStatus = async () => {
     try {
-      const response = await CommonService.getAllSectors();
-      setSectors(response.data);
+      const response =
+        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      setPaymentStatus(response.data);
     } catch (error) {
-      console.error("Error fetching sectors:", error);
+      console.error("Error fetching payment status:", error);
+      setPaymentStatus(null);
     }
   };
 
-  const fetchOccupations = async () => {
+  const fetchRecUsers = async () => {
     try {
-      const response = await CommonService.getAllOccupations();
-      setOccupations(response.data);
+      const response =
+        await UserRoleManagementService.getActiveRecUsers(access_token);
+      const mappedRecList = response.data.map((user) => ({
+        id: user.id,
+        userId: user.user_id,
+        name: `${user.first_name} ${user.middle_name ? user.middle_name + " " : ""}${user.last_name}`,
+        email: user.email_id,
+        mobileNo: user.mobile_no,
+        designation: user.current_role || "REC Member",
+        department: user.location_id || "N/A",
+      }));
+      setRecList(mappedRecList);
     } catch (error) {
-      console.error("Error fetching occupations:", error);
+      console.error("Error fetching REC users:", error);
+      toast.error("Failed to load REC members");
+    }
+  };
+
+  const fetchAccreditorUsers = async () => {
+    try {
+      const response =
+        await UserRoleManagementService.getActiveAccreditorUsers(access_token);
+      const mappedAccreditorList = response.data.map((user) => ({
+        id: user.id,
+        userId: user.user_id,
+        name: `${user.first_name} ${user.middle_name ? user.middle_name + " " : ""}${user.last_name}`,
+        email: user.email_id,
+        mobileNo: user.mobile_no,
+        designation: user.current_role || "Accreditor",
+        department: user.location_id || "N/A",
+      }));
+      setAccreditorList(mappedAccreditorList);
+    } catch (error) {
+      console.error("Error fetching accreditor users:", error);
+      toast.error("Failed to load Accreditor members");
     }
   };
 
@@ -411,24 +356,21 @@ const ViewAccreditedCourseRegistration = () => {
           applicationNo,
           access_token,
         );
-      console.log("course response", response.data);
-      let data = response.data;
-      if (Array.isArray(data) && data.length > 0) {
-        data = data[0];
-      }
+      let data =
+        Array.isArray(response.data) && response.data.length > 0
+          ? response.data[0]
+          : response.data;
 
       setCourseData(data);
       setCurrentStatusId(Number(data.status_id));
-      console.log("Current Status ID set to:", Number(data.status_id));
 
-      // Parse documents JSON
+      // Parse documents
       if (data.documents) {
         try {
-          let parsedDocs =
+          const parsedDocs =
             typeof data.documents === "string"
               ? JSON.parse(data.documents)
               : data.documents;
-
           if (Array.isArray(parsedDocs)) {
             const formattedDocs = parsedDocs.map((doc) => ({
               name: doc.documentName || doc.name || "Document",
@@ -444,62 +386,139 @@ const ViewAccreditedCourseRegistration = () => {
         }
       }
 
-      // Store raw quality standards
       if (data.quality_standard_responses) {
         setRawQualityStandards(data.quality_standard_responses);
       }
-
-      // Set assigned RECs if exists
-      if (data.assigned_recs) {
-        setAssignedRecs(data.assigned_recs);
-      }
-
-      // Set assigned Accreditors if exists
-      if (data.assigned_accreditors) {
+      if (data.assigned_recs) setAssignedRecs(data.assigned_recs);
+      if (data.assigned_accreditors)
         setAssignedAccreditors(data.assigned_accreditors);
-      }
     } catch (error) {
       console.error("Error fetching course details:", error);
       throw error;
     }
   };
 
-  const handleFileUpload = useCallback((uploadedFiles) => {
-    setNewDocuments(uploadedFiles || []);
-  }, []);
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchCourseDetails(),
+        fetchSectors(),
+        fetchOccupations(),
+        fetchQualityStandards(),
+        fetchGenderList(),
+        fetchQualificationList(),
+      ]);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load course data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const getSectorName = useCallback(
-    (id) => {
-      if (!id) return "N/A";
-      const sector = sectors.find((s) => String(s.id) === String(id));
-      return sector ? sector.sectorName || sector.name : id;
+  // Parse quality standards
+  const parseQualityStandardsWithData = useCallback(
+    (qualityStr, qualityDataRef) => {
+      try {
+        if (!qualityStr) return { responses: {}, remarks: {} };
+
+        const data =
+          typeof qualityStr === "string" ? JSON.parse(qualityStr) : qualityStr;
+        const responseMap = {};
+        const remarksMap = {};
+
+        data.forEach((item) => {
+          const subQuestionId = item.standardId?.toString();
+          const responseValue = item.responseId;
+          const remarkValue = item.remarks || "";
+
+          let categoryId = null;
+          for (const category of qualityDataRef) {
+            if (category.rows.some((row) => row.id === subQuestionId)) {
+              categoryId = category.id;
+              break;
+            }
+          }
+
+          if (categoryId && subQuestionId) {
+            if (!responseMap[categoryId]) responseMap[categoryId] = {};
+            if (!remarksMap[categoryId]) remarksMap[categoryId] = {};
+            responseMap[categoryId][subQuestionId] = responseValue;
+            remarksMap[categoryId][subQuestionId] = remarkValue;
+          }
+        });
+
+        return { responses: responseMap, remarks: remarksMap };
+      } catch (error) {
+        console.error("Error parsing quality standards:", error);
+        return { responses: {}, remarks: {} };
+      }
     },
-    [sectors],
+    [],
   );
 
-  const getCourseName = useCallback(
-    (id) => {
-      if (!id) return "N/A";
-      const occupation = occupations.find(
-        (occ) => String(occ.id) === String(id),
+  // Build occupation map
+  useEffect(() => {
+    if (occupations.length > 0) {
+      const map = {};
+      occupations.forEach((occ) => {
+        const name =
+          occ.occupationName ||
+          occ.name ||
+          occ.title ||
+          occ.occupation_title ||
+          occ.occupation_name ||
+          occ.occupation;
+        map[occ.id] = name || `Occupation ${occ.id}`;
+      });
+      setOccupationMap(map);
+    }
+  }, [occupations]);
+
+  // Effects
+  useEffect(() => {
+    if (applicationNo) {
+      fetchAllData();
+      if (isRole7) {
+        fetchRecUsers();
+        fetchAccreditorUsers();
+      }
+    }
+    fetchPaymentStatus();
+    fetchCertificateLevels();
+  }, [applicationNo]);
+
+  useEffect(() => {
+    if (courseData?.curriculum_id) {
+      fetchCurriculum(courseData.curriculum_id);
+    }
+  }, [courseData]);
+
+  useEffect(() => {
+    if (courseData?.registration_no) {
+      fetchInstituteData();
+    }
+  }, [courseData]);
+
+  useEffect(() => {
+    if (qualityData.length > 0 && rawQualityStandards) {
+      const { responses, remarks } = parseQualityStandardsWithData(
+        rawQualityStandards,
+        qualityData,
       );
-      return occupation
-        ? occupation.occupationName || occupation.title || occupation.name
-        : id;
-    },
-    [occupations],
-  );
+      setQualityResponses(responses);
+      setQualityRemarks(remarks);
+    }
+  }, [qualityData, rawQualityStandards, parseQualityStandardsWithData]);
 
+  // Quality handlers
   const handleQualityResponseChange = (categoryId, subQuestionId, value) => {
-    // If role is 23, don't allow changes
     if (isRole23) return;
 
     setQualityResponses((prev) => {
       const newResponses = { ...prev };
-
-      if (!newResponses[categoryId]) {
-        newResponses[categoryId] = {};
-      }
+      if (!newResponses[categoryId]) newResponses[categoryId] = {};
 
       if (newResponses[categoryId][subQuestionId] === value) {
         delete newResponses[categoryId][subQuestionId];
@@ -509,33 +528,25 @@ const ViewAccreditedCourseRegistration = () => {
       } else {
         newResponses[categoryId][subQuestionId] = value;
       }
-
       return newResponses;
     });
   };
 
   const handleQualityRemarkChange = (categoryId, subQuestionId, value) => {
-    // If role is 23, don't allow changes
     if (isRole23) return;
-
     setQualityRemarks((prev) => ({
       ...prev,
-      [categoryId]: {
-        ...prev[categoryId],
-        [subQuestionId]: value,
-      },
+      [categoryId]: { ...prev[categoryId], [subQuestionId]: value },
     }));
   };
 
   const prepareQualityStandardsForBackend = () => {
     const qualityStandardsData = [];
-
     Object.keys(qualityResponses).forEach((categoryId) => {
       Object.keys(qualityResponses[categoryId]).forEach((subQuestionId) => {
         const responseId = qualityResponses[categoryId][subQuestionId];
         const remark = qualityRemarks[categoryId]?.[subQuestionId] || "";
-
-        if (responseId && responseId !== "") {
+        if (responseId) {
           qualityStandardsData.push({
             standardId: parseInt(subQuestionId),
             responseId: responseId,
@@ -544,7 +555,6 @@ const ViewAccreditedCourseRegistration = () => {
         }
       });
     });
-
     return qualityStandardsData;
   };
 
@@ -554,12 +564,10 @@ const ViewAccreditedCourseRegistration = () => {
       toast.warning("REC members are read-only for your role");
       return;
     }
-
     if (!selectedRec) {
       toast.error("Please select a REC member to add");
       return;
     }
-
     if (
       assignedRecs.some((rec) => rec.id.toString() === selectedRec.toString())
     ) {
@@ -570,7 +578,6 @@ const ViewAccreditedCourseRegistration = () => {
     const selectedRecDetails = recList.find(
       (rec) => rec.id.toString() === selectedRec.toString(),
     );
-
     if (!selectedRecDetails) {
       toast.error("Selected REC member not found");
       return;
@@ -593,15 +600,6 @@ const ViewAccreditedCourseRegistration = () => {
     setSelectedRec("");
   };
 
-  const openDeleteRECDialog = (rec) => {
-    if (isRole23) {
-      toast.warning("REC members are read-only for your role");
-      return;
-    }
-    setRecToDelete(rec);
-    setDeleteDialogOpen(true);
-  };
-
   const handleDeleteREC = () => {
     if (recToDelete) {
       setAssignedRecs((prev) =>
@@ -619,12 +617,10 @@ const ViewAccreditedCourseRegistration = () => {
       toast.warning("Accreditors are read-only for your role");
       return;
     }
-
     if (!selectedAccreditor) {
       toast.error("Please select an Accreditor to add");
       return;
     }
-
     if (
       assignedAccreditors.some(
         (acc) => acc.id.toString() === selectedAccreditor.toString(),
@@ -637,7 +633,6 @@ const ViewAccreditedCourseRegistration = () => {
     const selectedAccreditorDetails = accreditorList.find(
       (acc) => acc.id.toString() === selectedAccreditor.toString(),
     );
-
     if (!selectedAccreditorDetails) {
       toast.error("Selected Accreditor not found");
       return;
@@ -660,15 +655,6 @@ const ViewAccreditedCourseRegistration = () => {
     setSelectedAccreditor("");
   };
 
-  const openDeleteAccreditorDialog = (acc) => {
-    if (isRole23) {
-      toast.warning("Accreditors are read-only for your role");
-      return;
-    }
-    setAccreditorToDelete(acc);
-    setDeleteDialogOpen(true);
-  };
-
   const handleDeleteAccreditor = () => {
     if (accreditorToDelete) {
       setAssignedAccreditors((prev) =>
@@ -686,6 +672,7 @@ const ViewAccreditedCourseRegistration = () => {
     setAccreditorToDelete(null);
   };
 
+  // Action handlers
   const openActionDialog = (statusId) => {
     if (isRole23 && statusId !== 59) {
       toast.warning("Only Endorse action is available for your role");
@@ -705,33 +692,18 @@ const ViewAccreditedCourseRegistration = () => {
   };
 
   const validateAssignments = (statusId) => {
-    // Get current status ID
     const currentStatus = Number(currentStatusId);
-
-    // If current status is 115, skip all validations - allow submission without REC and Accreditor
-    if (currentStatus === 115) {
-      console.log("Status is 115 - skipping REC and Accreditor validations");
-      return true;
-    }
-
-    // For forwarding to Level 2 (status 127) or rejection, skip REC validation
+    if (currentStatus === 115) return true;
     if (statusId === 127 || statusId === 58 || statusId === 60) {
-      // Skip REC validation for these statuses
-      console.log("Skipping REC validation for status:", statusId);
-    } else {
-      // Validate REC for other statuses
-      if (showRecTab && assignedRecs.length === 0) {
-        toast.error("Please assign at least one REC member before proceeding");
-        return false;
-      }
+      // Skip REC validation
+    } else if (isRole7 && assignedRecs.length === 0) {
+      toast.error("Please assign at least one REC member before proceeding");
+      return false;
     }
-
-    // Validate Accreditor for all statuses except when current status is 115
-    if (showAccreditorTab && assignedAccreditors.length === 0) {
+    if (isRole7 && assignedAccreditors.length === 0) {
       toast.error("Please assign at least one Accreditor before proceeding");
       return false;
     }
-
     return true;
   };
 
@@ -744,34 +716,24 @@ const ViewAccreditedCourseRegistration = () => {
       return;
     }
 
-    // Validate assignments before proceeding
-    if (!validateAssignments(selectedStatusId)) {
-      return;
-    }
+    if (!validateAssignments(selectedStatusId)) return;
 
     setActionLoading(true);
     try {
       const qualityStandardsData = prepareQualityStandardsForBackend();
-
-      // Prepare payloads
       const assignedRecsPayload = assignedRecs.map((rec) => ({
         userId: rec.userId,
       }));
-
       const assignedAccreditorsPayload = assignedAccreditors.map((acc) => ({
         userId: acc.userId,
       }));
-
-      // Determine serviceId based on status
-      // For forwarding to Level 2 (status 127) or renew (status 126), use serviceId 54
-      // For other actions, keep serviceId 26
       const serviceId =
         selectedStatusId === 127 || selectedStatusId === 126 ? 54 : 26;
 
       const payload = {
-        applicationNo: applicationNo,
+        applicationNo,
         statusId: selectedStatusId,
-        serviceId: serviceId,
+        serviceId,
         assignedRoleId: currentRoleId,
         remarks: remarks || "Application processed",
         updatedBy: actionId,
@@ -781,8 +743,6 @@ const ViewAccreditedCourseRegistration = () => {
         assignedAccreditors: assignedAccreditorsPayload,
       };
 
-      console.log("Payload being sent:", payload);
-
       const response =
         await ApplyAccreditedCourseService.verifyAccreditedCourse(
           payload,
@@ -790,37 +750,21 @@ const ViewAccreditedCourseRegistration = () => {
         );
 
       if (response.status === 200 || response.status === 201) {
-        let successMessage;
-        switch (selectedStatusId) {
-          case 56:
-            successMessage = "Course verified successfully";
-            break;
-          case 62:
-            successMessage = "Course verified successfully";
-            break;
-          case 59:
-            successMessage = "Course endorsed successfully";
-            break;
-          case 126:
-            successMessage = "Course renewed successfully";
-            break;
-          case 57:
-            successMessage = "Course approved successfully";
-            break;
-          case 58:
-            successMessage = "Course rejected successfully";
-            break;
-          case 127:
-            successMessage = "Forwarded to Level 2 successfully";
-            break;
-          default:
-            successMessage = "Action completed successfully";
-        }
-
+        const messages = {
+          56: "Course verified successfully",
+          62: "Course verified successfully",
+          59: "Course endorsed successfully",
+          126: "Course renewed successfully",
+          57: "Course approved successfully",
+          58: "Course rejected successfully",
+          127: "Forwarded to Level 2 successfully",
+        };
+        toast.success(
+          messages[selectedStatusId] || "Action completed successfully",
+        );
         closeDialog();
         await fetchCourseDetails();
         setNewDocuments([]);
-        toast.success(successMessage);
         navigate("/tasklist/task-details-index");
       }
     } catch (error) {
@@ -831,25 +775,18 @@ const ViewAccreditedCourseRegistration = () => {
     }
   };
 
+  // Dialog content helpers
   const getDialogTitle = () => {
-    switch (selectedStatusId) {
-      case 56:
-        return "Verify Course Application";
-      case 62:
-        return "Verify Course Application";
-      case 59:
-        return "Endorse Course Application";
-      case 57:
-        return "Approve Course Application";
-      case 58:
-        return "Reject Course Application";
-      case 126:
-        return "Renew Course Application";
-      case 127:
-        return "Forward to Level 2";
-      default:
-        return "Confirm Action";
-    }
+    const titles = {
+      56: "Verify Course Application",
+      62: "Verify Course Application",
+      59: "Endorse Course Application",
+      57: "Approve Course Application",
+      58: "Reject Course Application",
+      126: "Renew Course Application",
+      127: "Forward to Level 2",
+    };
+    return titles[selectedStatusId] || "Confirm Action";
   };
 
   const getDialogContent = () => {
@@ -863,7 +800,7 @@ const ViewAccreditedCourseRegistration = () => {
             <strong>Application No: {applicationNo}</strong>
             <br />
             <strong>
-              Course Title: {getCourseName(courseData?.course_id)}
+              Occupation: {getOccupationName(courseData?.occupation_id)}
             </strong>
           </DialogContentText>
           <TextField
@@ -884,134 +821,84 @@ const ViewAccreditedCourseRegistration = () => {
           />
         </>
       );
-    } else if (selectedStatusId === 127) {
-      return (
-        <>
-          <DialogContentText sx={{ mb: 2 }}>
-            Are you sure you want to forward this accredited course application
-            to Level 2?
-            <br />
-            <strong>Application No: {applicationNo}</strong>
-            <br />
-            <strong>
-              Course Title: {getCourseName(courseData?.course_id)}
-            </strong>
-          </DialogContentText>
-          <TextField
-            margin="dense"
-            label="Remarks (Optional)"
-            fullWidth
-            multiline
-            rows={3}
-            value={remarks}
-            onChange={(e) => {
-              setRemarks(e.target.value);
-            }}
-            placeholder="Add any additional remarks for forwarding to Level 2"
-          />
-        </>
-      );
-    } else {
-      const actionText =
-        selectedStatusId === 56 || selectedStatusId === 62
-          ? "verify"
-          : selectedStatusId === 59
-            ? "endorse"
-            : selectedStatusId === 126
-              ? "renew"
-              : "approve";
-
-      return (
-        <DialogContentText>
-          Are you sure you want to {actionText} this accredited course
-          application?
-          <br />
-          <strong>Application No: {applicationNo}</strong>
-          <br />
-          <strong>Course Title: {getCourseName(courseData?.course_id)}</strong>
-        </DialogContentText>
-      );
     }
+
+    const actionTexts = {
+      56: "verify",
+      62: "verify",
+      59: "endorse",
+      126: "renew",
+      127: "forward",
+      57: "approve",
+    };
+    const actionText = actionTexts[selectedStatusId] || "process";
+
+    return (
+      <DialogContentText>
+        Are you sure you want to {actionText} this accredited course
+        application?
+        <br />
+        <strong>Application No: {applicationNo}</strong>
+        <br />
+        <strong>
+          Occupation: {getOccupationName(courseData?.occupation_id)}
+        </strong>
+      </DialogContentText>
+    );
   };
 
   const getConfirmButtonColor = () => {
-    switch (selectedStatusId) {
-      case 56:
-      case 57:
-      case 62:
-        return "success";
-      case 58:
-        return "error";
-      case 59:
-        return "primary";
-      case 60:
-        return "warning";
-      case 126:
-        return "primary";
-      case 127:
-        return "primary";
-      default:
-        return "primary";
-    }
+    const colors = {
+      56: "success",
+      57: "success",
+      62: "success",
+      58: "error",
+      59: "primary",
+      60: "warning",
+      126: "primary",
+      127: "primary",
+    };
+    return colors[selectedStatusId] || "primary";
   };
 
   const getConfirmButtonText = () => {
     if (actionLoading) return <CircularProgress size={24} />;
-    switch (selectedStatusId) {
-      case 56:
-        return "Confirm Verify";
-      case 62:
-        return "Confirm Verify";
-      case 59:
-        return "Confirm Endorse";
-      case 57:
-        return "Confirm Approve";
-      case 58:
-      case 60:
-        return "Confirm Reject";
-      case 126:
-        return "Confirm Renew";
-      case 127:
-        return "Confirm Forward";
-      default:
-        return "Confirm";
-    }
+    const texts = {
+      56: "Confirm Verify",
+      62: "Confirm Verify",
+      59: "Confirm Endorse",
+      57: "Confirm Approve",
+      58: "Confirm Reject",
+      60: "Confirm Reject",
+      126: "Confirm Renew",
+      127: "Confirm Forward",
+    };
+    return texts[selectedStatusId] || "Confirm";
   };
 
-  // Generate PA Number handler
+  // Generate PA Number
   const handleGeneratePANumber = () => {
     if (!courseData) {
       toast.error("Course data not found");
       return;
     }
 
-    // Get institute data (handle both array and object)
     const institute =
       Array.isArray(instituteData) && instituteData.length > 0
         ? instituteData[0]
         : instituteData;
 
-    // Get mobile and email from institute data
     const taxPayerEmail = institute?.email_id || "N/A";
     const taxPayerMobileNo = institute?.mobile_no || "N/A";
     const instituteId = institute?.institute_id || "N/A";
-
-    // Prepare the data for BIRMS payment
-    const applicationNo = courseData.application_no;
-
-    // Use the constant service code directly
-    const serviceCode = SERVICE_CODE;
-
     const taxPayerNo = courseData.registration_no || "N/A";
     const taxPayerName = courseData.proposed_institute_name || "N/A";
 
-    // Navigate to BIRMS payment page
     navigate(
-      `/birms/common-payment-index/${applicationNo}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId} `,
+      `/birms/common-payment-index/${applicationNo}/${SERVICE_CODE}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId}`,
     );
   };
 
-  // Function to handle redirect to payment
   const handleRedirectToPayment = (redirectUrl) => {
     if (redirectUrl) {
       window.open(redirectUrl, "_blank");
@@ -1020,260 +907,153 @@ const ViewAccreditedCourseRegistration = () => {
     }
   };
 
+  const handleFileUpload = useCallback((uploadedFiles) => {
+    setNewDocuments(uploadedFiles || []);
+  }, []);
+
+  // Render quality checklist
   const renderChecklist = useCallback(
-    (standard) => {
-      return (
-        <Grid size={{ xs: 12 }} key={standard.id}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
-              {standard.title}
-            </Typography>
-            <TableContainer>
-              <Table size="small" sx={TABLE_STYLE}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell width="40">Sl. No</TableCell>
-                    <TableCell>Quality Indicator</TableCell>
-                    <TableCell align="center" width="80">
-                      YES
-                    </TableCell>
-                    <TableCell align="center" width="80">
-                      NO
-                    </TableCell>
-                    <TableCell width="250">Remarks</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {standard.rows.map((row, index) => {
-                    const selectedValue =
-                      qualityResponses[standard.id]?.[row.id];
-                    const isYes = selectedValue === "Y";
-                    const isNo = selectedValue === "N";
-                    const remark = qualityRemarks[standard.id]?.[row.id] || "";
+    (standard) => (
+      <Grid size={{ xs: 12 }} key={standard.id}>
+        <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
+            {standard.title}
+          </Typography>
+          <TableContainer>
+            <Table size="small" sx={TABLE_STYLE}>
+              <TableHead>
+                <TableRow>
+                  <TableCell width="40">Sl. No</TableCell>
+                  <TableCell>Quality Indicator</TableCell>
+                  <TableCell align="center" width="80">
+                    YES
+                  </TableCell>
+                  <TableCell align="center" width="80">
+                    NO
+                  </TableCell>
+                  <TableCell width="250">Remarks</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {standard.rows.map((row, index) => {
+                  const selectedValue = qualityResponses[standard.id]?.[row.id];
+                  const isYes = selectedValue === "Y";
+                  const isNo = selectedValue === "N";
+                  const remark = qualityRemarks[standard.id]?.[row.id] || "";
 
-                    // If role is 23, radios should be disabled (read-only)
-                    const isReadOnly = isRole23;
-
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell>{row.value}</TableCell>
-                        <TableCell align="center">
-                          {isReadOnly ? (
-                            <Tooltip
-                              title="Quality checklist is read-only"
-                              arrow
-                            >
-                              <span>
-                                <Radio
-                                  size="small"
-                                  sx={{ p: 0.25 }}
-                                  checked={isYes}
-                                  disabled={true}
-                                />
-                              </span>
-                            </Tooltip>
-                          ) : (
-                            <Radio
-                              size="small"
-                              sx={{ p: 0.25 }}
-                              checked={isYes}
-                              onChange={() => {
-                                const newValue = isYes ? undefined : "Y";
-                                handleQualityResponseChange(
-                                  standard.id,
-                                  row.id,
-                                  newValue,
-                                );
-                              }}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell align="center">
-                          {isReadOnly ? (
-                            <Tooltip
-                              title="Quality checklist is read-only"
-                              arrow
-                            >
-                              <span>
-                                <Radio
-                                  size="small"
-                                  sx={{ p: 0.25 }}
-                                  checked={isNo}
-                                  disabled={true}
-                                />
-                              </span>
-                            </Tooltip>
-                          ) : (
-                            <Radio
-                              size="small"
-                              sx={{ p: 0.25 }}
-                              checked={isNo}
-                              onChange={() => {
-                                const newValue = isNo ? undefined : "N";
-                                handleQualityResponseChange(
-                                  standard.id,
-                                  row.id,
-                                  newValue,
-                                );
-                              }}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {isReadOnly ? (
-                            <Tooltip
-                              title="Quality checklist is read-only"
-                              arrow
-                            >
-                              <span
-                                style={{
-                                  width: "100%",
-                                  display: "inline-block",
-                                }}
-                              >
-                                <TextField
-                                  fullWidth
-                                  size="small"
-                                  placeholder="Enter remarks"
-                                  value={remark}
-                                  disabled={true}
-                                  slotProps={{
-                                    input: {
-                                      sx: { fontSize: "0.75rem" },
-                                    },
-                                  }}
-                                  multiline
-                                  rows={2}
-                                />
-                              </span>
-                            </Tooltip>
-                          ) : (
-                            <TextField
-                              fullWidth
-                              size="small"
-                              placeholder="Enter remarks"
-                              value={remark}
-                              onChange={(e) =>
-                                handleQualityRemarkChange(
-                                  standard.id,
-                                  row.id,
-                                  e.target.value,
-                                )
-                              }
-                              slotProps={{
-                                input: {
-                                  sx: { fontSize: "0.75rem" },
-                                },
-                              }}
-                              multiline
-                              rows={2}
-                            />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
-      );
-    },
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{row.value}</TableCell>
+                      <TableCell align="center">
+                        <Radio
+                          size="small"
+                          sx={{ p: 0.25 }}
+                          checked={isYes}
+                          onChange={() =>
+                            handleQualityResponseChange(
+                              standard.id,
+                              row.id,
+                              "Y",
+                            )
+                          }
+                          disabled={isRole23}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Radio
+                          size="small"
+                          sx={{ p: 0.25 }}
+                          checked={isNo}
+                          onChange={() =>
+                            handleQualityResponseChange(
+                              standard.id,
+                              row.id,
+                              "N",
+                            )
+                          }
+                          disabled={isRole23}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Enter remarks"
+                          value={remark}
+                          onChange={(e) =>
+                            handleQualityRemarkChange(
+                              standard.id,
+                              row.id,
+                              e.target.value,
+                            )
+                          }
+                          disabled={isRole23}
+                          multiline
+                          rows={2}
+                          slotProps={{ input: { sx: { fontSize: "0.75rem" } } }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Grid>
+    ),
     [qualityResponses, qualityRemarks, isRole23],
   );
 
-  // Use useMemo to compute tabs based on currentStatusId
+  // Tabs configuration
   const tabs = useMemo(() => {
     const baseTabs = [
-      { icon: <BusinessIcon />, label: "Course Information" },
+      { icon: <BusinessIcon />, label: "Programme Information" },
       { icon: <VerifiedIcon />, label: "Quality Standards" },
       { icon: <FileOpenIcon />, label: "Supporting Documents" },
     ];
 
-    // Check if status is 115 or 127 - hide Accreditor and REC tabs
     const shouldHideAssignTabs =
       Number(currentStatusId) === 115 || Number(currentStatusId) === 127;
 
-    // Add Generate PA Number tab for role 7 - ALWAYS show this tab regardless of status
-    if (showGeneratePANumberTab) {
+    if (isRole7) {
       baseTabs.push({
         icon: <SettingsSuggestIcon />,
         label: "Generate PA Number",
       });
-    }
-
-    // Add Accreditor tab if currentRoleId is 7 and status is not 115 or 127
-    if (showAccreditorTab && !shouldHideAssignTabs) {
-      baseTabs.push({
-        icon: <GroupAddIcon />,
-        label: "Add Accreditors",
-      });
-    }
-
-    // Add REC tab if currentRoleId is 7 and status is not 115 or 127
-    if (showRecTab && !shouldHideAssignTabs) {
-      baseTabs.push({ icon: <EngineeringIcon />, label: "Assign REC" });
+      if (!shouldHideAssignTabs) {
+        baseTabs.push({ icon: <GroupAddIcon />, label: "Add Accreditors" });
+        baseTabs.push({ icon: <EngineeringIcon />, label: "Assign REC" });
+      }
     }
 
     return baseTabs;
-  }, [currentStatusId, showGeneratePANumberTab, showAccreditorTab, showRecTab]);
+  }, [currentStatusId, isRole7]);
 
-  // Navigation handlers
-  const handleNextTab = () => {
-    if (tabValue < tabs.length - 1) {
-      setTabValue(tabValue + 1);
-    }
-  };
-
-  const handlePreviousTab = () => {
-    if (tabValue > 0) {
-      setTabValue(tabValue - 1);
-    }
-  };
-
-  // Helper functions for button visibility
-  const isFirstTab = () => tabValue === 0;
-  const isLastTab = () => tabValue === tabs.length - 1;
-
-  // Get tab indices
   const getTabIndices = () => {
     let paNumberIndex = -1;
     let accreditorIndex = -1;
     let recIndex = -1;
-
     tabs.forEach((tab, index) => {
       if (tab.label === "Generate PA Number") paNumberIndex = index;
       if (tab.label === "Add Accreditors") accreditorIndex = index;
       if (tab.label === "Assign REC") recIndex = index;
     });
-
     return { paNumberIndex, accreditorIndex, recIndex };
   };
 
   const { paNumberIndex, accreditorIndex, recIndex } = getTabIndices();
 
-  // Get available REC members (not yet assigned)
-  const availableRecs = recList.filter(
-    (rec) => !assignedRecs.some((assigned) => assigned.id === rec.id),
-  );
+  const handleNextTab = () => {
+    if (tabValue < tabs.length - 1) setTabValue(tabValue + 1);
+  };
 
-  // Get selected REC details
-  const selectedRecDetails = recList.find(
-    (rec) => rec.id.toString() === selectedRec?.toString(),
-  );
+  const handlePreviousTab = () => {
+    if (tabValue > 0) setTabValue(tabValue - 1);
+  };
 
-  // Get available Accreditors (not yet assigned)
-  const availableAccreditors = accreditorList.filter(
-    (acc) => !assignedAccreditors.some((assigned) => assigned.id === acc.id),
-  );
-
-  // Get selected Accreditor details
-  const selectedAccreditorDetails = accreditorList.find(
-    (acc) => acc.id.toString() === selectedAccreditor?.toString(),
-  );
-
+  // Loading state
   if (loading) {
     return (
       <Box sx={{ p: 1, minHeight: "100vh" }}>
@@ -1285,15 +1065,16 @@ const ViewAccreditedCourseRegistration = () => {
     );
   }
 
+  // Error state
   if (!courseData) {
     return (
       <Box sx={{ m: 3 }}>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-            Accredited Course Details
+            BQF Programme Details
           </Typography>
           <Alert severity="error">
-            Accredited Course with Application No:{" "}
+            BQF Programme with Application No:{" "}
             <strong>{applicationNo}</strong> not found
           </Alert>
         </Paper>
@@ -1305,7 +1086,7 @@ const ViewAccreditedCourseRegistration = () => {
     <Box>
       <Paper sx={{ p: 2 }}>
         <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-          Accredited Course Details
+          BQF Programme Details
         </Typography>
         <Divider />
 
@@ -1313,148 +1094,200 @@ const ViewAccreditedCourseRegistration = () => {
           value={tabValue}
           onChange={(e, v) => setTabValue(v)}
           variant="fullWidth"
-          sx={{
-            "& .MuiTab-root": { textTransform: "none", fontWeight: 600 },
-          }}
+          sx={{ "& .MuiTab-root": { textTransform: "none", fontWeight: 600 } }}
         >
           {tabs.map((tab, index) => (
             <Tab key={index} icon={tab.icon} label={tab.label} />
           ))}
         </Tabs>
 
-        {/* Tab 0: Course Information */}
+        {/* Tab 0: Programme Information */}
         {tabValue === 0 && (
-          <Paper sx={{ p: 3, mb: 2 }} variant="outlined">
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Registration No"
-                  value={courseData.registration_no || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
+          <>
+            <Paper sx={{ p: 3, mb: 2 }} variant="outlined">
+              <Typography fontWeight={600} gutterBottom>
+                Basic Information
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Registration No"
+                    value={courseData.registration_no || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Institute Name"
+                    value={courseData.proposed_institute_name || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Curriculum Title"
+                    value={curriculumTypes?.curriculumTitle || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Certificate Level"
+                    value={getCertificateLevelName(
+                      curriculumTypes?.certificateLevelId,
+                    )}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Sector"
+                    value={getSectorName(courseData.sector_id)}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Occupation"
+                    value={getOccupationName(courseData.occupation_id)}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Programme Title"
+                    value={courseData.programme_title || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Fees per trainee (Nu.)"
+                    value={courseData.fees_per_trainee || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Enrollment capacity per batch"
+                    value={courseData.enrolment_capacity || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Total Program Duration (Hours)"
+                    value={curriculumTypes?.totalProgramDuration || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Theory Duration (Hours)"
+                    value={curriculumTypes?.totalTheoryDuration || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Practical Duration (Hours)"
+                    value={curriculumTypes?.totalPracticalDuration || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="OJT Duration (Hours)"
+                    value={curriculumTypes?.totalOjtDuration || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
               </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Institute Name"
-                  value={courseData.proposed_institute_name || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Curriculum Name"
-                  value={curriculumTypes?.curriculumName || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Certificate Level"
-                  value={getCertificateLevelName(
-                    curriculumTypes?.certificateLevelId,
-                  )}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Sector"
-                  value={getSectorName(courseData.sector_id)}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Course"
-                  value={getCourseName(courseData.course_id)}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Fees per trainee (Nu.)"
-                  value={courseData.fees_per_trainee || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Enrollment capacity per batch"
-                  value={courseData.enrolment_capacity || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Application No"
-                  value={courseData.application_no || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
+            </Paper>
 
-              {/* Curriculum Duration Fields */}
-              <Grid size={{ xs: 12 }}>
-                <Divider sx={{ my: 1 }} />
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  Curriculum Duration Details
-                </Typography>
+            <Paper
+              sx={{ p: 3, mb: 2, border: "1px solid", borderColor: "divider" }}
+            >
+              <Typography fontWeight={600} gutterBottom>
+                Lead Trainer Information
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Lead Trainer CID No."
+                    value={courseData.lead_trainer_cid_no || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Lead Trainer Name"
+                    value={courseData.lead_trainer_name || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Gender"
+                    value={getGenderName(courseData.gender_id)}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Academic Qualification"
+                    value={getQualificationName(courseData.qualification_id)}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Professional Experience"
+                    value={courseData.professional_experience || "N/A"}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Grid>
               </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Total Program Duration (Hours)"
-                  value={curriculumTypes?.totalProgramDuration || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Theory Duration (Hours)"
-                  value={curriculumTypes?.totalTheoryDuration || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Practical Duration (Hours)"
-                  value={curriculumTypes?.totalPracticalDuration || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="OJT Duration (Hours)"
-                  value={curriculumTypes?.totalOjtDuration || "N/A"}
-                  slotProps={{ input: { readOnly: true } }}
-                />
-              </Grid>
-            </Grid>
-          </Paper>
+            </Paper>
+          </>
         )}
 
         {/* Tab 1: Quality Standards */}
@@ -1489,8 +1322,8 @@ const ViewAccreditedCourseRegistration = () => {
           </Grid>
         )}
 
-        {/* Generate PA Number Tab - Always shown for role 7 */}
-        {showGeneratePANumberTab && tabValue === paNumberIndex && (
+        {/* Generate PA Number Tab */}
+        {isRole7 && tabValue === paNumberIndex && (
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12 }}>
               <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
@@ -1504,7 +1337,7 @@ const ViewAccreditedCourseRegistration = () => {
                 </Box>
 
                 {paymentStatus ? (
-                  <Card variant="outlined" sx={{ p: 0 }}>
+                  <Card variant="outlined">
                     <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
                       <Grid container spacing={0.5}>
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1532,7 +1365,6 @@ const ViewAccreditedCourseRegistration = () => {
                             </Typography>
                           </Box>
                         </Grid>
-
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                           <Box
                             sx={{
@@ -1558,7 +1390,6 @@ const ViewAccreditedCourseRegistration = () => {
                             </Typography>
                           </Box>
                         </Grid>
-
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                           <Box
                             sx={{
@@ -1585,7 +1416,6 @@ const ViewAccreditedCourseRegistration = () => {
                             </Typography>
                           </Box>
                         </Grid>
-
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                           <Box
                             sx={{
@@ -1618,7 +1448,6 @@ const ViewAccreditedCourseRegistration = () => {
                             />
                           </Box>
                         </Grid>
-
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                           <Box
                             sx={{
@@ -1644,7 +1473,6 @@ const ViewAccreditedCourseRegistration = () => {
                             </Typography>
                           </Box>
                         </Grid>
-
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                           <Box
                             sx={{
@@ -1670,7 +1498,6 @@ const ViewAccreditedCourseRegistration = () => {
                             </Typography>
                           </Box>
                         </Grid>
-
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                           <Box
                             sx={{
@@ -1697,7 +1524,6 @@ const ViewAccreditedCourseRegistration = () => {
                             </Typography>
                           </Box>
                         </Grid>
-
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                           <Box
                             sx={{
@@ -1720,60 +1546,6 @@ const ViewAccreditedCourseRegistration = () => {
                               sx={{ fontSize: "0.75rem" }}
                             >
                               {paymentStatus.paymentMode || "Not yet paid"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Service Code:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {SERVICE_CODE}
-                            </Typography>
-                          </Box>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Certificate Level:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {getCertificateLevelName(
-                                curriculumTypes?.certificateLevelId,
-                              )}
                             </Typography>
                           </Box>
                         </Grid>
@@ -1807,7 +1579,6 @@ const ViewAccreditedCourseRegistration = () => {
                           </Button>
                         </Box>
                       )}
-
                       <Alert
                         severity="info"
                         sx={{
@@ -1835,7 +1606,6 @@ const ViewAccreditedCourseRegistration = () => {
                         Click the button below to generate a PA number and
                         proceed to payment.
                       </Typography>
-
                       <Box
                         sx={{
                           mt: 1.5,
@@ -1862,7 +1632,6 @@ const ViewAccreditedCourseRegistration = () => {
                           Generate PA Number
                         </Button>
                       </Box>
-
                       <Alert
                         severity="info"
                         sx={{
@@ -1886,7 +1655,7 @@ const ViewAccreditedCourseRegistration = () => {
         )}
 
         {/* Add Accreditors Tab */}
-        {showAccreditorTab && tabValue === accreditorIndex && (
+        {isRole7 && tabValue === accreditorIndex && (
           <Grid container spacing={3} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12 }}>
               <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
@@ -1939,7 +1708,10 @@ const ViewAccreditedCourseRegistration = () => {
                                   onDelete={
                                     isRole23
                                       ? undefined
-                                      : () => openDeleteAccreditorDialog(acc)
+                                      : () => {
+                                          setAccreditorToDelete(acc);
+                                          setDeleteDialogOpen(true);
+                                        }
                                   }
                                   deleteIcon={
                                     isRole23 ? undefined : (
@@ -1972,11 +1744,20 @@ const ViewAccreditedCourseRegistration = () => {
                         <Autocomplete
                           fullWidth
                           size="small"
-                          options={availableAccreditors}
+                          options={accreditorList.filter(
+                            (acc) =>
+                              !assignedAccreditors.some((a) => a.id === acc.id),
+                          )}
                           getOptionLabel={(option) =>
                             `${option.name} (${option.userId})`
                           }
-                          value={selectedAccreditorDetails || null}
+                          value={
+                            accreditorList.find(
+                              (acc) =>
+                                acc.id.toString() ===
+                                selectedAccreditor?.toString(),
+                            ) || null
+                          }
                           onChange={(event, newValue) => {
                             if (isRole23) {
                               toast.warning(
@@ -1990,10 +1771,7 @@ const ViewAccreditedCourseRegistration = () => {
                             const searchTerm = state.inputValue
                               .toLowerCase()
                               .trim();
-                            if (!searchTerm || searchTerm.length < 2) {
-                              return [];
-                            }
-
+                            if (!searchTerm || searchTerm.length < 2) return [];
                             return options.filter(
                               (option) =>
                                 option.name
@@ -2034,13 +1812,10 @@ const ViewAccreditedCourseRegistration = () => {
                           )}
                           noOptionsText="No Accreditors available"
                           loadingText="Loading..."
-                          disabled={
-                            availableAccreditors.length === 0 || isRole23
-                          }
+                          disabled={accreditorList.length === 0 || isRole23}
                           openOnFocus={false}
                         />
                       </Grid>
-
                       <Grid size={{ xs: 12, md: 4 }}>
                         <Button
                           variant="contained"
@@ -2050,7 +1825,7 @@ const ViewAccreditedCourseRegistration = () => {
                           onClick={handleAddAccreditor}
                           disabled={
                             !selectedAccreditor ||
-                            availableAccreditors.length === 0 ||
+                            accreditorList.length === 0 ||
                             isRole23
                           }
                           sx={{
@@ -2064,82 +1839,10 @@ const ViewAccreditedCourseRegistration = () => {
                       </Grid>
                     </Grid>
 
-                    {selectedAccreditor && selectedAccreditorDetails && (
-                      <Box
-                        sx={{
-                          mt: 2,
-                          p: 2,
-                          bgcolor: "action.hover",
-                          borderRadius: 1,
-                        }}
-                      >
-                        <Typography
-                          variant="subtitle2"
-                          fontWeight={600}
-                          gutterBottom
-                        >
-                          Selected Accreditor Details:
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Name
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedAccreditorDetails.name}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              User ID
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedAccreditorDetails.userId}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Email
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedAccreditorDetails.email || "N/A"}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Mobile No
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedAccreditorDetails.mobileNo || "N/A"}
-                            </Typography>
-                          </Grid>
-                        </Grid>
-                      </Box>
-                    )}
-
                     {assignedAccreditors.length === 0 && (
                       <Alert severity="info" sx={{ mt: 2 }}>
                         No Accreditors have been assigned yet. Use the search
                         above to add Accreditor members.
-                      </Alert>
-                    )}
-
-                    {accreditorList.length === 0 && (
-                      <Alert severity="warning" sx={{ mt: 2 }}>
-                        No Accreditor members found. Please check if there are
-                        active Accreditor users in the system.
                       </Alert>
                     )}
                   </CardContent>
@@ -2150,7 +1853,7 @@ const ViewAccreditedCourseRegistration = () => {
         )}
 
         {/* Assign REC Tab */}
-        {showRecTab && tabValue === recIndex && (
+        {isRole7 && tabValue === recIndex && (
           <Grid container spacing={3} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12 }}>
               <Paper sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
@@ -2203,7 +1906,10 @@ const ViewAccreditedCourseRegistration = () => {
                                   onDelete={
                                     isRole23
                                       ? undefined
-                                      : () => openDeleteRECDialog(rec)
+                                      : () => {
+                                          setRecToDelete(rec);
+                                          setDeleteDialogOpen(true);
+                                        }
                                   }
                                   deleteIcon={
                                     isRole23 ? undefined : (
@@ -2236,11 +1942,18 @@ const ViewAccreditedCourseRegistration = () => {
                         <Autocomplete
                           fullWidth
                           size="small"
-                          options={availableRecs}
+                          options={recList.filter(
+                            (rec) => !assignedRecs.some((a) => a.id === rec.id),
+                          )}
                           getOptionLabel={(option) =>
                             `${option.name} (${option.userId})`
                           }
-                          value={selectedRecDetails || null}
+                          value={
+                            recList.find(
+                              (rec) =>
+                                rec.id.toString() === selectedRec?.toString(),
+                            ) || null
+                          }
                           onChange={(event, newValue) => {
                             if (isRole23) {
                               toast.warning(
@@ -2254,10 +1967,7 @@ const ViewAccreditedCourseRegistration = () => {
                             const searchTerm = state.inputValue
                               .toLowerCase()
                               .trim();
-                            if (!searchTerm || searchTerm.length < 2) {
-                              return [];
-                            }
-
+                            if (!searchTerm || searchTerm.length < 2) return [];
                             return options.filter(
                               (option) =>
                                 option.name
@@ -2298,11 +2008,10 @@ const ViewAccreditedCourseRegistration = () => {
                           )}
                           noOptionsText="No REC members available"
                           loadingText="Loading..."
-                          disabled={availableRecs.length === 0 || isRole23}
+                          disabled={recList.length === 0 || isRole23}
                           openOnFocus={false}
                         />
                       </Grid>
-
                       <Grid size={{ xs: 12, md: 4 }}>
                         <Button
                           variant="contained"
@@ -2311,9 +2020,7 @@ const ViewAccreditedCourseRegistration = () => {
                           startIcon={<PersonAddIcon />}
                           onClick={handleAddREC}
                           disabled={
-                            !selectedRec ||
-                            availableRecs.length === 0 ||
-                            isRole23
+                            !selectedRec || recList.length === 0 || isRole23
                           }
                           sx={{
                             fontWeight: 600,
@@ -2326,82 +2033,10 @@ const ViewAccreditedCourseRegistration = () => {
                       </Grid>
                     </Grid>
 
-                    {selectedRec && selectedRecDetails && (
-                      <Box
-                        sx={{
-                          mt: 2,
-                          p: 2,
-                          bgcolor: "action.hover",
-                          borderRadius: 1,
-                        }}
-                      >
-                        <Typography
-                          variant="subtitle2"
-                          fontWeight={600}
-                          gutterBottom
-                        >
-                          Selected REC Details:
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Name
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedRecDetails.name}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              User ID
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedRecDetails.userId}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Email
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedRecDetails.email || "N/A"}
-                            </Typography>
-                          </Grid>
-                          <Grid size={{ xs: 12, md: 3 }}>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Mobile No
-                            </Typography>
-                            <Typography variant="body2">
-                              {selectedRecDetails.mobileNo || "N/A"}
-                            </Typography>
-                          </Grid>
-                        </Grid>
-                      </Box>
-                    )}
-
                     {assignedRecs.length === 0 && (
                       <Alert severity="info" sx={{ mt: 2 }}>
                         No REC members have been assigned yet. Use the search
                         above to add REC members.
-                      </Alert>
-                    )}
-
-                    {recList.length === 0 && (
-                      <Alert severity="warning" sx={{ mt: 2 }}>
-                        No REC members found. Please check if there are active
-                        REC users in the system.
                       </Alert>
                     )}
                   </CardContent>
@@ -2415,7 +2050,7 @@ const ViewAccreditedCourseRegistration = () => {
         <Box
           sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}
         >
-          {!isFirstTab() && (
+          {tabValue > 0 && (
             <Button
               variant="outlined"
               size="small"
@@ -2427,7 +2062,7 @@ const ViewAccreditedCourseRegistration = () => {
             </Button>
           )}
 
-          {!isLastTab() && (
+          {tabValue < tabs.length - 1 && (
             <Button
               variant="contained"
               color="primary"
@@ -2440,12 +2075,11 @@ const ViewAccreditedCourseRegistration = () => {
             </Button>
           )}
 
-          {isLastTab() && (
+          {tabValue === tabs.length - 1 && (
             <>
               {roleId === "7" && (
                 <>
-                  {Number(currentStatusId) === 115 ||
-                  Number(currentStatusId) === 127 ? (
+                  {[115, 127].includes(Number(currentStatusId)) ? (
                     <Tooltip
                       title={
                         !isPaymentCompleted()

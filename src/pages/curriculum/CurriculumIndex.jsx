@@ -209,6 +209,137 @@ const getPaperStyles = (color) => ({
   border: `1px solid ${getBorderColor(color)}`,
 });
 
+// ==================== DURATION DISTRIBUTION VALIDATION ====================
+
+// Helper to validate BQF duration distribution
+const validateBQFDurationDistribution = (
+  totalNum,
+  theoryNum,
+  practicalNum,
+  ojtNum,
+  certificateLevelId,
+  certificateLevels,
+) => {
+  if (!certificateLevelId || totalNum === 0) {
+    return { isValid: true, message: "", color: "#2e7d32" };
+  }
+
+  const level = certificateLevels.find(
+    (l) => l.id === parseInt(certificateLevelId),
+  );
+
+  if (!level) {
+    return { isValid: true, message: "", color: "#2e7d32" };
+  }
+
+  const levelName = level.name.toLowerCase();
+  const isDiploma =
+    levelName.includes("diploma") || levelName.includes("advanced diploma");
+  const isCertificate = levelName.includes("certificate");
+
+  if (!isDiploma && !isCertificate) {
+    return { isValid: true, message: "", color: "#2e7d32" };
+  }
+
+  const theoryPercentage = (theoryNum / totalNum) * 100;
+  const practicalOjtPercentage = ((practicalNum + ojtNum) / totalNum) * 100;
+
+  const requiredTheory = isDiploma ? 40 : 20;
+  const requiredPracticalOjt = isDiploma ? 60 : 80;
+  const levelType = isDiploma ? "Diploma/Advanced Diploma" : "Certificate";
+
+  const tolerance = 0.5;
+  const isValidTheory = theoryPercentage >= requiredTheory - tolerance;
+  const isValidPractical =
+    practicalOjtPercentage <= requiredPracticalOjt + tolerance;
+  const isValid = isValidTheory && isValidPractical;
+
+  let message = "";
+  let color = "#2e7d32";
+
+  if (!isValid) {
+    color = "#c62828";
+    const issues = [];
+    if (!isValidTheory) {
+      issues.push(
+        `Theory ${theoryPercentage.toFixed(1)}% (minimum ${requiredTheory}%)`,
+      );
+    }
+    if (!isValidPractical) {
+      issues.push(
+        `Practical+OJT ${practicalOjtPercentage.toFixed(1)}% (maximum ${requiredPracticalOjt}%)`,
+      );
+    }
+    message = `❌ Invalid distribution for ${levelType}: ${issues.join("; ")}`;
+  } else {
+    // Check if practical+OJT is too low (optional warning)
+    const minPracticalOjtPercentage = requiredPracticalOjt - 30;
+    if (practicalOjtPercentage < minPracticalOjtPercentage) {
+      color = "#e65100";
+      message = `⚠️ Practical+OJT ${practicalOjtPercentage.toFixed(1)}% is low (expected ~${requiredPracticalOjt}%) for ${levelType}`;
+    } else {
+      message = `✅ Valid distribution for ${levelType}: Theory ${theoryPercentage.toFixed(1)}% (min ${requiredTheory}%), Practical+OJT ${practicalOjtPercentage.toFixed(1)}% (max ${requiredPracticalOjt}%)`;
+    }
+  }
+
+  return { isValid, message, color };
+};
+
+// Helper to render duration distribution validation
+const renderDurationDistributionValidation = (values, certificateLevels) => {
+  const { programmeTypeId, totalProgramDuration, certificateLevelId } = values;
+
+  if (
+    parseInt(programmeTypeId) !== 41 ||
+    !totalProgramDuration ||
+    !certificateLevelId
+  ) {
+    return null;
+  }
+
+  const totalNum = extractNumericValue(totalProgramDuration);
+  if (totalNum === 0) return null;
+
+  const theoryNum = extractNumericValue(values.totalTheoryDuration);
+  const practicalNum = extractNumericValue(values.totalPracticalDuration);
+  const ojtNum = extractNumericValue(values.totalOjtDuration);
+
+  const result = validateBQFDurationDistribution(
+    totalNum,
+    theoryNum,
+    practicalNum,
+    ojtNum,
+    certificateLevelId,
+    certificateLevels,
+  );
+
+  if (!result.message) return null;
+
+  const paperStyles = getPaperStyles(result.color);
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2,
+        borderRadius: 1,
+        display: "flex",
+        flexDirection: "column",
+        gap: 0.5,
+        ...paperStyles,
+      }}
+    >
+      <Typography variant="body2" fontWeight="bold">
+        {result.message}
+      </Typography>
+      <Typography variant="caption">
+        Total: {totalNum} hours | Theory: {theoryNum} hours | Practical:{" "}
+        {practicalNum} hours | OJT: {ojtNum} hours
+      </Typography>
+    </Paper>
+  );
+};
+
 // ==================== EXTRACTED HELPER FUNCTIONS ====================
 
 // Populate curriculum fields for endorse
@@ -609,7 +740,7 @@ const CurriculumForm = ({
     return "";
   };
 
-  // Render duration validation message - REFACTORED
+  // Render duration validation message
   const renderDurationValidation = () => {
     const { programmeTypeId, certificateLevelId } = formik.values;
 
@@ -645,6 +776,14 @@ const CurriculumForm = ({
           {message}
         </Typography>
       </Paper>
+    );
+  };
+
+  // Render duration distribution validation - FIXED: renamed to avoid recursion
+  const renderDurationDistributionValidationUI = () => {
+    return renderDurationDistributionValidation(
+      formik.values,
+      certificateLevels,
     );
   };
 
@@ -1309,6 +1448,9 @@ const CurriculumForm = ({
       {/* Duration Validation Message */}
       <Grid size={{ xs: 12 }}>{renderDurationValidation()}</Grid>
 
+      {/* Duration Distribution Validation Message - FIXED: using renamed function */}
+      <Grid size={{ xs: 12 }}>{renderDurationDistributionValidationUI()}</Grid>
+
       {/* Entry Requirement */}
       <Grid size={{ xs: 12, md: 12 }}>
         <TextField
@@ -1928,7 +2070,7 @@ const CurriculumIndex = () => {
       programmeTypeId: Yup.string().required("Programme Type is required"),
       curriculumTitle: Yup.string().required("Curriculum Title is required"),
       programmeTitle: Yup.string().when("programmeTypeId", {
-        is: (val) => val && parseInt(val) === 42, // Non-BQF Course
+        is: (val) => val && parseInt(val) === 42,
         then: (schema) =>
           schema.required("Programme Title is required for Non-BQF Programme"),
         otherwise: (schema) => schema.notRequired(),
@@ -1938,19 +2080,19 @@ const CurriculumIndex = () => {
         "Certificate Level is required",
       ),
       sectorId: Yup.string().when("programmeTypeId", {
-        is: (val) => val && parseInt(val) === 41, // BQF Course
+        is: (val) => val && parseInt(val) === 41,
         then: (schema) =>
           schema.required("Sector is required for BQF Programme"),
         otherwise: (schema) => schema.notRequired(),
       }),
       occupationId: Yup.string().when("programmeTypeId", {
-        is: (val) => val && parseInt(val) === 41, // BQF Course
+        is: (val) => val && parseInt(val) === 41,
         then: (schema) =>
           schema.required("Occupation is required for BQF Programme"),
         otherwise: (schema) => schema.notRequired(),
       }),
       ncsId: Yup.string().when("programmeTypeId", {
-        is: (val) => val && parseInt(val) === 41, // BQF Course
+        is: (val) => val && parseInt(val) === 41,
         then: (schema) => {
           if (isAdd) {
             return schema.required(
@@ -2004,83 +2146,114 @@ const CurriculumIndex = () => {
             return numericValue >= 140;
           },
         )
-        .test("duration-distribution", function (value) {
-          const {
-            totalTheoryDuration,
-            totalPracticalDuration,
-            totalOjtDuration,
-            certificateLevelId,
-            programmeTypeId,
-          } = this.parent;
+        // BQF Duration Distribution Validation
+        .when("programmeTypeId", {
+          is: (val) => val && parseInt(val) === 41,
+          then: (schema) =>
+            schema.test("duration-distribution", function (value) {
+              const {
+                totalTheoryDuration,
+                totalPracticalDuration,
+                totalOjtDuration,
+                certificateLevelId,
+                programmeTypeId,
+              } = this.parent;
 
-          // Only validate for BQF courses
-          if (parseInt(programmeTypeId) !== 41) {
-            return true;
-          }
+              // Only validate for BQF courses
+              if (parseInt(programmeTypeId) !== 41) {
+                return true;
+              }
 
-          if (!value || !certificateLevelId) return true;
+              if (!value || !certificateLevelId) return true;
 
-          const theoryNum = extractNumericValue(totalTheoryDuration);
-          const practicalNum = extractNumericValue(totalPracticalDuration);
-          const ojtNum = extractNumericValue(totalOjtDuration);
-          const totalNum = theoryNum + practicalNum + ojtNum;
+              const theoryNum = extractNumericValue(totalTheoryDuration);
+              const practicalNum = extractNumericValue(totalPracticalDuration);
+              const ojtNum = extractNumericValue(totalOjtDuration);
+              const totalNum = extractNumericValue(value);
 
-          if (totalNum === 0) return true;
+              if (totalNum === 0) return true;
 
-          const certificateLevel = certificateLevels.find(
-            (level) => level.id === parseInt(certificateLevelId),
-          );
+              // Find the certificate level
+              const certificateLevel = certificateLevels.find(
+                (level) => level.id === parseInt(certificateLevelId),
+              );
 
-          if (!certificateLevel) return true;
+              if (!certificateLevel) return true;
 
-          const levelName = certificateLevel.name.toLowerCase();
-          const isDiploma = levelName.includes("diploma");
-          const isAdvancedDiploma = levelName.includes("advanced diploma");
-          const isCertificate = levelName.includes("certificate");
+              const levelName = certificateLevel.name.toLowerCase();
 
-          let requiredTheoryPercentage = 0;
-          let requiredPracticalOjtPercentage = 0;
+              // Determine requirements based on certificate level
+              let requiredTheoryPercentage = 0;
+              let requiredPracticalOjtPercentage = 0;
+              let levelType = "";
 
-          if (isDiploma || isAdvancedDiploma) {
-            requiredTheoryPercentage = 40;
-            requiredPracticalOjtPercentage = 60;
-          } else if (isCertificate) {
-            requiredTheoryPercentage = 20;
-            requiredPracticalOjtPercentage = 80;
-          } else {
-            return true;
-          }
+              // Check for Diploma or Advanced Diploma
+              if (
+                levelName.includes("diploma") ||
+                levelName.includes("advanced diploma")
+              ) {
+                requiredTheoryPercentage = 40;
+                requiredPracticalOjtPercentage = 60;
+                levelType = "Diploma/Advanced Diploma";
+              }
+              // Check for Certificate
+              else if (levelName.includes("certificate")) {
+                requiredTheoryPercentage = 20;
+                requiredPracticalOjtPercentage = 80;
+                levelType = "Certificate";
+              } else {
+                // If level doesn't match known types, skip validation
+                return true;
+              }
 
-          const theoryPercentage = (theoryNum / totalNum) * 100;
-          const practicalOjtPercentage =
-            ((practicalNum + ojtNum) / totalNum) * 100;
+              const theoryPercentage = (theoryNum / totalNum) * 100;
+              const practicalOjtPercentage =
+                ((practicalNum + ojtNum) / totalNum) * 100;
 
-          const tolerance = 0.5;
+              // Use a small tolerance for floating point calculations
+              const tolerance = 0.5;
 
-          if (theoryPercentage < requiredTheoryPercentage - tolerance) {
-            return this.createError({
-              message: `Theory duration (${theoryPercentage.toFixed(
-                1,
-              )}%) must be at least ${requiredTheoryPercentage}% of total program duration for ${
-                certificateLevel.name
-              }. Current theory: ${theoryNum} hours out of ${totalNum} total hours.`,
-            });
-          }
+              // Check Theory percentage
+              if (theoryPercentage < requiredTheoryPercentage - tolerance) {
+                return this.createError({
+                  message: `❌ Theory duration (${theoryPercentage.toFixed(
+                    1,
+                  )}%) is less than the required ${requiredTheoryPercentage}% for ${levelType}. 
+                  Current theory: ${theoryNum} hours out of ${totalNum} total hours. 
+                  Required minimum theory: ${(totalNum * requiredTheoryPercentage) / 100} hours.`,
+                });
+              }
 
-          if (
-            practicalOjtPercentage >
-            requiredPracticalOjtPercentage + tolerance
-          ) {
-            return this.createError({
-              message: `Practical + OJT duration (${practicalOjtPercentage.toFixed(
-                1,
-              )}%) must not exceed ${requiredPracticalOjtPercentage}% of total program duration for ${
-                certificateLevel.name
-              }. Current practical + OJT: ${practicalNum + ojtNum} hours out of ${totalNum} total hours.`,
-            });
-          }
+              // Check Practical + OJT percentage
+              if (
+                practicalOjtPercentage >
+                requiredPracticalOjtPercentage + tolerance
+              ) {
+                return this.createError({
+                  message: `❌ Practical + OJT duration (${practicalOjtPercentage.toFixed(
+                    1,
+                  )}%) exceeds the allowed ${requiredPracticalOjtPercentage}% for ${levelType}. 
+                  Current practical + OJT: ${practicalNum + ojtNum} hours out of ${totalNum} total hours. 
+                  Maximum allowed practical + OJT: ${(totalNum * requiredPracticalOjtPercentage) / 100} hours.`,
+                });
+              }
 
-          return true;
+              // Check if Practical + OJT is too low (optional warning)
+              const minPracticalOjtPercentage =
+                requiredPracticalOjtPercentage - 30;
+              if (practicalOjtPercentage < minPracticalOjtPercentage) {
+                return this.createError({
+                  message: `⚠️ Practical + OJT duration (${practicalOjtPercentage.toFixed(
+                    1,
+                  )}%) is too low. 
+                  For ${levelType}, practical and OJT should be approximately ${requiredPracticalOjtPercentage}% of total duration. 
+                  Current practical + OJT: ${practicalNum + ojtNum} hours out of ${totalNum} total hours.`,
+                });
+              }
+
+              return true;
+            }),
+          otherwise: (schema) => schema,
         }),
     });
   };
@@ -2100,6 +2273,29 @@ const CurriculumIndex = () => {
       );
       setSubmitting(false);
       return;
+    }
+
+    // Validate BQF duration distribution before submission
+    if (parseInt(values.programmeTypeId) === 41) {
+      const theoryNum = extractNumericValue(values.totalTheoryDuration);
+      const practicalNum = extractNumericValue(values.totalPracticalDuration);
+      const ojtNum = extractNumericValue(values.totalOjtDuration);
+      const totalNum = extractNumericValue(values.totalProgramDuration);
+
+      const result = validateBQFDurationDistribution(
+        totalNum,
+        theoryNum,
+        practicalNum,
+        ojtNum,
+        values.certificateLevelId,
+        certificateLevels,
+      );
+
+      if (!result.isValid) {
+        toast.error(result.message);
+        setSubmitting(false);
+        return;
+      }
     }
 
     if (actionType === "add") setLoading(true);

@@ -37,13 +37,13 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import PaymentIcon from "@mui/icons-material/Payment";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EngineeringIcon from "@mui/icons-material/Engineering";
 import { toast } from "react-toastify";
-import ManageHistoryIcon from '@mui/icons-material/ManageHistory';
+import ManageHistoryIcon from "@mui/icons-material/ManageHistory";
+import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
@@ -68,7 +68,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [assessors, setAssessors] = useState([]);
   const [selectedAssessor, setSelectedAssessor] = useState("");
   const [assignedAssessors, setAssignedAssessors] = useState([]);
-
+  const [listAssignedAssessors, setListAssignedAssessors] = useState([]);
   // State for CA dates (only used when they don't exist in course details)
   const [caStartDate, setCaStartDate] = useState("");
   const [caEndDate, setCaEndDate] = useState("");
@@ -127,10 +127,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   // Check if service_id is 39 for Viva assessments
   const isServiceId39 = courseDetails?.service_id === "39";
 
-  // Check if CA dates are null (both start and end dates are null/empty)
-  const areCADatesNull =
-    !courseDetails?.ca_start_date && !courseDetails?.ca_end_date;
-
   // Helper function to check if certification level requires numeric input (only 111 and 112)
   const isNumericCertificationLevel = () => {
     const levelId = courseDetails?.certification_level_id;
@@ -142,8 +138,171 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return paymentStatus && paymentStatus.paymentStatus === "paid";
   };
 
-  // Check if approve button should be enabled (only when payment is paid)
-  const isApproveEnabled = paymentStatus && paymentStatus.paymentStatus === "paid";
+  // Check if CA dates are valid (when they need to be provided)
+  const areCADatesValid = () => {
+    if (hasCADatesInCourse) {
+      return true; // CA dates already exist in course, no need to validate
+    }
+    // When CA dates don't exist in course, both must be provided and end date >= start date
+    return (
+      caStartDate && caEndDate && new Date(caEndDate) >= new Date(caStartDate)
+    );
+  };
+
+  // Check if all trainees have assessment values
+  const allTraineesHaveAssessments = () => {
+    if (!hasInternalAssessmentForCourse) {
+      return true; // No assessment columns, so validation passes
+    }
+
+    // Check if all selected trainees have assessment values
+    return selectedTrainees.every((trainee) => {
+      const hasInternalAssessment =
+        trainee.internal_assessment !== null &&
+        trainee.internal_assessment !== "";
+
+      if (!hasInternalAssessment) {
+        return true; // Skip validation for trainees without CA marks
+      }
+
+      if (isServiceId39) {
+        // For service_id 39: Check Viva and Practical
+        const vivaValue = traineeVivaAssessments[trainee.id];
+        const practicalValue = traineeVivaPracticalAssessments[trainee.id];
+        return (
+          vivaValue &&
+          vivaValue !== "" &&
+          practicalValue &&
+          practicalValue !== ""
+        );
+      } else {
+        // For other services: Check Theory and Practical
+        const theoryValue = traineeTheoryAssessments[trainee.id];
+        const practicalValue = traineePracticalAssessments[trainee.id];
+        return (
+          theoryValue &&
+          theoryValue !== "" &&
+          practicalValue &&
+          practicalValue !== ""
+        );
+      }
+    });
+  };
+
+  // Check if assessors are assigned (when CA marks exist)
+  const areAssessorsAssigned = () => {
+    if (!allCAmarksExist) {
+      return false; // If CA marks don't exist, assessors are not required yet
+    }
+    return assignedAssessors.length > 0 || listAssignedAssessors.length > 0;
+  };
+
+  // Check if Generate PA button should be enabled
+  const isGeneratePAEnabled = () => {
+    // Must have all CA marks exist
+    if (!allCAmarksExist) {
+      return false;
+    }
+    return true;
+  };
+
+  // Check if Submit (55) button should be enabled
+  // Flow: CA Start Date & CA End Date must be set (when not in course)
+  const isSubmitEnabled = () => {
+    // Must have CA dates valid (either from course or provided)
+    if (!areCADatesValid()) {
+      return false;
+    }
+    return true;
+  };
+
+  // Check if Submit button should be shown
+  const shouldShowSubmitButton = () => {
+    // Show Submit button only when CA marks don't exist
+    return !allCAmarksExist && currentRoleId == 9;
+  };
+
+  // Check if Approve button should be shown
+  const shouldShowApproveButton = () => {
+    // Approve button only shows when payment is paid
+    return isPaymentCompleted() && currentRoleId == 9;
+  };
+
+  // Check if Approve button should be enabled
+  // Flow: Assessors Assigned → All Assessments Filled → Approve
+  const isApproveEnabled = () => {
+    // 1. Must have assessors assigned
+    if (!areAssessorsAssigned()) {
+      return false;
+    }
+    // 2. Must have all assessment values filled
+    if (!allTraineesHaveAssessments()) {
+      return false;
+    }
+    // 3. Must have CA dates valid (either from course or provided)
+    if (!areCADatesValid()) {
+      return false;
+    }
+    return true;
+  };
+
+  // Check if Endorse (59) button should be enabled
+  const isEndorseEnabled = () => {
+    // Must have CA dates valid (either from course or provided)
+    if (!areCADatesValid()) {
+      return false;
+    }
+    // Must have payment completed
+    if (!isPaymentCompleted()) {
+      return false;
+    }
+    // Must have assessors assigned
+    if (!areAssessorsAssigned()) {
+      return false;
+    }
+    // Must have all assessment values filled
+    if (!allTraineesHaveAssessments()) {
+      return false;
+    }
+    return true;
+  };
+
+  // Get Submit validation message
+  const getSubmitValidationMessage = () => {
+    if (!areCADatesValid()) {
+      if (!caStartDate || !caEndDate) {
+        return "Please provide both CA Start Date and CA End Date";
+      }
+      if (new Date(caEndDate) < new Date(caStartDate)) {
+        return "CA End Date cannot be earlier than CA Start Date";
+      }
+    }
+    return "";
+  };
+
+  // Get Approve/Endorse validation message
+  const getApprovalValidationMessage = () => {
+    if (!areCADatesValid()) {
+      return "Please provide both CA Start Date and CA End Date";
+    }
+    if (!areAssessorsAssigned()) {
+      return "At least one assessor must be assigned before approval";
+    }
+    if (!allTraineesHaveAssessments()) {
+      if (isServiceId39) {
+        return "All trainees must have Viva and Practical assessment values";
+      } else {
+        return "All trainees must have Theory and Practical assessment values";
+      }
+    }
+    return "";
+  };
+
+  // Check if assessment fields should be read-only
+  const isAssessmentReadOnly = () => {
+    // If payment is not completed OR role is 22, assessments should be read-only
+    return !isPaymentCompleted() || currentRoleId == 22;
+  };
 
   // Helper function to get service code based on service_id
   const getServiceCodeByServiceId = useCallback((serviceId) => {
@@ -152,7 +311,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     // Map service_id to service codes
     const serviceCodeMap = {
       39: 100586, // RPL course
-      37: 100584, // Accredited course 
+      37: 100584, // Accredited course
       // Add more mappings as needed
     };
 
@@ -166,6 +325,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     fetchAcademicCompetency();
     fetchAssessors();
     fetchPaymentStatus();
+    fetchAssignedAssessors();
   }, []);
 
   // Fetch course details and selected trainees when dependencies are ready
@@ -195,6 +355,39 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   useEffect(() => {
     checkCAmarksExist();
   }, [selectedTrainees]);
+
+  // Populate assigned assessors when both lists are available
+  useEffect(() => {
+    if (listAssignedAssessors.length > 0 && assessors.length > 0) {
+      const assignedAssessorsWithDetails = listAssignedAssessors
+        .map((assigned) => {
+          const assessorDetail = assessors.find(
+            (ass) => ass.userId === assigned.user_id,
+          );
+          if (assessorDetail) {
+            return {
+              id: assessorDetail.id,
+              userId: assessorDetail.userId,
+              name: assessorDetail.name,
+              email: assessorDetail.email,
+              mobileNo: assessorDetail.mobileNo,
+              designation: assessorDetail.designation || "Assessor",
+              location: assessorDetail.location || "N/A",
+              assignedDate: assigned.created_at || new Date().toISOString(),
+              assignedBy: assigned.assigned_by || actionId,
+            };
+          }
+          return null;
+        })
+        .filter((item) => item !== null);
+
+      setAssignedAssessors(assignedAssessorsWithDetails);
+      console.log(
+        "Assigned assessors with details:",
+        assignedAssessorsWithDetails,
+      );
+    }
+  }, [listAssignedAssessors, assessors]);
 
   const fetchAcademicQualification = async () => {
     try {
@@ -315,6 +508,20 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
+  const fetchAssignedAssessors = async () => {
+    try {
+      const response = await CourseEnrollmentService.fetchAssignedAssessors(
+        applicationNo,
+        access_token,
+      );
+      setListAssignedAssessors(response.data);
+      console.log("List of Assigned assessors fetched:", response.data);
+    } catch (error) {
+      console.error("Error fetching assigned assessors:", error);
+      setListAssignedAssessors([]);
+    }
+  };
+
   const fetchInstituteData = async () => {
     try {
       if (!courseDetails?.registration_no) {
@@ -346,7 +553,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         );
 
       const trainees = response.data || [];
-
+      console.log("Fetched trainees:", trainees);
       // Filter only selected trainees
       const selected = trainees.filter(
         (trainee) => trainee.status_id === selectedStatusId?.toString(),
@@ -616,7 +823,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   };
 
   const handleAction = async () => {
-    // StatusId 58 = Reject, StatusId 57 = Approve
+    // StatusId 55 = Submit, 57 = Approve, 58 = Reject, 59 = Endorse
     if (currentAction === 58 && !remarks.trim()) {
       setRemarksError("Remarks are required for rejection");
       return;
@@ -635,7 +842,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           : null,
         assignedRoleId: currentRoleId,
         remarks:
-          currentAction === 58 ? remarks : remarks || "Application approved",
+          currentAction === 58 ? remarks : remarks || "Application submitted",
       };
 
       // Only add CA dates to payload if they DON'T exist in course details
@@ -708,7 +915,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         }));
       }
 
-      console.log("Final approval payload:", payload);
+      console.log("Final payload:", payload);
 
       // Call the API to update the application with marks
       const response = await CourseEnrollmentService.updateTraineeApplication(
@@ -717,21 +924,23 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       );
 
       if (response.status === 200 || response.status === 201) {
-        toast.success(
-          `Course selection ${currentAction === 57 ? "approved" : "rejected"} successfully!`,
-        );
+        const actionName =
+          currentAction === 55
+            ? "submitted"
+            : currentAction === 57
+              ? "approved"
+              : currentAction === 59
+                ? "endorsed"
+                : "rejected";
+        toast.success(`Course selection ${actionName} successfully!`);
         closeDialog();
         await fetchData();
         navigate("/tasklist/task-details-index");
       }
     } catch (error) {
-      console.error(
-        `Error ${currentAction === 57 ? "approving" : "rejecting"} course selection:`,
-        error,
-      );
+      console.error(`Error updating course selection:`, error);
       toast.error(
-        error.response?.data?.message ||
-          `Failed to ${currentAction === 57 ? "approve" : "reject"} course selection`,
+        error.response?.data?.message || `Failed to update course selection`,
       );
     } finally {
       setActionLoading(false);
@@ -754,18 +963,51 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const isActionDisabled = () => {
     const statusId = currentStatusId;
-    // StatusId 57 = Approved, StatusId 58 = Rejected
-    return statusId === 57 || statusId === 58;
+    // StatusId 55 = Submitted, 57 = Approved, 58 = Rejected, 59 = Endorsed
+    return (
+      statusId === 55 || statusId === 57 || statusId === 58 || statusId === 59
+    );
   };
 
   const getDialogTitle = () => {
-    return currentAction === 57
-      ? "Approve Course Selection"
-      : "Reject Course Selection";
+    if (currentAction === 55) return "Submit Course Selection";
+    if (currentAction === 57) return "Approve Course Selection";
+    if (currentAction === 59) return "Endorse Course Selection";
+    return "Reject Course Selection";
   };
 
   const getDialogContent = () => {
-    if (currentAction === 57) {
+    if (currentAction === 55) {
+      return (
+        <DialogContentText>
+          Are you sure you want to submit this course selection?
+          <br />
+          <strong>Application No: {applicationNo}</strong>
+          <br />
+          <strong>Course Name: {courseDetails?.course_name}</strong>
+          <br />
+          <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
+          {!hasCADatesInCourse && caStartDate && caEndDate && (
+            <>
+              <br />
+              <strong>CA Start Date: {formatDate(caStartDate)}</strong>
+              <br />
+              <strong>CA End Date: {formatDate(caEndDate)}</strong>
+            </>
+          )}
+          {hasInternalAssessmentForCourse && (
+            <>
+              <br />
+              <br />
+              <strong>
+                Note: CA Mark/Competency values will be saved with this
+                submission.
+              </strong>
+            </>
+          )}
+        </DialogContentText>
+      );
+    } else if (currentAction === 57) {
       return (
         <DialogContentText>
           Are you sure you want to approve this course selection?
@@ -799,6 +1041,52 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                 Note:{" "}
                 {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
                 assessments will be saved with this approval.
+              </strong>
+            </>
+          )}
+          {assignedAssessors.length > 0 && (
+            <>
+              <br />
+              <br />
+              <strong>Assigned Assessors: {assignedAssessors.length}</strong>
+            </>
+          )}
+        </DialogContentText>
+      );
+    } else if (currentAction === 59) {
+      return (
+        <DialogContentText>
+          Are you sure you want to endorse this course selection?
+          <br />
+          <strong>Application No: {applicationNo}</strong>
+          <br />
+          <strong>Course Name: {courseDetails?.course_name}</strong>
+          <br />
+          <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
+          {paymentStatus && paymentStatus.paymentAdviceNo && (
+            <>
+              <br />
+              <strong>
+                Payment Advice No: {paymentStatus.paymentAdviceNo}
+              </strong>
+            </>
+          )}
+          {!hasCADatesInCourse && caStartDate && caEndDate && (
+            <>
+              <br />
+              <strong>CA Start Date: {formatDate(caStartDate)}</strong>
+              <br />
+              <strong>CA End Date: {formatDate(caEndDate)}</strong>
+            </>
+          )}
+          {hasInternalAssessmentForCourse && (
+            <>
+              <br />
+              <br />
+              <strong>
+                Note:{" "}
+                {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
+                assessments will be saved with this endorsement.
               </strong>
             </>
           )}
@@ -861,12 +1149,18 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   };
 
   const getConfirmButtonColor = () => {
-    return currentAction === 57 ? "success" : "error";
+    if (currentAction === 55) return "primary";
+    if (currentAction === 57) return "success";
+    if (currentAction === 59) return "info";
+    return "error";
   };
 
   const getConfirmButtonText = () => {
     if (actionLoading) return <CircularProgress size={24} />;
-    return currentAction === 57 ? "Confirm Approve" : "Confirm Reject";
+    if (currentAction === 55) return "Confirm Submit";
+    if (currentAction === 57) return "Confirm Approve";
+    if (currentAction === 59) return "Confirm Endorse";
+    return "Confirm Reject";
   };
 
   const handleRefresh = () => {
@@ -1066,7 +1360,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                 </Grid>
               )}
             </Grid>
-            {paymentStatus.redirectUrl && (
+            {/* Only show Proceed to Payment button if payment is NOT completed */}
+            {paymentStatus.redirectUrl && !isPaymentCompleted() && (
               <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
                 <Button
                   variant="contained"
@@ -1187,7 +1482,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   size="small"
                   value={caStartDate}
                   onChange={(e) => setCaStartDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                  }}
                   disabled={isActionDisabled()}
                 />
               </Grid>
@@ -1200,11 +1497,15 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   size="small"
                   value={caEndDate}
                   onChange={(e) => setCaEndDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  disabled={isActionDisabled()}
-                  inputProps={{
-                    min: caStartDate || undefined,
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                    input: {
+                      inputProps: {
+                        min: caStartDate || undefined,
+                      },
+                    },
                   }}
+                  disabled={isActionDisabled()}
                 />
               </Grid>
             </Grid>
@@ -1247,8 +1548,16 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                       key={ass.id}
                       label={`${ass.name} (${ass.userId})`}
                       color="success"
-                      onDelete={() => openDeleteAssessorDialog(ass)}
-                      deleteIcon={<DeleteIcon sx={{ color: "#d32f2f" }} />}
+                      onDelete={
+                        currentRoleId == 9
+                          ? () => openDeleteAssessorDialog(ass)
+                          : undefined
+                      }
+                      deleteIcon={
+                        currentRoleId == 9 ? (
+                          <DeleteIcon sx={{ color: "#d32f2f" }} />
+                        ) : undefined
+                      }
                       sx={{
                         mb: 1,
                         "& .MuiChip-deleteIcon": {
@@ -1264,140 +1573,148 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Box>
             )}
 
-            <Grid container spacing={2} alignItems="center">
-              <Grid item size={{ xs: 12, md: 8 }}>
-                <Autocomplete
-                  fullWidth
-                  size="small"
-                  options={availableAssessors}
-                  getOptionLabel={(option) =>
-                    `${option.name} (${option.userId})`
-                  }
-                  value={selectedAssessorDetails || null}
-                  onChange={(event, newValue) => {
-                    setSelectedAssessor(newValue ? newValue.id : "");
-                  }}
-                  filterOptions={(options, state) => {
-                    const searchTerm = state.inputValue.toLowerCase().trim();
-                    // Only show results if search term has at least 2 characters
-                    if (!searchTerm || searchTerm.length < 2) {
-                      return [];
+            {/* Add Assessor Section - Only for Role 9 */}
+            {currentRoleId == 9 && (
+              <Grid container spacing={2} alignItems="center">
+                <Grid item size={{ xs: 12, md: 8 }}>
+                  <Autocomplete
+                    fullWidth
+                    size="small"
+                    options={availableAssessors}
+                    getOptionLabel={(option) =>
+                      `${option.name} (${option.userId})`
                     }
-
-                    return options.filter(
-                      (option) =>
-                        option.name.toLowerCase().includes(searchTerm) ||
-                        option.userId?.toLowerCase().includes(searchTerm) ||
-                        option.email?.toLowerCase().includes(searchTerm) ||
-                        option.mobileNo?.includes(searchTerm),
-                    );
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Search Assessor by Name or User ID"
-                      placeholder="Type at least 2 characters to search..."
-                    />
-                  )}
-                  renderOption={(props, option) => (
-                    <li {...props}>
-                      <Box>
-                        <Typography variant="body2">{option.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          User ID: {option.userId} | Email:{" "}
-                          {option.email || "N/A"} | Mobile:{" "}
-                          {option.mobileNo || "N/A"}
-                        </Typography>
-                      </Box>
-                    </li>
-                  )}
-                  noOptionsText="No assessors available"
-                  loadingText="Loading..."
-                  disabled={availableAssessors.length === 0}
-                  openOnFocus={false}
-                />
-              </Grid>
-
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="medium"
-                  startIcon={<PersonAddIcon />}
-                  onClick={handleAddAssessor}
-                  disabled={
-                    !selectedAssessor || availableAssessors.length === 0
-                  }
-                  sx={{
-                    fontWeight: 600,
-                    textTransform: "none",
-                    width: "100%",
-                  }}
-                >
-                  Add Assessor
-                </Button>
-              </Grid>
-            </Grid>
-
-            {/* Selected Assessor Details Preview */}
-            {selectedAssessor && selectedAssessorDetails && (
-              <Box
-                sx={{
-                  mt: 2,
-                  p: 2,
-                  bgcolor: "action.hover",
-                  borderRadius: 1,
-                }}
-              >
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  Selected Assessor Details:
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item size={{ xs: 12, md: 3 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Name
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {selectedAssessorDetails.name}
-                    </Typography>
-                  </Grid>
-                  <Grid item size={{ xs: 12, md: 3 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      User ID
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {selectedAssessorDetails.userId}
-                    </Typography>
-                  </Grid>
-                  <Grid item size={{ xs: 12, md: 3 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Email
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {selectedAssessorDetails.email || "N/A"}
-                    </Typography>
-                  </Grid>
-                  <Grid item size={{ xs: 12, md: 3 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Mobile No
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {selectedAssessorDetails.mobileNo || "N/A"}
-                    </Typography>
-                  </Grid>
+                    value={selectedAssessorDetails || null}
+                    onChange={(event, newValue) => {
+                      setSelectedAssessor(newValue ? newValue.id : "");
+                    }}
+                    filterOptions={(options, state) => {
+                      const searchTerm = state.inputValue.toLowerCase().trim();
+                      if (!searchTerm || searchTerm.length < 2) {
+                        return [];
+                      }
+                      return options.filter(
+                        (option) =>
+                          option.name.toLowerCase().includes(searchTerm) ||
+                          option.userId?.toLowerCase().includes(searchTerm) ||
+                          option.email?.toLowerCase().includes(searchTerm) ||
+                          option.mobileNo?.includes(searchTerm),
+                      );
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Search Assessor by Name or User ID"
+                        placeholder="Type at least 2 characters to search..."
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <li {...props}>
+                        <Box>
+                          <Typography variant="body2">{option.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            User ID: {option.userId} | Email:{" "}
+                            {option.email || "N/A"} | Mobile:{" "}
+                            {option.mobileNo || "N/A"}
+                          </Typography>
+                        </Box>
+                      </li>
+                    )}
+                    noOptionsText="No assessors available"
+                    loadingText="Loading..."
+                    disabled={availableAssessors.length === 0}
+                    openOnFocus={false}
+                  />
                 </Grid>
-              </Box>
+
+                <Grid item size={{ xs: 12, md: 4 }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="medium"
+                    startIcon={<PersonAddIcon />}
+                    onClick={handleAddAssessor}
+                    disabled={
+                      !selectedAssessor || availableAssessors.length === 0
+                    }
+                    sx={{
+                      fontWeight: 600,
+                      textTransform: "none",
+                      width: "100%",
+                    }}
+                  >
+                    Add Assessor
+                  </Button>
+                </Grid>
+              </Grid>
             )}
 
-            {/* Empty State */}
-            {assignedAssessors.length === 0 && (
+            {/* For Role 22 - Show message that assessors are already assigned */}
+            {currentRoleId == 22 && assignedAssessors.length > 0 && (
               <Alert severity="info" sx={{ mt: 2 }}>
-                No assessors have been assigned yet. Use the search above to add
+                Assessors have been assigned. You cannot add or remove
                 assessors.
               </Alert>
             )}
 
-            {/* Show no data message */}
+            {selectedAssessor &&
+              selectedAssessorDetails &&
+              currentRoleId == 9 && (
+                <Box
+                  sx={{
+                    mt: 2,
+                    p: 2,
+                    bgcolor: "action.hover",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                    Selected Assessor Details:
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Name
+                      </Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {selectedAssessorDetails.name}
+                      </Typography>
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        User ID
+                      </Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {selectedAssessorDetails.userId}
+                      </Typography>
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Email
+                      </Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {selectedAssessorDetails.email || "N/A"}
+                      </Typography>
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 3 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Mobile No
+                      </Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {selectedAssessorDetails.mobileNo || "N/A"}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
+
+            {assignedAssessors.length === 0 && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                <strong>Required:</strong> At least one assessor must be
+                assigned before approval.
+              </Alert>
+            )}
+
             {assessors.length === 0 && (
               <Alert severity="warning" sx={{ mt: 2 }}>
                 No assessors found. Please check if there are active assessor
@@ -1447,11 +1764,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   <TableCell>Email</TableCell>
                   <TableCell>Qualification</TableCell>
                   <TableCell>Status</TableCell>
-                  {/* Show CA Mark/Competency column only if CA dates exist */}
                   {hasCADatesInCourse && (
                     <TableCell>CA Mark/Competency</TableCell>
                   )}
-                  {/* Show Theory and Practical or Viva and Practical based on service_id */}
                   {hasInternalAssessmentForCourse && (
                     <>
                       <TableCell>
@@ -1460,11 +1775,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                           : "Theory Assessment"}
                       </TableCell>
                       <TableCell>Practical Assessment</TableCell>
-                      {/* Total column for level 111/112 */}
                       {isNumericCertificationLevel() && !isServiceId39 && (
                         <TableCell>Total</TableCell>
                       )}
-                      {/* Remarks column - common for all */}
                       <TableCell>Remarks</TableCell>
                     </>
                   )}
@@ -1479,14 +1792,29 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                         trainee.internal_assessment !== null &&
                         trainee.internal_assessment !== "";
 
-                      // Calculate total for level 111/112
-                      const theoryValue = isNumericCertificationLevel() && !isServiceId39
-                        ? parseInt(traineeTheoryAssessments[trainee.id]) || 0
-                        : 0;
-                      const practicalValue = isNumericCertificationLevel() && !isServiceId39
-                        ? parseInt(traineePracticalAssessments[trainee.id]) || 0
-                        : 0;
+                      const readOnly = isAssessmentReadOnly();
+
+                      const theoryValue =
+                        isNumericCertificationLevel() && !isServiceId39
+                          ? parseInt(traineeTheoryAssessments[trainee.id]) || 0
+                          : 0;
+                      const practicalValue =
+                        isNumericCertificationLevel() && !isServiceId39
+                          ? parseInt(traineePracticalAssessments[trainee.id]) ||
+                            0
+                          : 0;
                       const totalValue = theoryValue + practicalValue;
+
+                      // Show tooltip when read-only due to role 22
+                      const getReadOnlyTooltip = () => {
+                        if (currentRoleId == 22) {
+                          return "Assessment fields are read-only for Endorser role";
+                        }
+                        if (!isPaymentCompleted()) {
+                          return "Payment must be completed to edit assessment";
+                        }
+                        return "";
+                      };
 
                       return (
                         <TableRow key={trainee.id} hover>
@@ -1511,7 +1839,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                               sx={getStatusColor(trainee.status_id)}
                             />
                           </TableCell>
-                          {/* Show CA Mark/Competency value only if CA dates exist in course */}
                           {hasCADatesInCourse && (
                             <TableCell>
                               {isNumericCertificationLevel() ? (
@@ -1533,7 +1860,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                               )}
                             </TableCell>
                           )}
-                          {/* Render assessment columns based on service type */}
                           {hasInternalAssessmentForCourse && (
                             <>
                               {/* Theory/Viva Assessment Column */}
@@ -1541,60 +1867,128 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                 {hasInternalAssessment ? (
                                   isNumericCertificationLevel() ? (
                                     isServiceId39 ? (
-                                      <TextField
-                                        type="number"
-                                        size="small"
-                                        value={traineeVivaAssessments[trainee.id] || ""}
-                                        onChange={(e) =>
-                                          handleVivaAssessmentChange(trainee.id, e.target.value)
-                                        }
-                                        fullWidth
-                                        InputProps={{
-                                          inputProps: { min: 0, max: 100 },
-                                        }}
-                                        sx={{ minWidth: 100 }}
-                                      />
+                                      <Tooltip
+                                        title={getReadOnlyTooltip()}
+                                        arrow
+                                      >
+                                        <TextField
+                                          type="number"
+                                          size="small"
+                                          value={
+                                            traineeVivaAssessments[
+                                              trainee.id
+                                            ] || ""
+                                          }
+                                          onChange={(e) =>
+                                            handleVivaAssessmentChange(
+                                              trainee.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          fullWidth
+                                          slotProps={{
+                                            input: {
+                                              readOnly: readOnly,
+                                              inputProps: { min: 0, max: 100 },
+                                            },
+                                          }}
+                                          sx={{
+                                            minWidth: 100,
+                                            backgroundColor: readOnly
+                                              ? "#f5f5f5"
+                                              : "transparent",
+                                          }}
+                                        />
+                                      </Tooltip>
                                     ) : (
-                                      <TextField
-                                        type="number"
-                                        size="small"
-                                        value={traineeTheoryAssessments[trainee.id] || ""}
-                                        onChange={(e) =>
-                                          handleTheoryAssessmentChange(trainee.id, e.target.value)
-                                        }
-                                        fullWidth
-                                        InputProps={{
-                                          inputProps: { min: 0, max: 100 },
-                                        }}
-                                        sx={{ minWidth: 100 }}
-                                      />
+                                      <Tooltip
+                                        title={getReadOnlyTooltip()}
+                                        arrow
+                                      >
+                                        <TextField
+                                          type="number"
+                                          size="small"
+                                          value={
+                                            traineeTheoryAssessments[
+                                              trainee.id
+                                            ] || ""
+                                          }
+                                          onChange={(e) =>
+                                            handleTheoryAssessmentChange(
+                                              trainee.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          fullWidth
+                                          slotProps={{
+                                            input: {
+                                              readOnly: readOnly,
+                                              inputProps: { min: 0, max: 100 },
+                                            },
+                                          }}
+                                          sx={{
+                                            minWidth: 100,
+                                            backgroundColor: readOnly
+                                              ? "#f5f5f5"
+                                              : "transparent",
+                                          }}
+                                        />
+                                      </Tooltip>
                                     )
                                   ) : (
-                                    <FormControl size="small" fullWidth sx={{ minWidth: 130 }}>
-                                      <Select
-                                        value={isServiceId39 
-                                          ? (traineeVivaAssessments[trainee.id] || "")
-                                          : (traineeTheoryAssessments[trainee.id] || "")
-                                        }
-                                        onChange={(e) => {
-                                          if (isServiceId39) {
-                                            handleVivaAssessmentChange(trainee.id, e.target.value);
-                                          } else {
-                                            handleTheoryAssessmentChange(trainee.id, e.target.value);
-                                          }
-                                        }}
-                                        displayEmpty
+                                    <Tooltip title={getReadOnlyTooltip()} arrow>
+                                      <FormControl
+                                        size="small"
+                                        fullWidth
+                                        sx={{ minWidth: 130 }}
                                       >
-                                        <MenuItem value="" disabled>
-                                          <em>Select Competency</em>
-                                        </MenuItem>
-                                        {academicCompetency.map((competency) => (
-                                          <MenuItem key={competency.id} value={competency.id}>
-                                            {competency.name}
+                                        <Select
+                                          value={
+                                            isServiceId39
+                                              ? traineeVivaAssessments[
+                                                  trainee.id
+                                                ] || ""
+                                              : traineeTheoryAssessments[
+                                                  trainee.id
+                                                ] || ""
+                                          }
+                                          onChange={(e) => {
+                                            if (isServiceId39) {
+                                              handleVivaAssessmentChange(
+                                                trainee.id,
+                                                e.target.value,
+                                              );
+                                            } else {
+                                              handleTheoryAssessmentChange(
+                                                trainee.id,
+                                                e.target.value,
+                                              );
+                                            }
+                                          }}
+                                          displayEmpty
+                                          readOnly={readOnly}
+                                          sx={{
+                                            backgroundColor: readOnly
+                                              ? "#f5f5f5"
+                                              : "transparent",
+                                          }}
+                                        >
+                                          <MenuItem value="" disabled>
+                                            <em>Select Competency</em>
                                           </MenuItem>
-                                        ))}
-                                      </Select>
-                                    </FormControl>
+                                          {academicCompetency.map(
+                                            (competency) => (
+                                              <MenuItem
+                                                key={competency.id}
+                                                value={competency.id}
+                                              >
+                                                {competency.name}
+                                              </MenuItem>
+                                            ),
+                                          )}
+                                        </Select>
+                                      </FormControl>
+                                    </Tooltip>
                                   )
                                 ) : (
                                   <Typography
@@ -1612,60 +2006,128 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                 {hasInternalAssessment ? (
                                   isNumericCertificationLevel() ? (
                                     isServiceId39 ? (
-                                      <TextField
-                                        type="number"
-                                        size="small"
-                                        value={traineeVivaPracticalAssessments[trainee.id] || ""}
-                                        onChange={(e) =>
-                                          handleVivaPracticalAssessmentChange(trainee.id, e.target.value)
-                                        }
-                                        fullWidth
-                                        InputProps={{
-                                          inputProps: { min: 0, max: 100 },
-                                        }}
-                                        sx={{ minWidth: 100 }}
-                                      />
+                                      <Tooltip
+                                        title={getReadOnlyTooltip()}
+                                        arrow
+                                      >
+                                        <TextField
+                                          type="number"
+                                          size="small"
+                                          value={
+                                            traineeVivaPracticalAssessments[
+                                              trainee.id
+                                            ] || ""
+                                          }
+                                          onChange={(e) =>
+                                            handleVivaPracticalAssessmentChange(
+                                              trainee.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          fullWidth
+                                          slotProps={{
+                                            input: {
+                                              readOnly: readOnly,
+                                              inputProps: { min: 0, max: 100 },
+                                            },
+                                          }}
+                                          sx={{
+                                            minWidth: 100,
+                                            backgroundColor: readOnly
+                                              ? "#f5f5f5"
+                                              : "transparent",
+                                          }}
+                                        />
+                                      </Tooltip>
                                     ) : (
-                                      <TextField
-                                        type="number"
-                                        size="small"
-                                        value={traineePracticalAssessments[trainee.id] || ""}
-                                        onChange={(e) =>
-                                          handlePracticalAssessmentChange(trainee.id, e.target.value)
-                                        }
-                                        fullWidth
-                                        InputProps={{
-                                          inputProps: { min: 0, max: 100 },
-                                        }}
-                                        sx={{ minWidth: 100 }}
-                                      />
+                                      <Tooltip
+                                        title={getReadOnlyTooltip()}
+                                        arrow
+                                      >
+                                        <TextField
+                                          type="number"
+                                          size="small"
+                                          value={
+                                            traineePracticalAssessments[
+                                              trainee.id
+                                            ] || ""
+                                          }
+                                          onChange={(e) =>
+                                            handlePracticalAssessmentChange(
+                                              trainee.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          fullWidth
+                                          slotProps={{
+                                            input: {
+                                              readOnly: readOnly,
+                                              inputProps: { min: 0, max: 100 },
+                                            },
+                                          }}
+                                          sx={{
+                                            minWidth: 100,
+                                            backgroundColor: readOnly
+                                              ? "#f5f5f5"
+                                              : "transparent",
+                                          }}
+                                        />
+                                      </Tooltip>
                                     )
                                   ) : (
-                                    <FormControl size="small" fullWidth sx={{ minWidth: 130 }}>
-                                      <Select
-                                        value={isServiceId39 
-                                          ? (traineeVivaPracticalAssessments[trainee.id] || "")
-                                          : (traineePracticalAssessments[trainee.id] || "")
-                                        }
-                                        onChange={(e) => {
-                                          if (isServiceId39) {
-                                            handleVivaPracticalAssessmentChange(trainee.id, e.target.value);
-                                          } else {
-                                            handlePracticalAssessmentChange(trainee.id, e.target.value);
-                                          }
-                                        }}
-                                        displayEmpty
+                                    <Tooltip title={getReadOnlyTooltip()} arrow>
+                                      <FormControl
+                                        size="small"
+                                        fullWidth
+                                        sx={{ minWidth: 130 }}
                                       >
-                                        <MenuItem value="" disabled>
-                                          <em>Select Competency</em>
-                                        </MenuItem>
-                                        {academicCompetency.map((competency) => (
-                                          <MenuItem key={competency.id} value={competency.id}>
-                                            {competency.name}
+                                        <Select
+                                          value={
+                                            isServiceId39
+                                              ? traineeVivaPracticalAssessments[
+                                                  trainee.id
+                                                ] || ""
+                                              : traineePracticalAssessments[
+                                                  trainee.id
+                                                ] || ""
+                                          }
+                                          onChange={(e) => {
+                                            if (isServiceId39) {
+                                              handleVivaPracticalAssessmentChange(
+                                                trainee.id,
+                                                e.target.value,
+                                              );
+                                            } else {
+                                              handlePracticalAssessmentChange(
+                                                trainee.id,
+                                                e.target.value,
+                                              );
+                                            }
+                                          }}
+                                          displayEmpty
+                                          readOnly={readOnly}
+                                          sx={{
+                                            backgroundColor: readOnly
+                                              ? "#f5f5f5"
+                                              : "transparent",
+                                          }}
+                                        >
+                                          <MenuItem value="" disabled>
+                                            <em>Select Competency</em>
                                           </MenuItem>
-                                        ))}
-                                      </Select>
-                                    </FormControl>
+                                          {academicCompetency.map(
+                                            (competency) => (
+                                              <MenuItem
+                                                key={competency.id}
+                                                value={competency.id}
+                                              >
+                                                {competency.name}
+                                              </MenuItem>
+                                            ),
+                                          )}
+                                        </Select>
+                                      </FormControl>
+                                    </Tooltip>
                                   )
                                 ) : (
                                   <Typography
@@ -1678,40 +2140,63 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                 )}
                               </TableCell>
 
-                              {/* Total Column - Only for level 111/112 and not service_id 39 */}
-                              {isNumericCertificationLevel() && !isServiceId39 && (
-                                <TableCell>
-                                  {hasInternalAssessment ? (
-                                    <Typography variant="body2" fontWeight="bold">
-                                      {totalValue}
-                                    </Typography>
-                                  ) : (
-                                    <Typography
-                                      variant="body2"
-                                      color="textSecondary"
-                                      sx={{ fontStyle: "italic" }}
-                                    >
-                                      N/A
-                                    </Typography>
-                                  )}
-                                </TableCell>
-                              )}
+                              {isNumericCertificationLevel() &&
+                                !isServiceId39 && (
+                                  <TableCell>
+                                    {hasInternalAssessment ? (
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="bold"
+                                      >
+                                        {totalValue}
+                                      </Typography>
+                                    ) : (
+                                      <Typography
+                                        variant="body2"
+                                        color="textSecondary"
+                                        sx={{ fontStyle: "italic" }}
+                                      >
+                                        N/A
+                                      </Typography>
+                                    )}
+                                  </TableCell>
+                                )}
 
-                              {/* Remarks Column - Common for all */}
+                              {/* Remarks Column */}
                               <TableCell>
-                                <TextField
-                                  size="small"
-                                  fullWidth
-                                  multiline
-                                  rows={1}
-                                  value={traineeRemarks[trainee.id] || ""}
-                                  onChange={(e) =>
-                                    handleRemarksChange(trainee.id, e.target.value)
+                                <Tooltip
+                                  title={
+                                    currentRoleId == 22
+                                      ? "Remarks are read-only for Endorser role"
+                                      : ""
                                   }
-                                  placeholder="Add remarks..."
-                                  sx={{ minWidth: 120 }}
-                                  disabled={isActionDisabled()}
-                                />
+                                  arrow
+                                >
+                                  <TextField
+                                    size="small"
+                                    fullWidth
+                                    multiline
+                                    rows={1}
+                                    value={traineeRemarks[trainee.id] || ""}
+                                    onChange={(e) =>
+                                      handleRemarksChange(
+                                        trainee.id,
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="Add remarks..."
+                                    sx={{
+                                      minWidth: 120,
+                                      backgroundColor:
+                                        currentRoleId == 22
+                                          ? "#f5f5f5"
+                                          : "transparent",
+                                    }}
+                                    disabled={
+                                      currentRoleId == 22 || isActionDisabled()
+                                    }
+                                  />
+                                </Tooltip>
                               </TableCell>
                             </>
                           )}
@@ -1729,7 +2214,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             </Table>
           </TableContainer>
 
-          {/* Pagination */}
           <TablePagination
             rowsPerPageOptions={[5, 10, 25, 50]}
             component="div"
@@ -1747,73 +2231,71 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         sx={{ display: "flex", justifyContent: "space-between", gap: 2, mt: 3 }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {!paymentStatus ? (
-            <Tooltip
-              title={
-                !allCAmarksExist
-                  ? "CA Mark/Competency values are required for all selected trainees"
+          <Tooltip
+            title={
+              !isGeneratePAEnabled()
+                ? "CA Mark/Competency values are required for all selected trainees to generate payment"
+                : paymentStatus
+                  ? "Payment already generated"
                   : "Generate Payment Advice"
-              }
-              arrow
-            >
-              <span>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<ManageHistoryIcon />}
-                  onClick={handleGeneratePA}
-                  disabled={
-                    isActionDisabled() || actionLoading || !allCAmarksExist
-                  }
-                  sx={{
-                    px: 3,
-                    py: 0.5,
-                    fontWeight: 600,
-                    textTransform: "none",
-                  }}
-                >
-                  Generate PA
-                </Button>
-              </span>
-            </Tooltip>
-          ) : (
-            <>
-              {paymentStatus.redirectUrl && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<PaymentIcon />}
-                  onClick={() =>
-                    handleRedirectToPayment(paymentStatus.redirectUrl)
-                  }
-                  sx={{
-                    px: 3,
-                    py: 0.5,
-                    fontWeight: 600,
-                    textTransform: "none",
-                  }}
-                >
-                  Proceed to Payment
-                </Button>
-              )}
-              {isPaymentCompleted() && (
-                <Chip label="Payment Completed" color="success" size="small" />
-              )}
-            </>
-          )}
-
-          {/* Show message when CA marks are missing */}
-          {!allCAmarksExist &&
-            !paymentStatus &&
-            selectedTrainees.length > 0 && (
-              <Typography
-                variant="caption"
-                color="error"
-                sx={{ alignSelf: "center" }}
+            }
+            arrow
+          >
+            <span>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<ManageHistoryIcon />}
+                onClick={handleGeneratePA}
+                disabled={
+                  isActionDisabled() ||
+                  actionLoading ||
+                  !isGeneratePAEnabled() ||
+                  !!paymentStatus
+                }
+                sx={{
+                  px: 3,
+                  py: 0.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                }}
               >
-                CA Mark/Competency values are required for all selected trainees
-              </Typography>
+                Generate PA
+              </Button>
+            </span>
+          </Tooltip>
+
+          {/* Only show Proceed to Payment button if payment exists and is NOT completed */}
+          {paymentStatus &&
+            paymentStatus.redirectUrl &&
+            !isPaymentCompleted() && (
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<PaymentIcon />}
+                onClick={() =>
+                  handleRedirectToPayment(paymentStatus.redirectUrl)
+                }
+                sx={{
+                  px: 3,
+                  py: 0.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                }}
+              >
+                Proceed to Payment
+              </Button>
             )}
+
+          {paymentStatus && (
+            <Chip
+              label={
+                isPaymentCompleted() ? "Payment Completed ✓" : "Payment Pending"
+              }
+              color={isPaymentCompleted() ? "success" : "warning"}
+              size="small"
+            />
+          )}
         </Box>
 
         <Box
@@ -1825,40 +2307,103 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           }}
         >
           <Box sx={{ display: "flex", gap: 2 }}>
-            <Tooltip
-              title={
-                !isApproveEnabled
-                  ? paymentStatus && !isPaymentCompleted()
-                    ? "Payment must be completed before approval"
-                    : !paymentStatus
-                      ? "Payment required - Generate PA first"
-                      : "Payment must be completed before approval"
-                  : "Approve this course selection"
-              }
-              arrow
-            >
-              <span>
-                <Button
-                  variant="contained"
-                  color="success"
-                  startIcon={<CheckCircleIcon />}
-                  onClick={() => openDialog(57)}
-                  disabled={
-                    isActionDisabled() ||
-                    actionLoading ||
-                    !isApproveEnabled
-                  }
-                  sx={{
-                    px: 3,
-                    py: 0.5,
-                    fontWeight: 600,
-                    textTransform: "none",
-                  }}
-                >
-                  Approve
-                </Button>
-              </span>
-            </Tooltip>
+            {/* Submit Button - Only show when CA marks don't exist (Role 9) */}
+            {shouldShowSubmitButton() && (
+              <Tooltip
+                title={
+                  !isSubmitEnabled()
+                    ? getSubmitValidationMessage()
+                    : "Submit this course selection"
+                }
+                arrow
+              >
+                <span>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<CheckCircleIcon />}
+                    onClick={() => openDialog(55)}
+                    disabled={
+                      isActionDisabled() || actionLoading || !isSubmitEnabled()
+                    }
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
+                  >
+                    Submit
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+
+            {/* Approve Button - Only shows when payment is paid (Role 9) */}
+            {shouldShowApproveButton() && (
+              <Tooltip
+                title={
+                  !isApproveEnabled()
+                    ? getApprovalValidationMessage()
+                    : "Approve this course selection"
+                }
+                arrow
+              >
+                <span>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    startIcon={<ThumbUpIcon />}
+                    onClick={() => openDialog(57)}
+                    disabled={
+                      isActionDisabled() || actionLoading || !isApproveEnabled()
+                    }
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
+                  >
+                    Approve
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+
+            {/* Endorse Button - Role 22 only */}
+            {currentRoleId == 22 && (
+              <Tooltip
+                title={
+                  !isEndorseEnabled()
+                    ? getApprovalValidationMessage()
+                    : "Endorse this course selection"
+                }
+                arrow
+              >
+                <span>
+                  <Button
+                    variant="contained"
+                    color="info"
+                    startIcon={<ThumbUpIcon />}
+                    onClick={() => openDialog(59)}
+                    disabled={
+                      isActionDisabled() || actionLoading || !isEndorseEnabled()
+                    }
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
+                  >
+                    Endorse
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+
+            {/* Reject Button - Both roles */}
             <Button
               variant="contained"
               color="error"
@@ -1870,6 +2415,34 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               Reject
             </Button>
           </Box>
+          {/* Show validation messages */}
+          {shouldShowSubmitButton() && !isSubmitEnabled() && (
+            <Typography
+              variant="caption"
+              color="warning.main"
+              sx={{ textAlign: "right" }}
+            >
+              {getSubmitValidationMessage()}
+            </Typography>
+          )}
+          {shouldShowApproveButton() && !isApproveEnabled() && (
+            <Typography
+              variant="caption"
+              color="warning.main"
+              sx={{ textAlign: "right" }}
+            >
+              {getApprovalValidationMessage()}
+            </Typography>
+          )}
+          {currentRoleId == 22 && !isEndorseEnabled() && (
+            <Typography
+              variant="caption"
+              color="warning.main"
+              sx={{ textAlign: "right" }}
+            >
+              {getApprovalValidationMessage()}
+            </Typography>
+          )}
         </Box>
       </Box>
 

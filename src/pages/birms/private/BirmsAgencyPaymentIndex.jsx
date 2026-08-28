@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -248,7 +248,6 @@ const BirmsAgencyPaymentIndex = () => {
       const response =
         await BirmsPaymentService.getCourseByInstituteId(instituteId);
       console.log("Courses response:", response.data);
-
       const mappedCourses = response.data.map((item) => ({
         id: item.course_id || item.id,
         name: item.course_name || item.name,
@@ -278,7 +277,6 @@ const BirmsAgencyPaymentIndex = () => {
 
   const applyFilters = () => {
     let filtered = [...payments];
-
     if (search) {
       filtered = filtered.filter(
         (payment) =>
