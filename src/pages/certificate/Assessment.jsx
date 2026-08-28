@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFormik } from "formik";
 import {
   Paper,
@@ -29,7 +29,7 @@ import { useSelector } from "react-redux";
 
 import {
   generateAssessmentCertificatePdf,
-  generateAllAssessmentCertificatesPdf
+  generateAllAssessmentCertificatesPdf,
 } from "@/utils/assessmentCertificatePdf";
 import CertificationService from "../../api/services/internal/certification/CertificationService";
 
@@ -49,7 +49,7 @@ const Assessment = () => {
   const [courseList, setCourseList] = useState([]);
   const access_token = useSelector((state) => state.auth.accessToken);
 
-  console.log("token", access_token)
+  console.log("token", access_token);
   useEffect(() => {
     fetchAssessmentInstitutes();
   }, []);
@@ -60,7 +60,8 @@ const Assessment = () => {
 
   const fetchAssessmentInstitutes = async () => {
     try {
-      const instituteLists = await CertificationService.getAssessmentInstitutes(access_token);
+      const instituteLists =
+        await CertificationService.getAssessmentInstitutes(access_token);
       //console.log("Ass Ins List", instituteLists.data);
       setInstituteList(instituteLists.data);
     } catch (error) {
@@ -70,7 +71,10 @@ const Assessment = () => {
 
   const fetchAssessmentCourses = async () => {
     try {
-      const courseLists = await CertificationService.getAssessmentCourses(instituteId, access_token);
+      const courseLists = await CertificationService.getAssessmentCourses(
+        instituteId,
+        access_token,
+      );
       console.log("instituteId", courseLists.data);
       setCourseList(courseLists.data);
     } catch (error) {
@@ -106,8 +110,6 @@ const Assessment = () => {
   const handleDownloadAll = () => {
     generateAllAssessmentCertificatesPdf(filteredReports);
   };
-
-
 
   // Sample report data
   const [reports] = useState([
@@ -189,7 +191,8 @@ const Assessment = () => {
     return (
       (filters.instituteList === "" || report.type === filters.instituteList) &&
       (filters.courseList === "" || report.courseList === filters.courseList) &&
-      (filters.applicatioNo === "" || report.applicatioNo === filters.applicatioNo) &&
+      (filters.applicatioNo === "" ||
+        report.applicatioNo === filters.applicatioNo) &&
       (filters.search === "" ||
         report.name.toLowerCase().includes(filters.search.toLowerCase()) ||
         report.courseList.toLowerCase().includes(filters.search.toLowerCase()))
@@ -236,12 +239,11 @@ const Assessment = () => {
               label="Institute Name"
             >
               <MenuItem value="">-Select-</MenuItem>
-              {
-                instituteList.map((ins) => (
-                  <MenuItem key={ins.instituteId} value={ins.institute_id}>
-                    {ins.proposed_institute_name}
-                  </MenuItem>
-                ))}
+              {instituteList.map((ins) => (
+                <MenuItem key={ins.instituteId} value={ins.institute_id}>
+                  {ins.proposed_institute_name}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         </Grid>
@@ -269,11 +271,7 @@ const Assessment = () => {
         <Grid item size={{ xs: 12, md: 3 }}>
           <TextField
             fullWidth
-            label={
-              <span>
-                Appication No{" "}
-              </span>
-            }
+            label={<span>Appication No </span>}
             type="number"
             name="Application"
             size="small"
@@ -341,12 +339,14 @@ const Assessment = () => {
           }}
         >
           <TableHead>
-            <TableRow sx={{
-              background: "#f5f5f5",
-              "& .MuiTableCell-root": {
-                fontWeight: "bold",
-              },
-            }}>
+            <TableRow
+              sx={{
+                background: "#f5f5f5",
+                "& .MuiTableCell-root": {
+                  fontWeight: "bold",
+                },
+              }}
+            >
               <TableCell>#</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>CID/Reference No</TableCell>
@@ -363,7 +363,7 @@ const Assessment = () => {
                   size="small"
                   startIcon={<DownloadIcon />}
                   onClick={handleDownloadAll}
-                  sx={{ textTransform: "none", fontWeight: "bold", }}
+                  sx={{ textTransform: "none", fontWeight: "bold" }}
                 >
                   Download All
                 </Button>

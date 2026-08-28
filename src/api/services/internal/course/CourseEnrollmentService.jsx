@@ -126,6 +126,34 @@ class CourseEnrollmentService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+   getTraineeDetailsById(traineeId, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/course-announcement/get-trainee-verification-details/${traineeId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+   fetchAssignedAssessors(application_no, token) {
+    return apiClient
+      .get(
+        `/api/v1/public/course-enrollment-trainee/get-assigned-assessors/${application_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new CourseEnrollmentService();

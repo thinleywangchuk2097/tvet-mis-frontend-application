@@ -24,10 +24,10 @@ import {
   Chip,
   CircularProgress,
   Tooltip,
+  Alert,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
-import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { Formik, Form } from "formik";
@@ -39,7 +39,6 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import CurriculumIndexService from "../../../api/services/internal/course/CurriculumIndexService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
-import NcsService from "../../../api/services/internal/ncs/NcsService";
 
 // Helper component for required field indicator
 const RequiredStar = () => (
@@ -122,6 +121,10 @@ const AccreditedCourseRegistration = () => {
   const [qualityData, setQualityData] = useState([]);
   const [qualitySelections, setQualitySelections] = useState({});
 
+  // Curriculum Duplication Check State
+  const [curriculumDuplicateError, setCurriculumDuplicateError] = useState("");
+  const [checkingCurriculum, setCheckingCurriculum] = useState(false);
+
   // Formik ref for auto-fill functionality
   const formikRef = useRef(null);
 
@@ -163,7 +166,6 @@ const AccreditedCourseRegistration = () => {
       selectedCourse?.curriculumId &&
       curriculumTypes.length > 0
     ) {
-      // Find the curriculum details
       const selectedCurriculum = curriculumTypes.find(
         (curriculum) => curriculum.id == selectedCourse.curriculumId,
       );
@@ -178,7 +180,6 @@ const AccreditedCourseRegistration = () => {
         };
         setSelectedCurriculumDetails(details);
 
-        // Update form values if formik is available
         if (formikRef.current) {
           formikRef.current.setFieldValue(
             "totalProgramDuration",
@@ -207,7 +208,7 @@ const AccreditedCourseRegistration = () => {
 
   const fetchQualityStandards = async () => {
     try {
-      const response = await CommonService.getAllQualitystandards(26); //service id 26 for accredited course application
+      const response = await CommonService.getAllQualitystandards(26);
       if (response.data) {
         const mainCategories = response.data.filter(
           (item) => item.parentId === 0,
@@ -240,87 +241,31 @@ const AccreditedCourseRegistration = () => {
       console.error("Error fetching status list:", error);
     }
   };
+
   const fetchGenderList = async () => {
     try {
       const genderResponse = await CommonService.getByParentId(8);
       setGenderList(genderResponse.data);
-      console.log("Fetched gender list:", genderResponse.data);
     } catch (error) {
       console.error("Error fetching gender list:", error);
     }
   };
+
   const fetchAcademicQualification = async () => {
     try {
       const AcademicQualification = await CommonService.getByParentId(18);
       setAcademicQualifications(AcademicQualification.data);
-      console.log(
-        "Fetched Academic Qualification:",
-        AcademicQualification.data,
-      );
     } catch (error) {
       console.error("Error fetching Academic Qualification :", error);
     }
   };
+
   const fetchCertificateLevels = async () => {
     try {
       const response = await CommonService.getByParentId(27);
       setCertificateLevels(response.data);
-      console.log("Certificate Levels:", response.data);
     } catch (error) {
       console.error("Error fetching certificate levels:", error);
-    }
-  };
-
-  const fetchProgrammeTitle = async (occupationId) => {
-    if (!occupationId) {
-      setProgrammeTitle("");
-      if (formikRef.current) {
-        formikRef.current.setFieldValue("programmeId", "");
-      }
-      return;
-    }
-
-    try {
-      const response = await NcsService.getProgrammeTitleByOccupationId(
-        occupationId,
-        access_token,
-      );
-      console.log("Programme Title Response:", response);
-
-      if (response && response.data && response.data.length > 0) {
-        const programme = response.data[0];
-        const title = programme.programme_title || 
-                     programme.courseName || 
-                     programme.name || 
-                     programme.occupationName || 
-                     programme.title;
-        const id = programme.id || programme.programme_id || "";
-
-        if (title) {
-          setProgrammeTitle(title);
-          // Update formik with the programme ID
-          if (formikRef.current) {
-            formikRef.current.setFieldValue("programmeId", id);
-          }
-          toast.info(`Programme Title auto-filled: ${title}`);
-        } else {
-          setProgrammeTitle("");
-          if (formikRef.current) {
-            formikRef.current.setFieldValue("programmeId", "");
-          }
-        }
-      } else {
-        setProgrammeTitle("");
-        if (formikRef.current) {
-          formikRef.current.setFieldValue("programmeId", "");
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching programme title:", error);
-      setProgrammeTitle("");
-      if (formikRef.current) {
-        formikRef.current.setFieldValue("programmeId", "");
-      }
     }
   };
 
@@ -362,41 +307,38 @@ const AccreditedCourseRegistration = () => {
       console.log("Fetched applied courses:", response.data);
 
       if (response.data && Array.isArray(response.data)) {
-        const mappedCourses = response.data.map((course, index) => ({
-          id: course.id || index,
-          applicationNo: course.application_no,
-          courseId: course.course_id,
-          course_name: course.course_name,
-          sectorId: course.sector_id,
-          statusId: course.status_id,
-          curriculumId: course.curriculum_id,
-          curriculum_title: course.curriculum_title,
-          registration_no: course.registration_no,
-          proposed_institute_name: course.proposed_institute_name,
-          institute_id: course.institute_id,
-          registration_date: course.registration_date,
-          validity_date: course.validity_date,
-          created_by: course.created_by,
-          created_at: course.created_at,
-          feesPerTrainee: course.fees_per_trainee || "",
-          enrolmentCapacity: course.enrolment_capacity || "",
-          // Lead Trainer fields
-          leadTrainerCidNo: course.lead_trainer_cid_no || "",
-          leadTrainerName: course.lead_trainer_name || "",
-          genderId: course.gender_id || "",
-          academicQualificationId: course.academic_qualification_id || "",
-          professionalExperience: course.professional_experience || "",
-          // Parse quality standards if it's a string
-          qualityStandards: course.quality_standard_responses
-            ? typeof course.quality_standard_responses === "string"
-              ? JSON.parse(course.quality_standard_responses)
-              : course.quality_standard_responses
+        const mappedCourses = response.data.map((programme, index) => ({
+          id: programme.id || index,
+          applicationNo: programme.application_no,
+          sectorId: programme.sector_id,
+          statusId: programme.status_id,
+          curriculumId: programme.curriculum_id,
+          curriculumTitle: programme.curriculum_title,
+          registrationNo: programme.registration_no,
+          proposedInstituteName: programme.proposed_institute_name,
+          instituteId: programme.institute_id,
+          programmeTitle: programme.programme_title,
+          registrationDate: programme.registration_date,
+          validityDate: programme.validity_date,
+          feesPerTrainee: programme.fees_per_trainee || "",
+          enrolmentCapacity: programme.enrolment_capacity || "",
+          leadTrainerCidNo: programme.lead_trainer_cid_no || "",
+          leadTrainerName: programme.lead_trainer_name || "",
+          genderId: programme.gender_id || "",
+          qualificationId: programme.qualification_id || "",
+          professionalExperience: programme.professional_experience || "",
+          courseId: programme.occupation_id || "",
+          occupationName:
+            programme.occupation_name || programme.course_name || "",
+          qualityStandards: programme.quality_standard_responses
+            ? typeof programme.quality_standard_responses === "string"
+              ? JSON.parse(programme.quality_standard_responses)
+              : programme.quality_standard_responses
             : [],
-          // Parse documents if needed
-          documents: course.documents
-            ? typeof course.documents === "string"
-              ? JSON.parse(course.documents)
-              : course.documents
+          documents: programme.documents
+            ? typeof programme.documents === "string"
+              ? JSON.parse(programme.documents)
+              : programme.documents
             : [],
         }));
         setCourses(mappedCourses);
@@ -424,10 +366,13 @@ const AccreditedCourseRegistration = () => {
       const occupationLists =
         await CommonService.getOccupationsBySectorId(sectorId);
       setOccupations(occupationLists.data);
+      console.log("Fetched occupations", ":", occupationLists.data);
+      return occupationLists.data;
     } catch (error) {
       console.error("Error fetching occupations:", error);
       setOccupations([]);
       toast.error("Failed to fetch courses for selected sector");
+      return [];
     } finally {
       setLoadingOccupations(false);
     }
@@ -452,6 +397,77 @@ const AccreditedCourseRegistration = () => {
     }
   };
 
+  // Check if curriculum already exists for this institute
+  const checkCurriculumExists = async (curriculumId) => {
+    if (!curriculumId) {
+      setCurriculumDuplicateError("");
+      return false;
+    }
+
+    setCheckingCurriculum(true);
+    setCurriculumDuplicateError("");
+
+    try {
+      const response =
+        await ApplyAccreditedCourseService.curriculumExistAlready(
+          curriculumId,
+          registration_no,
+          access_token,
+        );
+
+      console.log("Curriculum existence check response:", response.data);
+
+      // Check if the response indicates the curriculum already exists
+      // The response is an array of objects with curriculum_id when exists
+      if (
+        response.data &&
+        Array.isArray(response.data) &&
+        response.data.length > 0
+      ) {
+        // Check if any item in the array has the matching curriculum_id
+        const exists = response.data.some(
+          (item) => String(item.curriculum_id) === String(curriculumId),
+        );
+
+        if (exists) {
+          setCurriculumDuplicateError(
+            "This curriculum has already been registered for your institute. Please select a different curriculum.",
+          );
+          // Clear the curriculum selection fields
+          if (formikRef.current) {
+            formikRef.current.setFieldValue("curriculumId", "");
+            formikRef.current.setFieldValue("sectorId", "");
+            formikRef.current.setFieldValue("courseId", "");
+            formikRef.current.setFieldValue("occupationName", "");
+            formikRef.current.setFieldValue("programmeTitle", "");
+            formikRef.current.setFieldValue("totalProgramDuration", "");
+            formikRef.current.setFieldValue("totalTheoryDuration", "");
+            formikRef.current.setFieldValue("totalPracticalDuration", "");
+            formikRef.current.setFieldValue("totalOjtDuration", "");
+            formikRef.current.setFieldValue("certificateLevel", "");
+          }
+          setSelectedCurriculumDetails(null);
+          setSelectedSectorId("");
+          setProgrammeTitle("");
+          setOccupations([]);
+          return true;
+        }
+      }
+
+      setCurriculumDuplicateError("");
+      return false;
+    } catch (error) {
+      console.error("Error checking curriculum existence:", error);
+      toast.warning(
+        "Could not verify curriculum duplication. Please proceed with caution.",
+      );
+      setCurriculumDuplicateError("");
+      return false;
+    } finally {
+      setCheckingCurriculum(false);
+    }
+  };
+
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(+event.target.value);
@@ -460,7 +476,7 @@ const AccreditedCourseRegistration = () => {
 
   const filteredCourses = courses.filter(
     (c) =>
-      (c.course_name?.toLowerCase() || "").includes(search.toLowerCase()) ||
+      (c.programmeTitle?.toLowerCase() || "").includes(search.toLowerCase()) ||
       (c.applicationNo?.toLowerCase() || "").includes(search.toLowerCase()) ||
       (getSectorName(c.sectorId)?.toLowerCase() || "").includes(
         search.toLowerCase(),
@@ -472,12 +488,24 @@ const AccreditedCourseRegistration = () => {
     setDialogMode("view");
     setSelectedSectorId(course.sectorId);
 
-    // Fetch occupations for the sector to display course name properly
     if (course.sectorId) {
-      await fetchOccupationsBySector(course.sectorId);
+      const occupationsData = await fetchOccupationsBySector(course.sectorId);
+
+      if (occupationsData && occupationsData.length > 0 && course.courseId) {
+        const occupation = occupationsData.find(
+          (occ) => occ.id == course.courseId,
+        );
+        if (occupation) {
+          const occupationName =
+            occupation.occupationName || occupation.name || occupation.title;
+          course.occupationName = occupationName;
+          if (formikRef.current) {
+            formikRef.current.setFieldValue("occupationName", occupationName);
+          }
+        }
+      }
     }
 
-    // Set curriculum details for view mode
     if (course.curriculumId) {
       const selectedCurriculum = curriculumTypes.find(
         (curriculum) => curriculum.id == course.curriculumId,
@@ -491,6 +519,7 @@ const AccreditedCourseRegistration = () => {
           totalOjtDuration: selectedCurriculum.total_ojt_duration || "",
           certificateLevelId: selectedCurriculum.certificate_level_id || "",
         });
+        setProgrammeTitle(selectedCurriculum.programme_title || "");
       }
     }
 
@@ -505,12 +534,24 @@ const AccreditedCourseRegistration = () => {
     setDialogMode("renewal");
     setSelectedSectorId(course.sectorId);
 
-    // Fetch occupations for the sector to display course name properly
     if (course.sectorId) {
-      await fetchOccupationsBySector(course.sectorId);
+      const occupationsData = await fetchOccupationsBySector(course.sectorId);
+
+      if (occupationsData && occupationsData.length > 0 && course.courseId) {
+        const occupation = occupationsData.find(
+          (occ) => occ.id == course.courseId,
+        );
+        if (occupation) {
+          const occupationName =
+            occupation.occupationName || occupation.name || occupation.title;
+          course.occupationName = occupationName;
+          if (formikRef.current) {
+            formikRef.current.setFieldValue("occupationName", occupationName);
+          }
+        }
+      }
     }
 
-    // Set curriculum details for renewal mode
     if (course.curriculumId) {
       const selectedCurriculum = curriculumTypes.find(
         (curriculum) => curriculum.id == course.curriculumId,
@@ -524,6 +565,7 @@ const AccreditedCourseRegistration = () => {
           totalOjtDuration: selectedCurriculum.total_ojt_duration || "",
           certificateLevelId: selectedCurriculum.certificate_level_id || "",
         });
+        setProgrammeTitle(selectedCurriculum.programme_title || "");
       }
     }
 
@@ -541,6 +583,7 @@ const AccreditedCourseRegistration = () => {
     setQualitySelections({});
     setSelectedCurriculumDetails(null);
     setProgrammeTitle("");
+    setCurriculumDuplicateError("");
     setOpenDialog(true);
   };
 
@@ -619,7 +662,6 @@ const AccreditedCourseRegistration = () => {
   };
 
   const renderChecklist = (standard) => {
-    // Disable radio buttons only in view mode
     const isReadOnlyMode = dialogMode === "view";
 
     return (
@@ -695,11 +737,11 @@ const AccreditedCourseRegistration = () => {
     );
   };
 
-  // Get initial values based on mode
   const getInitialValues = () => {
     if ((dialogMode === "view" || dialogMode === "renewal") && selectedCourse) {
-      // Find the curriculum to get duration details
       let curriculumDetails = {};
+      let progTitle = "";
+
       if (selectedCourse.curriculumId) {
         const selectedCurriculum = curriculumTypes.find(
           (curriculum) => curriculum.id == selectedCourse.curriculumId,
@@ -714,6 +756,7 @@ const AccreditedCourseRegistration = () => {
             totalOjtDuration: selectedCurriculum.total_ojt_duration || "",
             certificateLevelId: selectedCurriculum.certificate_level_id || "",
           };
+          progTitle = selectedCurriculum.programme_title || "";
         }
       }
 
@@ -731,8 +774,8 @@ const AccreditedCourseRegistration = () => {
         curriculumId: selectedCourse.curriculumId || "",
         sectorId: selectedCourse.sectorId || "",
         courseId: selectedCourse.courseId || "",
-        courseName: selectedCourse.course_name || "",
-        programmeId: selectedCourse.programme_id || "",
+        occupationName: selectedCourse.occupationName || "",
+        programmeTitle: progTitle,
         feesPerTrainee: selectedCourse.feesPerTrainee || "",
         enrolmentCapacity: selectedCourse.enrolmentCapacity || "",
         totalProgramDuration: curriculumDetails.totalProgramDuration || "",
@@ -740,11 +783,10 @@ const AccreditedCourseRegistration = () => {
         totalPracticalDuration: curriculumDetails.totalPracticalDuration || "",
         totalOjtDuration: curriculumDetails.totalOjtDuration || "",
         certificateLevel: curriculumDetails.certificateLevelId || "",
-        // Lead Trainer fields
         leadTrainerCidNo: selectedCourse.leadTrainerCidNo || "",
         leadTrainerName: selectedCourse.leadTrainerName || "",
         genderId: selectedCourse.genderId || "",
-        academicQualificationId: selectedCourse.academicQualificationId || "",
+        qualificationId: selectedCourse.qualificationId || "",
         professionalExperience: selectedCourse.professionalExperience || "",
         files: [],
       };
@@ -757,8 +799,8 @@ const AccreditedCourseRegistration = () => {
       curriculumId: "",
       sectorId: "",
       courseId: "",
-      courseName: "",
-      programmeId: "",
+      occupationName: "",
+      programmeTitle: "",
       feesPerTrainee: "",
       enrolmentCapacity: "",
       totalProgramDuration: "",
@@ -766,11 +808,10 @@ const AccreditedCourseRegistration = () => {
       totalPracticalDuration: "",
       totalOjtDuration: "",
       certificateLevel: "",
-      // Lead Trainer fields
       leadTrainerCidNo: "",
       leadTrainerName: "",
       genderId: "",
-      academicQualificationId: "",
+      qualificationId: "",
       professionalExperience: "",
       files: [],
     };
@@ -780,7 +821,7 @@ const AccreditedCourseRegistration = () => {
     curriculumId: Yup.string().required("Curriculum is required"),
     sectorId: Yup.string().required("Sector is required"),
     courseId: Yup.string().required("Occupation is required"),
-    programmeId: Yup.string().required("Programme Title is required"),
+    programmeTitle: Yup.string().required("Programme Title is required"),
     feesPerTrainee: Yup.number()
       .required("Fees per trainee is required")
       .positive("Fees per trainee must be a positive number")
@@ -789,7 +830,6 @@ const AccreditedCourseRegistration = () => {
       .required("Enrollment capacity per batch is required")
       .positive("Enrollment capacity must be a positive number")
       .typeError("Enrollment capacity must be a valid number"),
-    // Lead Trainer validations
     leadTrainerCidNo: Yup.string()
       .required("Lead Trainer CID No. is required")
       .min(11, "CID must be exactly 11 digits")
@@ -799,7 +839,7 @@ const AccreditedCourseRegistration = () => {
       .required("Lead Trainer Name is required")
       .min(2, "Name must be at least 2 characters"),
     genderId: Yup.string().required("Gender is required"),
-    academicQualificationId: Yup.string().required(
+    qualificationId: Yup.string().required(
       "Academic Qualification is required",
     ),
     professionalExperience: Yup.string()
@@ -809,6 +849,14 @@ const AccreditedCourseRegistration = () => {
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
+    // Final check before submission
+    if (curriculumDuplicateError) {
+      toast.error(
+        "Please select a different curriculum. This one is already registered.",
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       if (dialogMode === "add") {
@@ -823,17 +871,16 @@ const AccreditedCourseRegistration = () => {
           instituteId: values.instituteId,
           applicantName: values.instituteName,
           courseId: values.courseId,
-          programmeId: values.programmeId,
+          programmeTitle: values.programmeTitle,
           feesPerTrainee: values.feesPerTrainee,
           enrolmentCapacity: values.enrolmentCapacity,
           curriculumId: values.curriculumId,
           sectorId: values.sectorId,
           certificateLevel: values.certificateLevel,
-          // Lead Trainer data
           leadTrainerCidNo: values.leadTrainerCidNo,
           leadTrainerName: values.leadTrainerName,
           genderId: values.genderId,
-          academicQualificationId: values.academicQualificationId,
+          qualificationId: values.qualificationId,
           professionalExperience: values.professionalExperience,
           registration_date: new Date().toISOString(),
           validity_date: null,
@@ -862,12 +909,12 @@ const AccreditedCourseRegistration = () => {
           setQualitySelections({});
           setSelectedCurriculumDetails(null);
           setProgrammeTitle("");
+          setCurriculumDuplicateError("");
           setOpenDialog(false);
         } else {
           toast.error(response.message || "Failed to submit application");
         }
       } else if (dialogMode === "renewal") {
-        // Handle renewal submission
         const documents = await Promise.all(
           values.files.map((file) => fileToBase64(file)),
         );
@@ -881,17 +928,16 @@ const AccreditedCourseRegistration = () => {
           instituteId: values.instituteId,
           applicantName: values.instituteName,
           courseId: values.courseId,
-          programmeId: values.programmeId,
+          programmeTitle: values.programmeTitle,
           feesPerTrainee: values.feesPerTrainee,
           enrolmentCapacity: values.enrolmentCapacity,
           curriculumId: values.curriculumId,
           sectorId: values.sectorId,
           certificateLevel: values.certificateLevel,
-          // Lead Trainer data
           leadTrainerCidNo: values.leadTrainerCidNo,
           leadTrainerName: values.leadTrainerName,
           genderId: values.genderId,
-          academicQualificationId: values.academicQualificationId,
+          qualificationId: values.qualificationId,
           professionalExperience: values.professionalExperience,
           registration_date: new Date().toISOString(),
           validity_date: null,
@@ -919,6 +965,7 @@ const AccreditedCourseRegistration = () => {
           setQualitySelections({});
           setSelectedCurriculumDetails(null);
           setProgrammeTitle("");
+          setCurriculumDuplicateError("");
           setOpenDialog(false);
         } else {
           toast.error(response.message || "Failed to renew accreditation");
@@ -926,7 +973,10 @@ const AccreditedCourseRegistration = () => {
       }
     } catch (error) {
       console.error("Error submitting application:", error);
-      toast.error("An error occurred while submitting the application");
+      toast.error(
+        error.response?.data?.message ||
+          "An error occurred while submitting the application",
+      );
     } finally {
       setLoading(false);
       setSubmitting(false);
@@ -937,14 +987,128 @@ const AccreditedCourseRegistration = () => {
     setQualitySelections({});
     setSelectedCurriculumDetails(null);
     setProgrammeTitle("");
+    setSelectedSectorId("");
+    setOccupations([]);
+    setCurriculumDuplicateError("");
+    if (formikRef.current) {
+      formikRef.current.setFieldValue("sectorId", "");
+      formikRef.current.setFieldValue("courseId", "");
+      formikRef.current.setFieldValue("occupationName", "");
+      formikRef.current.setFieldValue("programmeTitle", "");
+      formikRef.current.setFieldValue("totalProgramDuration", "");
+      formikRef.current.setFieldValue("totalTheoryDuration", "");
+      formikRef.current.setFieldValue("totalPracticalDuration", "");
+      formikRef.current.setFieldValue("totalOjtDuration", "");
+      formikRef.current.setFieldValue("certificateLevel", "");
+      formikRef.current.setFieldValue("curriculumId", "");
+    }
   };
 
-  // Check if renewal should be allowed based on status
   const canRenew = (course) => {
-    // Allow renewal for approved courses
-    // You can add more conditions like checking validity date, etc.
-    const approvedStatusIds = [56, 57]; // Add all status IDs that represent "Approved"
+    const approvedStatusIds = [56, 57];
     return approvedStatusIds.includes(parseInt(course.statusId));
+  };
+
+  // Function to handle curriculum selection and auto-fill with duplication check
+  const handleCurriculumSelect = async (selectedId, formik) => {
+    // Clear previous error
+    setCurriculumDuplicateError("");
+
+    if (selectedId && !isBasicInfoReadOnly()) {
+      // Check for duplication first
+      const exists = await checkCurriculumExists(selectedId);
+
+      if (exists) {
+        // If duplicate found, the checkCurriculumExists function already cleared the fields
+        // Just return to stop further processing
+        return;
+      }
+
+      // If no duplicate, proceed with auto-fill
+      const selectedCurriculum = curriculumTypes.find(
+        (curriculum) => curriculum.id == selectedId,
+      );
+      if (selectedCurriculum) {
+        const details = {
+          totalProgramDuration: selectedCurriculum.total_program_duration || 0,
+          totalTheoryDuration: selectedCurriculum.total_theory_duration || 0,
+          totalPracticalDuration:
+            selectedCurriculum.total_practical_duration || 0,
+          totalOjtDuration: selectedCurriculum.total_ojt_duration || 0,
+          certificateLevelId: selectedCurriculum.certificate_level_id || "",
+        };
+        setSelectedCurriculumDetails(details);
+
+        formik.setFieldValue(
+          "totalProgramDuration",
+          details.totalProgramDuration,
+        );
+        formik.setFieldValue(
+          "totalTheoryDuration",
+          details.totalTheoryDuration,
+        );
+        formik.setFieldValue(
+          "totalPracticalDuration",
+          details.totalPracticalDuration,
+        );
+        formik.setFieldValue("totalOjtDuration", details.totalOjtDuration);
+        formik.setFieldValue("certificateLevel", details.certificateLevelId);
+
+        // Auto-fill Sector
+        if (selectedCurriculum.sector_id) {
+          formik.setFieldValue("sectorId", selectedCurriculum.sector_id);
+          setSelectedSectorId(selectedCurriculum.sector_id);
+
+          const occupationsData = await fetchOccupationsBySector(
+            selectedCurriculum.sector_id,
+          );
+
+          if (selectedCurriculum.occupation_id) {
+            formik.setFieldValue("courseId", selectedCurriculum.occupation_id);
+
+            if (occupationsData && occupationsData.length > 0) {
+              const occupation = occupationsData.find(
+                (occ) => occ.id == selectedCurriculum.occupation_id,
+              );
+              if (occupation) {
+                const occupationName =
+                  occupation.occupationName ||
+                  occupation.name ||
+                  occupation.title;
+                formik.setFieldValue("occupationName", occupationName);
+              }
+            }
+          }
+
+          if (selectedCurriculum.programme_title) {
+            setProgrammeTitle(selectedCurriculum.programme_title);
+            formik.setFieldValue(
+              "programmeTitle",
+              selectedCurriculum.programme_title,
+            );
+          }
+
+          toast.info(`Auto-filled: ${selectedCurriculum.curriculum_title}`);
+        }
+      }
+    } else if (!selectedId && !isBasicInfoReadOnly()) {
+      // Clear all fields
+      setSelectedCurriculumDetails(null);
+      setSelectedSectorId("");
+      setProgrammeTitle("");
+      setOccupations([]);
+      setCurriculumDuplicateError("");
+
+      formik.setFieldValue("totalProgramDuration", "");
+      formik.setFieldValue("totalTheoryDuration", "");
+      formik.setFieldValue("totalPracticalDuration", "");
+      formik.setFieldValue("totalOjtDuration", "");
+      formik.setFieldValue("certificateLevel", "");
+      formik.setFieldValue("sectorId", "");
+      formik.setFieldValue("courseId", "");
+      formik.setFieldValue("occupationName", "");
+      formik.setFieldValue("programmeTitle", "");
+    }
   };
 
   return (
@@ -1014,7 +1178,7 @@ const AccreditedCourseRegistration = () => {
                     <TableRow key={course.id || index}>
                       <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
                       <TableCell>{course.applicationNo}</TableCell>
-                      <TableCell>{course.course_name}</TableCell>
+                      <TableCell>{course.programmeTitle}</TableCell>
                       <TableCell>{sectorName}</TableCell>
                       <TableCell>
                         <Chip
@@ -1061,7 +1225,6 @@ const AccreditedCourseRegistration = () => {
                               <VisibilityIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          {/* Renewal button - show for approved courses */}
                           {canRenew(course) ? (
                             <Tooltip
                               title="Renew Course Accreditation"
@@ -1078,7 +1241,6 @@ const AccreditedCourseRegistration = () => {
                               </IconButton>
                             </Tooltip>
                           ) : (
-                            // Placeholder to maintain width when renewal button is not shown
                             <Box sx={{ width: "32px", height: "32px" }} />
                           )}
                         </Box>
@@ -1193,70 +1355,22 @@ const AccreditedCourseRegistration = () => {
                         name="curriculumId"
                         size="small"
                         value={formik.values.curriculumId}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const selectedId = e.target.value;
                           formik.handleChange(e);
-
-                          if (selectedId && !isBasicInfoReadOnly()) {
-                            const selectedCurriculum = curriculumTypes.find(
-                              (curriculum) => curriculum.id == selectedId,
-                            );
-                            if (selectedCurriculum) {
-                              const details = {
-                                totalProgramDuration:
-                                  selectedCurriculum.total_program_duration ||
-                                  0,
-                                totalTheoryDuration:
-                                  selectedCurriculum.total_theory_duration || 0,
-                                totalPracticalDuration:
-                                  selectedCurriculum.total_practical_duration ||
-                                  0,
-                                totalOjtDuration:
-                                  selectedCurriculum.total_ojt_duration || 0,
-                                certificateLevelId:
-                                  selectedCurriculum.certificate_level_id || "",
-                              };
-                              setSelectedCurriculumDetails(details);
-
-                              // Set form values
-                              formik.setFieldValue(
-                                "totalProgramDuration",
-                                details.totalProgramDuration,
-                              );
-                              formik.setFieldValue(
-                                "totalTheoryDuration",
-                                details.totalTheoryDuration,
-                              );
-                              formik.setFieldValue(
-                                "totalPracticalDuration",
-                                details.totalPracticalDuration,
-                              );
-                              formik.setFieldValue(
-                                "totalOjtDuration",
-                                details.totalOjtDuration,
-                              );
-                              formik.setFieldValue(
-                                "certificateLevel",
-                                details.certificateLevelId,
-                              );
-                            }
-                          } else if (!selectedId && !isBasicInfoReadOnly()) {
-                            setSelectedCurriculumDetails(null);
-                            formik.setFieldValue("totalProgramDuration", "");
-                            formik.setFieldValue("totalTheoryDuration", "");
-                            formik.setFieldValue("totalPracticalDuration", "");
-                            formik.setFieldValue("totalOjtDuration", "");
-                            formik.setFieldValue("certificateLevel", "");
-                          }
+                          await handleCurriculumSelect(selectedId, formik);
                         }}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.curriculumId &&
-                          Boolean(formik.errors.curriculumId)
+                          (formik.touched.curriculumId &&
+                            Boolean(formik.errors.curriculumId)) ||
+                          !!curriculumDuplicateError
                         }
                         helperText={
-                          formik.touched.curriculumId &&
-                          formik.errors.curriculumId
+                          (formik.touched.curriculumId &&
+                            formik.errors.curriculumId) ||
+                          curriculumDuplicateError ||
+                          undefined
                         }
                         slotProps={{
                           input: {
@@ -1277,10 +1391,20 @@ const AccreditedCourseRegistration = () => {
                           ))
                         )}
                       </TextField>
+                      {checkingCurriculum && (
+                        <Typography variant="caption" color="info.main">
+                          Checking curriculum availability...
+                        </Typography>
+                      )}
+                      {curriculumDuplicateError && (
+                        <Alert severity="error" sx={{ mt: 1 }} size="small">
+                          {curriculumDuplicateError}
+                        </Alert>
+                      )}
                     </Grid>
 
-                    {/* Curriculum Details Fields - Only show when curriculum is selected */}
-                    {selectedCurriculumDetails && (
+                    {/* Curriculum Details - All Read Only */}
+                    {selectedCurriculumDetails && !curriculumDuplicateError && (
                       <>
                         <Grid item size={{ xs: 12, md: 3 }}>
                           <TextField
@@ -1361,132 +1485,39 @@ const AccreditedCourseRegistration = () => {
                       </>
                     )}
 
+                    {/* Sector - Read Only (Auto-filled) */}
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
-                        select
                         fullWidth
-                        label={
-                          <>
-                            Sector <RequiredStar />
-                          </>
-                        }
+                        label="Sector"
                         name="sectorId"
                         size="small"
-                        value={formik.values.sectorId}
-                        onChange={(e) => {
-                          formik.handleChange(e);
-                          if (!isBasicInfoReadOnly()) {
-                            setSelectedSectorId(e.target.value);
-                          }
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.sectorId &&
-                          Boolean(formik.errors.sectorId)
-                        }
-                        helperText={
-                          formik.touched.sectorId && formik.errors.sectorId
-                        }
+                        value={getSectorName(formik.values.sectorId)}
                         slotProps={{
                           input: {
-                            readOnly: isBasicInfoReadOnly(),
+                            readOnly: true,
                           },
                         }}
-                      >
-                        <MenuItem value="">-select-</MenuItem>
-                        {sectors.map((sector) => (
-                          <MenuItem key={sector.id} value={sector.id}>
-                            {sector.sectorName}
-                          </MenuItem>
-                        ))}
-                      </TextField>
+                      />
                     </Grid>
 
-                    {/* Occupation Dropdown */}
+                    {/* Occupation - Read Only (Auto-filled) */}
                     <Grid item size={{ xs: 12, md: 4 }}>
-                      {isBasicInfoReadOnly() ? (
-                        <TextField
-                          fullWidth
-                          label="Occupation"
-                          name="courseName"
-                          size="small"
-                          value={formik.values.courseName}
-                          slotProps={{
-                            input: {
-                              readOnly: true,
-                            },
-                          }}
-                        />
-                      ) : (
-                        <TextField
-                          select
-                          fullWidth
-                          label={
-                            <>
-                              Occupation <RequiredStar />
-                            </>
-                          }
-                          name="courseId"
-                          size="small"
-                          value={formik.values.courseId}
-                          onChange={(e) => {
-                            const selectedValue = e.target.value;
-                            formik.handleChange(e);
-                            const selectedCourseObj = occupations.find(
-                              (occ) => occ.id == selectedValue,
-                            );
-                            if (selectedCourseObj) {
-                              formik.setFieldValue(
-                                "courseName",
-                                selectedCourseObj.occupationName ||
-                                  selectedCourseObj.name,
-                              );
-                              // Fetch programme title when occupation is selected
-                              fetchProgrammeTitle(selectedValue);
-                            } else {
-                              formik.setFieldValue("courseName", "");
-                              setProgrammeTitle("");
-                              formik.setFieldValue("programmeId", "");
-                            }
-                          }}
-                          onBlur={formik.handleBlur}
-                          error={
-                            formik.touched.courseId &&
-                            Boolean(formik.errors.courseId)
-                          }
-                          helperText={
-                            formik.touched.courseId && formik.errors.courseId
-                          }
-                          disabled={!formik.values.sectorId}
-                          slotProps={{
-                            input: {
-                              readOnly: isBasicInfoReadOnly(),
-                            },
-                          }}
-                        >
-                          <MenuItem value="">-select-</MenuItem>
-                          {loadingOccupations ? (
-                            <MenuItem disabled>
-                              <CircularProgress size={20} /> Loading
-                              occupations...
-                            </MenuItem>
-                          ) : (
-                            occupations.map((occupation) => (
-                              <MenuItem
-                                key={occupation.id}
-                                value={occupation.id}
-                              >
-                                {occupation.occupationName ||
-                                  occupation.title ||
-                                  occupation.name}
-                              </MenuItem>
-                            ))
-                          )}
-                        </TextField>
-                      )}
+                      <TextField
+                        fullWidth
+                        label="Occupation"
+                        name="occupationName"
+                        size="small"
+                        value={formik.values.occupationName}
+                        slotProps={{
+                          input: {
+                            readOnly: true,
+                          },
+                        }}
+                      />
                     </Grid>
 
-                    {/* Programme Title - Auto-filled from Endorsed Curriculum (stores ID, displays title) */}
+                    {/* Programme Title - Read Only (Auto-filled) */}
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
@@ -1495,33 +1526,19 @@ const AccreditedCourseRegistration = () => {
                             Programme Title <RequiredStar />
                           </>
                         }
-                        name="programmeId"
+                        name="programmeTitle"
                         size="small"
-                        value={programmeTitle}
-                        onChange={(e) => {
-                          // This is read-only, but we keep the handler for formik
-                          formik.handleChange(e);
-                        }}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.programmeId &&
-                          Boolean(formik.errors.programmeId)
-                        }
-                        helperText={
-                          formik.touched.programmeId &&
-                          formik.errors.programmeId
-                        }
+                        value={programmeTitle || formik.values.programmeTitle}
                         slotProps={{
                           input: {
                             readOnly: true,
-                           
                           },
                         }}
-                        placeholder="Auto-filled from Endorsed Curriculum"
+                        placeholder="Auto-filled from Curriculum"
                       />
                     </Grid>
 
-                    {/* New Fields: Fees per trainee and Enrollment capacity */}
+                    {/* Fees per trainee - Editable */}
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
@@ -1549,9 +1566,10 @@ const AccreditedCourseRegistration = () => {
                             readOnly: isBasicInfoReadOnly(),
                           },
                         }}
-                        inputProps={{ min: 1 }}
                       />
                     </Grid>
+
+                    {/* Enrollment capacity - Editable */}
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
@@ -1579,7 +1597,6 @@ const AccreditedCourseRegistration = () => {
                             readOnly: isBasicInfoReadOnly(),
                           },
                         }}
-                        inputProps={{ min: 1 }}
                       />
                     </Grid>
                   </Grid>
@@ -1620,6 +1637,11 @@ const AccreditedCourseRegistration = () => {
                           formik.touched.leadTrainerCidNo &&
                           formik.errors.leadTrainerCidNo
                         }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
                       />
                     </Grid>
                     <Grid item size={{ xs: 12, md: 4 }}>
@@ -1643,6 +1665,11 @@ const AccreditedCourseRegistration = () => {
                           formik.touched.leadTrainerName &&
                           formik.errors.leadTrainerName
                         }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
                       />
                     </Grid>
 
@@ -1667,6 +1694,11 @@ const AccreditedCourseRegistration = () => {
                         helperText={
                           formik.touched.genderId && formik.errors.genderId
                         }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
                       >
                         <MenuItem value="">-select-</MenuItem>
                         {genderList.map((gender) => (
@@ -1685,19 +1717,24 @@ const AccreditedCourseRegistration = () => {
                             Academic Qualification <RequiredStar />
                           </>
                         }
-                        name="academicQualificationId"
+                        name="qualificationId"
                         size="small"
-                        value={formik.values.academicQualificationId}
+                        value={formik.values.qualificationId}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.academicQualificationId &&
-                          Boolean(formik.errors.academicQualificationId)
+                          formik.touched.qualificationId &&
+                          Boolean(formik.errors.qualificationId)
                         }
                         helperText={
-                          formik.touched.academicQualificationId &&
-                          formik.errors.academicQualificationId
+                          formik.touched.qualificationId &&
+                          formik.errors.qualificationId
                         }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
                       >
                         <MenuItem value="">-select-</MenuItem>
                         {academicQualifications.map((qualification) => (
@@ -1731,6 +1768,11 @@ const AccreditedCourseRegistration = () => {
                           formik.touched.professionalExperience &&
                           formik.errors.professionalExperience
                         }
+                        slotProps={{
+                          input: {
+                            readOnly: isBasicInfoReadOnly(),
+                          },
+                        }}
                       />
                     </Grid>
                   </Grid>
@@ -1829,7 +1871,10 @@ const AccreditedCourseRegistration = () => {
                       disabled={
                         loading ||
                         !areAllQualityStandardsYes ||
-                        formik.values.files.length === 0
+                        formik.values.files.length === 0 ||
+                        !!curriculumDuplicateError ||
+                        checkingCurriculum ||
+                        !formik.values.curriculumId
                       }
                     >
                       {loading
@@ -1839,15 +1884,6 @@ const AccreditedCourseRegistration = () => {
                           : "Submit"}
                     </Button>
                   </>
-                )}
-                {isReadOnly() && (
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => setOpenDialog(false)}
-                  >
-                    Close
-                  </Button>
                 )}
               </DialogActions>
             </Form>

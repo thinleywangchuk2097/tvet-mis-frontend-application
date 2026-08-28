@@ -94,6 +94,7 @@ const useCourseData = (registration_no, access_token) => {
           access_token,
         );
       setCourses(response.data);
+      console.log("Enrolled Courses:", response.data);
     } catch (error) {
       console.error("Error fetching courses:", error);
     } finally {
@@ -109,6 +110,7 @@ const useCourseData = (registration_no, access_token) => {
           access_token,
         );
       setApprovedCourses(response.data);
+      console.log("Approved Courses:", response.data);
     } catch (error) {
       console.error("Error fetching approved courses:", error);
     }
@@ -121,13 +123,13 @@ const useCourseData = (registration_no, access_token) => {
         const documents = await Promise.all(values.files.map(fileToBase64));
 
         const selectedCourse = values.approvedCourses?.find(
-          (course) => course.id === values.courseId,
+          (course) => course.id === values.programmeId,
         );
 
         const payload = {
           instituteId: values.instituteId,
-          courseId: values.courseId,
-          courseName: selectedCourse?.course_name || values.courseId,
+          programmeId: values.programmeId,
+          courseName: selectedCourse?.course_name || values.programmeId,
           feesPerTrainee: values.feesPerTrainee,
           certificationLevelId: values.certificationLevelId,
           enrollmentCapacity: values.enrollmentCapacity,
@@ -502,10 +504,10 @@ const NonAccreditedCourse = () => {
   );
 
   const getCourseNameById = useCallback(
-    (courseId) => {
-      if (!courseId) return "N/A";
-      const course = courseData.approvedCourses.find((c) => c.id === courseId);
-      return course ? course.course_name : courseId;
+    (programmeId) => {
+      if (!programmeId) return "N/A";
+      const course = courseData.approvedCourses.find((c) => c.id === programmeId);
+      return course ? course.course_name : programmeId;
     },
     [courseData.approvedCourses],
   );
@@ -520,8 +522,8 @@ const NonAccreditedCourse = () => {
     },
     {
       id: "course",
-      label: "Course",
-      render: (course) => getCourseNameById(course.course_id),
+      label: "Programme Name",
+      render: (course) => getCourseNameById(course.programme_id),
     },
     {
       id: "certificationLevel",
@@ -600,7 +602,7 @@ const NonAccreditedCourse = () => {
   // Form initial values
   const initialValues = {
     instituteId: institute.institute_id || "",
-    courseId: "",
+    programmeId: "",
     feesPerTrainee: "",
     certificationLevelId: "",
     enrollmentCapacity: "",
@@ -618,7 +620,7 @@ const NonAccreditedCourse = () => {
 
   // Form validation schema
   const validationSchema = Yup.object().shape({
-    courseId: Yup.string().required("Course Name is required"),
+    programmeId: Yup.string().required("Programme Name is required"),
     feesPerTrainee: Yup.number()
       .typeError("Must be a number")
       .required("Fees per trainee is required"),
@@ -675,15 +677,15 @@ const NonAccreditedCourse = () => {
   // Handle course selection - auto-fill fields
   const handleCourseChange = useCallback(
     (event, formik) => {
-      const courseId = event.target.value;
+      const programmeId = event.target.value;
 
-      if (courseId) {
+      if (programmeId) {
         const selectedCourse = courseData.approvedCourses.find(
-          (course) => course.id === courseId,
+          (course) => course.id === programmeId,
         );
 
         if (selectedCourse) {
-          formik.setFieldValue("courseId", courseId, false);
+          formik.setFieldValue("programmeId", programmeId, false);
           formik.setFieldValue(
             "feesPerTrainee",
             selectedCourse.fees_per_trainee || "",
@@ -703,7 +705,7 @@ const NonAccreditedCourse = () => {
           );
         }
       } else {
-        formik.setFieldValue("courseId", "", false);
+        formik.setFieldValue("programmeId", "", false);
         formik.setFieldValue("feesPerTrainee", "", false);
         formik.setFieldValue("certificationLevelId", "", false);
         formik.setFieldValue("enrollmentCapacity", "", false);
@@ -767,10 +769,10 @@ const NonAccreditedCourse = () => {
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormTextField
                       formik={formik}
-                      name="courseId"
+                      name="programmeId"
                       label={
                         <>
-                          <RequiredStar /> Course Name
+                          <RequiredStar /> Programme Name
                         </>
                       }
                       select

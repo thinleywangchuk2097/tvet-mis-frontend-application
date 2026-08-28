@@ -1,33 +1,56 @@
-# Use official Node as the base image
-FROM node:22.18.0-alpine3.22
+# syntax=docker/dockerfile:1.7
 
-# Update system packages to fix Alpine vulnerabilities
-RUN apk update && apk upgrade --no-cache
+# ---------- Stage 1: build ----------
+FROM node:22-alpine3.22 AS builder
 
-# Create custom group and user
-RUN addgroup -g 1001 -S tvet-mis && \
-    adduser -S tvet-user -u 1001 -G tvet-mis
+# Patch the bundled npm CLI (source of the tar/glob/minimatch/brace-expansion CVEs)
+RUN npm install -g npm@latest && npm cache clean --force
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json first (better layer caching)
 COPY package*.json ./
 
-# Install dependencies Without --legacy-peer-deps (Uses strict peer dependency checking)
-RUN npm install --legacy-peer-deps
+# Force-resolve vulnerable transitive deps.
+# Packages that are ALSO direct dependencies get a self-reference ($name),
+# because npm rejects a hard override on a direct dep (EOVERRIDE).
+RUN <<'EOF' node
+const fs = require('fs');
+const p = JSON.parse(fs.readFileSync('package.json'));
+const fix = {
+  'tar': '^7.5.19',
+  'glob': '^11.1.0',
+  'minimatch': '^10.2.3',
+  'brace-expansion': '^5.0.9',
+  'picomatch': '^4.0.4',
+  'ip-address': '^10.3.1',
+  'sigstore': '^4.1.1',
+};
+const direct = { ...p.dependencies, ...p.devDependencies };
+p.overrides = p.overrides || {};
+for (const [name, want] of Object.entries(fix)) {
+  if (direct[name]) {
+    p.overrides[name] = '$' + name;
+    console.log(`self-ref ${name} (direct: ${direct[name]}, fix line: ${want})`);
+  } else {
+    p.overrides[name] = want;
+  }
+}
+fs.writeFileSync('package.json', JSON.stringify(p, null, 2));
+EOF
 
-# Copy the rest of the application code with proper ownership
-COPY --chown=tvet-user:tvet-mis . .
+RUN npm install --legacy-peer-deps && npm cache clean --force
 
-# Change ownership of the entire app directory
-RUN chown -R tvet-user:tvet-mis /app
+COPY . .
+RUN npm run build
 
-# Switch to the non-root user
-USER tvet-user
+# ---------- Stage 2: runtime (no npm, no node, no node_modules) ----------
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
 
-# Expose the port the app runs on
-EXPOSE 5173
+USER root
+RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
+USER 101
 
-# Start the development server
-CMD ["npm", "run", "dev", "--", "--host"]
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]
