@@ -41,7 +41,7 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import InstituteProposalService from "../../../api/services/internal/registration/InstituteProposalService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import DatahubService from "../../../api/services/external/datahub/DatahubService";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 
 // Constants
 const TABLE_STYLE = {
@@ -171,6 +171,8 @@ const InstituteSesCentreAssessmentCentre = () => {
     courseId: null,
   });
   const { serviceId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Check if it's tuition service
   const isTuitionService = serviceId === "36" || serviceId === 36;
@@ -333,6 +335,61 @@ const InstituteSesCentreAssessmentCentre = () => {
       }),
     [isTuitionService],
   );
+
+  // Reset handler
+  const handleReset = () => {
+    formik.resetForm();
+    setQualitySelections({});
+    setTabValue(0);
+    setTrainerError("");
+    setCourseError("");
+    setTuitionError("");
+    setPendingMappings({
+      sectorId: null,
+      dzongkhagId: null,
+      courseId: null,
+    });
+    setApplicationFound(false);
+    setSearchValue("");
+    setApplicationNo(null);
+    // Reset form values manually
+    formik.setValues({
+      instituteName: "",
+      dzongkhag: "",
+      location: "",
+      telephone: "",
+      mobile: "",
+      email: "",
+      website: "",
+      ownershipType: "",
+      bhutaneseEmployees: "",
+      nonBhutaneseEmployees: "",
+      businessLicenseNo: "",
+      keyContactName: "",
+      keyContactDesignation: "",
+      keyContactMobileNo: "",
+      trainers: isTuitionService ? [] : [{ ...initialTrainer }],
+      courses: isTuitionService ? [] : [{ ...initialCourse }],
+      tuitionDetails: isTuitionService ? [{ ...initialTuition }] : [],
+      files: [],
+      declarationAccepted: false,
+    });
+  };
+
+  // Handle reset from navigation
+  useEffect(() => {
+    if (location.state?.resetForm) {
+      const timer = setTimeout(() => {
+        handleReset();
+        // Clear the reset flag
+        navigate(location.pathname, {
+          state: { ...location.state, resetForm: false },
+          replace: true,
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state?.resetForm, location.pathname]);
 
   useEffect(() => {
     fetchServiceName();
@@ -929,17 +986,6 @@ const InstituteSesCentreAssessmentCentre = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleReset = () => {
-    formik.resetForm();
-    setQualitySelections({});
-    setTabValue(0);
-    setTrainerError("");
-    setCourseError("");
-    setTuitionError("");
-    setPendingMappings({ sectorId: null, dzongkhagId: null, courseId: null });
-    toast.info("Form has been reset");
   };
 
   const handleRadioChange = (standardId, rowId, value) => {

@@ -29,7 +29,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import FacebookIcon from "@mui/icons-material/Facebook";
 import XIcon from "@mui/icons-material/X";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
-import FileCopyIcon from '@mui/icons-material/FileCopy';
+import FileCopyIcon from "@mui/icons-material/FileCopy";
 import ArticleIcon from "@mui/icons-material/Article";
 import BusinessIcon from "@mui/icons-material/Business";
 import ApartmentIcon from "@mui/icons-material/Apartment";
@@ -43,7 +43,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import PaymentIcon from "@mui/icons-material/Payment";
 import RuleFolderIcon from "@mui/icons-material/RuleFolder";
 import FeedbackIcon from "@mui/icons-material/Feedback";
-import PublicIcon from '@mui/icons-material/Public';
+import PublicIcon from "@mui/icons-material/Public";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // ── Government logo
@@ -189,20 +189,20 @@ const NAV_MENU = [
     icon: <FeedbackIcon sx={{ fontSize: 16 }} />,
     path: "/feedback/form",
   },
-   {
+  {
     label: "Publication",
-    icon: <PublicIcon  sx={{ fontSize: 16 }} />,
+    icon: <PublicIcon sx={{ fontSize: 16 }} />,
     path: "/publication/publication-index",
   },
-    {
+  {
     label: "Forms",
-    icon: <FileCopyIcon  sx={{ fontSize: 16 }} />,
+    icon: <FileCopyIcon sx={{ fontSize: 16 }} />,
     path: "/forms/forms-index",
   },
 ];
 
-// Paths that require a full page reload after navigation
-const refreshPaths = [
+// Paths that require form reset (no hard refresh)
+const resetPaths = [
   "/register/institute/7",
   "/register/ses-centre/36",
   "/register/assessment-centre/4",
@@ -322,13 +322,22 @@ const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpand, setMobileExpand] = useState({});
 
-  // Navigate with optional full page reload
+  // Navigate with state-based reset (no hard refresh)
   const handleNav = (path, closeFn) => {
     if (closeFn) closeFn();
     if (!path) return;
-    navigate(path);
-    if (refreshPaths.includes(path)) {
-      setTimeout(() => window.location.reload(), 100);
+
+    // Check if this is a registration page that needs form reset
+    if (resetPaths.includes(path)) {
+      // Use location state instead of hard refresh
+      navigate(path, {
+        state: {
+          resetForm: true,
+          timestamp: Date.now(),
+        },
+      });
+    } else {
+      navigate(path);
     }
   };
 
