@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import PropTypes from "prop-types";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -27,6 +28,59 @@ import CommonService from "../../api/services/internal/common/CommonService";
 import FileDownload from "../../components/file/FileDownload";
 import CurriculumIndexService from "../../api/services/internal/course/CurriculumIndexService";
 import NcsService from "../../api/services/internal/ncs/NcsService";
+
+// ==================== SUB-COMPONENTS ====================
+
+// RejectButton component
+const RejectButton = ({ isDisabled, onReject }) => (
+  <Button
+    variant="contained"
+    color="error"
+    startIcon={<CancelIcon />}
+    onClick={onReject}
+    disabled={isDisabled}
+    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+  >
+    Reject
+  </Button>
+);
+
+RejectButton.propTypes = {
+  isDisabled: PropTypes.bool,
+  onReject: PropTypes.func.isRequired,
+};
+
+// ActionButton component
+const ActionButton = ({
+  color,
+  startIcon,
+  onClick,
+  disabled,
+  label,
+  variant = "contained",
+}) => (
+  <Button
+    variant={variant}
+    color={color}
+    startIcon={startIcon}
+    onClick={onClick}
+    disabled={disabled}
+    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+  >
+    {label}
+  </Button>
+);
+
+ActionButton.propTypes = {
+  color: PropTypes.oneOf(["primary", "success", "error", "warning", "info"]),
+  startIcon: PropTypes.node,
+  onClick: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+  label: PropTypes.string.isRequired,
+  variant: PropTypes.oneOf(["contained", "outlined", "text"]),
+};
+
+// ==================== MAIN COMPONENT ====================
 
 const ViewCurriculumIndex = () => {
   const { applicationNo } = useParams();
@@ -177,17 +231,23 @@ const ViewCurriculumIndex = () => {
       );
       console.log("Programme Title Response:", response);
       console.log("Programme Title Response Data:", response.data);
-      
+
       // Check if response.data is an array and has elements
-      if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
+      if (
+        response &&
+        response.data &&
+        Array.isArray(response.data) &&
+        response.data.length > 0
+      ) {
         const item = response.data[0];
         // Try to get the programme title from various possible field names
-        const title = item.programme_title || 
-                      item.courseName || 
-                      item.name || 
-                      item.occupationName ||
-                      item.title;
-        
+        const title =
+          item.programme_title ||
+          item.courseName ||
+          item.name ||
+          item.occupationName ||
+          item.title;
+
         if (title) {
           setProgrammeTitle(title);
           console.log("Programme Title set to:", title);
@@ -195,15 +255,21 @@ const ViewCurriculumIndex = () => {
           console.warn("No title found in response data:", item);
           setProgrammeTitle(`Programme ID: ${programmeId}`);
         }
-      } else if (response && response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+      } else if (
+        response &&
+        response.data &&
+        typeof response.data === "object" &&
+        !Array.isArray(response.data)
+      ) {
         // If it's a single object (not an array)
         const item = response.data;
-        const title = item.programme_title || 
-                      item.courseName || 
-                      item.name || 
-                      item.occupationName ||
-                      item.title;
-        
+        const title =
+          item.programme_title ||
+          item.courseName ||
+          item.name ||
+          item.occupationName ||
+          item.title;
+
         if (title) {
           setProgrammeTitle(title);
         } else {
@@ -421,19 +487,17 @@ const ViewCurriculumIndex = () => {
     return true;
   };
 
-  // Common Reject Button
-  const RejectButton = ({ isDisabled }) => (
-    <Button
-      variant="contained"
-      color="error"
-      startIcon={<CancelIcon />}
-      onClick={() => openDialog(58)}
-      disabled={isDisabled}
-      sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-    >
-      Reject
-    </Button>
-  );
+  // Open dialog with action
+  const openDialog = (action) => {
+    setCurrentAction(action);
+    setRemarksError("");
+    setActionDialogOpen(true);
+  };
+
+  // Handle reject action
+  const handleReject = () => {
+    openDialog(58);
+  };
 
   // Get the action buttons based on role
   const getActionButtons = () => {
@@ -448,17 +512,14 @@ const ViewCurriculumIndex = () => {
     if (roleId === 21 && isCurriculumTypeAllowed(["25", "49"])) {
       return (
         <>
-          <Button
-            variant="contained"
+          <ActionButton
             color="primary"
             startIcon={<FastForwardIcon />}
             onClick={() => openDialog(113)}
             disabled={isDisabled}
-            sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-          >
-            Forward TTTRC
-          </Button>
-          <RejectButton isDisabled={isDisabled} />
+            label="Forward TTTRC"
+          />
+          <RejectButton isDisabled={isDisabled} onReject={handleReject} />
         </>
       );
     }
@@ -467,17 +528,14 @@ const ViewCurriculumIndex = () => {
     if (roleId === 14 && isCurriculumTypeAllowed(["25", "49", "48"])) {
       return (
         <>
-          <Button
-            variant="contained"
+          <ActionButton
             color="primary"
             startIcon={<FastForwardIcon />}
             onClick={() => openDialog(114)}
             disabled={isDisabled}
-            sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-          >
-            Forward Head TTTRC
-          </Button>
-          <RejectButton isDisabled={isDisabled} />
+            label="Forward Head TTTRC"
+          />
+          <RejectButton isDisabled={isDisabled} onReject={handleReject} />
         </>
       );
     }
@@ -486,17 +544,14 @@ const ViewCurriculumIndex = () => {
     if (roleId === 15 && isCurriculumTypeAllowed(["25"])) {
       return (
         <>
-          <Button
-            variant="contained"
+          <ActionButton
             color="success"
             startIcon={<CheckCircleIcon />}
             onClick={() => openDialog(57)}
             disabled={isDisabled}
-            sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-          >
-            Approve
-          </Button>
-          <RejectButton isDisabled={isDisabled} />
+            label="Approve"
+          />
+          <RejectButton isDisabled={isDisabled} onReject={handleReject} />
         </>
       );
     }
@@ -505,23 +560,20 @@ const ViewCurriculumIndex = () => {
     if (roleId === 15 && isCurriculumTypeAllowed(["48", "49"])) {
       return (
         <>
-          <Button
-            variant="contained"
+          <ActionButton
             color="success"
             startIcon={<ThumbUpIcon />}
             onClick={() => openDialog(59)}
             disabled={isDisabled}
-            sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
-          >
-            Endorse
-          </Button>
-          <RejectButton isDisabled={isDisabled} />
+            label="Endorse"
+          />
+          <RejectButton isDisabled={isDisabled} onReject={handleReject} />
         </>
       );
     }
 
     // For all other roles, show only Reject button
-    return <RejectButton isDisabled={isDisabled} />;
+    return <RejectButton isDisabled={isDisabled} onReject={handleReject} />;
   };
 
   const handleAction = async () => {
@@ -576,12 +628,6 @@ const ViewCurriculumIndex = () => {
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const openDialog = (action) => {
-    setCurrentAction(action);
-    setRemarksError("");
-    setActionDialogOpen(true);
   };
 
   const closeDialog = () => {
@@ -1061,5 +1107,8 @@ const ViewCurriculumIndex = () => {
     </Box>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+ViewCurriculumIndex.propTypes = {};
 
 export default ViewCurriculumIndex;

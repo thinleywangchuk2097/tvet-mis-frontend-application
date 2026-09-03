@@ -1,5 +1,6 @@
 // OnCampusJobPlacement.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Table,
   TableBody,
@@ -224,6 +225,82 @@ const usePagination = () => {
   };
 };
 
+// ==================== PROPTYPES ====================
+
+const statusChipPropTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  dropdownData: PropTypes.array,
+};
+
+const employmentStatusChipPropTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  employmentStatuses: PropTypes.array,
+};
+
+const formFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  type: PropTypes.string,
+  required: PropTypes.bool,
+  select: PropTypes.bool,
+  options: PropTypes.array,
+  optionLabelKey: PropTypes.string,
+};
+
+const reusableTablePropTypes = {
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      label: PropTypes.string,
+      field: PropTypes.string,
+      render: PropTypes.func,
+    }),
+  ).isRequired,
+  data: PropTypes.array.isRequired,
+  page: PropTypes.number,
+  rowsPerPage: PropTypes.number,
+  loading: PropTypes.bool,
+  actions: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string,
+      icon: PropTypes.node,
+      tooltip: PropTypes.string,
+      color: PropTypes.string,
+      onClick: PropTypes.func,
+      disabled: PropTypes.func,
+    }),
+  ),
+  emptyMessage: PropTypes.string,
+};
+
+const deleteConfirmationDialogPropTypes = {
+  open: PropTypes.bool.isRequired,
+  item: PropTypes.object,
+  type: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+};
+
+const viewDialogPropTypes = {
+  open: PropTypes.bool.isRequired,
+  title: PropTypes.string.isRequired,
+  fields: PropTypes.arrayOf(
+    PropTypes.shape({
+      label: PropTypes.string,
+      value: PropTypes.any,
+      multiline: PropTypes.bool,
+      rows: PropTypes.number,
+    }),
+  ).isRequired,
+  onClose: PropTypes.func.isRequired,
+};
+
+const addButtonPropTypes = {
+  onClick: PropTypes.func.isRequired,
+  label: PropTypes.string.isRequired,
+};
+
 // ==================== REUSABLE COMPONENTS ====================
 const StatusChip = ({ id, dropdownData }) => (
   <Chip
@@ -232,6 +309,8 @@ const StatusChip = ({ id, dropdownData }) => (
     size="small"
   />
 );
+
+StatusChip.propTypes = statusChipPropTypes;
 
 const EmploymentStatusChip = ({ id, employmentStatuses }) => {
   const name = getEmploymentStatusName(id, employmentStatuses);
@@ -243,6 +322,8 @@ const EmploymentStatusChip = ({ id, employmentStatuses }) => {
     />
   );
 };
+
+EmploymentStatusChip.propTypes = employmentStatusChipPropTypes;
 
 const FormField = ({
   formik,
@@ -290,6 +371,8 @@ const FormField = ({
 
   return <TextField {...fieldProps} />;
 };
+
+FormField.propTypes = formFieldPropTypes;
 
 const ReusableTable = ({
   columns,
@@ -360,6 +443,8 @@ const ReusableTable = ({
   </TableContainer>
 );
 
+ReusableTable.propTypes = reusableTablePropTypes;
+
 const DeleteConfirmationDialog = ({ open, item, type, onClose, onConfirm }) => {
   const messages = {
     session: `Delete session "<strong>${item?.session_name}</strong>"?`,
@@ -398,6 +483,8 @@ const DeleteConfirmationDialog = ({ open, item, type, onClose, onConfirm }) => {
   );
 };
 
+DeleteConfirmationDialog.propTypes = deleteConfirmationDialogPropTypes;
+
 const ViewDialog = ({ open, title, fields, onClose }) => (
   <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
     <DialogTitle>{title}</DialogTitle>
@@ -426,6 +513,8 @@ const ViewDialog = ({ open, title, fields, onClose }) => (
   </Dialog>
 );
 
+ViewDialog.propTypes = viewDialogPropTypes;
+
 const AddButton = ({ onClick, label }) => (
   <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
     <Button
@@ -439,6 +528,8 @@ const AddButton = ({ onClick, label }) => (
     </Button>
   </Box>
 );
+
+AddButton.propTypes = addButtonPropTypes;
 
 // ==================== ENTITY CONFIGURATION ====================
 const ENTITY_CONFIG = {
@@ -1395,5 +1486,8 @@ const OnCampusJobPlacement = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+OnCampusJobPlacement.propTypes = {};
 
 export default OnCampusJobPlacement;

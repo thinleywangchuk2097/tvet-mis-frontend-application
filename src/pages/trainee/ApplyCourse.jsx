@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Paper,
@@ -26,12 +27,6 @@ import {
   TableHead,
   TableRow,
   Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Tooltip,
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
@@ -112,6 +107,12 @@ const SectionHeader = ({ icon: Icon, title, subtitle }) => (
     </Box>
   </Box>
 );
+
+SectionHeader.propTypes = {
+  icon: PropTypes.elementType.isRequired,
+  title: PropTypes.string.isRequired,
+  subtitle: PropTypes.string,
+};
 
 /* ---------- Validation ---------- */
 
@@ -308,7 +309,7 @@ const ApplyCourse = () => {
       setFetchingCourse(true);
       const response =
         await CommonService.getCourseAnnouncementByApplicationNo(applicationNo);
-        console.log("course details :",response.data )
+      console.log("course details :", response.data);
       const courseData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;

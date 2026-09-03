@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   Grid,
   Card,
@@ -359,6 +360,8 @@ const transactionSchema = Yup.object().shape({
   status: Yup.string().required("Required"),
 });
 
+// ==================== ENHANCED STAT CARD COMPONENT ====================
+
 // Enhanced Stat Card Component - Compact version
 const EnhancedStatCard = ({
   title,
@@ -443,7 +446,7 @@ const EnhancedStatCard = ({
                   fontSize: "1.5rem",
                 }}
               >
-                {typeof value === "number" && title.includes("Revenue")
+                {typeof value === "number" && title && title.includes("Revenue")
                   ? `$${value.toLocaleString()}`
                   : typeof value === "number"
                     ? value.toLocaleString()
@@ -572,7 +575,9 @@ const EnhancedStatCard = ({
                 }}
               >
                 Target:{" "}
-                {typeof target === "number" && title.includes("Revenue")
+                {typeof target === "number" &&
+                title &&
+                title.includes("Revenue")
                   ? `$${target.toLocaleString()}`
                   : target.toLocaleString()}
               </Typography>
@@ -583,6 +588,28 @@ const EnhancedStatCard = ({
     </Grow>
   );
 };
+
+// ==================== PROPTYPES FOR ENHANCED STAT CARD ====================
+EnhancedStatCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  icon: PropTypes.node.isRequired,
+  color: PropTypes.oneOf([
+    "primary",
+    "secondary",
+    "success",
+    "warning",
+    "error",
+    "info",
+  ]),
+  trend: PropTypes.shape({
+    value: PropTypes.number,
+  }),
+  target: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  subtitle: PropTypes.string,
+};
+
+// ==================== MAIN COMPONENT ====================
 
 const Level2Dashboard = () => {
   const theme = useTheme();
@@ -1760,5 +1787,8 @@ const Level2Dashboard = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+Level2Dashboard.propTypes = {};
 
 export default Level2Dashboard;

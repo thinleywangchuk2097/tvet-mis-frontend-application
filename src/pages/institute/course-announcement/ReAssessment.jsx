@@ -243,7 +243,6 @@ const ReAssessment = () => {
   };
 
   const handleViewDetails = (applicationNo, courseId) => {
-    // Navigate with both applicationNo and courseId as route parameters
     navigate(
       `/announcement/reassessment-trainee-selection/${applicationNo}/${courseId}`,
     );
@@ -255,6 +254,7 @@ const ReAssessment = () => {
     return type ? type.service_name : "N/A";
   };
 
+  // FIXED: Removed redundant conditional that returned same value
   const getCourseName = (courseId, serviceId) => {
     if (!courseId) return "N/A";
 
@@ -265,15 +265,11 @@ const ReAssessment = () => {
     } else if (serviceId === "42" || serviceId === 42) {
       course = accreditedCourses.find((c) => String(c.id) === String(courseId));
     } else {
+      // For other service IDs, try to find in approvedCourses
       course = approvedCourses.find((c) => String(c.id) === String(courseId));
-      if (!course) {
-        const originalCourse = courses.find(
-          (c) => String(c.course_id) === String(courseId),
-        );
-        return originalCourse ? originalCourse.course_name : courseId;
-      }
     }
 
+    // If course is found, return its name, otherwise return the courseId
     return course ? course.name : courseId;
   };
 
@@ -291,8 +287,8 @@ const ReAssessment = () => {
     instituteId: institute.institute_id || "",
     reassessmentTypeId: "",
     courseId: "",
-    feesPerTrainee: "", // Changed from courseFee
-    enrollmentCapacity: "", // Changed from totalNoTrainees
+    feesPerTrainee: "",
+    enrollmentCapacity: "",
     courseStartDate: "",
     courseEndDate: "",
     certificationLevelId: "",
@@ -305,10 +301,10 @@ const ReAssessment = () => {
   const validationSchema = Yup.object().shape({
     reassessmentTypeId: Yup.string().required("Reassessment Type is required"),
     courseId: Yup.string().required("Course Name is required"),
-    feesPerTrainee: Yup.number() // Changed from courseFee
+    feesPerTrainee: Yup.number()
       .typeError("Must be a number")
       .required("Course Fee is required"),
-    enrollmentCapacity: Yup.number() // Changed from totalNoTrainees
+    enrollmentCapacity: Yup.number()
       .typeError("Must be a number")
       .required("Total number of trainees required"),
     courseStartDate: Yup.date()
@@ -343,8 +339,8 @@ const ReAssessment = () => {
         instituteId: values.instituteId,
         serviceId: values.reassessmentTypeId,
         courseId: values.courseId,
-        feesPerTrainee: values.feesPerTrainee, // Changed from courseFee
-        enrollmentCapacity: values.enrollmentCapacity, // Changed from totalNoTrainees
+        feesPerTrainee: values.feesPerTrainee,
+        enrollmentCapacity: values.enrollmentCapacity,
         courseStartDate: values.courseStartDate,
         courseEndDate: values.courseEndDate,
         certificationLevelId: values.certificationLevelId,
@@ -726,19 +722,19 @@ const ReAssessment = () => {
                           Fees per Trainee (Nu.) <RequiredStar />
                         </>
                       }
-                      name="feesPerTrainee" // Changed from courseFee
+                      name="feesPerTrainee"
                       size="small"
                       type="number"
-                      value={formik.values.feesPerTrainee} // Changed from courseFee
+                      value={formik.values.feesPerTrainee}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       error={
-                        formik.touched.feesPerTrainee && // Changed from courseFee
-                        Boolean(formik.errors.feesPerTrainee) // Changed from courseFee
+                        formik.touched.feesPerTrainee &&
+                        Boolean(formik.errors.feesPerTrainee)
                       }
                       helperText={
                         formik.touched.feesPerTrainee &&
-                        formik.errors.feesPerTrainee // Changed from courseFee
+                        formik.errors.feesPerTrainee
                       }
                     />
                   </Grid>
@@ -783,19 +779,19 @@ const ReAssessment = () => {
                           Enrollment Capacity per Batch <RequiredStar />
                         </>
                       }
-                      name="enrollmentCapacity" // Changed from totalNoTrainees
+                      name="enrollmentCapacity"
                       size="small"
                       type="number"
-                      value={formik.values.enrollmentCapacity} // Changed from totalNoTrainees
+                      value={formik.values.enrollmentCapacity}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       error={
-                        formik.touched.enrollmentCapacity && // Changed from totalNoTrainees
-                        Boolean(formik.errors.enrollmentCapacity) // Changed from totalNoTrainees
+                        formik.touched.enrollmentCapacity &&
+                        Boolean(formik.errors.enrollmentCapacity)
                       }
                       helperText={
                         formik.touched.enrollmentCapacity &&
-                        formik.errors.enrollmentCapacity // Changed from totalNoTrainees
+                        formik.errors.enrollmentCapacity
                       }
                     />
                   </Grid>

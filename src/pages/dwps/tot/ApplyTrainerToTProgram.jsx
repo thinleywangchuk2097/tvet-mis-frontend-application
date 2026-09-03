@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Table,
   TableBody,
@@ -30,6 +31,222 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import AddTrainerService from "../../../api/services/internal/trainer/AddTrainerService";
 
+// ==================== PROPTYPES ====================
+
+const trainerTablePropTypes = {
+  announcementId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+    .isRequired,
+  trainersList: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      name: PropTypes.string,
+      cid: PropTypes.string,
+      email: PropTypes.string,
+      phone: PropTypes.string,
+      gender: PropTypes.string,
+      qualification: PropTypes.string,
+      experience: PropTypes.string,
+      specialization: PropTypes.string,
+    }),
+  ).isRequired,
+};
+
+// ==================== TRAINER TABLE COMPONENT ====================
+const TrainerTable = ({ announcementId, trainersList }) => {
+  const [trainerPage, setTrainerPage] = useState(0);
+  const [trainerRowsPerPage, setTrainerRowsPerPage] = useState(5);
+
+  // Access selectedTrainers from parent context
+  const [selectedTrainers, setSelectedTrainers] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  const handleTrainerPageChange = (event, newPage) => setTrainerPage(newPage);
+  const handleTrainerRowsPerPageChange = (event) => {
+    setTrainerRowsPerPage(+event.target.value);
+    setTrainerPage(0);
+  };
+
+  const isAllSelected = () => {
+    const selected = selectedTrainers[announcementId] || [];
+    return trainersList.length > 0 && selected.length === trainersList.length;
+  };
+
+  const selectedCount = (selectedTrainers[announcementId] || []).length;
+
+  const handleSelectTrainer = (announcementId, trainerId) => {
+    setSelectedTrainers((prev) => {
+      const currentSelected = prev[announcementId] || [];
+      if (currentSelected.includes(trainerId)) {
+        return {
+          ...prev,
+          [announcementId]: currentSelected.filter((id) => id !== trainerId),
+        };
+      } else {
+        return {
+          ...prev,
+          [announcementId]: [...currentSelected, trainerId],
+        };
+      }
+    });
+  };
+
+  const handleSelectAllTrainers = (announcementId, event) => {
+    const trainerList = trainersList || [];
+    if (event.target.checked) {
+      setSelectedTrainers((prev) => ({
+        ...prev,
+        [announcementId]: trainerList.map((t) => t.id),
+      }));
+    } else {
+      setSelectedTrainers((prev) => ({
+        ...prev,
+        [announcementId]: [],
+      }));
+    }
+  };
+
+  if (trainersList.length === 0) {
+    return (
+      <Alert severity="info" sx={{ mt: 1 }}>
+        No trainers available for this program.
+      </Alert>
+    );
+  }
+
+  return (
+    <Box>
+      <TableContainer component={Paper} variant="outlined" sx={{ mt: 1 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  checked={isAllSelected()}
+                  onChange={(e) => handleSelectAllTrainers(announcementId, e)}
+                />
+              </TableCell>
+              <TableCell>#</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>CID</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Phone</TableCell>
+              <TableCell>Gender</TableCell>
+              <TableCell>Qualification</TableCell>
+              <TableCell>Experience</TableCell>
+              <TableCell>Specialization</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {trainersList
+              .slice(
+                trainerPage * trainerRowsPerPage,
+                trainerPage * trainerRowsPerPage + trainerRowsPerPage,
+              )
+              .map((trainer, index) => {
+                const isSelected = (
+                  selectedTrainers[announcementId] || []
+                ).includes(trainer.id);
+                return (
+                  <TableRow
+                    key={trainer.id}
+                    hover
+                    selected={isSelected}
+                    sx={{ cursor: "pointer" }}
+                    onClick={() =>
+                      handleSelectTrainer(announcementId, trainer.id)
+                    }
+                  >
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={isSelected}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() =>
+                          handleSelectTrainer(announcementId, trainer.id)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {index + 1 + trainerPage * trainerRowsPerPage}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="medium">
+                        {trainer.name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{trainer.cid}</TableCell>
+                    <TableCell>{trainer.email}</TableCell>
+                    <TableCell>{trainer.phone}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={trainer.gender || "N/A"}
+                        size="small"
+                        color="default"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={trainer.qualification || "N/A"}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={trainer.experience || "0 years"}
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{trainer.specialization || "—"}</TableCell>
+                  </TableRow>
+                );
+              })}
+          </TableBody>
+        </Table>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={trainersList.length}
+          rowsPerPage={trainerRowsPerPage}
+          page={trainerPage}
+          onPageChange={handleTrainerPageChange}
+          onRowsPerPageChange={handleTrainerRowsPerPageChange}
+        />
+      </TableContainer>
+
+      <Box
+        sx={{
+          mt: 2,
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 2,
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          Selected: <strong>{selectedCount}</strong> trainer(s)
+        </Typography>
+        <Button
+          variant="contained"
+          color="success"
+          startIcon={<SendIcon />}
+          onClick={() => handleApplyTrainers(announcementId)}
+          disabled={selectedCount === 0 || loading}
+          size="small"
+        >
+          Apply Selected ({selectedCount})
+        </Button>
+      </Box>
+    </Box>
+  );
+};
+
+TrainerTable.propTypes = trainerTablePropTypes;
+
+// ==================== MAIN COMPONENT ====================
 const ApplyTrainerToTProgram = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -494,162 +711,6 @@ const ApplyTrainerToTProgram = () => {
       item.programCode?.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const TrainerTable = ({ announcementId, trainersList }) => {
-    const [trainerPage, setTrainerPage] = useState(0);
-    const [trainerRowsPerPage, setTrainerRowsPerPage] = useState(5);
-
-    const handleTrainerPageChange = (event, newPage) => setTrainerPage(newPage);
-    const handleTrainerRowsPerPageChange = (event) => {
-      setTrainerRowsPerPage(+event.target.value);
-      setTrainerPage(0);
-    };
-
-    const isAllSelected = () => {
-      const selected = selectedTrainers[announcementId] || [];
-      return trainersList.length > 0 && selected.length === trainersList.length;
-    };
-
-    const selectedCount = (selectedTrainers[announcementId] || []).length;
-
-    if (trainersList.length === 0) {
-      return (
-        <Alert severity="info" sx={{ mt: 1 }}>
-          No trainers available for this program.
-        </Alert>
-      );
-    }
-
-    return (
-      <Box>
-        <TableContainer component={Paper} variant="outlined" sx={{ mt: 1 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    checked={isAllSelected()}
-                    onChange={(e) => handleSelectAllTrainers(announcementId, e)}
-                  />
-                </TableCell>
-                <TableCell>#</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>CID</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Phone</TableCell>
-                <TableCell>Gender</TableCell>
-                <TableCell>Qualification</TableCell>
-                <TableCell>Experience</TableCell>
-                <TableCell>Specialization</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {trainersList
-                .slice(
-                  trainerPage * trainerRowsPerPage,
-                  trainerPage * trainerRowsPerPage + trainerRowsPerPage,
-                )
-                .map((trainer, index) => {
-                  const isSelected = (
-                    selectedTrainers[announcementId] || []
-                  ).includes(trainer.id);
-                  return (
-                    <TableRow
-                      key={trainer.id}
-                      hover
-                      selected={isSelected}
-                      sx={{ cursor: "pointer" }}
-                      onClick={() =>
-                        handleSelectTrainer(announcementId, trainer.id)
-                      }
-                    >
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={isSelected}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() =>
-                            handleSelectTrainer(announcementId, trainer.id)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {index + 1 + trainerPage * trainerRowsPerPage}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
-                          {trainer.name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{trainer.cid}</TableCell>
-                      <TableCell>{trainer.email}</TableCell>
-                      <TableCell>{trainer.phone}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={trainer.gender || "N/A"}
-                          size="small"
-                          color="default"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={trainer.qualification || "N/A"}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={trainer.experience || "0 years"}
-                          size="small"
-                          color="info"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>{trainer.specialization || "—"}</TableCell>
-                    </TableRow>
-                  );
-                })}
-            </TableBody>
-          </Table>
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={trainersList.length}
-            rowsPerPage={trainerRowsPerPage}
-            page={trainerPage}
-            onPageChange={handleTrainerPageChange}
-            onRowsPerPageChange={handleTrainerRowsPerPageChange}
-          />
-        </TableContainer>
-
-        <Box
-          sx={{
-            mt: 2,
-            display: "flex",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            gap: 2,
-          }}
-        >
-          <Typography variant="body2" color="text.secondary">
-            Selected: <strong>{selectedCount}</strong> trainer(s)
-          </Typography>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<SendIcon />}
-            onClick={() => handleApplyTrainers(announcementId)}
-            disabled={selectedCount === 0 || loading}
-            size="small"
-          >
-            Apply Selected ({selectedCount})
-          </Button>
-        </Box>
-      </Box>
-    );
-  };
-
   if (!isReferenceDataLoaded) {
     return (
       <Paper
@@ -892,5 +953,8 @@ const ApplyTrainerToTProgram = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+ApplyTrainerToTProgram.propTypes = {};
 
 export default ApplyTrainerToTProgram;

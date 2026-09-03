@@ -360,10 +360,10 @@ const DropdownIndex = () => {
       formik.values.description.trim() !== "" &&
       formik.values.dropdownChild.length > 0;
 
-    if (editMode) {
-      return !hasErrors && hasRequiredValues && hasChanges;
-    }
-    return !hasErrors && hasRequiredValues;
+    // In edit mode, require changes; in add mode, just require valid values
+    return editMode
+      ? !hasErrors && hasRequiredValues && hasChanges
+      : !hasErrors && hasRequiredValues;
   };
 
   useEffect(() => {
@@ -464,53 +464,58 @@ const DropdownIndex = () => {
   );
 
   // Render table view (compact desktop)
-  const renderTable = () => (
-    <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-      <Table
-        sx={{
-          borderCollapse: "collapse",
-          minWidth: 500,
-          "& .MuiTableCell-root": {
-            py: 0.75,
-            px: 1,
-            fontSize: "0.8rem",
-          },
-        }}
-        size="small"
-      >
-        <TableHead>
-          <TableRow
-            sx={{
-              "& .MuiTableCell-root": {
-                textAlign: "center",
-                fontWeight: 600,
-                fontSize: "0.75rem",
-                py: 0.5,
-              },
-            }}
-          >
-            <TableCell sx={{ border: "1px solid #e0e0e0", width: "8%" }}>
-              ID
-            </TableCell>
-            <TableCell sx={{ border: "1px solid #e0e0e0", width: "20%" }}>
-              Dropdown Name
-            </TableCell>
-            <TableCell sx={{ border: "1px solid #e0e0e0", width: "40%" }}>
-              Description
-            </TableCell>
-            <TableCell
-              sx={{ border: "1px solid #e0e0e0", width: "32%" }}
-              align="center"
+  const renderTable = () => {
+    const paginatedDropdowns = filteredDropdowns.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage,
+    );
+    const hasData = paginatedDropdowns.length > 0;
+
+    return (
+      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+        <Table
+          sx={{
+            borderCollapse: "collapse",
+            minWidth: 500,
+            "& .MuiTableCell-root": {
+              py: 0.75,
+              px: 1,
+              fontSize: "0.8rem",
+            },
+          }}
+          size="small"
+        >
+          <TableHead>
+            <TableRow
+              sx={{
+                "& .MuiTableCell-root": {
+                  textAlign: "center",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  py: 0.5,
+                },
+              }}
             >
-              Actions
-            </TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {filteredDropdowns.length > 0 ? (
-            filteredDropdowns
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((dropdown) => (
+              <TableCell sx={{ border: "1px solid #e0e0e0", width: "8%" }}>
+                ID
+              </TableCell>
+              <TableCell sx={{ border: "1px solid #e0e0e0", width: "20%" }}>
+                Dropdown Name
+              </TableCell>
+              <TableCell sx={{ border: "1px solid #e0e0e0", width: "40%" }}>
+                Description
+              </TableCell>
+              <TableCell
+                sx={{ border: "1px solid #e0e0e0", width: "32%" }}
+                align="center"
+              >
+                Actions
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {hasData ? (
+              paginatedDropdowns.map((dropdown) => (
                 <TableRow
                   key={dropdown.id}
                   hover
@@ -574,49 +579,50 @@ const DropdownIndex = () => {
                   </TableCell>
                 </TableRow>
               ))
-          ) : (
-            <TableRow>
-              <TableCell
-                colSpan={4}
-                align="center"
-                sx={{ py: 2, fontSize: "0.85rem" }}
-              >
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ fontSize: "0.8rem" }}
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={4}
+                  align="center"
+                  sx={{ py: 2, fontSize: "0.85rem" }}
                 >
-                  {searchTerm
-                    ? "No dropdowns found matching your search."
-                    : "No dropdowns available."}
-                </Typography>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ fontSize: "0.8rem" }}
+                  >
+                    {searchTerm
+                      ? "No dropdowns found matching your search."
+                      : "No dropdowns available."}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
 
-      <TablePagination
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        component="div"
-        count={filteredDropdowns.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        sx={{
-          "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
-            {
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          component="div"
+          count={filteredDropdowns.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          sx={{
+            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+              {
+                fontSize: "0.75rem",
+              },
+            "& .MuiTablePagination-select": {
               fontSize: "0.75rem",
             },
-          "& .MuiTablePagination-select": {
-            fontSize: "0.75rem",
-          },
-          minHeight: 40,
-        }}
-      />
-    </TableContainer>
-  );
+            minHeight: 40,
+          }}
+        />
+      </TableContainer>
+    );
+  };
 
   // ==================== MAIN RENDER ====================
 

@@ -67,10 +67,11 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const [traineeTheoryAssessments, setTraineeTheoryAssessments] = useState({});
   const [traineePracticalAssessments, setTraineePracticalAssessments] =
     useState({});
-  
+
   // State for storing viva and practical assessments for service_id 41
   const [traineeVivaAssessments, setTraineeVivaAssessments] = useState({});
-  const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] = useState({});
+  const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] =
+    useState({});
 
   // Dialog states
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
@@ -93,9 +94,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   // Check if any trainee has internal_assessment (to determine if we need theory/practical columns)
   const [hasInternalAssessmentForCourse, setHasInternalAssessmentForCourse] =
     useState(false);
-  
+
   // Check if service_id is 41 for Viva assessments
-  const isServiceId41 = courseDetails?.service_id === "41";//39isServiceId39
+  const isServiceId41 = courseDetails?.service_id === "41";
 
   // Fetch data on component mount
   useEffect(() => {
@@ -177,19 +178,24 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   };
 
   const fetchData = async () => {
-    await Promise.all([fetchCourseDetails(), fetchReAssessmentSelectedTrainees()]);
+    await Promise.all([
+      fetchCourseDetails(),
+      fetchReAssessmentSelectedTrainees(),
+    ]);
   };
 
   const fetchCourseDetails = async () => {
     try {
       const response =
-        await CommonService.getReAssessmentAnnouncementByApplicationNo(applicationNo);
+        await CommonService.getReAssessmentAnnouncementByApplicationNo(
+          applicationNo,
+        );
       const courseData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
       setCourseDetails(courseData);
       setCurrentStatusId(courseData?.status_id);
-      
+
       // Only set CA dates in state if they DON'T exist in course details
       if (!courseData?.ca_start_date) {
         setCaStartDate("");
@@ -240,7 +246,8 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
         initialTheory[trainee.id] = trainee.theory_assessment || "";
         initialPractical[trainee.id] = trainee.practical_assessment || "";
         initialViva[trainee.id] = trainee.viva_assessment || "";
-        initialVivaPractical[trainee.id] = trainee.viva_practical_assessment || "";
+        initialVivaPractical[trainee.id] =
+          trainee.viva_practical_assessment || "";
       });
 
       setTraineeTheoryAssessments(initialTheory);
@@ -496,7 +503,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
               <br />
               <br />
               <strong>
-                Note: {isServiceId41 ? "Viva and Practical" : "Theory and Practical"} assessments will be saved with this approval.
+                Note:{" "}
+                {isServiceId41 ? "Viva and Practical" : "Theory and Practical"}{" "}
+                assessments will be saved with this approval.
               </strong>
             </>
           )}
@@ -610,214 +619,126 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return cols;
   };
 
-  // Render assessment column based on service type
+  // FIXED: Simplified renderAssessmentColumn to reduce duplication
   const renderAssessmentColumn = (trainee) => {
     const hasInternalAssessment =
-      trainee.internal_assessment !== null && trainee.internal_assessment !== "";
+      trainee.internal_assessment !== null &&
+      trainee.internal_assessment !== "";
 
-    if (isServiceId41) {
-      // For service_id 41: Show Viva and Practical columns
+    if (!hasInternalAssessment) {
       return (
         <>
-          {/* Viva Assessment Column */}
           <TableCell>
-            {hasInternalAssessment ? (
-              courseDetails?.certification_level_id === "36" ? (
-                <TextField
-                  type="number"
-                  size="small"
-                  value={traineeVivaAssessments[trainee.id] || ""}
-                  onChange={(e) =>
-                    handleVivaAssessmentChange(trainee.id, e.target.value)
-                  }
-                  fullWidth
-                  InputProps={{
-                    inputProps: { min: 0, max: 100 },
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-              ) : (
-                <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                  <Select
-                    value={traineeVivaAssessments[trainee.id] || ""}
-                    onChange={(e) =>
-                      handleVivaAssessmentChange(trainee.id, e.target.value)
-                    }
-                    displayEmpty
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select Competency</em>
-                    </MenuItem>
-                    {academicCompetency.map((competency) => (
-                      <MenuItem key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )
-            ) : (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                sx={{ fontStyle: "italic" }}
-              >
-                N/A
-              </Typography>
-            )}
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              sx={{ fontStyle: "italic" }}
+            >
+              N/A
+            </Typography>
           </TableCell>
-          
-          {/* Practical Assessment Column for service_id 41 */}
           <TableCell>
-            {hasInternalAssessment ? (
-              courseDetails?.certification_level_id === "36" ? (
-                <TextField
-                  type="number"
-                  size="small"
-                  value={traineeVivaPracticalAssessments[trainee.id] || ""}
-                  onChange={(e) =>
-                    handleVivaPracticalAssessmentChange(trainee.id, e.target.value)
-                  }
-                  fullWidth
-                  InputProps={{
-                    inputProps: { min: 0, max: 100 },
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-              ) : (
-                <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                  <Select
-                    value={traineeVivaPracticalAssessments[trainee.id] || ""}
-                    onChange={(e) =>
-                      handleVivaPracticalAssessmentChange(trainee.id, e.target.value)
-                    }
-                    displayEmpty
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select Competency</em>
-                    </MenuItem>
-                    {academicCompetency.map((competency) => (
-                      <MenuItem key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )
-            ) : (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                sx={{ fontStyle: "italic" }}
-              >
-                N/A
-              </Typography>
-            )}
-          </TableCell>
-        </>
-      );
-    } else {
-      // For other services: Show Theory and Practical columns
-      return (
-        <>
-          {/* Theory Assessment Column */}
-          <TableCell>
-            {hasInternalAssessment ? (
-              courseDetails?.certification_level_id === "36" ? (
-                <TextField
-                  type="number"
-                  size="small"
-                  value={traineeTheoryAssessments[trainee.id] || ""}
-                  onChange={(e) =>
-                    handleTheoryAssessmentChange(trainee.id, e.target.value)
-                  }
-                  fullWidth
-                  InputProps={{
-                    inputProps: { min: 0, max: 100 },
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-              ) : (
-                <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                  <Select
-                    value={traineeTheoryAssessments[trainee.id] || ""}
-                    onChange={(e) =>
-                      handleTheoryAssessmentChange(trainee.id, e.target.value)
-                    }
-                    displayEmpty
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select Competency</em>
-                    </MenuItem>
-                    {academicCompetency.map((competency) => (
-                      <MenuItem key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )
-            ) : (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                sx={{ fontStyle: "italic" }}
-              >
-                N/A
-              </Typography>
-            )}
-          </TableCell>
-          
-          {/* Practical Assessment Column for other services */}
-          <TableCell>
-            {hasInternalAssessment ? (
-              courseDetails?.certification_level_id === "36" ? (
-                <TextField
-                  type="number"
-                  size="small"
-                  value={traineePracticalAssessments[trainee.id] || ""}
-                  onChange={(e) =>
-                    handlePracticalAssessmentChange(trainee.id, e.target.value)
-                  }
-                  fullWidth
-                  InputProps={{
-                    inputProps: { min: 0, max: 100 },
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-              ) : (
-                <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
-                  <Select
-                    value={traineePracticalAssessments[trainee.id] || ""}
-                    onChange={(e) =>
-                      handlePracticalAssessmentChange(trainee.id, e.target.value)
-                    }
-                    displayEmpty
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select Competency</em>
-                    </MenuItem>
-                    {academicCompetency.map((competency) => (
-                      <MenuItem key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )
-            ) : (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                sx={{ fontStyle: "italic" }}
-              >
-                N/A
-              </Typography>
-            )}
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              sx={{ fontStyle: "italic" }}
+            >
+              N/A
+            </Typography>
           </TableCell>
         </>
       );
     }
+
+    const isNumeric = courseDetails?.certification_level_id === "36";
+    const isVivaType = isServiceId41;
+
+    // Define the assessment configuration
+    const getAssessmentConfig = () => {
+      if (isVivaType) {
+        return {
+          firstField: {
+            value: traineeVivaAssessments[trainee.id] || "",
+            onChange: (value) => handleVivaAssessmentChange(trainee.id, value),
+            label: "Viva Assessment",
+          },
+          secondField: {
+            value: traineeVivaPracticalAssessments[trainee.id] || "",
+            onChange: (value) =>
+              handleVivaPracticalAssessmentChange(trainee.id, value),
+            label: "Practical Assessment",
+          },
+        };
+      } else {
+        return {
+          firstField: {
+            value: traineeTheoryAssessments[trainee.id] || "",
+            onChange: (value) =>
+              handleTheoryAssessmentChange(trainee.id, value),
+            label: "Theory Assessment",
+          },
+          secondField: {
+            value: traineePracticalAssessments[trainee.id] || "",
+            onChange: (value) =>
+              handlePracticalAssessmentChange(trainee.id, value),
+            label: "Practical Assessment",
+          },
+        };
+      }
+    };
+
+    const config = getAssessmentConfig();
+
+    // Render assessment field helper
+    const renderAssessmentField = (fieldConfig, isNumericField) => {
+      if (isNumericField) {
+        return (
+          <TextField
+            type="number"
+            size="small"
+            value={fieldConfig.value}
+            onChange={(e) => fieldConfig.onChange(e.target.value)}
+            fullWidth
+            slotProps={{
+              input: {
+                inputProps: { min: 0, max: 100 },
+              },
+            }}
+            sx={{ minWidth: 120 }}
+          />
+        );
+      } else {
+        return (
+          <FormControl size="small" fullWidth sx={{ minWidth: 150 }}>
+            <Select
+              value={fieldConfig.value}
+              onChange={(e) => fieldConfig.onChange(e.target.value)}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                <em>Select Competency</em>
+              </MenuItem>
+              {academicCompetency.map((competency) => (
+                <MenuItem key={competency.id} value={competency.id}>
+                  {competency.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        );
+      }
+    };
+
+    return (
+      <>
+        <TableCell>
+          {renderAssessmentField(config.firstField, isNumeric)}
+        </TableCell>
+        <TableCell>
+          {renderAssessmentField(config.secondField, isNumeric)}
+        </TableCell>
+      </>
+    );
   };
 
   if (loading && !courseDetails && selectedTrainees.length === 0) {
@@ -962,7 +883,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   size="small"
                   value={caStartDate}
                   onChange={(e) => setCaStartDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                  }}
                   disabled={isActionDisabled()}
                 />
               </Grid>
@@ -975,11 +898,15 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   size="small"
                   value={caEndDate}
                   onChange={(e) => setCaEndDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  disabled={isActionDisabled()}
-                  inputProps={{
-                    min: caStartDate || undefined,
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                    input: {
+                      inputProps: {
+                        min: caStartDate || undefined,
+                      },
+                    },
                   }}
+                  disabled={isActionDisabled()}
                 />
               </Grid>
             </Grid>
@@ -1040,7 +967,11 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   {/* Show Theory and Practical or Viva and Practical based on service_id */}
                   {hasInternalAssessmentForCourse && (
                     <>
-                      <TableCell>{isServiceId41 ? "Viva Assessment" : "Theory Assessment"}</TableCell>
+                      <TableCell>
+                        {isServiceId41
+                          ? "Viva Assessment"
+                          : "Theory Assessment"}
+                      </TableCell>
                       <TableCell>Practical Assessment</TableCell>
                     </>
                   )}
@@ -1061,7 +992,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                             {index + 1 + page * rowsPerPage}
                           </TableCell>
                           <TableCell>{trainee.applicant_name}</TableCell>
-                          <TableCell>{trainee.cid_no || trainee.reference_no}</TableCell>
+                          <TableCell>
+                            {trainee.cid_no || trainee.reference_no}
+                          </TableCell>
                           <TableCell>{trainee.mobile_no}</TableCell>
                           <TableCell>{trainee.email_id}</TableCell>
                           <TableCell>
@@ -1100,7 +1033,8 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                             </TableCell>
                           )}
                           {/* Render assessment columns based on service type */}
-                          {hasInternalAssessmentForCourse && renderAssessmentColumn(trainee)}
+                          {hasInternalAssessmentForCourse &&
+                            renderAssessmentColumn(trainee)}
                         </TableRow>
                       );
                     })

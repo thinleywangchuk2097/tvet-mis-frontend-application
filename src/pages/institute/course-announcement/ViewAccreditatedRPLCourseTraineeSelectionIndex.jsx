@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Paper,
   Typography,
@@ -976,130 +976,64 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return "Reject Course Selection";
   };
 
+  // FIXED: Simplified the dialog content to reduce duplication
   const getDialogContent = () => {
+    // Common content for non-reject actions
+    const getCommonContent = (actionText) => (
+      <DialogContentText>
+        Are you sure you want to {actionText} this course selection?
+        <br />
+        <strong>Application No: {applicationNo}</strong>
+        <br />
+        <strong>Course Name: {courseDetails?.course_name}</strong>
+        <br />
+        <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
+        {paymentStatus && paymentStatus.paymentAdviceNo && (
+          <>
+            <br />
+            <strong>Payment Advice No: {paymentStatus.paymentAdviceNo}</strong>
+          </>
+        )}
+        {!hasCADatesInCourse && caStartDate && caEndDate && (
+          <>
+            <br />
+            <strong>CA Start Date: {formatDate(caStartDate)}</strong>
+            <br />
+            <strong>CA End Date: {formatDate(caEndDate)}</strong>
+          </>
+        )}
+        {hasInternalAssessmentForCourse && (
+          <>
+            <br />
+            <br />
+            <strong>
+              Note:{" "}
+              {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
+              {actionText === "submit"
+                ? "values will be saved"
+                : "assessments will be saved"}{" "}
+              with this {actionText}.
+            </strong>
+          </>
+        )}
+        {assignedAssessors.length > 0 && (
+          <>
+            <br />
+            <br />
+            <strong>Assigned Assessors: {assignedAssessors.length}</strong>
+          </>
+        )}
+      </DialogContentText>
+    );
+
     if (currentAction === 55) {
-      return (
-        <DialogContentText>
-          Are you sure you want to submit this course selection?
-          <br />
-          <strong>Application No: {applicationNo}</strong>
-          <br />
-          <strong>Course Name: {courseDetails?.course_name}</strong>
-          <br />
-          <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-          {!hasCADatesInCourse && caStartDate && caEndDate && (
-            <>
-              <br />
-              <strong>CA Start Date: {formatDate(caStartDate)}</strong>
-              <br />
-              <strong>CA End Date: {formatDate(caEndDate)}</strong>
-            </>
-          )}
-          {hasInternalAssessmentForCourse && (
-            <>
-              <br />
-              <br />
-              <strong>
-                Note: CA Mark/Competency values will be saved with this
-                submission.
-              </strong>
-            </>
-          )}
-        </DialogContentText>
-      );
+      return getCommonContent("submit");
     } else if (currentAction === 57) {
-      return (
-        <DialogContentText>
-          Are you sure you want to approve this course selection?
-          <br />
-          <strong>Application No: {applicationNo}</strong>
-          <br />
-          <strong>Course Name: {courseDetails?.course_name}</strong>
-          <br />
-          <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-          {paymentStatus && paymentStatus.paymentAdviceNo && (
-            <>
-              <br />
-              <strong>
-                Payment Advice No: {paymentStatus.paymentAdviceNo}
-              </strong>
-            </>
-          )}
-          {!hasCADatesInCourse && caStartDate && caEndDate && (
-            <>
-              <br />
-              <strong>CA Start Date: {formatDate(caStartDate)}</strong>
-              <br />
-              <strong>CA End Date: {formatDate(caEndDate)}</strong>
-            </>
-          )}
-          {hasInternalAssessmentForCourse && (
-            <>
-              <br />
-              <br />
-              <strong>
-                Note:{" "}
-                {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
-                assessments will be saved with this approval.
-              </strong>
-            </>
-          )}
-          {assignedAssessors.length > 0 && (
-            <>
-              <br />
-              <br />
-              <strong>Assigned Assessors: {assignedAssessors.length}</strong>
-            </>
-          )}
-        </DialogContentText>
-      );
+      return getCommonContent("approve");
     } else if (currentAction === 59) {
-      return (
-        <DialogContentText>
-          Are you sure you want to endorse this course selection?
-          <br />
-          <strong>Application No: {applicationNo}</strong>
-          <br />
-          <strong>Course Name: {courseDetails?.course_name}</strong>
-          <br />
-          <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-          {paymentStatus && paymentStatus.paymentAdviceNo && (
-            <>
-              <br />
-              <strong>
-                Payment Advice No: {paymentStatus.paymentAdviceNo}
-              </strong>
-            </>
-          )}
-          {!hasCADatesInCourse && caStartDate && caEndDate && (
-            <>
-              <br />
-              <strong>CA Start Date: {formatDate(caStartDate)}</strong>
-              <br />
-              <strong>CA End Date: {formatDate(caEndDate)}</strong>
-            </>
-          )}
-          {hasInternalAssessmentForCourse && (
-            <>
-              <br />
-              <br />
-              <strong>
-                Note:{" "}
-                {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
-                assessments will be saved with this endorsement.
-              </strong>
-            </>
-          )}
-          {assignedAssessors.length > 0 && (
-            <>
-              <br />
-              <br />
-              <strong>Assigned Assessors: {assignedAssessors.length}</strong>
-            </>
-          )}
-        </DialogContentText>
-      );
+      return getCommonContent("endorse");
     } else {
+      // Reject action - requires remarks
       return (
         <>
           <DialogContentText sx={{ mb: 2 }}>

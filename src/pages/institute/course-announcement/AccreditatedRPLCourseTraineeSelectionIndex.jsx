@@ -265,7 +265,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
 
       console.log("payment details:", response);
     } catch (error) {
-      console.error("Error fetching payment details :", error);
+      console.error("Error fetching payment details:", error);
       toast.error("Failed to fetch payment details");
       setPaymentAdviceNo(null);
       setPaymentRedirectUrl(null);
@@ -314,6 +314,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     try {
       const response = await CommonService.getByParentId(22);
       const competencies = response.data;
+      console.log("Academic Competencies Response:", competencies);
       setAcademicCompetency(competencies);
 
       // Create a map for competency lookup
@@ -382,7 +383,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           initialInternalAssessments[trainee.id] = "";
         }
 
-        // Initialize theory and practical assessments
+        // Initialize theory and practical assessments - use trainee data directly
         initialTheory[trainee.id] = trainee.theory_assessment || "";
         initialPractical[trainee.id] = trainee.practical_assessment || "";
 
@@ -973,35 +974,55 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     // Only render if application is endorsed
     if (!isApplicationEndorsed()) return null;
 
+    // Check if certification level is numeric (111 or 112)
+    const isNumeric = isNumericCertificationLevel();
+
     if (isServiceId39) {
       // For service_id 39: Show Viva and Practical columns (read-only with tooltip)
+      // Get value from state or fallback to trainee data directly
+      const vivaValue =
+        traineeVivaAssessments[trainee.id] || trainee.viva_assessment || "";
+      const practicalValue =
+        traineeVivaPracticalAssessments[trainee.id] ||
+        trainee.practical_assessment ||
+        "";
+
       return (
         <>
           {/* Viva Assessment Column */}
           <TableCell>
             <Tooltip
               title={
-                traineeVivaAssessments[trainee.id]
-                  ? `Viva Assessment: ${traineeVivaAssessments[trainee.id]}`
+                vivaValue
+                  ? `Viva Assessment: ${vivaValue}`
                   : "No viva assessment available"
               }
               arrow
             >
-              <TextField
-                type="number"
-                size="small"
-                value={traineeVivaAssessments[trainee.id] || "N/A"}
-                fullWidth
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                  },
-                }}
-                sx={{
-                  minWidth: 120,
-                  backgroundColor: "#f5f5f5",
-                }}
-              />
+              {isNumeric ? (
+                <TextField
+                  type="number"
+                  size="small"
+                  value={vivaValue || ""}
+                  fullWidth
+                  slotProps={{
+                    input: {
+                      readOnly: true,
+                    },
+                  }}
+                  sx={{
+                    minWidth: 120,
+                    backgroundColor: "#f5f5f5",
+                  }}
+                />
+              ) : (
+                <Chip
+                  label={getCompetencyName(vivaValue) || "N/A"}
+                  size="small"
+                  color="info"
+                  sx={{ minWidth: 100 }}
+                />
+              )}
             </Tooltip>
           </TableCell>
 
@@ -1009,60 +1030,86 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           <TableCell>
             <Tooltip
               title={
-                traineeVivaPracticalAssessments[trainee.id]
-                  ? `Practical Assessment: ${traineeVivaPracticalAssessments[trainee.id]}`
+                practicalValue
+                  ? `Practical Assessment: ${practicalValue}`
                   : "No practical assessment available"
               }
               arrow
             >
-              <TextField
-                type="number"
-                size="small"
-                value={traineeVivaPracticalAssessments[trainee.id] || "N/A"}
-                fullWidth
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                  },
-                }}
-                sx={{
-                  minWidth: 120,
-                  backgroundColor: "#f5f5f5",
-                }}
-              />
+              {isNumeric ? (
+                <TextField
+                  type="number"
+                  size="small"
+                  value={practicalValue || ""}
+                  fullWidth
+                  slotProps={{
+                    input: {
+                      readOnly: true,
+                    },
+                  }}
+                  sx={{
+                    minWidth: 120,
+                    backgroundColor: "#f5f5f5",
+                  }}
+                />
+              ) : (
+                <Chip
+                  label={getCompetencyName(practicalValue) || "N/A"}
+                  size="small"
+                  color="info"
+                  sx={{ minWidth: 100 }}
+                />
+              )}
             </Tooltip>
           </TableCell>
         </>
       );
     } else {
       // For other services: Show Theory and Practical columns (read-only with tooltip)
+      // Get value from state or fallback to trainee data directly
+      const theoryValue =
+        traineeTheoryAssessments[trainee.id] || trainee.theory_assessment || "";
+      const practicalValue =
+        traineePracticalAssessments[trainee.id] ||
+        trainee.practical_assessment ||
+        "";
+
       return (
         <>
           {/* Theory Assessment Column */}
           <TableCell>
             <Tooltip
               title={
-                traineeTheoryAssessments[trainee.id]
-                  ? `Theory Assessment: ${traineeTheoryAssessments[trainee.id]}`
+                theoryValue
+                  ? `Theory Assessment: ${theoryValue}`
                   : "No theory assessment available"
               }
               arrow
             >
-              <TextField
-                type="number"
-                size="small"
-                value={traineeTheoryAssessments[trainee.id] || "N/A"}
-                fullWidth
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                  },
-                }}
-                sx={{
-                  minWidth: 120,
-                  backgroundColor: "#f5f5f5",
-                }}
-              />
+              {isNumeric ? (
+                <TextField
+                  type="number"
+                  size="small"
+                  value={theoryValue || ""}
+                  fullWidth
+                  slotProps={{
+                    input: {
+                      readOnly: true,
+                    },
+                  }}
+                  sx={{
+                    minWidth: 120,
+                    backgroundColor: "#f5f5f5",
+                  }}
+                />
+              ) : (
+                <Chip
+                  label={getCompetencyName(theoryValue) || "N/A"}
+                  size="small"
+                  color="info"
+                  sx={{ minWidth: 100 }}
+                />
+              )}
             </Tooltip>
           </TableCell>
 
@@ -1070,27 +1117,36 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           <TableCell>
             <Tooltip
               title={
-                traineePracticalAssessments[trainee.id]
-                  ? `Practical Assessment: ${traineePracticalAssessments[trainee.id]}`
+                practicalValue
+                  ? `Practical Assessment: ${practicalValue}`
                   : "No practical assessment available"
               }
               arrow
             >
-              <TextField
-                type="number"
-                size="small"
-                value={traineePracticalAssessments[trainee.id] || "N/A"}
-                fullWidth
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                  },
-                }}
-                sx={{
-                  minWidth: 120,
-                  backgroundColor: "#f5f5f5",
-                }}
-              />
+              {isNumeric ? (
+                <TextField
+                  type="number"
+                  size="small"
+                  value={practicalValue || ""}
+                  fullWidth
+                  slotProps={{
+                    input: {
+                      readOnly: true,
+                    },
+                  }}
+                  sx={{
+                    minWidth: 120,
+                    backgroundColor: "#f5f5f5",
+                  }}
+                />
+              ) : (
+                <Chip
+                  label={getCompetencyName(practicalValue) || "N/A"}
+                  size="small"
+                  color="info"
+                  sx={{ minWidth: 100 }}
+                />
+              )}
             </Tooltip>
           </TableCell>
         </>

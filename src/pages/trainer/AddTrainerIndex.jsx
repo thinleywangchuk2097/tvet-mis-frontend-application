@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -65,7 +66,7 @@ const TABLE_STYLE = {
     verticalAlign: "middle",
   },
   "& th": {
-    fontWeight: 600
+    fontWeight: 600,
   },
 };
 
@@ -76,6 +77,11 @@ const RequiredLabel = ({ children }) => (
     <span style={{ color: "red", marginLeft: "4px" }}>*</span>
   </span>
 );
+
+// Add PropTypes for RequiredLabel
+RequiredLabel.propTypes = {
+  children: PropTypes.node.isRequired,
+};
 
 const AddTrainerIndex = () => {
   const [trainers, setTrainers] = useState([]);
@@ -193,12 +199,14 @@ const AddTrainerIndex = () => {
     // Get names from reference data (using string comparison since API returns strings)
     const genderName = getGenderName(trainer.gender_id);
     const qualificationName = getQualificationName(trainer.qualification_id);
-    const employmentTypeName = getEmploymentTypeName(trainer.employment_type_id);
-    
+    const employmentTypeName = getEmploymentTypeName(
+      trainer.employment_type_id,
+    );
+
     // Add course names
-    const coursesWithNames = parsedCourses.map(course => ({
+    const coursesWithNames = parsedCourses.map((course) => ({
       ...course,
-      courseName: getCourseName(course.courseTypeId, course.courseId)
+      courseName: getCourseName(course.courseTypeId, course.courseId),
     }));
 
     return {
@@ -334,7 +342,7 @@ const AddTrainerIndex = () => {
   // Function to get course name by type and ID
   const getCourseName = (courseTypeId, courseId) => {
     const coursesList = getCoursesByType(courseTypeId);
-    const course = coursesList.find(c => String(c.id) === String(courseId));
+    const course = coursesList.find((c) => String(c.id) === String(courseId));
     return course?.course_name || course?.name || `Course ID: ${courseId}`;
   };
 

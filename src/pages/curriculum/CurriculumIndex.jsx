@@ -427,10 +427,10 @@ const fetchRelatedData = (
 ) => {
   if (sectorId) {
     fetchOccupationsBySector(sectorId);
-    setSelectedSectorId(sectorId);
+    setSelectedSectorId(() => sectorId);
   } else {
-    setOccupations([]);
-    setSelectedSectorId("");
+    setOccupations(() => []);
+    setSelectedSectorId(() => "");
   }
 
   if (selected.programme_type_id) {
@@ -479,10 +479,10 @@ const resetProgrammeTypeFields = (
   formik.setFieldValue("curriculumTitle", "");
   formik.setFieldValue("programmeTitle", "");
   formik.setFieldValue("ncsId", "");
-  setSelectedSectorId("");
-  setOccupations([]);
-  setNcsExists(false);
-  setNcsData(null);
+  setSelectedSectorId(() => "");
+  setOccupations(() => []);
+  setNcsExists(() => false);
+  setNcsData(() => null);
 };
 
 // Reset sector fields
@@ -491,8 +491,8 @@ const resetSectorFields = (formik, setNcsExists, setNcsData) => {
   formik.setFieldValue("curriculumTitle", "");
   formik.setFieldValue("programmeTitle", "");
   formik.setFieldValue("ncsId", "");
-  setNcsExists(false);
-  setNcsData(null);
+  setNcsExists(() => false);
+  setNcsData(() => null);
 };
 
 // Check if NCS should be checked
@@ -644,14 +644,14 @@ const CurriculumForm = ({
   const handleSectorChange = async (e) => {
     const sectorId = e.target.value;
     formik.handleChange(e);
-    setSelectedSectorId(sectorId);
+    setSelectedSectorId(() => sectorId);
 
     resetSectorFields(formik, setNcsExists, setNcsData);
 
     if (sectorId) {
       await fetchOccupationsBySector(sectorId);
     } else {
-      setOccupations([]);
+      setOccupations(() => []);
     }
   };
 
@@ -659,8 +659,8 @@ const CurriculumForm = ({
   const handleOccupationChange = async (e) => {
     const occupationId = e.target.value;
     formik.handleChange(e);
-    setNcsExists(false);
-    setNcsData(null);
+    setNcsExists(() => false);
+    setNcsData(() => null);
 
     if (shouldCheckNcs(isAdd, formik, occupationId)) {
       await checkNcsExists(
@@ -678,8 +678,8 @@ const CurriculumForm = ({
   const handleCertificateLevelChange = async (e) => {
     const certificateLevelId = e.target.value;
     formik.handleChange(e);
-    setNcsExists(false);
-    setNcsData(null);
+    setNcsExists(() => false);
+    setNcsData(() => null);
 
     if (
       shouldCheckNcsForCertificate(
@@ -779,7 +779,7 @@ const CurriculumForm = ({
     );
   };
 
-  // Render duration distribution validation - FIXED: renamed to avoid recursion
+  // Render duration distribution validation
   const renderDurationDistributionValidationUI = () => {
     return renderDurationDistributionValidation(
       formik.values,
@@ -1448,7 +1448,7 @@ const CurriculumForm = ({
       {/* Duration Validation Message */}
       <Grid size={{ xs: 12 }}>{renderDurationValidation()}</Grid>
 
-      {/* Duration Distribution Validation Message - FIXED: using renamed function */}
+      {/* Duration Distribution Validation Message */}
       <Grid size={{ xs: 12 }}>{renderDurationDistributionValidationUI()}</Grid>
 
       {/* Entry Requirement */}
@@ -1645,7 +1645,7 @@ const CurriculumIndex = () => {
 
   const fetchOccupationsBySector = async (sectorId) => {
     if (!sectorId) {
-      setOccupations([]);
+      setOccupations(() => []);
       return;
     }
     setLoadingOccupations(true);
@@ -1659,24 +1659,24 @@ const CurriculumIndex = () => {
           occupationName:
             child.occupationName || child.name || `Occupation ${child.id}`,
         }));
-        setOccupations(occupationsData);
+        setOccupations(() => occupationsData);
         console.log("Occupations from sector child:", occupationsData);
       } else {
         try {
           const response =
             await CommonService.getOccupationsBySectorId(sectorId);
           const occData = response.data || [];
-          setOccupations(occData);
+          setOccupations(() => occData);
           console.log("Occupations from API:", occData);
         } catch (apiError) {
           console.error("API fallback failed:", apiError);
-          setOccupations([]);
+          setOccupations(() => []);
         }
       }
     } catch (error) {
       console.error("Error fetching occupations:", error);
       toast.error("Failed to fetch occupations");
-      setOccupations([]);
+      setOccupations(() => []);
     } finally {
       setLoadingOccupations(false);
     }
@@ -1834,8 +1834,8 @@ const CurriculumIndex = () => {
     setFieldValue,
   ) => {
     if (!sectorId || !occupationId || !certificationId) {
-      setNcsExists(false);
-      setNcsData(null);
+      setNcsExists(() => false);
+      setNcsData(() => null);
       setFieldValue("curriculumTitle", "");
       setFieldValue("programmeTitle", "");
       setFieldValue("ncsId", "");
@@ -1853,8 +1853,8 @@ const CurriculumIndex = () => {
       console.log("NCS Exists Check Response:", response);
 
       if (response.data && response.data.length > 0) {
-        setNcsExists(true);
-        setNcsData(response.data[0]);
+        setNcsExists(() => true);
+        setNcsData(() => response.data[0]);
         console.log("NCS combination exists:", response.data[0]);
 
         if (response.data[0].programme_title) {
@@ -1866,8 +1866,8 @@ const CurriculumIndex = () => {
           );
         }
       } else {
-        setNcsExists(false);
-        setNcsData(null);
+        setNcsExists(() => false);
+        setNcsData(() => null);
         setFieldValue("curriculumTitle", "");
         setFieldValue("programmeTitle", "");
         setFieldValue("ncsId", "");
@@ -1875,8 +1875,8 @@ const CurriculumIndex = () => {
       }
     } catch (error) {
       console.error("Error checking NCS exists:", error);
-      setNcsExists(false);
-      setNcsData(null);
+      setNcsExists(() => false);
+      setNcsData(() => null);
       setFieldValue("curriculumTitle", "");
       setFieldValue("programmeTitle", "");
       setFieldValue("ncsId", "");
@@ -2387,10 +2387,10 @@ const CurriculumIndex = () => {
         setSelectedCurriculum(null);
       }
       setCertificateLevels([]);
-      setSelectedSectorId("");
-      setOccupations([]);
-      setNcsExists(false);
-      setNcsData(null);
+      setSelectedSectorId(() => "");
+      setOccupations(() => []);
+      setNcsExists(() => false);
+      setNcsData(() => null);
     } catch (error) {
       console.error("Error submitting curriculum:", error);
       const curriculumType = getCurriculumType(values.curriculumTypeId);
@@ -2430,7 +2430,7 @@ const CurriculumIndex = () => {
     }
     if (curriculum.sector_id) {
       fetchOccupationsBySector(curriculum.sector_id);
-      setSelectedSectorId(curriculum.sector_id);
+      setSelectedSectorId(() => curriculum.sector_id);
     }
     setOpenEditDialog(true);
   };
@@ -2661,10 +2661,10 @@ const CurriculumIndex = () => {
         onClose={() => {
           setOpenDialog(false);
           setCertificateLevels([]);
-          setSelectedSectorId("");
-          setOccupations([]);
-          setNcsExists(false);
-          setNcsData(null);
+          setSelectedSectorId(() => "");
+          setOccupations(() => []);
+          setNcsExists(() => false);
+          setNcsData(() => null);
         }}
         maxWidth="lg"
         fullWidth
@@ -2719,10 +2719,10 @@ const CurriculumIndex = () => {
                   onClick={() => {
                     setOpenDialog(false);
                     setCertificateLevels([]);
-                    setSelectedSectorId("");
-                    setOccupations([]);
-                    setNcsExists(false);
-                    setNcsData(null);
+                    setSelectedSectorId(() => "");
+                    setOccupations(() => []);
+                    setNcsExists(() => false);
+                    setNcsData(() => null);
                   }}
                   disabled={loading}
                 >
@@ -2749,10 +2749,10 @@ const CurriculumIndex = () => {
         onClose={() => {
           setOpenEndorseDialog(false);
           setCertificateLevels([]);
-          setSelectedSectorId("");
-          setOccupations([]);
-          setNcsExists(false);
-          setNcsData(null);
+          setSelectedSectorId(() => "");
+          setOccupations(() => []);
+          setNcsExists(() => false);
+          setNcsData(() => null);
         }}
         maxWidth="lg"
         fullWidth
@@ -2807,10 +2807,10 @@ const CurriculumIndex = () => {
                   onClick={() => {
                     setOpenEndorseDialog(false);
                     setCertificateLevels([]);
-                    setSelectedSectorId("");
-                    setOccupations([]);
-                    setNcsExists(false);
-                    setNcsData(null);
+                    setSelectedSectorId(() => "");
+                    setOccupations(() => []);
+                    setNcsExists(() => false);
+                    setNcsData(() => null);
                   }}
                   disabled={endorseLoading}
                 >
@@ -2838,10 +2838,10 @@ const CurriculumIndex = () => {
           setOpenEditDialog(false);
           setSelectedCurriculum(null);
           setCertificateLevels([]);
-          setSelectedSectorId("");
-          setOccupations([]);
-          setNcsExists(false);
-          setNcsData(null);
+          setSelectedSectorId(() => "");
+          setOccupations(() => []);
+          setNcsExists(() => false);
+          setNcsData(() => null);
         }}
         maxWidth="lg"
         fullWidth
@@ -2902,10 +2902,10 @@ const CurriculumIndex = () => {
                     setOpenEditDialog(false);
                     setSelectedCurriculum(null);
                     setCertificateLevels([]);
-                    setSelectedSectorId("");
-                    setOccupations([]);
-                    setNcsExists(false);
-                    setNcsData(null);
+                    setSelectedSectorId(() => "");
+                    setOccupations(() => []);
+                    setNcsExists(() => false);
+                    setNcsData(() => null);
                   }}
                   disabled={editLoading}
                 >

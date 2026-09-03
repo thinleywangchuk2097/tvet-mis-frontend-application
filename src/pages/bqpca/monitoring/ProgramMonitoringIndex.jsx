@@ -1,5 +1,6 @@
 // ProgramMonitoringIndex.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -357,6 +358,37 @@ const useFormState = (initialData = {}) => {
   };
 };
 
+// ==================== PROPTYPES ====================
+const dropdownFieldPropTypes = {
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func.isRequired,
+  label: PropTypes.string.isRequired,
+  options: PropTypes.array.isRequired,
+  disabled: PropTypes.bool,
+  optionLabelKey: PropTypes.string,
+  optionValueKey: PropTypes.string,
+  placeholder: PropTypes.string,
+};
+
+const qualityChecklistTablePropTypes = {
+  standard: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    title: PropTypes.string,
+    rows: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        value: PropTypes.string,
+      }),
+    ),
+  }).isRequired,
+  qualityResponses: PropTypes.object.isRequired,
+  qualityRemarks: PropTypes.object.isRequired,
+  onResponseChange: PropTypes.func.isRequired,
+  onRemarkChange: PropTypes.func.isRequired,
+  errors: PropTypes.object,
+  touched: PropTypes.object,
+};
+
 // ==================== REUSABLE COMPONENTS ====================
 const DropdownField = ({
   value,
@@ -381,6 +413,8 @@ const DropdownField = ({
     </Select>
   </FormControl>
 );
+
+DropdownField.propTypes = dropdownFieldPropTypes;
 
 const QualityChecklistTable = ({
   standard,
@@ -508,6 +542,8 @@ const QualityChecklistTable = ({
     </Paper>
   );
 };
+
+QualityChecklistTable.propTypes = qualityChecklistTablePropTypes;
 
 // ==================== MAIN COMPONENT ====================
 const ProgramMonitoringIndex = () => {
@@ -740,8 +776,8 @@ const ProgramMonitoringIndex = () => {
   const showChecklist = useMemo(() => {
     return !!(
       formState.selectedInstitute &&
-      formState.selectedCourseType &&
-      formState.selectedCourse
+      formState.selectedCourse &&
+      formState.selectedCourseType
     );
   }, [
     formState.selectedInstitute,
@@ -941,5 +977,8 @@ const ProgramMonitoringIndex = () => {
     </form>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+ProgramMonitoringIndex.propTypes = {};
 
 export default ProgramMonitoringIndex;

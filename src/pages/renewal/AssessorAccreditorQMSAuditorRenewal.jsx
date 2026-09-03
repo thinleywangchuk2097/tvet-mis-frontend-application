@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Paper,
@@ -34,6 +35,44 @@ import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import CommonService from "../../api/services/internal/common/CommonService";
 import AssessorAccreditorQMSAuditorService from "../../api/services/internal/registration/AssessorAccreditorQMSAuditorService";
 import { useNavigate, useParams } from "react-router-dom";
+
+// ==================== PROPTYPES ====================
+
+const formSectionPropTypes = {
+  title: PropTypes.string.isRequired,
+  children: PropTypes.node.isRequired,
+  sx: PropTypes.object,
+};
+
+const selectFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  options: PropTypes.array.isRequired,
+  valueKey: PropTypes.string,
+  labelKey: PropTypes.string,
+  disabled: PropTypes.bool,
+  loading: PropTypes.bool,
+};
+
+const textInputFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  type: PropTypes.string,
+  disabled: PropTypes.bool,
+  loading: PropTypes.bool,
+  multiline: PropTypes.bool,
+  rows: PropTypes.number,
+};
+
+const workExperienceFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  index: PropTypes.number.isRequired,
+  exp: PropTypes.object.isRequired,
+  onRemove: PropTypes.func.isRequired,
+  loading: PropTypes.bool,
+};
 
 // ==================== UTILITY FUNCTIONS ====================
 const fileToBase64 = (file) =>
@@ -398,6 +437,8 @@ const FormSection = ({ title, children, sx = {} }) => (
   </Paper>
 );
 
+FormSection.propTypes = formSectionPropTypes;
+
 const SelectField = ({
   formik,
   name,
@@ -432,6 +473,8 @@ const SelectField = ({
   </TextField>
 );
 
+SelectField.propTypes = selectFieldPropTypes;
+
 const TextInputField = ({
   formik,
   name,
@@ -460,6 +503,8 @@ const TextInputField = ({
     {...props}
   />
 );
+
+TextInputField.propTypes = textInputFieldPropTypes;
 
 const WorkExperienceField = ({ formik, index, exp, onRemove, loading }) => (
   <Grid container spacing={3} sx={{ mb: 2, alignItems: "flex-start" }}>
@@ -515,6 +560,8 @@ const WorkExperienceField = ({ formik, index, exp, onRemove, loading }) => (
     </Grid>
   </Grid>
 );
+
+WorkExperienceField.propTypes = workExperienceFieldPropTypes;
 
 // ==================== MAIN COMPONENT ====================
 const AssessorAccreditorQMSAuditorRenewal = () => {
@@ -938,10 +985,12 @@ const AssessorAccreditorQMSAuditorRenewal = () => {
                         loading={loading || applicant.fetchingDetails}
                         placeholder="Enter your Citizen ID Number"
                         onChange={(e) => handleCitizenIdChange(e, formik)}
-                        InputProps={{
-                          endAdornment: applicant.fetchingDetails && (
-                            <CircularProgress size={20} />
-                          ),
+                        slotProps={{
+                          input: {
+                            endAdornment: applicant.fetchingDetails && (
+                              <CircularProgress size={20} />
+                            ),
+                          },
                         }}
                       />
                     </Grid>
@@ -954,10 +1003,12 @@ const AssessorAccreditorQMSAuditorRenewal = () => {
                         loading={loading || applicant.fetchingDetails}
                         placeholder="Enter reference number"
                         onChange={(e) => handleReferenceNoChange(e, formik)}
-                        InputProps={{
-                          endAdornment: applicant.fetchingDetails && (
-                            <CircularProgress size={20} />
-                          ),
+                        slotProps={{
+                          input: {
+                            endAdornment: applicant.fetchingDetails && (
+                              <CircularProgress size={20} />
+                            ),
+                          },
                         }}
                       />
                     </Grid>
@@ -1110,5 +1161,8 @@ const AssessorAccreditorQMSAuditorRenewal = () => {
     </Box>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+AssessorAccreditorQMSAuditorRenewal.propTypes = {};
 
 export default AssessorAccreditorQMSAuditorRenewal;

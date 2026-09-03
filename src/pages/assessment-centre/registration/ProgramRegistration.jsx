@@ -214,7 +214,7 @@ const ProgramRegistration = () => {
   };
 
   const handleChangePage = (event, newPage) => setPage(newPage);
-  
+
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(+event.target.value);
     setPage(0);
@@ -224,7 +224,7 @@ const ProgramRegistration = () => {
     (p) =>
       (p.programName?.toLowerCase() || "").includes(search.toLowerCase()) ||
       (p.applicationNo?.toLowerCase() || "").includes(search.toLowerCase()) ||
-      (p.programType?.toLowerCase() || "").includes(search.toLowerCase())
+      (p.programType?.toLowerCase() || "").includes(search.toLowerCase()),
   );
 
   const handleView = (program) => {
@@ -246,7 +246,11 @@ const ProgramRegistration = () => {
   };
 
   const handleDelete = async (program) => {
-    if (window.confirm(`Are you sure you want to delete "${program.programName}"?`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to delete "${program.programName}"?`,
+      )
+    ) {
       try {
         // Replace with your actual API call
         setPrograms(programs.filter((p) => p.id !== program.id));
@@ -325,11 +329,16 @@ const ProgramRegistration = () => {
     startDate: Yup.string().required("Start date is required"),
     endDate: Yup.string()
       .required("End date is required")
-      .test("is-after-start", "End date must be after start date", function(value) {
-        const { startDate } = this.parent;
-        if (!startDate || !value) return true;
-        return new Date(value) >= new Date(startDate);
-      }),
+      // FIXED: Use arrow function with context parameter instead of function()
+      .test(
+        "is-after-start",
+        "End date must be after start date",
+        (value, context) => {
+          const { startDate } = context.parent;
+          if (!startDate || !value) return true;
+          return new Date(value) >= new Date(startDate);
+        },
+      ),
     description: Yup.string()
       .required("Description is required")
       .max(1000, "Description must be at most 1000 characters"),
@@ -343,13 +352,16 @@ const ProgramRegistration = () => {
     setLoading(true);
     try {
       const documents = await Promise.all(
-        values.files.map((file) => fileToBase64(file))
+        values.files.map((file) => fileToBase64(file)),
       );
 
       const submissionData = {
         ...values,
         documents: documents,
-        applicationNo: dialogMode === "add" ? `PRG${new Date().getFullYear()}${String(programs.length + 1).padStart(4, "0")}` : selectedProgram?.applicationNo,
+        applicationNo:
+          dialogMode === "add"
+            ? `PRG${new Date().getFullYear()}${String(programs.length + 1).padStart(4, "0")}`
+            : selectedProgram?.applicationNo,
         statusId: dialogMode === "add" ? 1 : selectedProgram?.statusId,
         submittedAt: new Date().toISOString().split("T")[0],
         createdBy: actionId,
@@ -368,7 +380,7 @@ const ProgramRegistration = () => {
       } else if (dialogMode === "edit") {
         // Replace with your actual API call
         const updatedPrograms = programs.map((p) =>
-          p.id === selectedProgram.id ? { ...p, ...submissionData } : p
+          p.id === selectedProgram.id ? { ...p, ...submissionData } : p,
         );
         setPrograms(updatedPrograms);
         toast.success("Program updated successfully!");
@@ -481,8 +493,12 @@ const ProgramRegistration = () => {
                         {program.duration} {program.durationType}
                       </TableCell>
                       <TableCell align="center">{program.totalHours}</TableCell>
-                      <TableCell align="center">{program.fee.toLocaleString()}</TableCell>
-                      <TableCell align="center">{program.intakeCapacity}</TableCell>
+                      <TableCell align="center">
+                        {program.fee.toLocaleString()}
+                      </TableCell>
+                      <TableCell align="center">
+                        {program.intakeCapacity}
+                      </TableCell>
                       <TableCell align="center">
                         <Chip
                           label={statusName}
@@ -565,8 +581,8 @@ const ProgramRegistration = () => {
               {dialogMode === "add"
                 ? "Register New Program"
                 : dialogMode === "edit"
-                ? "Edit Program Details"
-                : "Program Details"}
+                  ? "Edit Program Details"
+                  : "Program Details"}
             </Typography>
           </Box>
         </DialogTitle>
@@ -608,7 +624,8 @@ const ProgramRegistration = () => {
                           Boolean(formik.errors.programName)
                         }
                         helperText={
-                          formik.touched.programName && formik.errors.programName
+                          formik.touched.programName &&
+                          formik.errors.programName
                         }
                         slotProps={{
                           input: {
@@ -632,7 +649,8 @@ const ProgramRegistration = () => {
                           Boolean(formik.errors.programType)
                         }
                         helperText={
-                          formik.touched.programType && formik.errors.programType
+                          formik.touched.programType &&
+                          formik.errors.programType
                         }
                         slotProps={{
                           input: {
@@ -688,7 +706,8 @@ const ProgramRegistration = () => {
                           Boolean(formik.errors.durationType)
                         }
                         helperText={
-                          formik.touched.durationType && formik.errors.durationType
+                          formik.touched.durationType &&
+                          formik.errors.durationType
                         }
                         slotProps={{
                           input: {
@@ -738,13 +757,8 @@ const ProgramRegistration = () => {
                         value={formik.values.fee}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.fee &&
-                          Boolean(formik.errors.fee)
-                        }
-                        helperText={
-                          formik.touched.fee && formik.errors.fee
-                        }
+                        error={formik.touched.fee && Boolean(formik.errors.fee)}
+                        helperText={formik.touched.fee && formik.errors.fee}
                         slotProps={{
                           input: {
                             readOnly: dialogMode === "view",
@@ -768,7 +782,8 @@ const ProgramRegistration = () => {
                           Boolean(formik.errors.intakeCapacity)
                         }
                         helperText={
-                          formik.touched.intakeCapacity && formik.errors.intakeCapacity
+                          formik.touched.intakeCapacity &&
+                          formik.errors.intakeCapacity
                         }
                         slotProps={{
                           input: {
@@ -861,7 +876,8 @@ const ProgramRegistration = () => {
                           Boolean(formik.errors.description)
                         }
                         helperText={
-                          formik.touched.description && formik.errors.description
+                          formik.touched.description &&
+                          formik.errors.description
                         }
                         slotProps={{
                           input: {
@@ -886,7 +902,8 @@ const ProgramRegistration = () => {
                           Boolean(formik.errors.targetAudience)
                         }
                         helperText={
-                          formik.touched.targetAudience && formik.errors.targetAudience
+                          formik.touched.targetAudience &&
+                          formik.errors.targetAudience
                         }
                         slotProps={{
                           input: {
@@ -911,7 +928,8 @@ const ProgramRegistration = () => {
                           Boolean(formik.errors.entryRequirement)
                         }
                         helperText={
-                          formik.touched.entryRequirement && formik.errors.entryRequirement
+                          formik.touched.entryRequirement &&
+                          formik.errors.entryRequirement
                         }
                         slotProps={{
                           input: {
@@ -936,7 +954,8 @@ const ProgramRegistration = () => {
                           Boolean(formik.errors.assessmentMethod)
                         }
                         helperText={
-                          formik.touched.assessmentMethod && formik.errors.assessmentMethod
+                          formik.touched.assessmentMethod &&
+                          formik.errors.assessmentMethod
                         }
                         slotProps={{
                           input: {
@@ -1050,8 +1069,8 @@ const ProgramRegistration = () => {
                       {loading
                         ? "Saving..."
                         : dialogMode === "add"
-                        ? "Submit Registration"
-                        : "Update"}
+                          ? "Submit Registration"
+                          : "Update"}
                     </Button>
                   </>
                 )}

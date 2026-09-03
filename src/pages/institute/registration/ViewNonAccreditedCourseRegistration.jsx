@@ -1,5 +1,6 @@
 // ViewApplyNonAccreditedCourse.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Paper,
@@ -75,6 +76,82 @@ const STATUS = {
   ENDORSE_REC: 59,
   REJECT_QAS2: 60,
   VERIFY_QAS2: 62,
+};
+
+// ==================== PROPTYPES ====================
+
+const sectionHeaderPropTypes = {
+  title: PropTypes.string.isRequired,
+};
+
+const readOnlyFieldPropTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  gridProps: PropTypes.object,
+};
+
+const checklistQuestionPropTypes = {
+  row: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    value: PropTypes.string,
+  }).isRequired,
+  index: PropTypes.number.isRequired,
+  categoryId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+    .isRequired,
+  qualityResponses: PropTypes.object.isRequired,
+  qualityRemarks: PropTypes.object.isRequired,
+  onResponseChange: PropTypes.func.isRequired,
+  onRemarkChange: PropTypes.func.isRequired,
+};
+
+const checklistCategoryPropTypes = {
+  standard: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    title: PropTypes.string,
+    rows: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        value: PropTypes.string,
+      }),
+    ),
+  }).isRequired,
+  qualityResponses: PropTypes.object.isRequired,
+  qualityRemarks: PropTypes.object.isRequired,
+  onResponseChange: PropTypes.func.isRequired,
+  onRemarkChange: PropTypes.func.isRequired,
+};
+
+const paymentInfoCardPropTypes = {
+  paymentStatus: PropTypes.shape({
+    paymentAdviceNo: PropTypes.string,
+    refNo: PropTypes.string,
+    taxPayerName: PropTypes.string,
+    paymentStatus: PropTypes.string,
+    paymentDueDate: PropTypes.string,
+    platform: PropTypes.string,
+    totalPayableAmount: PropTypes.number,
+    paymentMode: PropTypes.string,
+    redirectUrl: PropTypes.string,
+  }),
+  onGeneratePayment: PropTypes.func.isRequired,
+};
+
+const tabNavigationPropTypes = {
+  tabs: PropTypes.arrayOf(
+    PropTypes.shape({
+      icon: PropTypes.node,
+      label: PropTypes.string,
+    }),
+  ).isRequired,
+  tabValue: PropTypes.number.isRequired,
+  setTabValue: PropTypes.func.isRequired,
+  roleId: PropTypes.string,
+  isLastTab: PropTypes.bool.isRequired,
+  isFirstTab: PropTypes.bool.isRequired,
+  onPrevious: PropTypes.func.isRequired,
+  onNext: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
+  actionButtons: PropTypes.node,
 };
 
 // ==================== UTILITY FUNCTIONS ====================
@@ -412,6 +489,8 @@ const SectionHeader = ({ title }) => (
   </Typography>
 );
 
+SectionHeader.propTypes = sectionHeaderPropTypes;
+
 const ReadOnlyField = ({ label, value, gridProps = { xs: 12, md: 6 } }) => (
   <Grid item {...gridProps}>
     <TextField
@@ -423,6 +502,8 @@ const ReadOnlyField = ({ label, value, gridProps = { xs: 12, md: 6 } }) => (
     />
   </Grid>
 );
+
+ReadOnlyField.propTypes = readOnlyFieldPropTypes;
 
 const ChecklistQuestion = ({
   row,
@@ -480,6 +561,8 @@ const ChecklistQuestion = ({
   );
 };
 
+ChecklistQuestion.propTypes = checklistQuestionPropTypes;
+
 const ChecklistCategory = ({
   standard,
   qualityResponses,
@@ -524,6 +607,8 @@ const ChecklistCategory = ({
     </TableContainer>
   </Paper>
 );
+
+ChecklistCategory.propTypes = checklistCategoryPropTypes;
 
 const PaymentInfoCard = ({ paymentStatus, onGeneratePayment }) => {
   if (paymentStatus) {
@@ -684,6 +769,8 @@ const PaymentInfoCard = ({ paymentStatus, onGeneratePayment }) => {
   );
 };
 
+PaymentInfoCard.propTypes = paymentInfoCardPropTypes;
+
 // ==================== TAB NAVIGATION COMPONENT ====================
 const TabNavigation = ({
   tabs,
@@ -753,6 +840,8 @@ const TabNavigation = ({
     </Box>
   </>
 );
+
+TabNavigation.propTypes = tabNavigationPropTypes;
 
 // ==================== MAIN COMPONENT ====================
 const ViewApplyNonAccreditedCourse = () => {
@@ -1440,5 +1529,8 @@ const ViewApplyNonAccreditedCourse = () => {
     </Box>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+ViewApplyNonAccreditedCourse.propTypes = {};
 
 export default ViewApplyNonAccreditedCourse;

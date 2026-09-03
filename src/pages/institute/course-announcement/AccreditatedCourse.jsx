@@ -54,6 +54,8 @@ const fileToBase64 = (file) =>
     reader.onerror = reject;
   });
 
+// ==================== MAIN COMPONENT ====================
+
 const AccreditatedCourse = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -217,8 +219,8 @@ const AccreditatedCourse = () => {
       .test(
         "is-after-application-end",
         "Course start date must be after application end date",
-        function (value) {
-          const { applicationEndDate } = this.parent;
+        (value, context) => {
+          const { applicationEndDate } = context.parent;
           if (!value || !applicationEndDate) return true;
           return new Date(value) > new Date(applicationEndDate);
         },

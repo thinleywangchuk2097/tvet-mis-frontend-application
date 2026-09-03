@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import PropTypes from "prop-types";
 import {
   CardContent,
   Typography,
@@ -42,6 +43,9 @@ const RequiredStar = () => (
     *
   </Typography>
 );
+
+// ==================== PROPTYPES FOR REQUIRED STAR ====================
+RequiredStar.propTypes = {};
 
 const PasswordChange = ({ redirectOnSuccess = "/" }) => {
   const token = useSelector((state) => state.auth.accessToken);
@@ -338,6 +342,11 @@ const PasswordChange = ({ redirectOnSuccess = "/" }) => {
       </Container>
     </Fade>
   );
+};
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+PasswordChange.propTypes = {
+  redirectOnSuccess: PropTypes.string,
 };
 
 export default PasswordChange;

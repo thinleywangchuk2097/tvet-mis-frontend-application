@@ -1,5 +1,6 @@
 // CertificateIndex.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -292,12 +293,80 @@ const useCourseData = (access_token) => {
   };
 };
 
+// ==================== PROPTYPES ====================
+const sectionHeaderPropTypes = {
+  title: PropTypes.string.isRequired,
+};
+
+const filterSelectPropTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  label: PropTypes.string.isRequired,
+  options: PropTypes.array.isRequired,
+  onChange: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+};
+
+const filterDateFieldPropTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.string,
+  label: PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
+const filterTextFieldPropTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.string,
+  label: PropTypes.string.isRequired,
+  type: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
+
+const actionButtonsPropTypes = {
+  onClear: PropTypes.func.isRequired,
+  onExport: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+  exportLabel: PropTypes.string,
+};
+
+const searchFieldPropTypes = {
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  placeholder: PropTypes.string,
+};
+
+const dataTablePropTypes = {
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      label: PropTypes.string,
+      field: PropTypes.string,
+      align: PropTypes.string,
+      render: PropTypes.func,
+    }),
+  ).isRequired,
+  data: PropTypes.array.isRequired,
+  page: PropTypes.number,
+  rowsPerPage: PropTypes.number,
+  emptyMessage: PropTypes.string,
+};
+
+const paginationFooterPropTypes = {
+  count: PropTypes.number.isRequired,
+  rowsPerPage: PropTypes.number.isRequired,
+  page: PropTypes.number.isRequired,
+  onPageChange: PropTypes.func.isRequired,
+  onRowsPerPageChange: PropTypes.func.isRequired,
+};
+
 // ==================== REUSABLE COMPONENTS ====================
 const SectionHeader = ({ title }) => (
   <Typography variant="h6" mb={3}>
     {title}
   </Typography>
 );
+
+SectionHeader.propTypes = sectionHeaderPropTypes;
 
 const FilterSelect = ({
   name,
@@ -320,6 +389,8 @@ const FilterSelect = ({
   </FormControl>
 );
 
+FilterSelect.propTypes = filterSelectPropTypes;
+
 const FilterDateField = ({ name, value, label, onChange }) => (
   <TextField
     fullWidth
@@ -333,6 +404,8 @@ const FilterDateField = ({ name, value, label, onChange }) => (
   />
 );
 
+FilterDateField.propTypes = filterDateFieldPropTypes;
+
 const FilterTextField = ({ name, value, label, type = "text", onChange }) => (
   <TextField
     fullWidth
@@ -344,6 +417,8 @@ const FilterTextField = ({ name, value, label, type = "text", onChange }) => (
     size="small"
   />
 );
+
+FilterTextField.propTypes = filterTextFieldPropTypes;
 
 const ActionButtons = ({
   onClear,
@@ -374,6 +449,8 @@ const ActionButtons = ({
   </Box>
 );
 
+ActionButtons.propTypes = actionButtonsPropTypes;
+
 const SearchField = ({
   value,
   onChange,
@@ -394,6 +471,8 @@ const SearchField = ({
     }}
   />
 );
+
+SearchField.propTypes = searchFieldPropTypes;
 
 const DataTable = ({
   columns,
@@ -450,6 +529,8 @@ const DataTable = ({
   );
 };
 
+DataTable.propTypes = dataTablePropTypes;
+
 const PaginationFooter = ({
   count,
   rowsPerPage,
@@ -482,6 +563,8 @@ const PaginationFooter = ({
     />
   </Box>
 );
+
+PaginationFooter.propTypes = paginationFooterPropTypes;
 
 // ==================== MAIN COMPONENT ====================
 const CertificateIndex = () => {
@@ -750,5 +833,8 @@ const CertificateIndex = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+CertificateIndex.propTypes = {};
 
 export default CertificateIndex;

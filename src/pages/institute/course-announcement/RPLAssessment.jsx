@@ -1,5 +1,6 @@
 // RPLAssessment.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Table,
   TableBody,
@@ -54,6 +55,8 @@ const RequiredStar = () => (
   </Typography>
 );
 
+RequiredStar.propTypes = {};
+
 // ==================== CONSTANTS ====================
 const TABLE_STYLE = {
   border: "1px solid",
@@ -66,6 +69,39 @@ const TABLE_STYLE = {
 
 const RPL_SERVICE_ID = 39;
 const INITIAL_STATUS_ID = 55;
+
+// ==================== PROPTYPES ====================
+
+const searchBarPropTypes = {
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
+
+const addButtonPropTypes = {
+  onClick: PropTypes.func.isRequired,
+};
+
+const statusChipPropTypes = {
+  statusId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  statusList: PropTypes.array,
+};
+
+const formTextFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.node.isRequired,
+  type: PropTypes.string,
+  select: PropTypes.bool,
+  options: PropTypes.array,
+  optionLabelKey: PropTypes.string,
+  optionValueKey: PropTypes.string,
+};
+
+const formDateFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.node.isRequired,
+};
 
 // ==================== CUSTOM HOOKS ====================
 const useRPLData = (registration_no, access_token) => {
@@ -229,6 +265,8 @@ const SearchBar = ({ value, onChange }) => (
   />
 );
 
+SearchBar.propTypes = searchBarPropTypes;
+
 const AddButton = ({ onClick }) => (
   <Button
     variant="contained"
@@ -241,6 +279,8 @@ const AddButton = ({ onClick }) => (
     Apply for RPL
   </Button>
 );
+
+AddButton.propTypes = addButtonPropTypes;
 
 const StatusChip = ({ statusId, statusList }) => {
   const getStatusName = useCallback(
@@ -282,6 +322,8 @@ const StatusChip = ({ statusId, statusList }) => {
   );
 };
 
+StatusChip.propTypes = statusChipPropTypes;
+
 const FormTextField = ({
   formik,
   name,
@@ -322,6 +364,8 @@ const FormTextField = ({
   return <TextField {...fieldProps} type={type} />;
 };
 
+FormTextField.propTypes = formTextFieldPropTypes;
+
 const FormDateField = ({ formik, name, label }) => (
   <TextField
     type="date"
@@ -337,6 +381,8 @@ const FormDateField = ({ formik, name, label }) => (
     helperText={formik.touched[name] && formik.errors[name]}
   />
 );
+
+FormDateField.propTypes = formDateFieldPropTypes;
 
 // ==================== MAIN COMPONENT ====================
 const RPLAssessment = () => {
@@ -452,7 +498,7 @@ const RPLAssessment = () => {
     createdBy: actionId,
   };
 
-  // Form validation schema
+  // FIXED: Removed `this` usage - using arrow function with context parameter
   const validationSchema = Yup.object().shape({
     courseId: Yup.string().required("Course Name is required"),
     feesPerTrainee: Yup.number()
@@ -477,8 +523,8 @@ const RPLAssessment = () => {
       .test(
         "is-after-application-end",
         "Assessment start date must be after application end date",
-        function (value) {
-          const { applicationEndDate } = this.parent;
+        (value, context) => {
+          const { applicationEndDate } = context.parent;
           if (!value || !applicationEndDate) return true;
           return new Date(value) > new Date(applicationEndDate);
         },
@@ -864,5 +910,8 @@ const RPLAssessment = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+RPLAssessment.propTypes = {};
 
 export default RPLAssessment;

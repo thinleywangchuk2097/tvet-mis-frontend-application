@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -56,6 +57,14 @@ const TABLE_STYLE = {
   },
 };
 
+// ==================== PROPTYPES ====================
+
+const requiredLabelPropTypes = {
+  children: PropTypes.node.isRequired,
+};
+
+// ==================== COMPONENTS ====================
+
 // Custom styled component for required field label
 const RequiredLabel = ({ children }) => (
   <span>
@@ -63,6 +72,8 @@ const RequiredLabel = ({ children }) => (
     <span style={{ color: "red", marginLeft: "4px" }}>*</span>
   </span>
 );
+
+RequiredLabel.propTypes = requiredLabelPropTypes;
 
 // Status list constant
 const STATUS_LIST = [
@@ -84,7 +95,7 @@ const SubjectIndex = () => {
   const [loading, setLoading] = useState(false);
   const [instituteId, setInstituteId] = useState(null);
   const [isInstituteLoaded, setIsInstituteLoaded] = useState(false);
-  
+
   // Delete confirmation dialog state
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState(null);
@@ -103,7 +114,8 @@ const SubjectIndex = () => {
 
   const fetchInstituteDetails = async () => {
     try {
-      const response = await InstituteRegistrationService.getInstituteDetails(registration_no);
+      const response =
+        await InstituteRegistrationService.getInstituteDetails(registration_no);
       const instId = response.data[0]?.institute_id;
       if (instId) {
         console.log("Fetched Institute ID:", instId);
@@ -141,17 +153,20 @@ const SubjectIndex = () => {
       console.warn("Institute ID not available yet");
       return;
     }
-    
+
     setLoading(true);
     try {
       console.log("Fetching subjects with Institute ID:", instituteId);
-      const response = await SubjectService.getAllSubjects(instituteId, access_token);
+      const response = await SubjectService.getAllSubjects(
+        instituteId,
+        access_token,
+      );
       console.log("Fetch Subjects Response:", response);
-      
+
       // Handle response - map snake_case to camelCase
       if (response && response.data) {
         // If response.data is an array, map each subject
-        const subjectsData = Array.isArray(response.data) 
+        const subjectsData = Array.isArray(response.data)
           ? response.data.map(mapSubjectData)
           : [];
         setSubjects(subjectsData);
@@ -174,7 +189,13 @@ const SubjectIndex = () => {
 
   const getStatusName = (statusId) => {
     const status = STATUS_LIST.find((s) => s.id === statusId);
-    return status ? status.name : statusId === 1 ? "Active" : statusId === 0 ? "Inactive" : "Unknown";
+    return status
+      ? status.name
+      : statusId === 1
+        ? "Active"
+        : statusId === 0
+          ? "Inactive"
+          : "Unknown";
   };
 
   const getStatusColor = (statusId) => {
@@ -227,17 +248,22 @@ const SubjectIndex = () => {
 
   const handleConfirmDelete = async () => {
     if (!subjectToDelete) return;
-    
+
     setLoading(true);
     try {
-      const response = await SubjectService.deleteSubject(subjectToDelete.id, access_token);
-      
+      const response = await SubjectService.deleteSubject(
+        subjectToDelete.id,
+        access_token,
+      );
+
       // Handle response based on status
       if (response && response.status === 200) {
         const responseData = response.data;
         // Check if response has status field
         if (responseData?.status === "SUCCESS") {
-          toast.success(responseData?.message || "Subject deleted successfully!");
+          toast.success(
+            responseData?.message || "Subject deleted successfully!",
+          );
         } else {
           toast.success("Subject deleted successfully!");
         }
@@ -271,7 +297,8 @@ const SubjectIndex = () => {
         creditHours: selectedSubject.creditHours || "",
         theoryHours: selectedSubject.theoryHours || "",
         practicalHours: selectedSubject.practicalHours || "",
-        statusId: selectedSubject.statusId !== undefined ? selectedSubject.statusId : 1,
+        statusId:
+          selectedSubject.statusId !== undefined ? selectedSubject.statusId : 1,
         description: selectedSubject.description || "",
       };
     }
@@ -337,16 +364,18 @@ const SubjectIndex = () => {
       };
 
       let response;
-      
+
       if (dialogMode === "add") {
         response = await SubjectService.submitSubject(payload, access_token);
         console.log("Submit Response:", response);
-        
+
         // Handle response for add operation
         if (response && response.status === 201) {
           const responseData = response.data;
           if (responseData?.status === "SUCCESS") {
-            toast.success(responseData?.message || "Subject created successfully!");
+            toast.success(
+              responseData?.message || "Subject created successfully!",
+            );
             resetForm();
             setOpenDialog(false);
             await fetchSubjects(); // Refresh the list
@@ -355,7 +384,9 @@ const SubjectIndex = () => {
           }
         } else if (response && response.status === 200) {
           // Fallback for 200 status
-          toast.success(response.data?.message || "Subject created successfully!");
+          toast.success(
+            response.data?.message || "Subject created successfully!",
+          );
           resetForm();
           setOpenDialog(false);
           await fetchSubjects();
@@ -365,12 +396,14 @@ const SubjectIndex = () => {
       } else if (dialogMode === "edit") {
         response = await SubjectService.updateSubject(payload, access_token);
         console.log("Update Response:", response);
-        
+
         // Handle response for update operation
         if (response && response.status === 200) {
           const responseData = response.data;
           if (responseData?.status === "SUCCESS") {
-            toast.success(responseData?.message || "Subject updated successfully!");
+            toast.success(
+              responseData?.message || "Subject updated successfully!",
+            );
           } else {
             toast.success("Subject updated successfully!");
           }
@@ -384,11 +417,16 @@ const SubjectIndex = () => {
       console.error("Error saving subject:", error);
       // Handle different error scenarios
       if (error.response?.status === 409) {
-        toast.error(error.response?.data?.message || "Subject name already exists!");
+        toast.error(
+          error.response?.data?.message || "Subject name already exists!",
+        );
       } else if (error.response?.status === 404) {
         toast.error(error.response?.data?.message || "Subject not found!");
       } else {
-        toast.error(error.response?.data?.message || "An error occurred while saving the subject");
+        toast.error(
+          error.response?.data?.message ||
+            "An error occurred while saving the subject",
+        );
       }
     } finally {
       setLoading(false);
@@ -404,7 +442,10 @@ const SubjectIndex = () => {
   // Show loading while fetching institute details
   if (!isInstituteLoaded) {
     return (
-      <Paper elevation={3} style={{ padding: 20, margin: 10, textAlign: "center" }}>
+      <Paper
+        elevation={3}
+        style={{ padding: 20, margin: 10, textAlign: "center" }}
+      >
         <CircularProgress />
         <Typography variant="body1" sx={{ mt: 2 }}>
           Loading institute details...
@@ -884,5 +925,8 @@ const SubjectIndex = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+SubjectIndex.propTypes = {};
 
 export default SubjectIndex;

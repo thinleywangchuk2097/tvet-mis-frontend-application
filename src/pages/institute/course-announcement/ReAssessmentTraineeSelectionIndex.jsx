@@ -223,6 +223,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
+  // FIXED: Removed redundant conditional where both branches returned the same value
   const fetchFailedTraineesLists = async () => {
     try {
       setLoading(true);
@@ -245,10 +246,10 @@ const ReAssessmentTraineeSelectionIndex = () => {
           );
 
         console.log("Failed Trainees Response:", failedResponse);
-
-        trainees = failedResponse.data;
+        trainees = failedResponse.data || [];
       }
 
+      // Ensure trainees is an array
       trainees = trainees || [];
       setAllTrainees(trainees);
 
@@ -1060,8 +1061,10 @@ const ReAssessmentTraineeSelectionIndex = () => {
               value={searchSelected}
               onChange={(e) => setSearchSelected(e.target.value)}
               sx={{ mb: 2, ...textFieldStyle }}
-              InputProps={{
-                startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+              slotProps={{
+                input: {
+                  startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+                },
               }}
             />
 
@@ -1183,8 +1186,10 @@ const ReAssessmentTraineeSelectionIndex = () => {
                                     )
                                   }
                                   fullWidth
-                                  InputProps={{
-                                    inputProps: { min: 0, max: 100 },
+                                  slotProps={{
+                                    input: {
+                                      inputProps: { min: 0, max: 100 },
+                                    },
                                   }}
                                   sx={{ minWidth: 120 }}
                                 />
@@ -1324,8 +1329,10 @@ const ReAssessmentTraineeSelectionIndex = () => {
               value={searchPending}
               onChange={(e) => setSearchPending(e.target.value)}
               sx={{ mb: 2, ...textFieldStyle }}
-              InputProps={{
-                startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+              slotProps={{
+                input: {
+                  startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+                },
               }}
             />
 

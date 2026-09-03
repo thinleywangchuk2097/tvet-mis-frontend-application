@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -66,6 +67,14 @@ const TABLE_STYLE = {
   },
 };
 
+// ==================== PROPTYPES ====================
+
+const requiredLabelPropTypes = {
+  children: PropTypes.node.isRequired,
+};
+
+// ==================== COMPONENTS ====================
+
 // Custom styled component for required field label
 const RequiredLabel = ({ children }) => (
   <span>
@@ -73,6 +82,8 @@ const RequiredLabel = ({ children }) => (
     <span style={{ color: "red", marginLeft: "4px" }}>*</span>
   </span>
 );
+
+RequiredLabel.propTypes = requiredLabelPropTypes;
 
 // Status list constant
 const STATUS_LIST = [
@@ -447,6 +458,7 @@ const TuitionAnnouncementIndex = () => {
     };
   };
 
+  // FIXED: Removed `this` usage - using arrow functions with context parameter
   const validationSchema = Yup.object().shape({
     title: Yup.string()
       .required("Title is required")
@@ -462,8 +474,8 @@ const TuitionAnnouncementIndex = () => {
       .test(
         "is-after-start",
         "End date must be after start date",
-        function (value) {
-          const { startDate } = this.parent;
+        (value, context) => {
+          const { startDate } = context.parent;
           if (!startDate || !value) return true;
           return new Date(value) >= new Date(startDate);
         },
@@ -474,8 +486,8 @@ const TuitionAnnouncementIndex = () => {
       .test(
         "is-after-start",
         "End time must be after start time",
-        function (value) {
-          const { startTime } = this.parent;
+        (value, context) => {
+          const { startTime } = context.parent;
           if (!startTime || !value) return true;
           return value > startTime;
         },
@@ -1528,5 +1540,8 @@ const TuitionAnnouncementIndex = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+TuitionAnnouncementIndex.propTypes = {};
 
 export default TuitionAnnouncementIndex;

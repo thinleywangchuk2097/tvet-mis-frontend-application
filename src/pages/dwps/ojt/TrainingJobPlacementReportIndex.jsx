@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -43,6 +44,23 @@ import { format } from "date-fns";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import OJTService from "../../../api/services/internal/ojt/OJTService";
 import CampusPlacementService from "../../../api/services/internal/ojt/CampusPlacementService";
+
+// ==================== PROPTYPES ====================
+
+const statCardPropTypes = {
+  icon: PropTypes.elementType.isRequired,
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  color: PropTypes.oneOf([
+    "primary",
+    "secondary",
+    "success",
+    "warning",
+    "error",
+    "info",
+  ]).isRequired,
+  subtitle: PropTypes.string,
+};
 
 // ==================== STYLED STAT CARD ====================
 const StatCard = ({ icon: Icon, title, value, color, subtitle }) => {
@@ -107,6 +125,8 @@ const StatCard = ({ icon: Icon, title, value, color, subtitle }) => {
     </Card>
   );
 };
+
+StatCard.propTypes = statCardPropTypes;
 
 // ==================== MAIN COMPONENT ====================
 const TrainingJobPlacementReportIndex = () => {
@@ -824,5 +844,8 @@ const TrainingJobPlacementReportIndex = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+TrainingJobPlacementReportIndex.propTypes = {};
 
 export default TrainingJobPlacementReportIndex;

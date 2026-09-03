@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Grid,
@@ -21,6 +22,24 @@ import {
 import SendIcon from "@mui/icons-material/Send";
 import CommonService from "../../../api/services/internal/common/CommonService";
 
+// ==================== PROPTYPES ====================
+
+const employerTracerSurveyPropTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSend: PropTypes.func.isRequired,
+  survey: PropTypes.shape({
+    applicationNo: PropTypes.string,
+    parentTracerType: PropTypes.string,
+    subTracerType: PropTypes.string,
+    applicationName: PropTypes.string,
+    mobileNo: PropTypes.string,
+    emailId: PropTypes.string,
+  }),
+};
+
+// ==================== MAIN COMPONENT ====================
+
 const EmployerTracerSurvey = ({ open, onClose, survey, onSend }) => {
   const [selectedEmployers, setSelectedEmployers] = useState([]);
   const [industryFilter, setIndustryFilter] = useState("");
@@ -41,7 +60,7 @@ const EmployerTracerSurvey = ({ open, onClose, survey, onSend }) => {
       console.error("Error fetching sectors:", error);
     }
   };
-  // Sample employer data 
+  // Sample employer data
   const [employers] = useState([
     {
       id: "EMP001",
@@ -342,5 +361,8 @@ const EmployerTracerSurvey = ({ open, onClose, survey, onSend }) => {
     </Box>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+EmployerTracerSurvey.propTypes = employerTracerSurveyPropTypes;
 
 export default EmployerTracerSurvey;

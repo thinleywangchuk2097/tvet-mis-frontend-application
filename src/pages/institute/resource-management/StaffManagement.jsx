@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Table,
@@ -67,7 +68,17 @@ const RequiredAsterisk = () => (
   </Typography>
 );
 
-// Section Header Component
+RequiredAsterisk.propTypes = {};
+
+// ==================== PROPTYPES ====================
+
+const sectionHeaderPropTypes = {
+  icon: PropTypes.elementType.isRequired,
+  title: PropTypes.string.isRequired,
+  subtitle: PropTypes.string,
+};
+
+// ==================== SECTION HEADER COMPONENT ====================
 const SectionHeader = ({ icon: Icon, title, subtitle }) => (
   <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
     <Box
@@ -97,6 +108,8 @@ const SectionHeader = ({ icon: Icon, title, subtitle }) => (
     </Box>
   </Box>
 );
+
+SectionHeader.propTypes = sectionHeaderPropTypes;
 
 // Helper function to map snake_case to camelCase
 const mapStaffData = (rawData) => {
@@ -345,7 +358,7 @@ const StaffManagement = () => {
     ],
   };
 
-  // Validation schema using test() instead of when()
+  // FIXED: Removed `this` usage - using arrow functions with context parameter
   const validationSchema = Yup.object().shape({
     hasCitizenId: Yup.string().required("Required"),
 
@@ -353,27 +366,31 @@ const StaffManagement = () => {
       .test(
         "citizenId-validation",
         "Citizen ID must be exactly 11 digits",
-        function (value) {
-          const { hasCitizenId } = this.parent;
+        (value, context) => {
+          const { hasCitizenId } = context.parent;
           if (hasCitizenId === "Y") {
             return value && /^\d{11}$/.test(value);
           }
           return true;
         },
       )
-      .test("citizenId-required", "Citizen ID is required", function (value) {
-        const { hasCitizenId } = this.parent;
-        if (hasCitizenId === "Y") {
-          return value && value.length === 11;
-        }
-        return true;
-      }),
+      .test(
+        "citizenId-required",
+        "Citizen ID is required",
+        (value, context) => {
+          const { hasCitizenId } = context.parent;
+          if (hasCitizenId === "Y") {
+            return value && value.length === 11;
+          }
+          return true;
+        },
+      ),
 
     referenceNo: Yup.string().test(
       "referenceNo-required",
       "Reference No is required",
-      function (value) {
-        const { hasCitizenId } = this.parent;
+      (value, context) => {
+        const { hasCitizenId } = context.parent;
         if (hasCitizenId === "N") {
           return value && value.trim().length > 0;
         }
@@ -394,8 +411,8 @@ const StaffManagement = () => {
     genderId: Yup.string().test(
       "genderId-required",
       "Gender is required",
-      function (value) {
-        const { hasCitizenId } = this.parent;
+      (value, context) => {
+        const { hasCitizenId } = context.parent;
         if (hasCitizenId === "N") {
           return value && value.trim().length > 0;
         }
@@ -793,7 +810,11 @@ const StaffManagement = () => {
                     <input type="hidden" name="id" value={values.id} />
                   )}
                   {values.createdBy && (
-                    <input type="hidden" name="createdBy" value={values.createdBy} />
+                    <input
+                      type="hidden"
+                      name="createdBy"
+                      value={values.createdBy}
+                    />
                   )}
 
                   {/* Section 1: Personal Details */}
@@ -870,7 +891,10 @@ const StaffManagement = () => {
                                     );
                                     if (value.length <= 11) {
                                       setFieldValue("citizenId", value);
-                                      if (value.length === 11 && !editingIndex) {
+                                      if (
+                                        value.length === 11 &&
+                                        !editingIndex
+                                      ) {
                                         debouncedFetchCitizen(
                                           value,
                                           setFieldValue,
@@ -882,10 +906,12 @@ const StaffManagement = () => {
                                       }
                                     }
                                   }}
-                                  InputProps={{
-                                    endAdornment: fetchingCitizen && (
-                                      <CircularProgress size={18} />
-                                    ),
+                                  slotProps={{
+                                    input: {
+                                      endAdornment: fetchingCitizen && (
+                                        <CircularProgress size={18} />
+                                      ),
+                                    },
                                   }}
                                 />
                                 <ErrorMessage
@@ -905,9 +931,11 @@ const StaffManagement = () => {
                                     </>
                                   }
                                   name="name"
-                                  InputProps={{
-                                    readOnly: true,
-                                    sx: { bgcolor: "#f5f5f5" },
+                                  slotProps={{
+                                    input: {
+                                      readOnly: true,
+                                      sx: { bgcolor: "#f5f5f5" },
+                                    },
                                   }}
                                 />
                                 <ErrorMessage name="name" component="div" />
@@ -1485,5 +1513,8 @@ const StaffManagement = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+StaffManagement.propTypes = {};
 
 export default StaffManagement;
