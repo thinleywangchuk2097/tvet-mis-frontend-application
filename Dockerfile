@@ -8,11 +8,11 @@ RUN npm install -g npm@latest && npm cache clean --force
 
 WORKDIR /app
 
+# Copy package files first for better caching
 COPY package*.json ./
+COPY yarn.lock ./
 
 # Force-resolve vulnerable transitive deps.
-# Packages that are ALSO direct dependencies get a self-reference ($name),
-# because npm rejects a hard override on a direct dep (EOVERRIDE).
 RUN <<'EOF' node
 const fs = require('fs');
 const p = JSON.parse(fs.readFileSync('package.json'));
@@ -38,26 +38,39 @@ for (const [name, want] of Object.entries(fix)) {
 fs.writeFileSync('package.json', JSON.stringify(p, null, 2));
 EOF
 
+# Install dependencies
 RUN npm install --legacy-peer-deps && npm cache clean --force
 
-COPY . .
+# Copy source code and configuration files (ONLY what's needed for build)
+COPY index.html ./
+COPY vite.config.js ./
+COPY eslint.config.js ./
+COPY public/ ./public/
+COPY src/ ./src/
+
+# Run build
 RUN npm run build
 
-# ---------- Stage 2: runtime (no npm, no node, no node_modules) ----------
+# ---------- Stage 2: runtime ----------
 FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
 
 USER root
 RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
 
-# Create nginx configuration directory
 RUN mkdir -p /etc/nginx/conf.d
 
-# Create custom nginx configuration with proper routing
+# Create nginx configuration with security headers
 RUN echo 'server { \
     listen 8080; \
     server_name localhost; \
     root /usr/share/nginx/html; \
     index index.html; \
+    \
+    # Security headers \
+    add_header X-Frame-Options "SAMEORIGIN" always; \
+    add_header X-Content-Type-Options "nosniff" always; \
+    add_header X-XSS-Protection "1; mode=block" always; \
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always; \
     \
     # Enable gzip compression \
     gzip on; \
@@ -65,7 +78,7 @@ RUN echo 'server { \
     gzip_min_length 1024; \
     gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json; \
     \
-    # CRITICAL: Handle all routes - serve index.html for any route that\'s not a file \
+    # Handle all routes - SPA routing \
     location / { \
         try_files $uri $uri/ /index.html; \
         add_header Cache-Control "no-cache, no-store, must-revalidate"; \
@@ -85,7 +98,7 @@ RUN echo 'server { \
         try_files $uri =404; \
     } \
     \
-    # Health check for Kubernetes \
+    # Health check \
     location /health { \
         access_log off; \
         return 200 "healthy\n"; \
@@ -98,6 +111,7 @@ RUN echo 'server { \
 
 USER 101
 
+# Copy built assets
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 8080

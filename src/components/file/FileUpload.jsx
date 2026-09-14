@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Typography,
@@ -316,6 +317,42 @@ const FileItem = ({
   );
 };
 
+// ==================== PROPTYPES FOR FILEITEM ====================
+FileItem.propTypes = {
+  item: PropTypes.shape({
+    file: PropTypes.instanceOf(File),
+    name: PropTypes.string,
+    size: PropTypes.number,
+    type: PropTypes.string,
+    url: PropTypes.string,
+    icon: PropTypes.node,
+    formattedSize: PropTypes.string,
+  }).isRequired,
+  index: PropTypes.number.isRequired,
+  isConverting: PropTypes.bool,
+  progress: PropTypes.number,
+  isProcessing: PropTypes.bool,
+  onPreview: PropTypes.func.isRequired,
+  onRemove: PropTypes.func.isRequired,
+  theme: PropTypes.shape({
+    palette: PropTypes.shape({
+      primary: PropTypes.shape({
+        main: PropTypes.string,
+        light: PropTypes.string,
+      }),
+      background: PropTypes.shape({
+        paper: PropTypes.string,
+      }),
+      text: PropTypes.shape({
+        secondary: PropTypes.string,
+      }),
+      success: PropTypes.shape({
+        main: PropTypes.string,
+      }),
+    }),
+  }).isRequired,
+};
+
 // ==================== SUB-COMPONENT: FileUploadHeader ====================
 
 const FileUploadHeader = ({
@@ -379,6 +416,35 @@ const FileUploadHeader = ({
   );
 };
 
+// ==================== PROPTYPES FOR FILEUPLOADHEADER ====================
+FileUploadHeader.propTypes = {
+  description: PropTypes.string,
+  maxSizeMB: PropTypes.number,
+  maxFiles: PropTypes.number,
+  required: PropTypes.bool,
+  convertingFiles: PropTypes.arrayOf(PropTypes.string),
+  isProcessing: PropTypes.bool,
+  error: PropTypes.bool,
+  helperText: PropTypes.string,
+  theme: PropTypes.shape({
+    palette: PropTypes.shape({
+      primary: PropTypes.shape({
+        main: PropTypes.string,
+        light: PropTypes.string,
+      }),
+      background: PropTypes.shape({
+        paper: PropTypes.string,
+      }),
+      text: PropTypes.shape({
+        secondary: PropTypes.string,
+      }),
+      success: PropTypes.shape({
+        main: PropTypes.string,
+      }),
+    }),
+  }).isRequired,
+};
+
 // ==================== SUB-COMPONENT: FileListSection ====================
 
 const FileListSection = ({
@@ -417,6 +483,40 @@ const FileListSection = ({
       </Grid>
     </Box>
   );
+};
+
+// ==================== PROPTYPES FOR FILELISTSECTION ====================
+FileListSection.propTypes = {
+  items: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string,
+      type: PropTypes.string,
+      url: PropTypes.string,
+    }),
+  ),
+  expanded: PropTypes.bool,
+  convertingFiles: PropTypes.arrayOf(PropTypes.string),
+  convertProgress: PropTypes.objectOf(PropTypes.number),
+  isProcessing: PropTypes.bool,
+  onPreview: PropTypes.func.isRequired,
+  onRemove: PropTypes.func.isRequired,
+  theme: PropTypes.shape({
+    palette: PropTypes.shape({
+      primary: PropTypes.shape({
+        main: PropTypes.string,
+        light: PropTypes.string,
+      }),
+      background: PropTypes.shape({
+        paper: PropTypes.string,
+      }),
+      text: PropTypes.shape({
+        secondary: PropTypes.string,
+      }),
+      success: PropTypes.shape({
+        main: PropTypes.string,
+      }),
+    }),
+  }).isRequired,
 };
 
 // ==================== SUB-COMPONENT: FileUploadFooter ====================
@@ -495,6 +595,30 @@ const FileUploadFooter = ({
       </Box>
     </>
   );
+};
+
+// ==================== PROPTYPES FOR FILEUPLOADFOOTER ====================
+FileUploadFooter.propTypes = {
+  items: PropTypes.array,
+  expanded: PropTypes.bool,
+  toggleExpanded: PropTypes.func.isRequired,
+  maxFiles: PropTypes.number,
+  handleRemoveAll: PropTypes.func.isRequired,
+  handleUploadClick: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+  isProcessing: PropTypes.bool,
+  convertingFiles: PropTypes.arrayOf(PropTypes.string),
+  theme: PropTypes.shape({
+    palette: PropTypes.shape({
+      primary: PropTypes.shape({
+        main: PropTypes.string,
+        light: PropTypes.string,
+      }),
+      text: PropTypes.shape({
+        secondary: PropTypes.string,
+      }),
+    }),
+  }).isRequired,
 };
 
 // ==================== SUB-COMPONENT: PreviewDialog ====================
@@ -597,6 +721,25 @@ const PreviewDialog = ({ open, currentPreview, onClose, theme }) => {
       </DialogContent>
     </Dialog>
   );
+};
+
+// ==================== PROPTYPES FOR PREVIEWDIALOG ====================
+PreviewDialog.propTypes = {
+  open: PropTypes.bool.isRequired,
+  currentPreview: PropTypes.shape({
+    name: PropTypes.string,
+    type: PropTypes.string,
+    url: PropTypes.string,
+  }),
+  onClose: PropTypes.func.isRequired,
+  theme: PropTypes.shape({
+    palette: PropTypes.shape({
+      divider: PropTypes.string,
+      text: PropTypes.shape({
+        secondary: PropTypes.string,
+      }),
+    }),
+  }).isRequired,
 };
 
 // ==================== SUB-COMPONENT: UploadArea ====================
@@ -728,6 +871,49 @@ const UploadArea = ({
       )}
     </Paper>
   );
+};
+
+// ==================== PROPTYPES FOR UPLOADAREA ====================
+UploadArea.propTypes = {
+  isDragging: PropTypes.bool,
+  error: PropTypes.bool,
+  isAnyProcessing: PropTypes.bool,
+  description: PropTypes.string,
+  maxSizeMB: PropTypes.number,
+  maxFiles: PropTypes.number,
+  required: PropTypes.bool,
+  errorMessage: PropTypes.string,
+  items: PropTypes.array,
+  expanded: PropTypes.bool,
+  toggleExpanded: PropTypes.func.isRequired,
+  handleRemove: PropTypes.func.isRequired,
+  handleRemoveAll: PropTypes.func.isRequired,
+  handlePreview: PropTypes.func.isRequired,
+  handleUploadClick: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+  isProcessing: PropTypes.bool,
+  convertingFiles: PropTypes.arrayOf(PropTypes.string),
+  convertProgress: PropTypes.objectOf(PropTypes.number),
+  helperText: PropTypes.string,
+  theme: PropTypes.shape({
+    palette: PropTypes.shape({
+      primary: PropTypes.shape({
+        main: PropTypes.string,
+        light: PropTypes.string,
+      }),
+      background: PropTypes.shape({
+        paper: PropTypes.string,
+      }),
+      error: PropTypes.shape({
+        main: PropTypes.string,
+      }),
+    }),
+  }).isRequired,
+  handleDragEnter: PropTypes.func.isRequired,
+  handleDragLeave: PropTypes.func.isRequired,
+  handleDragOver: PropTypes.func.isRequired,
+  handleDrop: PropTypes.func.isRequired,
+  dropAreaRef: PropTypes.object,
 };
 
 // ==================== MAIN COMPONENT ====================
@@ -1024,6 +1210,22 @@ const FileUpload = ({
       />
     </Box>
   );
+};
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+FileUpload.propTypes = {
+  files: PropTypes.arrayOf(PropTypes.instanceOf(File)),
+  onFilesChange: PropTypes.func.isRequired,
+  onFileUpload: PropTypes.func,
+  disabled: PropTypes.bool,
+  isProcessing: PropTypes.bool,
+  maxSizeMB: PropTypes.number,
+  maxFiles: PropTypes.number,
+  acceptedFileTypes: PropTypes.string,
+  description: PropTypes.string,
+  required: PropTypes.bool,
+  error: PropTypes.bool,
+  helperText: PropTypes.string,
 };
 
 export default FileUpload;

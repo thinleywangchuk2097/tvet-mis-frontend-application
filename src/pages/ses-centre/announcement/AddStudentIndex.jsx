@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -72,6 +73,14 @@ const TABLE_STYLE = {
   },
 };
 
+// ==================== PROPTYPES ====================
+
+const requiredLabelPropTypes = {
+  children: PropTypes.node.isRequired,
+};
+
+// ==================== COMPONENTS ====================
+
 // Custom styled component for required field label
 const RequiredLabel = ({ children }) => (
   <span>
@@ -79,6 +88,8 @@ const RequiredLabel = ({ children }) => (
     <span style={{ color: "red", marginLeft: "4px" }}>*</span>
   </span>
 );
+
+RequiredLabel.propTypes = requiredLabelPropTypes;
 
 // Status list constant
 const STATUS_LIST = [
@@ -1749,5 +1760,8 @@ const AddStudentIndex = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+AddStudentIndex.propTypes = {};
 
 export default AddStudentIndex;

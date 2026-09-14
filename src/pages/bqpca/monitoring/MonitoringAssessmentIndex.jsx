@@ -154,17 +154,12 @@ const MonitoringAssessmentIndex = () => {
     fetchDzongkhagLists();
   }, []);
 
-  // Fetch monitoring checklist when parentEntityId changes
+  // Fetch monitoring checklist when parentEntityId changes - FIXED
   useEffect(() => {
-    if (parentEntityId) {
-      setQualityData([]);
-      setQualityResponses({});
-      setQualityRemarks({});
-    } else {
-      setQualityData([]);
-      setQualityResponses({});
-      setQualityRemarks({});
-    }
+    // Reset all quality-related state when parentEntityId changes
+    setQualityData([]);
+    setQualityResponses({});
+    setQualityRemarks({});
   }, [parentEntityId]);
 
   // Fetch lists when parent entity id changes
@@ -516,7 +511,7 @@ const MonitoringAssessmentIndex = () => {
         exactLocation: formData.exactLocation,
         qualityStandards: qualityStandardsData,
         createdBy: actionId,
-        serviceId: parentEntityId,//this serviceId is use to get checklist
+        serviceId: parentEntityId, //this serviceId is use to get checklist
         // serviceId: 47,
         statusId: 55,
       };

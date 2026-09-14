@@ -1,5 +1,6 @@
 // OnJobTrainingIndex.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Table,
   TableBody,
@@ -246,6 +247,125 @@ const usePagination = () => {
   };
 };
 
+// ==================== PROPTYPES ====================
+
+const statusChipPropTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  dropdownData: PropTypes.array,
+};
+
+const employmentStatusChipPropTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  employmentStatuses: PropTypes.array,
+};
+
+const documentLinksPropTypes = {
+  documents: PropTypes.oneOfType([PropTypes.string, PropTypes.array]),
+  onDownload: PropTypes.func.isRequired,
+  downloading: PropTypes.bool,
+};
+
+const formFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  type: PropTypes.string,
+  required: PropTypes.bool,
+  select: PropTypes.bool,
+  options: PropTypes.array,
+  optionLabelKey: PropTypes.string,
+};
+
+const reusableTablePropTypes = {
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      label: PropTypes.string,
+      field: PropTypes.string,
+      render: PropTypes.func,
+    }),
+  ).isRequired,
+  data: PropTypes.array.isRequired,
+  page: PropTypes.number,
+  rowsPerPage: PropTypes.number,
+  loading: PropTypes.bool,
+  actions: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string,
+      icon: PropTypes.node,
+      tooltip: PropTypes.string,
+      color: PropTypes.string,
+      onClick: PropTypes.func,
+      disabled: PropTypes.func,
+    }),
+  ),
+  emptyMessage: PropTypes.string,
+};
+
+const deleteConfirmationDialogPropTypes = {
+  open: PropTypes.bool.isRequired,
+  item: PropTypes.object,
+  type: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+};
+
+const viewDialogPropTypes = {
+  open: PropTypes.bool.isRequired,
+  title: PropTypes.string.isRequired,
+  fields: PropTypes.arrayOf(
+    PropTypes.shape({
+      label: PropTypes.string,
+      value: PropTypes.any,
+      multiline: PropTypes.bool,
+      rows: PropTypes.number,
+    }),
+  ).isRequired,
+  onClose: PropTypes.func.isRequired,
+};
+
+const addButtonPropTypes = {
+  onClick: PropTypes.func.isRequired,
+  label: PropTypes.string.isRequired,
+};
+
+// PropTypes for the FormComponent rendered inside ENTITY_CONFIGS.
+// This resolves the SonarQube "missing in props validation" issues for
+// formik, formik.values, formik.values.files, formik.setFieldValue,
+// context, and all context.* nested accesses (dzongkhags, firmData,
+// ojtData, ojtData.map, courses, employmentStatuses, etc.)
+const formComponentPropTypes = {
+  formik: PropTypes.shape({
+    values: PropTypes.object.isRequired,
+    errors: PropTypes.object,
+    touched: PropTypes.object,
+    handleChange: PropTypes.func.isRequired,
+    handleBlur: PropTypes.func.isRequired,
+    setFieldValue: PropTypes.func.isRequired,
+    resetForm: PropTypes.func,
+    isValid: PropTypes.bool,
+  }).isRequired,
+  context: PropTypes.shape({
+    selected: PropTypes.object,
+    openDialog: PropTypes.func,
+    handleDelete: PropTypes.func,
+    selectItem: PropTypes.func,
+    getCompanyName: PropTypes.func,
+    getAgreementTitle: PropTypes.func,
+    dropdownData: PropTypes.array,
+    employmentStatuses: PropTypes.array,
+    dzongkhags: PropTypes.array,
+    firmData: PropTypes.array,
+    ojtData: PropTypes.array,
+    courses: PropTypes.array,
+    downloading: PropTypes.bool,
+    handleDownload: PropTypes.func,
+    access_token: PropTypes.string,
+    instituteId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    actionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  }).isRequired,
+};
+
 // ==================== REUSABLE COMPONENTS ====================
 const StatusChip = ({ id, dropdownData }) => (
   <Chip
@@ -254,6 +374,8 @@ const StatusChip = ({ id, dropdownData }) => (
     size="small"
   />
 );
+
+StatusChip.propTypes = statusChipPropTypes;
 
 const EmploymentStatusChip = ({ id, employmentStatuses }) => {
   const name = getEmploymentStatusName(id, employmentStatuses);
@@ -265,6 +387,8 @@ const EmploymentStatusChip = ({ id, employmentStatuses }) => {
     />
   );
 };
+
+EmploymentStatusChip.propTypes = employmentStatusChipPropTypes;
 
 const DocumentLinks = ({ documents, onDownload, downloading }) => {
   const docs = getDocumentLinks(documents);
@@ -287,6 +411,8 @@ const DocumentLinks = ({ documents, onDownload, downloading }) => {
     </div>
   ));
 };
+
+DocumentLinks.propTypes = documentLinksPropTypes;
 
 const FormField = ({
   formik,
@@ -323,7 +449,7 @@ const FormField = ({
       <TextField {...fieldProps}>
         <MenuItem value="">-select-</MenuItem>
         {options.map((opt) => {
-          let displayValue =
+          const displayValue =
             opt[optionLabelKey] ||
             opt.name ||
             opt.company_name ||
@@ -346,6 +472,8 @@ const FormField = ({
 
   return <TextField {...fieldProps} />;
 };
+
+FormField.propTypes = formFieldPropTypes;
 
 const ReusableTable = ({
   columns,
@@ -416,6 +544,8 @@ const ReusableTable = ({
   </TableContainer>
 );
 
+ReusableTable.propTypes = reusableTablePropTypes;
+
 const DeleteConfirmationDialog = ({ open, item, type, onClose, onConfirm }) => {
   const messages = {
     firm: `Delete firm "<strong>${item?.company_name}</strong>"?`,
@@ -454,6 +584,8 @@ const DeleteConfirmationDialog = ({ open, item, type, onClose, onConfirm }) => {
   );
 };
 
+DeleteConfirmationDialog.propTypes = deleteConfirmationDialogPropTypes;
+
 const ViewDialog = ({ open, title, fields, onClose }) => (
   <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
     <DialogTitle>{title}</DialogTitle>
@@ -482,6 +614,8 @@ const ViewDialog = ({ open, title, fields, onClose }) => (
   </Dialog>
 );
 
+ViewDialog.propTypes = viewDialogPropTypes;
+
 const AddButton = ({ onClick, label }) => (
   <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
     <Button
@@ -495,6 +629,235 @@ const AddButton = ({ onClick, label }) => (
     </Button>
   </Box>
 );
+
+AddButton.propTypes = addButtonPropTypes;
+
+// ==================== FORM COMPONENTS (extracted for clean PropTypes) ====================
+
+const FirmFormComponent = ({ formik, context }) => (
+  <Grid container spacing={2}>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="registrationNo"
+        label="Registration No"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField formik={formik} name="firmName" label="Firm Name" />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="contactPerson"
+        label="Contact Person Name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="contactPhone"
+        label="Contact Person Mobile No"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="contactEmail"
+        label="Contact Person Email"
+        type="email"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="dzongkhag"
+        label="Location Dzongkhag"
+        select
+        options={context.dzongkhags}
+        optionLabelKey="dzonkhagName"
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FormField
+        formik={formik}
+        name="address"
+        label="Address"
+        multiline
+        rows={2}
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FormField
+        formik={formik}
+        name="description"
+        label="Description"
+        multiline
+        rows={2}
+      />
+    </Grid>
+  </Grid>
+);
+
+FirmFormComponent.propTypes = formComponentPropTypes;
+
+const OjtFormComponent = ({ formik, context }) => (
+  <Grid container spacing={2}>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="firmId"
+        label="Firm/Company"
+        select
+        options={context.firmData}
+        optionLabelKey="company_name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="agreementTitle"
+        label="Agreement Title"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="agreementDate"
+        label="Agreement Date"
+        type="date"
+        InputLabelProps={{ shrink: true }}
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="startDate"
+        label="Start Date"
+        type="date"
+        InputLabelProps={{ shrink: true }}
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="endDate"
+        label="End Date"
+        type="date"
+        InputLabelProps={{ shrink: true }}
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="numberOfTrainees"
+        label="Number of Trainees"
+        type="number"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="supervisorName"
+        label="Supervisor Name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="supervisorContact"
+        label="Supervisor Contact"
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FormField
+        formik={formik}
+        name="description"
+        label="Description/Remarks"
+        multiline
+        rows={3}
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FileUpload
+        files={formik.values.files}
+        onFilesChange={(f) => formik.setFieldValue("files", f)}
+      />
+    </Grid>
+  </Grid>
+);
+
+OjtFormComponent.propTypes = formComponentPropTypes;
+
+const PlacementFormComponent = ({ formik, context }) => (
+  <Grid container spacing={2}>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="ojtAgreementId"
+        label="OJT Agreement"
+        select
+        options={context.ojtData.map((o) => ({
+          ...o,
+          name: o.agreement_title,
+        }))}
+        optionLabelKey="name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="traineeCid"
+        label="Trainee CID"
+        placeholder="e.g., 1234567890123"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField formik={formik} name="traineeName" label="Trainee Name" />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="courseId"
+        label="Course"
+        select
+        options={context.courses}
+        optionLabelKey="course_name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField formik={formik} name="position" label="Position" />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="employmentStatus"
+        label="Employment Status"
+        select
+        options={context.employmentStatuses}
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="salary"
+        label="Salary (if applicable)"
+        type="number"
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FormField
+        formik={formik}
+        name="remarks"
+        label="Remarks"
+        multiline
+        rows={2}
+      />
+    </Grid>
+  </Grid>
+);
+
+PlacementFormComponent.propTypes = formComponentPropTypes;
 
 // ==================== ENTITY CONFIGURATIONS ====================
 const ENTITY_CONFIGS = {
@@ -577,70 +940,7 @@ const ENTITY_CONFIGS = {
       createdBy: context.actionId,
       ...(isEdit && { id: context.selected.firm?.id }),
     }),
-    FormComponent: ({ formik, context }) => (
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="registrationNo"
-            label="Registration No"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField formik={formik} name="firmName" label="Firm Name" />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="contactPerson"
-            label="Contact Person Name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="contactPhone"
-            label="Contact Person Mobile No"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="contactEmail"
-            label="Contact Person Email"
-            type="email"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="dzongkhag"
-            label="Location Dzongkhag"
-            select
-            options={context.dzongkhags}
-            optionLabelKey="dzonkhagName"
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FormField
-            formik={formik}
-            name="address"
-            label="Address"
-            multiline
-            rows={2}
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FormField
-            formik={formik}
-            name="description"
-            label="Description"
-            multiline
-            rows={2}
-          />
-        </Grid>
-      </Grid>
-    ),
+    FormComponent: FirmFormComponent,
   },
   ojt: {
     label: "OJT Agreement",
@@ -792,91 +1092,7 @@ const ENTITY_CONFIGS = {
         rows: 2,
       },
     ],
-    FormComponent: ({ formik, context }) => (
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="firmId"
-            label="Firm/Company"
-            select
-            options={context.firmData}
-            optionLabelKey="company_name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="agreementTitle"
-            label="Agreement Title"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="agreementDate"
-            label="Agreement Date"
-            type="date"
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="startDate"
-            label="Start Date"
-            type="date"
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="endDate"
-            label="End Date"
-            type="date"
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="numberOfTrainees"
-            label="Number of Trainees"
-            type="number"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="supervisorName"
-            label="Supervisor Name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="supervisorContact"
-            label="Supervisor Contact"
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FormField
-            formik={formik}
-            name="description"
-            label="Description/Remarks"
-            multiline
-            rows={3}
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FileUpload
-            files={formik.values.files}
-            onFilesChange={(f) => formik.setFieldValue("files", f)}
-          />
-        </Grid>
-      </Grid>
-    ),
+    FormComponent: OjtFormComponent,
   },
   placement: {
     label: "Placement",
@@ -987,73 +1203,7 @@ const ENTITY_CONFIGS = {
         rows: 2,
       },
     ],
-    FormComponent: ({ formik, context }) => (
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="ojtAgreementId"
-            label="OJT Agreement"
-            select
-            options={context.ojtData.map((o) => ({
-              ...o,
-              name: o.agreement_title,
-            }))}
-            optionLabelKey="name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="traineeCid"
-            label="Trainee CID"
-            placeholder="e.g., 1234567890123"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField formik={formik} name="traineeName" label="Trainee Name" />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="courseId"
-            label="Course"
-            select
-            options={context.courses}
-            optionLabelKey="course_name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField formik={formik} name="position" label="Position" />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="employmentStatus"
-            label="Employment Status"
-            select
-            options={context.employmentStatuses}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="salary"
-            label="Salary (if applicable)"
-            type="number"
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FormField
-            formik={formik}
-            name="remarks"
-            label="Remarks"
-            multiline
-            rows={2}
-          />
-        </Grid>
-      </Grid>
-    ),
+    FormComponent: PlacementFormComponent,
   },
 };
 
@@ -1086,6 +1236,87 @@ const OnJobTrainingIndex = () => {
   const [dzongkhags, setDzongkhags] = useState([]);
   const [instituteId, setInstituteId] = useState(null);
 
+  // ===== DATA FETCHING =====
+  const fetchDropdownData = useCallback(async () => {
+    const data = await apiFetch.fetchData(
+      CommonService.getByParentId,
+      [4],
+      "Failed to load dropdown",
+    );
+    setDropdownData(data);
+  }, [apiFetch]);
+
+  const fetchEmploymentStatuses = useCallback(async () => {
+    const data = await apiFetch.fetchData(
+      CommonService.getByParentId,
+      [17],
+      "Failed to load employment statuses",
+    );
+    setEmploymentStatuses(data);
+  }, [apiFetch]);
+
+  const fetchDzongkhags = useCallback(async () => {
+    const data = await apiFetch.fetchData(
+      CommonService.getAllDzongkhags,
+      [],
+      "Failed to load dzongkhags",
+    );
+    const mappedData = data.map((item) => ({
+      id: String(item.id || item.dzonkhagId),
+      name: item.dzonkhagName || item.name || item.dzonkhag,
+      dzonkhagName: item.dzonkhagName || item.name || item.dzonkhag,
+      ...item,
+    }));
+    setDzongkhags(mappedData);
+  }, [apiFetch]);
+
+  const fetchInstituteDetails = useCallback(async () => {
+    try {
+      const response =
+        await InstituteRegistrationService.getInstituteDetails(registration_no);
+      setInstituteId(response.data[0]?.institute_id);
+    } catch (error) {
+      toast.error("Failed to load institute details");
+    }
+  }, [registration_no]);
+
+  const fetchCourses = useCallback(async () => {
+    const data = await apiFetch.fetchData(
+      ApplyAccreditedCourseService.getAccreditedCourseByInstituteId,
+      [instituteId, access_token],
+      "Failed to load courses",
+    );
+    setCourses(data);
+  }, [instituteId, access_token, apiFetch]);
+
+  const fetchOjtData = useCallback(async () => {
+    const data = await apiFetch.fetchData(
+      OJTService.getAgreementByInstituteId,
+      [instituteId, access_token],
+      "Failed to load OJT agreements",
+    );
+    setOjtData(data);
+  }, [instituteId, access_token, apiFetch]);
+
+  const fetchFirmData = useCallback(async () => {
+    const data = await apiFetch.fetchData(
+      OJTService.getCompanyByInstituteId,
+      [instituteId, access_token],
+      "Failed to load firms",
+    );
+    setFirmData(data);
+  }, [instituteId, access_token, apiFetch]);
+
+  const fetchPlacementData = useCallback(async () => {
+    if (!instituteId || !access_token) return;
+    const data = await apiFetch.fetchData(
+      OJTService.getTraineeByInstituteId,
+      [instituteId, access_token],
+      "Failed to load placements",
+    );
+    setPlacementData(data);
+  }, [instituteId, access_token, apiFetch]);
+
   // ===== EFFECTS =====
   useEffect(() => {
     const loadIndependent = async () => {
@@ -1097,7 +1328,12 @@ const OnJobTrainingIndex = () => {
       ]);
     };
     loadIndependent();
-  }, []);
+  }, [
+    fetchDropdownData,
+    fetchInstituteDetails,
+    fetchDzongkhags,
+    fetchEmploymentStatuses,
+  ]);
 
   useEffect(() => {
     if (instituteId && access_token) {
@@ -1111,88 +1347,14 @@ const OnJobTrainingIndex = () => {
       };
       loadDependent();
     }
-  }, [instituteId, access_token]);
-
-  // ===== DATA FETCHING =====
-  const fetchDropdownData = async () => {
-    const data = await apiFetch.fetchData(
-      CommonService.getByParentId,
-      [4],
-      "Failed to load dropdown",
-    );
-    setDropdownData(data);
-  };
-
-  const fetchEmploymentStatuses = async () => {
-    const data = await apiFetch.fetchData(
-      CommonService.getByParentId,
-      [17],
-      "Failed to load employment statuses",
-    );
-    setEmploymentStatuses(data);
-  };
-
-  const fetchDzongkhags = async () => {
-    const data = await apiFetch.fetchData(
-      CommonService.getAllDzongkhags,
-      [],
-      "Failed to load dzongkhags",
-    );
-    const mappedData = data.map((item) => ({
-      id: String(item.id || item.dzonkhagId),
-      name: item.dzonkhagName || item.name || item.dzonkhag,
-      dzonkhagName: item.dzonkhagName || item.name || item.dzonkhag,
-      ...item,
-    }));
-    setDzongkhags(mappedData);
-  };
-
-  const fetchInstituteDetails = async () => {
-    try {
-      const response =
-        await InstituteRegistrationService.getInstituteDetails(registration_no);
-      setInstituteId(response.data[0]?.institute_id);
-    } catch (error) {
-      toast.error("Failed to load institute details");
-    }
-  };
-
-  const fetchCourses = async () => {
-    const data = await apiFetch.fetchData(
-      ApplyAccreditedCourseService.getAccreditedCourseByInstituteId,
-      [instituteId, access_token],
-      "Failed to load courses",
-    );
-    setCourses(data);
-  };
-
-  const fetchOjtData = async () => {
-    const data = await apiFetch.fetchData(
-      OJTService.getAgreementByInstituteId,
-      [instituteId, access_token],
-      "Failed to load OJT agreements",
-    );
-    setOjtData(data);
-  };
-
-  const fetchFirmData = async () => {
-    const data = await apiFetch.fetchData(
-      OJTService.getCompanyByInstituteId,
-      [instituteId, access_token],
-      "Failed to load firms",
-    );
-    setFirmData(data);
-  };
-
-  const fetchPlacementData = async () => {
-    if (!instituteId || !access_token) return;
-    const data = await apiFetch.fetchData(
-      OJTService.getTraineeByInstituteId,
-      [instituteId, access_token],
-      "Failed to load placements",
-    );
-    setPlacementData(data);
-  };
+  }, [
+    instituteId,
+    access_token,
+    fetchFirmData,
+    fetchOjtData,
+    fetchPlacementData,
+    fetchCourses,
+  ]);
 
   // ===== HELPERS =====
   const handleTabChange = (_, newValue) => {
@@ -1633,5 +1795,8 @@ const OnJobTrainingIndex = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+OnJobTrainingIndex.propTypes = {};
 
 export default OnJobTrainingIndex;

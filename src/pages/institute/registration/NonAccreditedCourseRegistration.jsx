@@ -263,6 +263,7 @@ const NonAccreditedCourseRegistration = () => {
             formikRef.current.setFieldValue("practicalHour", "");
             formikRef.current.setFieldValue("ojtHour", "");
             formikRef.current.setFieldValue("certificateLevelId", "");
+            formikRef.current.setFieldValue("programmeTitle", "");
           }
           setSelectedCurriculumId(null);
           return true;
@@ -319,7 +320,6 @@ const NonAccreditedCourseRegistration = () => {
           let qualityStandards = [];
           if (item.quality_standard_responses) {
             try {
-              // If it's a string, parse it
               if (typeof item.quality_standard_responses === "string") {
                 qualityStandards = JSON.parse(item.quality_standard_responses);
               } else if (Array.isArray(item.quality_standard_responses)) {
@@ -408,11 +408,9 @@ const NonAccreditedCourseRegistration = () => {
     const selections = {};
 
     qualityStandards.forEach((qs) => {
-      // The standardId could be at different paths in the object
       let subQuestionId = null;
       let responseValue = null;
 
-      // Check different possible property names
       if (qs.standardId) {
         subQuestionId = qs.standardId.toString();
         responseValue = qs.responseId || qs.responseValue;
@@ -424,9 +422,7 @@ const NonAccreditedCourseRegistration = () => {
         responseValue = qs.responseId;
       }
 
-      // If we couldn't find standardId, try using qs.id if it's the standardId
       if (!subQuestionId && qs.id) {
-        // Check if this id matches any standard id in qualityData
         const found = qualityData.some((cat) =>
           cat.rows.some((row) => row.id === qs.id.toString()),
         );
@@ -441,7 +437,6 @@ const NonAccreditedCourseRegistration = () => {
         return;
       }
 
-      // Find which category this sub-question belongs to
       const category = qualityData.find((cat) =>
         cat.rows.some((row) => row.id === subQuestionId),
       );
@@ -474,20 +469,16 @@ const NonAccreditedCourseRegistration = () => {
     console.log("Viewing course:", course);
     console.log("Quality standards:", course.qualityStandards);
 
-    // When viewing, make sure we have the latest curriculum name
     const curriculumName = getCurriculumTypeName(course.curriculumId);
     setSelectedCourse({
       ...course,
       curriculumDisplayName: curriculumName,
     });
 
-    // Populate quality selections for viewing
     if (course.qualityStandards && course.qualityStandards.length > 0) {
-      // Wait for qualityData to be available
       if (qualityData.length > 0) {
         populateQualitySelections(course.qualityStandards);
       } else {
-        // If qualityData is not loaded yet, set a timeout to retry
         const checkQualityData = setInterval(() => {
           if (qualityData.length > 0) {
             populateQualitySelections(course.qualityStandards);
@@ -495,11 +486,9 @@ const NonAccreditedCourseRegistration = () => {
           }
         }, 100);
 
-        // Clear interval after 5 seconds to prevent infinite loop
         setTimeout(() => clearInterval(checkQualityData), 5000);
       }
     } else {
-      // Reset selections if no quality standards
       setQualitySelections({});
     }
 
@@ -616,7 +605,6 @@ const NonAccreditedCourseRegistration = () => {
                 {standard.rows.map((row, index) => {
                   const selectedValue =
                     qualitySelections[standard.id]?.[row.id];
-                  // Check if selected value is YES (case insensitive)
                   const isYes =
                     selectedValue &&
                     (selectedValue === "Y" ||
@@ -628,7 +616,6 @@ const NonAccreditedCourseRegistration = () => {
                       selectedValue === "1" ||
                       selectedValue === 1);
 
-                  // Check if selected value is NO (case insensitive)
                   const isNo =
                     selectedValue &&
                     (selectedValue === "N" ||
@@ -807,21 +794,12 @@ const NonAccreditedCourseRegistration = () => {
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
-    // Final check before submission
-    if (curriculumDuplicateError) {
-      toast.error(
-        "Please select a different curriculum. This one is already registered.",
-      );
-      return;
-    }
-
     setLoading(true);
     try {
       const documents = await Promise.all(
         values.files.map((file) => fileToBase64(file)),
       );
 
-      // Find the selected curriculum by id (only if curriculumId is provided)
       const selectedCurriculum = values.curriculumId
         ? curriculumTypes.find(
             (t) => String(t.id) === String(values.curriculumId),
@@ -830,8 +808,8 @@ const NonAccreditedCourseRegistration = () => {
 
       const qualityStandardsList = transformQualityStandards(qualitySelections);
 
+      // Build the base payload
       const payload = {
-        programmeTitle: values.programmeTitle,
         applicantName: values.instituteName,
         theoryHour:
           values.programmeTypeId === "137"
@@ -861,6 +839,21 @@ const NonAccreditedCourseRegistration = () => {
         qualityStandards: qualityStandardsList,
       };
 
+      // Conditionally add programmeTitle:
+      // - If curriculumId exists (and programmeTypeId is not "137"), use curriculum_title as programmeTitle
+      // - If no curriculumId OR programmeTypeId is "137", use user-entered programmeTitle
+      if (values.curriculumId && values.programmeTypeId !== "137") {
+        // Use curriculum_title from the selected curriculum
+        const curriculum = curriculumTypes.find(
+          (t) => String(t.id) === String(values.curriculumId),
+        );
+        payload.programmeTitle =
+          curriculum?.curriculum_title || values.programmeTitle;
+      } else {
+        // Use user-entered programmeTitle
+        payload.programmeTitle = values.programmeTitle;
+      }
+
       console.log("Submitting payload:", payload);
       const response =
         await ApplyNonAccreditedCourseService.submitNonAccreditedCourse(
@@ -869,7 +862,6 @@ const NonAccreditedCourseRegistration = () => {
         );
 
       if (response.status === 200 || response.status === 201) {
-        // Get curriculum hours for the new course (only if curriculum exists)
         const curriculum = values.curriculumId
           ? curriculumTypes.find(
               (t) => String(t.id) === String(values.curriculumId),
@@ -882,7 +874,10 @@ const NonAccreditedCourseRegistration = () => {
 
         const newCourse = {
           id: response.data?.id || courses.length + 1,
-          programmeTitle: values.programmeTitle,
+          programmeTitle:
+            values.curriculumId && values.programmeTypeId !== "137"
+              ? curriculum?.curriculum_title || values.programmeTitle
+              : values.programmeTitle,
           programmeTypeId: values.programmeTypeId,
           programmeTypeName: programmeType?.name || "",
           theoryHour:
@@ -963,28 +958,21 @@ const NonAccreditedCourseRegistration = () => {
   const getCertificateLevelName = (levelId) => {
     if (!levelId) return "-";
 
-    // Convert both to string for comparison
     const levelIdStr = String(levelId);
-
-    // Find the certificate level
     const level = certificateLevels.find((l) => String(l.id) === levelIdStr);
 
-    // Return the name or fallback
     return (
       level?.name || level?.value || level?.certificate_level_name || levelIdStr
     );
   };
 
-  // Get curriculum type name - robust version with fallback
   const getCurriculumTypeName = (curriculumId) => {
     if (!curriculumId) return "-";
 
-    // First try to find by id
     let curriculum = curriculumTypes.find(
       (type) => String(type.id) === String(curriculumId),
     );
 
-    // If not found, try by curriculum_type_id
     if (!curriculum) {
       curriculum = curriculumTypes.find(
         (type) => String(type.curriculum_type_id) === String(curriculumId),
@@ -994,7 +982,7 @@ const NonAccreditedCourseRegistration = () => {
     return curriculum?.curriculum_title || "-";
   };
 
-  // Auto-fill function
+  // Auto-fill function - now includes programmeTitle
   const autoFillCurriculumFields = (selectedId) => {
     if (selectedId && formikRef.current) {
       const selectedCurriculum = curriculumTypes.find(
@@ -1002,7 +990,6 @@ const NonAccreditedCourseRegistration = () => {
       );
 
       if (selectedCurriculum) {
-        // Parse values safely
         const theoryHours = selectedCurriculum.total_theory_duration
           ? parseInt(selectedCurriculum.total_theory_duration)
           : 0;
@@ -1013,7 +1000,14 @@ const NonAccreditedCourseRegistration = () => {
           ? parseInt(selectedCurriculum.total_ojt_duration)
           : 0;
 
-        // Auto-fill hours with safe defaults
+        // Auto-fill programmeTitle with curriculum_title
+        if (selectedCurriculum.curriculum_title) {
+          formikRef.current.setFieldValue(
+            "programmeTitle",
+            selectedCurriculum.curriculum_title,
+          );
+        }
+
         formikRef.current.setFieldValue(
           "theoryHour",
           isNaN(theoryHours) ? 0 : theoryHours,
@@ -1027,7 +1021,6 @@ const NonAccreditedCourseRegistration = () => {
           isNaN(ojtHours) ? 0 : ojtHours,
         );
 
-        // Auto-fill certificate level
         if (selectedCurriculum.certificate_level_id) {
           formikRef.current.setFieldValue(
             "certificateLevelId",
@@ -1038,12 +1031,12 @@ const NonAccreditedCourseRegistration = () => {
         return true;
       }
     } else {
-      // Clear fields if no curriculum selected
       if (formikRef.current) {
         formikRef.current.setFieldValue("theoryHour", "");
         formikRef.current.setFieldValue("practicalHour", "");
         formikRef.current.setFieldValue("ojtHour", "");
         formikRef.current.setFieldValue("certificateLevelId", "");
+        // Don't clear programmeTitle when curriculum is deselected - keep it as is
       }
     }
     return false;
@@ -1494,7 +1487,6 @@ const NonAccreditedCourseRegistration = () => {
           enableReinitialize={true}
         >
           {(formik) => {
-            // Check if programme type is "less than 140 hours"
             const isLessThan140 = formik.values.programmeTypeId === "137";
 
             return (
@@ -1557,16 +1549,17 @@ const NonAccreditedCourseRegistration = () => {
                           onChange={(e) => {
                             const selectedId = e.target.value;
                             formik.handleChange(e);
-                            // If "less than 140 hours" is selected, clear curriculum related fields
-                            if (selectedId === "137") {
-                              formik.setFieldValue("curriculumId", "");
-                              formik.setFieldValue("theoryHour", "");
-                              formik.setFieldValue("practicalHour", "");
-                              formik.setFieldValue("ojtHour", "");
-                              formik.setFieldValue("certificateLevelId", "");
-                              setSelectedCurriculumId(null);
-                              setCurriculumDuplicateError("");
-                            }
+
+                            // Clear curriculum-related fields when switching programme type
+                            formik.setFieldValue("curriculumId", "");
+                            formik.setFieldValue("theoryHour", "");
+                            formik.setFieldValue("practicalHour", "");
+                            formik.setFieldValue("ojtHour", "");
+                            formik.setFieldValue("certificateLevelId", "");
+                            formik.setFieldValue("programmeTitle", "");
+
+                            setSelectedCurriculumId(null);
+                            setCurriculumDuplicateError("");
                           }}
                           onBlur={formik.handleBlur}
                           error={
@@ -1587,7 +1580,6 @@ const NonAccreditedCourseRegistration = () => {
                         </TextField>
                       </Grid>
 
-                      {/* Only show Curriculum fields if programme type is NOT "less than 140 hours" */}
                       {!isLessThan140 && (
                         <>
                           <Grid item size={{ xs: 12, md: 4 }}>
@@ -1607,12 +1599,10 @@ const NonAccreditedCourseRegistration = () => {
                                 formik.handleChange(e);
                                 setSelectedCurriculumId(selectedId);
 
-                                // Check for duplication when curriculum is selected
                                 if (selectedId) {
                                   const exists =
                                     await checkCurriculumExists(selectedId);
                                   if (exists) {
-                                    // If duplicate found, the checkCurriculumExists function already cleared the fields
                                     setSelectedCurriculumId(null);
                                   }
                                 } else {
@@ -1655,7 +1645,6 @@ const NonAccreditedCourseRegistration = () => {
                             )}
                           </Grid>
 
-                          {/* Duration Fields - Only show when curriculum is selected */}
                           {selectedCurriculumId &&
                             !curriculumDuplicateError && (
                               <>
@@ -1758,7 +1747,6 @@ const NonAccreditedCourseRegistration = () => {
                               </>
                             )}
 
-                          {/* Certificate Level - Only show when curriculum is selected */}
                           {selectedCurriculumId &&
                             !curriculumDuplicateError && (
                               <Grid item size={{ xs: 12, md: 4 }}>
@@ -1827,6 +1815,21 @@ const NonAccreditedCourseRegistration = () => {
                             formik.touched.programmeTitle &&
                             formik.errors.programmeTitle
                           }
+                          // Make it read-only when curriculum is selected
+                          slotProps={{
+                            input: {
+                              readOnly:
+                                !isLessThan140 && !!formik.values.curriculumId,
+                            },
+                          }}
+                          sx={{
+                            "& .MuiInputBase-input.Mui-readOnly": {
+                              backgroundColor:
+                                !isLessThan140 && !!formik.values.curriculumId
+                                  ? "#f5f5f5"
+                                  : "transparent",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 4 }}>

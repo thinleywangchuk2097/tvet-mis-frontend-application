@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   Grid,
   Card,
@@ -157,6 +158,8 @@ const initialValues = {
   status: "pending",
 };
 
+// ==================== STAT CARD COMPONENT ====================
+
 // Stat Card Component - Compact
 const StatCard = ({ title, value, icon, color, trend }) => {
   const getColorValue = (colorName) => {
@@ -253,6 +256,26 @@ const StatCard = ({ title, value, icon, color, trend }) => {
     </Card>
   );
 };
+
+// ==================== PROPTYPES FOR STAT CARD ====================
+StatCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  icon: PropTypes.node.isRequired,
+  color: PropTypes.oneOf([
+    "primary",
+    "secondary",
+    "success",
+    "warning",
+    "error",
+    "info",
+  ]),
+  trend: PropTypes.shape({
+    value: PropTypes.number,
+  }),
+};
+
+// ==================== MAIN COMPONENT ====================
 
 const DefaultDashboard = () => {
   const theme = useTheme();
@@ -1046,5 +1069,8 @@ const DefaultDashboard = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+DefaultDashboard.propTypes = {};
 
 export default DefaultDashboard;

@@ -1,5 +1,6 @@
-// RPLAssessment.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+// RPLAssessmentIndex.jsx
+import { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Table,
   TableBody,
@@ -33,6 +34,7 @@ import InstituteRegistrationService from "../../../api/services/internal/registr
 import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
+import NcsService from "../../../api/services/internal/ncs/NcsService";
 
 // ==================== UTILITY FUNCTIONS ====================
 const fileToBase64 = (file) =>
@@ -54,6 +56,8 @@ const RequiredStar = () => (
   </Typography>
 );
 
+RequiredStar.propTypes = {};
+
 // ==================== CONSTANTS ====================
 const TABLE_STYLE = {
   border: "1px solid",
@@ -66,6 +70,39 @@ const TABLE_STYLE = {
 
 const RPL_SERVICE_ID = 39;
 const INITIAL_STATUS_ID = 55;
+
+// ==================== PROPTYPES ====================
+
+const searchBarPropTypes = {
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
+
+const addButtonPropTypes = {
+  onClick: PropTypes.func.isRequired,
+};
+
+const statusChipPropTypes = {
+  statusId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  statusList: PropTypes.array,
+};
+
+const formTextFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.node.isRequired,
+  type: PropTypes.string,
+  select: PropTypes.bool,
+  options: PropTypes.array,
+  optionLabelKey: PropTypes.string,
+  optionValueKey: PropTypes.string,
+};
+
+const formDateFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.node.isRequired,
+};
 
 // ==================== CUSTOM HOOKS ====================
 const useRPLData = (registration_no, access_token) => {
@@ -93,6 +130,7 @@ const useRPLData = (registration_no, access_token) => {
           access_token,
         );
       setRplApplications(response.data);
+      console.log("Fetched RPL applications:", response.data);
     } catch (error) {
       console.error("Error fetching RPL applications:", error);
     } finally {
@@ -107,7 +145,7 @@ const useRPLData = (registration_no, access_token) => {
         const documents = await Promise.all(values.files.map(fileToBase64));
         const payload = {
           instituteId: values.instituteId,
-          courseId: values.courseId,
+          programmeId: values.programmeId,
           feesPerTrainee: values.feesPerTrainee,
           enrollmentCapacity: values.enrollmentCapacity,
           applicationStartDate: values.applicationStartDate,
@@ -163,49 +201,75 @@ const useRPLData = (registration_no, access_token) => {
   };
 };
 
-const useDropdownData = () => {
+const useDropdownData = (access_token) => {
   const [certificationLevels, setCertificationLevels] = useState([]);
   const [fundingSources, setFundingSources] = useState([]);
   const [dzongkhags, setDzongkhags] = useState([]);
-  const [approvedCourses, setApprovedCourses] = useState([]);
+  const [approvedProgrammes, setApprovedProgrammes] = useState([]);
   const [statusList, setStatusList] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const fetchDropdownData = useCallback(async () => {
+    setLoading(true);
     try {
       const [
         levelsResponse,
         fundingResponse,
         statusResponse,
         dzongkhagResponse,
-        coursesResponse,
+        programmesResponse,
       ] = await Promise.all([
         CommonService.getByParentId(27),
         CommonService.getByParentId(16),
         CommonService.getByParentId(4),
         CommonService.getAllDzongkhags(),
-        CommonService.getAllOccupations(),
+        NcsService.getAllNcsProgrammes(access_token),
       ]);
 
-      setCertificationLevels(levelsResponse.data || []);
-      setFundingSources(fundingResponse.data || []);
-      setStatusList(statusResponse.data || []);
-      setDzongkhags(dzongkhagResponse.data || []);
-
-      const activeCourses = (coursesResponse.data || []).filter(
-        (course) => course.isActive === "Y",
+      // Ensure we're setting arrays, even if the response is undefined or null
+      setCertificationLevels(
+        Array.isArray(levelsResponse?.data) ? levelsResponse.data : [],
       );
-      setApprovedCourses(activeCourses);
+      setFundingSources(
+        Array.isArray(fundingResponse?.data) ? fundingResponse.data : [],
+      );
+      setStatusList(
+        Array.isArray(statusResponse?.data) ? statusResponse.data : [],
+      );
+      setDzongkhags(
+        Array.isArray(dzongkhagResponse?.data) ? dzongkhagResponse.data : [],
+      );
+
+      // Handle programmes response - using the data directly
+      let programmes = [];
+      if (programmesResponse?.data) {
+        programmes = Array.isArray(programmesResponse.data)
+          ? programmesResponse.data
+          : programmesResponse.data.data || [];
+      }
+
+      console.log("Fetched programme data:", programmes);
+      setApprovedProgrammes(programmes);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
+      // Set empty arrays on error to prevent undefined errors
+      setCertificationLevels([]);
+      setFundingSources([]);
+      setStatusList([]);
+      setDzongkhags([]);
+      setApprovedProgrammes([]);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [access_token]);
 
   return {
     certificationLevels,
     fundingSources,
     dzongkhags,
-    approvedCourses,
+    approvedProgrammes,
     statusList,
+    loading,
     fetchDropdownData,
   };
 };
@@ -213,7 +277,7 @@ const useDropdownData = () => {
 // ==================== REUSABLE COMPONENTS ====================
 const SearchBar = ({ value, onChange }) => (
   <TextField
-    label="Search by Course or Application No"
+    label="Search by Programme or Application No"
     variant="outlined"
     size="small"
     fullWidth
@@ -229,6 +293,8 @@ const SearchBar = ({ value, onChange }) => (
   />
 );
 
+SearchBar.propTypes = searchBarPropTypes;
+
 const AddButton = ({ onClick }) => (
   <Button
     variant="contained"
@@ -242,11 +308,15 @@ const AddButton = ({ onClick }) => (
   </Button>
 );
 
+AddButton.propTypes = addButtonPropTypes;
+
 const StatusChip = ({ statusId, statusList }) => {
   const getStatusName = useCallback(
     (id) => {
       if (!id) return "Pending";
-      const status = statusList.find((s) => parseInt(s.id) === parseInt(id));
+      const status = (statusList || []).find(
+        (s) => parseInt(s.id) === parseInt(id),
+      );
       return status ? status.name : "Pending";
     },
     [statusList],
@@ -282,6 +352,8 @@ const StatusChip = ({ statusId, statusList }) => {
   );
 };
 
+StatusChip.propTypes = statusChipPropTypes;
+
 const FormTextField = ({
   formik,
   name,
@@ -307,10 +379,12 @@ const FormTextField = ({
   };
 
   if (select) {
+    // Ensure options is an array
+    const optionsArray = Array.isArray(options) ? options : [];
     return (
       <TextField select {...fieldProps}>
         <MenuItem value="">-select-</MenuItem>
-        {options.map((option) => (
+        {optionsArray.map((option) => (
           <MenuItem key={option[optionValueKey]} value={option[optionValueKey]}>
             {option[optionLabelKey]}
           </MenuItem>
@@ -321,6 +395,8 @@ const FormTextField = ({
 
   return <TextField {...fieldProps} type={type} />;
 };
+
+FormTextField.propTypes = formTextFieldPropTypes;
 
 const FormDateField = ({ formik, name, label }) => (
   <TextField
@@ -338,8 +414,10 @@ const FormDateField = ({ formik, name, label }) => (
   />
 );
 
+FormDateField.propTypes = formDateFieldPropTypes;
+
 // ==================== MAIN COMPONENT ====================
-const RPLAssessment = () => {
+const RPLAssessmentIndex = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -352,14 +430,14 @@ const RPLAssessment = () => {
 
   // Custom hooks
   const rplData = useRPLData(registration_no, access_token);
-  const dropdownData = useDropdownData();
+  const dropdownData = useDropdownData(access_token);
 
   // Fetch all data on mount
   useEffect(() => {
     rplData.fetchInstituteDetails();
     rplData.fetchRPLApplications();
     dropdownData.fetchDropdownData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get institute details
   const institute = useMemo(
@@ -380,7 +458,7 @@ const RPLAssessment = () => {
 
   // Filter applications
   const filteredApplications = useMemo(() => {
-    return rplData.rplApplications.filter(
+    return (rplData.rplApplications || []).filter(
       (app) =>
         (app.course_name?.toLowerCase() || "").includes(search.toLowerCase()) ||
         (app.application_no?.toLowerCase() || "").includes(
@@ -389,36 +467,47 @@ const RPLAssessment = () => {
     );
   }, [rplData.rplApplications, search]);
 
-  // Helper functions for display
+  // Helper functions for display - Using correct field names from the data
   const getDzongkhagName = useCallback(
     (locationId) => {
       if (!locationId) return "N/A";
-      const dzongkhag = dropdownData.dzongkhags.find(
-        (dz) => dz.id === parseInt(locationId),
-      );
+      const dzongkhags = Array.isArray(dropdownData.dzongkhags)
+        ? dropdownData.dzongkhags
+        : [];
+      const dzongkhag = dzongkhags.find((dz) => dz.id === parseInt(locationId));
       return dzongkhag ? dzongkhag.dzonkhagName : "N/A";
     },
     [dropdownData.dzongkhags],
   );
 
-  const getCourseName = useCallback(
-    (courseId) => {
-      if (!courseId) return "N/A";
-      const course = dropdownData.approvedCourses.find(
-        (c) => c.id === parseInt(courseId),
+  // Using programme_title from the data
+  const getProgrammeName = useCallback(
+    (programmeId) => {
+      if (!programmeId) return "N/A";
+      const programmes = Array.isArray(dropdownData.approvedProgrammes)
+        ? dropdownData.approvedProgrammes
+        : [];
+      const programme = programmes.find(
+        (c) => c.id === parseInt(programmeId) || c.id === programmeId,
       );
-      return course ? course.occupationName : courseId;
+      return programme
+        ? programme.programme_title ||
+            programme.programmeTitle ||
+            programme.name ||
+            "N/A"
+        : "N/A";
     },
-    [dropdownData.approvedCourses],
+    [dropdownData.approvedProgrammes],
   );
 
   const getCertificationLevelName = useCallback(
     (levelId) => {
       if (!levelId) return "N/A";
-      const level = dropdownData.certificationLevels.find(
-        (l) => l.id === parseInt(levelId),
-      );
-      return level ? level.name : levelId;
+      const levels = Array.isArray(dropdownData.certificationLevels)
+        ? dropdownData.certificationLevels
+        : [];
+      const level = levels.find((l) => l.id === parseInt(levelId));
+      return level ? level.name : "N/A";
     },
     [dropdownData.certificationLevels],
   );
@@ -426,10 +515,11 @@ const RPLAssessment = () => {
   const getFundingSourceName = useCallback(
     (sourceId) => {
       if (!sourceId) return "N/A";
-      const source = dropdownData.fundingSources.find(
-        (s) => s.id === parseInt(sourceId),
-      );
-      return source ? source.name : sourceId;
+      const sources = Array.isArray(dropdownData.fundingSources)
+        ? dropdownData.fundingSources
+        : [];
+      const source = sources.find((s) => s.id === parseInt(sourceId));
+      return source ? source.name : "N/A";
     },
     [dropdownData.fundingSources],
   );
@@ -437,7 +527,7 @@ const RPLAssessment = () => {
   // Form initial values
   const initialValues = {
     instituteId: institute.institute_id || "",
-    courseId: "",
+    programmeId: "",
     feesPerTrainee: "",
     enrollmentCapacity: "",
     applicationStartDate: "",
@@ -452,12 +542,12 @@ const RPLAssessment = () => {
     createdBy: actionId,
   };
 
-  // Form validation schema
+  // Validation Schema
   const validationSchema = Yup.object().shape({
-    courseId: Yup.string().required("Course Name is required"),
+    programmeId: Yup.string().required("Programme Name is required"),
     feesPerTrainee: Yup.number()
       .typeError("Must be a number")
-      .required("Course Fee is required"),
+      .required("Programme Fee is required"),
     enrollmentCapacity: Yup.number()
       .typeError("Must be a number")
       .required("Total number of trainees required"),
@@ -477,8 +567,8 @@ const RPLAssessment = () => {
       .test(
         "is-after-application-end",
         "Assessment start date must be after application end date",
-        function (value) {
-          const { applicationEndDate } = this.parent;
+        (value, context) => {
+          const { applicationEndDate } = context.parent;
           if (!value || !applicationEndDate) return true;
           return new Date(value) > new Date(applicationEndDate);
         },
@@ -498,7 +588,7 @@ const RPLAssessment = () => {
       "Assessment Location is required",
     ),
     courseDescription: Yup.string().required(
-      "Course/Assessment Description is required",
+      "Programme/Assessment Description is required",
     ),
     files: Yup.array()
       .min(1, "Please upload required documents")
@@ -518,7 +608,7 @@ const RPLAssessment = () => {
   const tableColumns = [
     { id: "#", render: (_, index) => index + 1 + page * rowsPerPage },
     { id: "Application No", render: (app) => app.application_no || "N/A" },
-    { id: "Course", render: (app) => getCourseName(app.course_id) },
+    { id: "Programme", render: (app) => getProgrammeName(app.programme_id) },
     {
       id: "Certification Level",
       render: (app) => getCertificationLevelName(app.certification_level_id),
@@ -670,15 +760,15 @@ const RPLAssessment = () => {
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormTextField
                       formik={formik}
-                      name="courseId"
+                      name="programmeId"
                       label={
                         <>
-                          <RequiredStar /> Course Name
+                          <RequiredStar /> Programme Name
                         </>
                       }
                       select
-                      options={dropdownData.approvedCourses}
-                      optionLabelKey="occupationName"
+                      options={dropdownData.approvedProgrammes}
+                      optionLabelKey="programme_title"
                     />
                   </Grid>
 
@@ -805,7 +895,7 @@ const RPLAssessment = () => {
                       name="courseDescription"
                       label={
                         <>
-                          <RequiredStar /> Course/Assessment Description
+                          <RequiredStar /> Programme/Assessment Description
                         </>
                       }
                       multiline
@@ -865,4 +955,6 @@ const RPLAssessment = () => {
   );
 };
 
-export default RPLAssessment;
+RPLAssessmentIndex.propTypes = {};
+
+export default RPLAssessmentIndex;

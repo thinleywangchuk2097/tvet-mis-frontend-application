@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 import {
   Card,
   CardContent,
@@ -95,7 +96,9 @@ const quickActions = [
   { icon: <Settings />, label: "Settings", color: "info" },
 ];
 
-// Components
+// ==================== COMPONENTS ====================
+
+// ==================== STAT CARD ====================
 const StatCard = ({ title, value, change, icon, color }) => {
   const theme = useTheme();
   return (
@@ -153,6 +156,23 @@ const StatCard = ({ title, value, change, icon, color }) => {
   );
 };
 
+// ==================== PROPTYPES FOR STAT CARD ====================
+StatCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  change: PropTypes.number.isRequired,
+  icon: PropTypes.node.isRequired,
+  color: PropTypes.oneOf([
+    "primary",
+    "secondary",
+    "success",
+    "warning",
+    "error",
+    "info",
+  ]).isRequired,
+};
+
+// ==================== PROGRESS CARD ====================
 const ProgressCard = ({ title, value, subtitle, icon }) => {
   const theme = useTheme();
   return (
@@ -204,6 +224,15 @@ const ProgressCard = ({ title, value, subtitle, icon }) => {
   );
 };
 
+// ==================== PROPTYPES FOR PROGRESS CARD ====================
+ProgressCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.number.isRequired,
+  subtitle: PropTypes.string.isRequired,
+  icon: PropTypes.node.isRequired,
+};
+
+// ==================== RECENT ACTIVITY ====================
 const RecentActivity = () => (
   <Card elevation={3} sx={{ borderRadius: 3, height: "100%" }}>
     <CardContent>
@@ -252,6 +281,7 @@ const RecentActivity = () => (
   </Card>
 );
 
+// ==================== QUICK ACTIONS ====================
 const QuickActions = () => (
   <Card elevation={3} sx={{ borderRadius: 3, height: "100%" }}>
     <CardContent>
@@ -289,6 +319,7 @@ const QuickActions = () => (
   </Card>
 );
 
+// ==================== MAIN COMPONENT ====================
 const TraineeDashboard = () => {
   const theme = useTheme();
 
@@ -484,5 +515,8 @@ const TraineeDashboard = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+TraineeDashboard.propTypes = {};
 
 export default TraineeDashboard;

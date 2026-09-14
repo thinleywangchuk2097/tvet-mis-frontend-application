@@ -1,5 +1,6 @@
 // NcsPublication.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -202,6 +203,75 @@ const SAMPLE_DATA = [
   },
 ];
 
+// ==================== PROPTYPES ====================
+
+const filterBarPropTypes = {
+  sectors: PropTypes.arrayOf(PropTypes.string).isRequired,
+  filters: PropTypes.shape({
+    sector: PropTypes.string,
+    search: PropTypes.string,
+  }).isRequired,
+  onFilterChange: PropTypes.func.isRequired,
+  onClearFilters: PropTypes.func.isRequired,
+  rowsPerPage: PropTypes.number.isRequired,
+  onRowsPerPageChange: PropTypes.func.isRequired,
+};
+
+const unitCodesPropTypes = {
+  units: PropTypes.arrayOf(
+    PropTypes.shape({
+      unitCode: PropTypes.string,
+      unitTitle: PropTypes.string,
+    }),
+  ),
+};
+
+const unitTitlesPropTypes = {
+  units: PropTypes.arrayOf(
+    PropTypes.shape({
+      unitCode: PropTypes.string,
+      unitTitle: PropTypes.string,
+    }),
+  ),
+};
+
+const fileAttachmentsPropTypes = {
+  documents: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string,
+      documentId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      contentType: PropTypes.string,
+      url: PropTypes.string,
+      content: PropTypes.string,
+    }),
+  ),
+  onView: PropTypes.func.isRequired,
+  onDownload: PropTypes.func.isRequired,
+};
+
+const dataTablePropTypes = {
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      label: PropTypes.string,
+      field: PropTypes.string,
+      render: PropTypes.func,
+    }),
+  ).isRequired,
+  data: PropTypes.array.isRequired,
+  page: PropTypes.number.isRequired,
+  rowsPerPage: PropTypes.number.isRequired,
+  emptyMessage: PropTypes.string,
+};
+
+const paginationFooterPropTypes = {
+  count: PropTypes.number.isRequired,
+  rowsPerPage: PropTypes.number.isRequired,
+  page: PropTypes.number.isRequired,
+  onPageChange: PropTypes.func.isRequired,
+  onRowsPerPageChange: PropTypes.func.isRequired,
+};
+
 // ==================== UTILITY FUNCTIONS ====================
 const getFileExtension = (fileName) => {
   if (!fileName) return "";
@@ -345,12 +415,14 @@ const FilterBar = ({
           value={filters.search}
           onChange={onFilterChange}
           sx={{ flex: 1, maxWidth: 300 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <Button variant="contained" color="secondary" onClick={onClearFilters}>
@@ -360,6 +432,8 @@ const FilterBar = ({
     </Grid>
   </Grid>
 );
+
+FilterBar.propTypes = filterBarPropTypes;
 
 const UnitCodes = ({ units }) => {
   if (!units || units.length === 0) return "N/A";
@@ -380,6 +454,8 @@ const UnitCodes = ({ units }) => {
   );
 };
 
+UnitCodes.propTypes = unitCodesPropTypes;
+
 const UnitTitles = ({ units }) => {
   if (!units || units.length === 0) return "N/A";
   return units.map((unit, idx) => (
@@ -389,6 +465,8 @@ const UnitTitles = ({ units }) => {
     </Box>
   ));
 };
+
+UnitTitles.propTypes = unitTitlesPropTypes;
 
 const FileAttachments = ({ documents, onView, onDownload }) => {
   if (!documents || documents.length === 0) {
@@ -441,6 +519,8 @@ const FileAttachments = ({ documents, onView, onDownload }) => {
     </Stack>
   );
 };
+
+FileAttachments.propTypes = fileAttachmentsPropTypes;
 
 const DataTable = ({
   columns,
@@ -496,6 +576,8 @@ const DataTable = ({
   );
 };
 
+DataTable.propTypes = dataTablePropTypes;
+
 const PaginationFooter = ({
   count,
   rowsPerPage,
@@ -526,6 +608,8 @@ const PaginationFooter = ({
     />
   </Box>
 );
+
+PaginationFooter.propTypes = paginationFooterPropTypes;
 
 // ==================== MAIN COMPONENT ====================
 const NcsPublication = () => {
@@ -696,5 +780,8 @@ const NcsPublication = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+NcsPublication.propTypes = {};
 
 export default NcsPublication;

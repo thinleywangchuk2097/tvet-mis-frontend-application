@@ -11,6 +11,7 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
+import PropTypes from "prop-types";
 import {
   People as PeopleIcon,
   BarChart as BarChartIcon,
@@ -107,7 +108,8 @@ const composedData = [
   { month: "Jun", revenue: 72000, users: 1820, growth: 25 },
 ];
 
-// Stat Card Component
+// ==================== STAT CARD COMPONENT ====================
+
 const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
   const getColorValue = (colorName) => {
     const colorMap = {
@@ -219,6 +221,28 @@ const StatCard = ({ title, value, icon, color, trend, subtitle }) => {
     </Card>
   );
 };
+
+// ==================== PROPTYPES FOR STAT CARD ====================
+StatCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  icon: PropTypes.node.isRequired,
+  color: PropTypes.oneOf([
+    "primary",
+    "secondary",
+    "success",
+    "warning",
+    "error",
+    "info",
+  ]),
+  trend: PropTypes.shape({
+    value: PropTypes.number,
+    label: PropTypes.string,
+  }),
+  subtitle: PropTypes.string,
+};
+
+// ==================== ADMIN DASHBOARD ====================
 
 const AdminDashboard = () => {
   const quickActions = [
@@ -683,5 +707,8 @@ const AdminDashboard = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+AdminDashboard.propTypes = {};
 
 export default AdminDashboard;

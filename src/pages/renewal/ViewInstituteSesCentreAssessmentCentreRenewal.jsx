@@ -1,4 +1,6 @@
+// ViewInstituteSesCentreAssessmentCentreRenewal.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Paper,
@@ -75,6 +77,103 @@ const STATUS = {
   ENDORSE: 59,
   REJECT_REC: 60,
   VERIFY_REC: 62,
+};
+
+// ==================== PROPTYPES ====================
+
+const basicInfoFieldPropTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  gridProps: PropTypes.object,
+};
+
+const trainerCardPropTypes = {
+  trainer: PropTypes.shape({
+    nationalityId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    cid: PropTypes.string,
+    workPermit: PropTypes.string,
+    name: PropTypes.string,
+    genderId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    qualification: PropTypes.string,
+    experience: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    typeId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  }).isRequired,
+  index: PropTypes.number.isRequired,
+  getters: PropTypes.shape({
+    getNationalityName: PropTypes.func.isRequired,
+    getGenderName: PropTypes.func.isRequired,
+    getJobTypeName: PropTypes.func.isRequired,
+  }).isRequired,
+};
+
+const courseCardPropTypes = {
+  course: PropTypes.shape({
+    sectorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    courseId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    courseLevelId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    theoryHours: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    practicalHours: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    ojtHours: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    feesPerTrainee: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    enrollmentCapacity: PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.number,
+    ]),
+  }).isRequired,
+  index: PropTypes.number.isRequired,
+  getters: PropTypes.shape({
+    getSectorName: PropTypes.func.isRequired,
+    getCourseName: PropTypes.func.isRequired,
+    getCertificateLevelName: PropTypes.func.isRequired,
+  }).isRequired,
+};
+
+const tuitionCardPropTypes = {
+  tuition: PropTypes.shape({
+    classLevel: PropTypes.string,
+    subjects: PropTypes.string,
+    duration: PropTypes.string,
+    fees: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    tutorName: PropTypes.string,
+    tutorCid: PropTypes.string,
+    tutorQualification: PropTypes.string,
+  }).isRequired,
+  index: PropTypes.number.isRequired,
+};
+
+const qualityChecklistTablePropTypes = {
+  standard: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    title: PropTypes.string,
+    rows: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        value: PropTypes.string,
+      }),
+    ),
+  }).isRequired,
+  qualityResponses: PropTypes.object.isRequired,
+  qualityRemarks: PropTypes.object.isRequired,
+  onResponseChange: PropTypes.func.isRequired,
+  onRemarkChange: PropTypes.func.isRequired,
+  isReadOnly: PropTypes.bool,
+};
+
+const paymentInfoCardPropTypes = {
+  paymentStatus: PropTypes.shape({
+    paymentAdviceNo: PropTypes.string,
+    refNo: PropTypes.string,
+    taxPayerName: PropTypes.string,
+    paymentStatus: PropTypes.string,
+    paymentDueDate: PropTypes.string,
+    platform: PropTypes.string,
+    totalPayableAmount: PropTypes.number,
+    paymentMode: PropTypes.string,
+    redirectUrl: PropTypes.string,
+  }),
+  onGeneratePayment: PropTypes.func.isRequired,
+  renewalData: PropTypes.object,
+  navigate: PropTypes.func.isRequired,
 };
 
 // ==================== UTILITY FUNCTIONS ====================
@@ -543,6 +642,8 @@ const BasicInfoField = ({ label, value, gridProps = { xs: 12, md: 4 } }) => (
   </Grid>
 );
 
+BasicInfoField.propTypes = basicInfoFieldPropTypes;
+
 const TrainerCard = ({ trainer, index, getters }) => {
   const { getNationalityName, getGenderName, getJobTypeName } = getters;
 
@@ -603,6 +704,8 @@ const TrainerCard = ({ trainer, index, getters }) => {
   );
 };
 
+TrainerCard.propTypes = trainerCardPropTypes;
+
 const CourseCard = ({ course, index, getters }) => {
   const { getSectorName, getCourseName, getCertificateLevelName } = getters;
 
@@ -659,6 +762,8 @@ const CourseCard = ({ course, index, getters }) => {
   );
 };
 
+CourseCard.propTypes = courseCardPropTypes;
+
 const TuitionCard = ({ tuition, index }) => (
   <Grid size={{ xs: 12 }}>
     <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
@@ -705,6 +810,8 @@ const TuitionCard = ({ tuition, index }) => (
     </Paper>
   </Grid>
 );
+
+TuitionCard.propTypes = tuitionCardPropTypes;
 
 const QualityChecklistTable = ({
   standard,
@@ -799,6 +906,8 @@ const QualityChecklistTable = ({
     </Grid>
   );
 };
+
+QualityChecklistTable.propTypes = qualityChecklistTablePropTypes;
 
 const PaymentInfoCard = ({
   paymentStatus,
@@ -1095,6 +1204,8 @@ const PaymentInfoCard = ({
     </Card>
   );
 };
+
+PaymentInfoCard.propTypes = paymentInfoCardPropTypes;
 
 // ==================== MAIN COMPONENT ====================
 const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
@@ -1958,5 +2069,8 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
     </Box>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+ViewInstituteSesCentreAssessmentCentreRenewal.propTypes = {};
 
 export default ViewInstituteSesCentreAssessmentCentreRenewal;

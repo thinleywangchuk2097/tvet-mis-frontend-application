@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Grid,
@@ -21,6 +22,24 @@ import {
   Snackbar,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
+
+// ==================== PROPTYPES ====================
+
+const traineeTracerSurveyPropTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSend: PropTypes.func.isRequired,
+  survey: PropTypes.shape({
+    applicationNo: PropTypes.string,
+    parentTracerType: PropTypes.string,
+    subTracerType: PropTypes.string,
+    applicationName: PropTypes.string,
+    mobileNo: PropTypes.string,
+    emailId: PropTypes.string,
+  }),
+};
+
+// ==================== MAIN COMPONENT ====================
 
 const TraineeTracerSurvey = ({ open, onClose, survey, onSend }) => {
   const [selectedTrainees, setSelectedTrainees] = useState([]);
@@ -113,7 +132,9 @@ const TraineeTracerSurvey = ({ open, onClose, survey, onSend }) => {
 
   // Filter trainees based on institute and search
   const filteredTrainees = trainees.filter((trainee) => {
-    const matchesInstitute = instituteFilter ? trainee.institute === instituteFilter : true;
+    const matchesInstitute = instituteFilter
+      ? trainee.institute === instituteFilter
+      : true;
     const matchesSearch = search
       ? trainee.name.toLowerCase().includes(search.toLowerCase()) ||
         trainee.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -145,10 +166,12 @@ const TraineeTracerSurvey = ({ open, onClose, survey, onSend }) => {
       alert("Please select at least one trainee to send the survey to");
       return;
     }
-    
+
     setSending(true);
     try {
-      const selectedTraineeDetails = trainees.filter(t => selectedTrainees.includes(t.id));
+      const selectedTraineeDetails = trainees.filter((t) =>
+        selectedTrainees.includes(t.id),
+      );
       await onSend(selectedTraineeDetails);
     } catch (error) {
       console.error("Error sending survey:", error);
@@ -166,10 +189,12 @@ const TraineeTracerSurvey = ({ open, onClose, survey, onSend }) => {
           Select Trainees to Send Survey
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-          Survey: {survey?.applicationNo} • {survey?.parentTracerType} - {survey?.subTracerType}
+          Survey: {survey?.applicationNo} • {survey?.parentTracerType} -{" "}
+          {survey?.subTracerType}
         </Typography>
         <Typography variant="body2" color="primary" sx={{ mb: 2 }}>
-          Application Name: {survey?.applicationName} | Mobile: {survey?.mobileNo} | Email: {survey?.emailId}
+          Application Name: {survey?.applicationName} | Mobile:{" "}
+          {survey?.mobileNo} | Email: {survey?.emailId}
         </Typography>
       </Box>
 
@@ -248,7 +273,9 @@ const TraineeTracerSurvey = ({ open, onClose, survey, onSend }) => {
                   size="small"
                 />
               </TableCell>
-              <TableCell align="center" width={40}>#</TableCell>
+              <TableCell align="center" width={40}>
+                #
+              </TableCell>
               <TableCell>Trainee Name</TableCell>
               <TableCell>Mobile No</TableCell>
               <TableCell>Email</TableCell>
@@ -309,7 +336,12 @@ const TraineeTracerSurvey = ({ open, onClose, survey, onSend }) => {
       </TableContainer>
 
       <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-        <Button variant="contained" color="error" onClick={onClose} disabled={sending}>
+        <Button
+          variant="contained"
+          color="error"
+          onClick={onClose}
+          disabled={sending}
+        >
           Cancel
         </Button>
         <Button
@@ -319,11 +351,16 @@ const TraineeTracerSurvey = ({ open, onClose, survey, onSend }) => {
           onClick={handleSend}
           disabled={selectedTrainees.length === 0 || sending}
         >
-          {sending ? "Sending..." : `Send to ${selectedTrainees.length > 0 ? `(${selectedTrainees.length})` : ""}`}
+          {sending
+            ? "Sending..."
+            : `Send to ${selectedTrainees.length > 0 ? `(${selectedTrainees.length})` : ""}`}
         </Button>
       </Box>
     </Box>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+TraineeTracerSurvey.propTypes = traineeTracerSurveyPropTypes;
 
 export default TraineeTracerSurvey;

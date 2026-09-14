@@ -1,5 +1,6 @@
 // OnCampusJobPlacement.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   Table,
   TableBody,
@@ -224,6 +225,113 @@ const usePagination = () => {
   };
 };
 
+// ==================== PROPTYPES ====================
+
+const statusChipPropTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  dropdownData: PropTypes.array,
+};
+
+const employmentStatusChipPropTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  employmentStatuses: PropTypes.array,
+};
+
+const formFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  type: PropTypes.string,
+  required: PropTypes.bool,
+  select: PropTypes.bool,
+  options: PropTypes.array,
+  optionLabelKey: PropTypes.string,
+};
+
+const reusableTablePropTypes = {
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      label: PropTypes.string,
+      field: PropTypes.string,
+      render: PropTypes.func,
+    }),
+  ).isRequired,
+  data: PropTypes.array.isRequired,
+  page: PropTypes.number,
+  rowsPerPage: PropTypes.number,
+  loading: PropTypes.bool,
+  actions: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string,
+      icon: PropTypes.node,
+      tooltip: PropTypes.string,
+      color: PropTypes.string,
+      onClick: PropTypes.func,
+      disabled: PropTypes.func,
+    }),
+  ),
+  emptyMessage: PropTypes.string,
+};
+
+const deleteConfirmationDialogPropTypes = {
+  open: PropTypes.bool.isRequired,
+  item: PropTypes.object,
+  type: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+};
+
+const viewDialogPropTypes = {
+  open: PropTypes.bool.isRequired,
+  title: PropTypes.string.isRequired,
+  fields: PropTypes.arrayOf(
+    PropTypes.shape({
+      label: PropTypes.string,
+      value: PropTypes.any,
+      multiline: PropTypes.bool,
+      rows: PropTypes.number,
+    }),
+  ).isRequired,
+  onClose: PropTypes.func.isRequired,
+};
+
+const addButtonPropTypes = {
+  onClick: PropTypes.func.isRequired,
+  label: PropTypes.string.isRequired,
+};
+
+// PropTypes for the FormComponent rendered inside ENTITY_CONFIG.
+// This resolves the SonarQube "missing in props validation" issues for
+// formik, formik.values, formik.values.files, formik.setFieldValue,
+// context, and all context.* nested accesses.
+const formComponentPropTypes = {
+  formik: PropTypes.shape({
+    values: PropTypes.object.isRequired,
+    errors: PropTypes.object,
+    touched: PropTypes.object,
+    handleChange: PropTypes.func.isRequired,
+    handleBlur: PropTypes.func.isRequired,
+    setFieldValue: PropTypes.func.isRequired,
+    resetForm: PropTypes.func,
+    isValid: PropTypes.bool,
+  }).isRequired,
+  context: PropTypes.shape({
+    selected: PropTypes.object,
+    openDialog: PropTypes.func,
+    handleDelete: PropTypes.func,
+    selectItem: PropTypes.func,
+    dropdownData: PropTypes.array,
+    employmentStatuses: PropTypes.array,
+    dzongkhags: PropTypes.array,
+    sessionData: PropTypes.array,
+    firmData: PropTypes.array,
+    courses: PropTypes.array,
+    instituteId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    actionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  }).isRequired,
+};
+
 // ==================== REUSABLE COMPONENTS ====================
 const StatusChip = ({ id, dropdownData }) => (
   <Chip
@@ -232,6 +340,8 @@ const StatusChip = ({ id, dropdownData }) => (
     size="small"
   />
 );
+
+StatusChip.propTypes = statusChipPropTypes;
 
 const EmploymentStatusChip = ({ id, employmentStatuses }) => {
   const name = getEmploymentStatusName(id, employmentStatuses);
@@ -243,6 +353,8 @@ const EmploymentStatusChip = ({ id, employmentStatuses }) => {
     />
   );
 };
+
+EmploymentStatusChip.propTypes = employmentStatusChipPropTypes;
 
 const FormField = ({
   formik,
@@ -290,6 +402,8 @@ const FormField = ({
 
   return <TextField {...fieldProps} />;
 };
+
+FormField.propTypes = formFieldPropTypes;
 
 const ReusableTable = ({
   columns,
@@ -360,6 +474,8 @@ const ReusableTable = ({
   </TableContainer>
 );
 
+ReusableTable.propTypes = reusableTablePropTypes;
+
 const DeleteConfirmationDialog = ({ open, item, type, onClose, onConfirm }) => {
   const messages = {
     session: `Delete session "<strong>${item?.session_name}</strong>"?`,
@@ -398,6 +514,8 @@ const DeleteConfirmationDialog = ({ open, item, type, onClose, onConfirm }) => {
   );
 };
 
+DeleteConfirmationDialog.propTypes = deleteConfirmationDialogPropTypes;
+
 const ViewDialog = ({ open, title, fields, onClose }) => (
   <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
     <DialogTitle>{title}</DialogTitle>
@@ -426,6 +544,8 @@ const ViewDialog = ({ open, title, fields, onClose }) => (
   </Dialog>
 );
 
+ViewDialog.propTypes = viewDialogPropTypes;
+
 const AddButton = ({ onClick, label }) => (
   <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
     <Button
@@ -439,6 +559,200 @@ const AddButton = ({ onClick, label }) => (
     </Button>
   </Box>
 );
+
+AddButton.propTypes = addButtonPropTypes;
+
+// ==================== FORM COMPONENTS (extracted for clean PropTypes) ====================
+
+const SessionFormComponent = ({ formik, context }) => (
+  <Grid container spacing={2}>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField formik={formik} name="sessionName" label="Session Name" />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="sessionDate"
+        label="Session Date"
+        type="date"
+        InputLabelProps={{ shrink: true }}
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="sessionTime"
+        label="Session Time"
+        type="time"
+        InputLabelProps={{ shrink: true }}
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField formik={formik} name="venue" label="Venue" />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FormField
+        formik={formik}
+        name="description"
+        label="Description"
+        multiline
+        rows={3}
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FileUpload
+        files={formik.values.files}
+        onFilesChange={(f) => formik.setFieldValue("files", f)}
+      />
+    </Grid>
+  </Grid>
+);
+
+SessionFormComponent.propTypes = formComponentPropTypes;
+
+const FirmFormComponent = ({ formik, context }) => (
+  <Grid container spacing={2}>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="registrationNo"
+        label="Registration No"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField formik={formik} name="firmName" label="Firm Name" />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="contactPerson"
+        label="Contact Person Name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="contactPhone"
+        label="Contact Person Mobile No"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="contactEmail"
+        label="Contact Person Email"
+        type="email"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="dzongkhag"
+        label="Location Dzongkhag"
+        select
+        options={context.dzongkhags}
+        optionLabelKey="dzonkhagName"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="placementSession"
+        label="Placement Session"
+        select
+        options={context.sessionData}
+        optionLabelKey="session_name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FormField
+        formik={formik}
+        name="address"
+        label="Address"
+        multiline
+        rows={2}
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FormField
+        formik={formik}
+        name="description"
+        label="Description"
+        multiline
+        rows={2}
+      />
+    </Grid>
+  </Grid>
+);
+
+FirmFormComponent.propTypes = formComponentPropTypes;
+
+const PlacementFormComponent = ({ formik, context }) => (
+  <Grid container spacing={2}>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="firmId"
+        label="Company"
+        select
+        options={context.firmData}
+        optionLabelKey="firm_name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="traineeCid"
+        label="Trainee CID"
+        placeholder="e.g., 1234567890123"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField formik={formik} name="traineeName" label="Trainee Name" />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="courseId"
+        label="Course"
+        select
+        options={context.courses}
+        optionLabelKey="course_name"
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField formik={formik} name="position" label="Position" />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="employmentStatus"
+        label="Employment Status"
+        select
+        options={context.employmentStatuses}
+      />
+    </Grid>
+    <Grid size={{ xs: 12, md: 6 }}>
+      <FormField
+        formik={formik}
+        name="salary"
+        label="Salary (if applicable)"
+        type="number"
+      />
+    </Grid>
+    <Grid size={{ xs: 12 }}>
+      <FormField
+        formik={formik}
+        name="remarks"
+        label="Remarks"
+        multiline
+        rows={2}
+      />
+    </Grid>
+  </Grid>
+);
+
+PlacementFormComponent.propTypes = formComponentPropTypes;
 
 // ==================== ENTITY CONFIGURATION ====================
 const ENTITY_CONFIG = {
@@ -548,49 +862,7 @@ const ENTITY_CONFIG = {
         onClick: (i) => context.handleDelete(i, "session"),
       },
     ],
-    FormComponent: ({ formik, context }) => (
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField formik={formik} name="sessionName" label="Session Name" />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="sessionDate"
-            label="Session Date"
-            type="date"
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="sessionTime"
-            label="Session Time"
-            type="time"
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField formik={formik} name="venue" label="Venue" />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FormField
-            formik={formik}
-            name="description"
-            label="Description"
-            multiline
-            rows={3}
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FileUpload
-            files={formik.values.files}
-            onFilesChange={(f) => formik.setFieldValue("files", f)}
-          />
-        </Grid>
-      </Grid>
-    ),
+    FormComponent: SessionFormComponent,
   },
   firm: {
     label: "Firm",
@@ -682,80 +954,7 @@ const ENTITY_CONFIG = {
         onClick: (i) => context.handleDelete(i, "firm"),
       },
     ],
-    FormComponent: ({ formik, context }) => (
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="registrationNo"
-            label="Registration No"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField formik={formik} name="firmName" label="Firm Name" />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="contactPerson"
-            label="Contact Person Name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="contactPhone"
-            label="Contact Person Mobile No"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="contactEmail"
-            label="Contact Person Email"
-            type="email"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="dzongkhag"
-            label="Location Dzongkhag"
-            select
-            options={context.dzongkhags}
-            optionLabelKey="dzonkhagName"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="placementSession"
-            label="Placement Session"
-            select
-            options={context.sessionData}
-            optionLabelKey="session_name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FormField
-            formik={formik}
-            name="address"
-            label="Address"
-            multiline
-            rows={2}
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FormField
-            formik={formik}
-            name="description"
-            label="Description"
-            multiline
-            rows={2}
-          />
-        </Grid>
-      </Grid>
-    ),
+    FormComponent: FirmFormComponent,
   },
   placement: {
     label: "Placement",
@@ -859,70 +1058,7 @@ const ENTITY_CONFIG = {
         onClick: (i) => context.handleDelete(i, "placement"),
       },
     ],
-    FormComponent: ({ formik, context }) => (
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="firmId"
-            label="Company"
-            select
-            options={context.firmData}
-            optionLabelKey="firm_name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="traineeCid"
-            label="Trainee CID"
-            placeholder="e.g., 1234567890123"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField formik={formik} name="traineeName" label="Trainee Name" />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="courseId"
-            label="Course"
-            select
-            options={context.courses}
-            optionLabelKey="course_name"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField formik={formik} name="position" label="Position" />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="employmentStatus"
-            label="Employment Status"
-            select
-            options={context.employmentStatuses}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FormField
-            formik={formik}
-            name="salary"
-            label="Salary (if applicable)"
-            type="number"
-          />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <FormField
-            formik={formik}
-            name="remarks"
-            label="Remarks"
-            multiline
-            rows={2}
-          />
-        </Grid>
-      </Grid>
-    ),
+    FormComponent: PlacementFormComponent,
   },
 };
 
@@ -1395,5 +1531,8 @@ const OnCampusJobPlacement = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+OnCampusJobPlacement.propTypes = {};
 
 export default OnCampusJobPlacement;

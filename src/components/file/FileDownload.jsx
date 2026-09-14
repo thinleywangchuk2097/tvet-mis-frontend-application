@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Typography,
@@ -51,7 +52,6 @@ const formatFileSize = (bytes) => {
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  // ✅ FIXED: Use Number.parseFloat instead of parseFloat
   return (
     Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
   );
@@ -71,7 +71,6 @@ const fileToDocumentDto = async (file) => {
         path: null,
       });
     };
-    // ✅ FIXED: Reject with an Error object instead of a string
     reader.onerror = (error) =>
       reject(new Error(`Failed to read file: ${file.name}`));
     reader.readAsDataURL(file);
@@ -820,6 +819,24 @@ const FileDownload = ({
       {renderErrorMessage()}
     </Box>
   );
+};
+
+// PropTypes validation
+FileDownload.propTypes = {
+  initialFiles: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.string,
+      url: PropTypes.string,
+      size: PropTypes.number,
+      type: PropTypes.string,
+      file: PropTypes.instanceOf(File),
+    }),
+  ),
+  title: PropTypes.string,
+  description: PropTypes.string,
+  disabled: PropTypes.bool,
+  onFileUpload: PropTypes.func,
+  allowUpload: PropTypes.bool,
 };
 
 export default FileDownload;

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -65,7 +66,7 @@ const TABLE_STYLE = {
     verticalAlign: "middle",
   },
   "& th": {
-    fontWeight: 600
+    fontWeight: 600,
   },
 };
 
@@ -76,6 +77,10 @@ const RequiredLabel = ({ children }) => (
     <span style={{ color: "red", marginLeft: "4px" }}>*</span>
   </span>
 );
+
+RequiredLabel.propTypes = {
+  children: PropTypes.node.isRequired,
+};
 
 const AddTrainerIndex = () => {
   const [trainers, setTrainers] = useState([]);
@@ -108,6 +113,7 @@ const AddTrainerIndex = () => {
   // Load all reference data first
   useEffect(() => {
     loadReferenceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadReferenceData = async () => {
@@ -132,6 +138,7 @@ const AddTrainerIndex = () => {
     if (isDataLoaded && registration_no) {
       fetchInstituteDetails();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDataLoaded, registration_no]);
 
   const fetchInstituteDetails = async () => {
@@ -158,13 +165,11 @@ const AddTrainerIndex = () => {
         instId,
         access_token,
       );
-      console.log("fetch trainer data api", response.data);
       if (response && response.data) {
         const trainersData = Array.isArray(response.data)
           ? response.data.map((trainer) => mapTrainerData(trainer))
           : [];
         setTrainers(trainersData);
-        console.log("Fetched trainers:", trainersData);
       }
     } catch (error) {
       console.error("Error fetching trainers:", error);
@@ -175,7 +180,6 @@ const AddTrainerIndex = () => {
   };
 
   const mapTrainerData = (trainer) => {
-    // Parse courses if it's a string
     let parsedCourses = [];
     if (trainer.courses) {
       if (typeof trainer.courses === "string") {
@@ -190,15 +194,15 @@ const AddTrainerIndex = () => {
       }
     }
 
-    // Get names from reference data (using string comparison since API returns strings)
     const genderName = getGenderName(trainer.gender_id);
     const qualificationName = getQualificationName(trainer.qualification_id);
-    const employmentTypeName = getEmploymentTypeName(trainer.employment_type_id);
-    
-    // Add course names
-    const coursesWithNames = parsedCourses.map(course => ({
+    const employmentTypeName = getEmploymentTypeName(
+      trainer.employment_type_id,
+    );
+
+    const coursesWithNames = parsedCourses.map((course) => ({
       ...course,
-      courseName: getCourseName(course.courseTypeId, course.courseId)
+      courseName: getCourseName(course.courseTypeId, course.courseId),
     }));
 
     return {
@@ -228,7 +232,6 @@ const AddTrainerIndex = () => {
     try {
       const AcademicQualification = await CommonService.getByParentId(18);
       setAcademicQualifications(AcademicQualification.data);
-      console.log("Academic Qualification:", AcademicQualification.data);
     } catch (error) {
       console.error("Error fetching Academic Qualification:", error);
       toast.error("Failed to fetch academic qualifications");
@@ -239,7 +242,6 @@ const AddTrainerIndex = () => {
     try {
       const gender = await CommonService.getByParentId(8);
       setGenders(gender.data);
-      console.log("Gender:", gender.data);
     } catch (error) {
       console.error("Error fetching Genders:", error);
       toast.error("Failed to fetch genders");
@@ -248,9 +250,8 @@ const AddTrainerIndex = () => {
 
   const fetchCourseTypes = async () => {
     try {
-      const courseTypes = await CommonService.getByParentId(13);
-      setCourseTypes(courseTypes.data);
-      console.log("Course Types:", courseTypes.data);
+      const courseTypesResponse = await CommonService.getByParentId(13);
+      setCourseTypes(courseTypesResponse.data);
     } catch (error) {
       console.error("Error fetching course types:", error);
       toast.error("Failed to fetch course types");
@@ -261,14 +262,12 @@ const AddTrainerIndex = () => {
     try {
       const employmentType = await CommonService.getByParentId(11);
       setEmploymentTypes(employmentType.data);
-      console.log("Employment Type:", employmentType.data);
     } catch (error) {
       console.error("Error Fetching Employment Type:", error);
       toast.error("Failed to fetch employment types");
     }
   };
 
-  // Fetch accredited courses - using actual API
   const fetchAccreditedCourses = async () => {
     setLoadingCourses(true);
     try {
@@ -278,7 +277,6 @@ const AddTrainerIndex = () => {
           access_token,
         );
       setAccreditedCourses(response.data);
-      console.log("Accredited Courses", response.data);
     } catch (error) {
       console.error("Error fetching accredited courses:", error);
       toast.error("Failed to fetch accredited courses");
@@ -288,7 +286,6 @@ const AddTrainerIndex = () => {
     }
   };
 
-  // Fetch non-accredited courses - using actual API
   const fetchNonAccreditedCourses = async () => {
     setLoadingCourses(true);
     try {
@@ -298,7 +295,6 @@ const AddTrainerIndex = () => {
           access_token,
         );
       setNonAccreditedCourses(response.data);
-      console.log("Non Accredited Courses", response.data);
     } catch (error) {
       console.error("Error fetching non-accredited courses:", error);
       toast.error("Failed to fetch non-accredited courses");
@@ -308,7 +304,6 @@ const AddTrainerIndex = () => {
     }
   };
 
-  // Helper functions to get names from IDs (handle both string and number IDs)
   const getGenderName = (genderId) => {
     if (!genderId) return "";
     const gender = genders.find((g) => String(g.id) === String(genderId));
@@ -331,14 +326,12 @@ const AddTrainerIndex = () => {
     return employmentType?.name || "";
   };
 
-  // Function to get course name by type and ID
   const getCourseName = (courseTypeId, courseId) => {
     const coursesList = getCoursesByType(courseTypeId);
-    const course = coursesList.find(c => String(c.id) === String(courseId));
+    const course = coursesList.find((c) => String(c.id) === String(courseId));
     return course?.course_name || course?.name || `Course ID: ${courseId}`;
   };
 
-  // Function to get courses based on course type value
   const getCoursesByType = (courseTypeValue) => {
     const selectedCourseType = courseTypes.find(
       (type) => String(type.id) === String(courseTypeValue),
@@ -468,26 +461,20 @@ const AddTrainerIndex = () => {
 
   const validationSchema = Yup.object().shape({
     hasCitizenId: Yup.string().required("Required"),
-    citizenId: Yup.string()
-      .test("citizenId-required", "Citizen ID is required", function (value) {
-        const { hasCitizenId } = this.parent;
-        if (hasCitizenId === "yes") {
-          return value && value.length > 0;
-        }
-        return true;
-      })
-      .max(20, "Citizen ID must be at most 20 characters"),
-    workPermitNo: Yup.string().test(
-      "workPermitNo-required",
-      "Work Permit No/Reference No is required",
-      function (value) {
-        const { hasCitizenId } = this.parent;
-        if (hasCitizenId === "no") {
-          return value && value.length > 0;
-        }
-        return true;
-      },
-    ),
+    citizenId: Yup.string().when("hasCitizenId", {
+      is: "yes",
+      then: (schema) =>
+        schema
+          .required("Citizen ID is required")
+          .max(20, "Citizen ID must be at most 20 characters"),
+      otherwise: (schema) => schema.nullable(),
+    }),
+    workPermitNo: Yup.string().when("hasCitizenId", {
+      is: "no",
+      then: (schema) =>
+        schema.required("Work Permit No/Reference No is required"),
+      otherwise: (schema) => schema.nullable(),
+    }),
     name: Yup.string()
       .required("Name is required")
       .max(100, "Name must be at most 100 characters"),
@@ -543,12 +530,10 @@ const AddTrainerIndex = () => {
     setLoading(true);
 
     try {
-      // Process files to base64 if any
       const processedFiles = await Promise.all(
         values.files.map((file) => fileToBase64(file)),
       );
 
-      // Process courses - keep courseTypeId inside each course
       const processedCourses = values.courses.map((course) => {
         return {
           courseTypeId: parseInt(course.courseTypeId),
@@ -556,7 +541,6 @@ const AddTrainerIndex = () => {
         };
       });
 
-      // Prepare the payload
       const payload = {
         id: dialogMode === "edit" ? values.id : null,
         citizenId: values.citizenId || null,
@@ -576,8 +560,6 @@ const AddTrainerIndex = () => {
         updatedBy: actionId,
         courses: processedCourses,
       };
-
-      console.log("Payload being sent:", payload);
 
       let response;
       if (dialogMode === "add") {
@@ -1569,7 +1551,7 @@ const AddTrainerIndex = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete "{trainerToDelete?.name}"?
+            Are you sure you want to delete &quot;{trainerToDelete?.name}&quot;?
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             This action cannot be undone.

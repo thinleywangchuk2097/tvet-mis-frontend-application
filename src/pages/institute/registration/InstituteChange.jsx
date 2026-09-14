@@ -1,5 +1,6 @@
 // InstituteChange.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Paper,
@@ -72,6 +73,53 @@ const CHANGE_COLORS = {
 };
 
 const STEPS = ["Changes", "Documents", "Review & Submit"];
+
+// ==================== PROPTYPES ====================
+
+const sectionHeaderPropTypes = {
+  icon: PropTypes.elementType.isRequired,
+  title: PropTypes.string.isRequired,
+  color: PropTypes.string,
+};
+
+const infoDisplayPropTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};
+
+const changeTypeRadioPropTypes = {
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  error: PropTypes.string,
+};
+
+const infoAlertPropTypes = {
+  severity: PropTypes.oneOf(["success", "info", "warning", "error"]),
+  title: PropTypes.string.isRequired,
+  value: PropTypes.string,
+};
+
+const formTextFieldPropTypes = {
+  formik: PropTypes.object.isRequired,
+  name: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  select: PropTypes.bool,
+  options: PropTypes.array,
+  optionLabel: PropTypes.string,
+  optionValue: PropTypes.string,
+  placeholder: PropTypes.string,
+  readOnly: PropTypes.bool,
+  endAdornment: PropTypes.node,
+};
+
+const partnerCardPropTypes = {
+  partner: PropTypes.object.isRequired,
+  index: PropTypes.number.isRequired,
+  formik: PropTypes.object.isRequired,
+  typeOfOwners: PropTypes.array.isRequired,
+  fetchingCitizen: PropTypes.bool,
+  onFetchPartner: PropTypes.func.isRequired,
+};
 
 // ==================== CUSTOM HOOKS ====================
 const useMasterData = () => {
@@ -270,6 +318,8 @@ const SectionHeader = ({ icon: Icon, title, color = "primary" }) => (
   </Box>
 );
 
+SectionHeader.propTypes = sectionHeaderPropTypes;
+
 const InfoDisplay = ({ label, value }) => (
   <Box>
     <Typography variant="body2" color="textSecondary">
@@ -280,6 +330,8 @@ const InfoDisplay = ({ label, value }) => (
     </Typography>
   </Box>
 );
+
+InfoDisplay.propTypes = infoDisplayPropTypes;
 
 const ChangeTypeRadio = ({ value, onChange, error }) => (
   <FormControl component="fieldset" sx={{ width: "100%" }}>
@@ -318,11 +370,15 @@ const ChangeTypeRadio = ({ value, onChange, error }) => (
   </FormControl>
 );
 
+ChangeTypeRadio.propTypes = changeTypeRadioPropTypes;
+
 const InfoAlert = ({ severity = "info", title, value }) => (
   <Alert severity={severity} sx={{ mb: 2 }}>
     {title}: {value || "N/A"}
   </Alert>
 );
+
+InfoAlert.propTypes = infoAlertPropTypes;
 
 const FormTextField = ({
   formik,
@@ -348,9 +404,11 @@ const FormTextField = ({
     error: formik.touched[name] && Boolean(formik.errors[name]),
     helperText: formik.touched[name] && formik.errors[name],
     placeholder,
-    InputProps: {
-      readOnly,
-      ...(endAdornment && { endAdornment }),
+    slotProps: {
+      input: {
+        readOnly,
+        ...(endAdornment && { endAdornment }),
+      },
     },
     ...props,
   };
@@ -370,6 +428,8 @@ const FormTextField = ({
 
   return <TextField {...fieldProps} />;
 };
+
+FormTextField.propTypes = formTextFieldPropTypes;
 
 const PartnerCard = ({
   partner,
@@ -470,6 +530,8 @@ const PartnerCard = ({
     </Box>
   );
 };
+
+PartnerCard.propTypes = partnerCardPropTypes;
 
 // ==================== VALIDATION SCHEMA ====================
 const getValidationSchema = () => {
@@ -624,7 +686,7 @@ const InstituteChange = () => {
   const citizenLookup = useCitizenLookup();
   const stepper = useStepper(0);
 
-  const [formValues, setFormValues] = useState({
+  const [formValues] = useState({
     changeType: "",
     dzongkhag_id: "",
     exact_location: "",
@@ -709,6 +771,7 @@ const InstituteChange = () => {
   // ===== EFFECTS =====
   useEffect(() => {
     masterData.fetchMasterData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ===== HELPERS =====
@@ -964,7 +1027,7 @@ const InstituteChange = () => {
                   <FormTextField
                     formik={formik}
                     name="registration_no"
-                    label={isCompany() ? "Registration No" : "Registration No"}
+                    label="Registration No"
                     placeholder="Enter registration number"
                     required
                   />
@@ -1093,9 +1156,7 @@ const InstituteChange = () => {
 
     return null;
   }, [
-    formik.values,
-    formik.handleChange,
-    formik.handleBlur,
+    formik,
     masterData.dzongkhags,
     masterData.ownershipTypes,
     masterData.otherOwnershipTypes,
@@ -1254,13 +1315,7 @@ const InstituteChange = () => {
         </Grid>
       </Paper>
     );
-  }, [
-    formik.values,
-    getChangeSummary,
-    getTypeOfOwnerName,
-    instituteData,
-    masterData,
-  ]);
+  }, [formik, getChangeSummary, getTypeOfOwnerName, instituteData, masterData]);
 
   if (instituteData.loading) {
     return (
@@ -1291,7 +1346,7 @@ const InstituteChange = () => {
             Request for Institute Change
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            Submit a request to change your institute's location, name, or
+            Submit a request to change your institute&apos;s location, name, or
             ownership details
           </Typography>
           {registration_no && (
@@ -1307,7 +1362,7 @@ const InstituteChange = () => {
 
         {/* Stepper */}
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {STEPS.map((label, index) => (
+          {STEPS.map((label) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>
             </Step>
@@ -1372,8 +1427,8 @@ const InstituteChange = () => {
                       ? "Active"
                       : "Pending",
                 },
-              ].map((field, idx) => (
-                <Grid key={idx} item size={{ xs: 12, md: 3 }}>
+              ].map((field) => (
+                <Grid key={field.label} item size={{ xs: 12, md: 3 }}>
                   <InfoDisplay label={field.label} value={field.value} />
                 </Grid>
               ))}
@@ -1513,5 +1568,8 @@ const InstituteChange = () => {
     </Box>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+InstituteChange.propTypes = {};
 
 export default InstituteChange;

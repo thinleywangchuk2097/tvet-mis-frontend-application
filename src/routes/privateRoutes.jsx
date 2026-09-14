@@ -14,8 +14,8 @@ import TaskListIndex from "../pages/tasklist/TaskListIndex";
 //course announcement paths
 import AccreditatedCourse from "../pages/institute/course-announcement/AccreditatedCourse";
 import NonAccreditedCourse from "../pages/institute/course-announcement/NonAccreditedCourse";
-import RPLAssessment1 from "../pages/institute/course-announcement/RPLAssessment";
-import ReAssessment from "../pages/institute/course-announcement/ReAssessment";
+import RPLAssessmentIndex from "../pages/institute/course-announcement/RPLAssessmentIndex";
+import ReAssessmentIndex from "../pages/institute/course-announcement/ReAssessmentIndex";
 import AccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/course-announcement/AccreditatedRPLCourseTraineeSelectionIndex";
 import ViewAccreditatedRPLCourseTraineeSelectionIndex from "../pages/institute/course-announcement/ViewAccreditatedRPLCourseTraineeSelectionIndex";
 import NonAccreditedCourseTraineeSelection from "../pages/institute/course-announcement/NonAccreditedCourseTraineeSelection";
@@ -277,8 +277,8 @@ export const privateRoutes = [
     children: [
       { path: "accredited-course", element: <AccreditatedCourse /> },
       { path: "non-accredited-course", element: <NonAccreditedCourse /> },
-      { path: "rpl-assessment", element: <RPLAssessment1 /> },
-      { path: "reassessment", element: <ReAssessment /> },
+      { path: "rpl-assessment", element: <RPLAssessmentIndex /> },
+      { path: "reassessment", element: <ReAssessmentIndex /> },
       {
         path: "course-trainee-selection/:applicationNo",
         element: <AccreditatedRPLCourseTraineeSelectionIndex />,
@@ -288,7 +288,7 @@ export const privateRoutes = [
         element: <NonAccreditedCourseTraineeSelection />,
       },
       {
-        path: "reassessment-trainee-selection/:applicationNo/:courseId",
+        path: "reassessment-trainee-selection/:applicationNo/:programmeId",
         element: <ReAssessmentTraineeSelectionIndex />,
       },
     ],

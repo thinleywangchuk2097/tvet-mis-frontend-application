@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Paper,
   Typography,
@@ -108,6 +108,10 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assessorToDelete, setAssessorToDelete] = useState(null);
 
+  // Trainee delete confirmation dialog
+  const [deleteTraineeDialogOpen, setDeleteTraineeDialogOpen] = useState(false);
+  const [traineeToDelete, setTraineeToDelete] = useState(null);
+
   // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -131,6 +135,108 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const isNumericCertificationLevel = () => {
     const levelId = courseDetails?.certification_level_id;
     return levelId === "111" || levelId === "112";
+  };
+
+  // Helper function to check if certification level is diploma (111 or 112)
+  const isDiplomaCertificationLevel = () => {
+    const levelId = courseDetails?.certification_level_id;
+    return levelId === "111" || levelId === "112";
+  };
+
+  // Get max value for Theory Assessment based on certification level (for non-service_id 39)
+  const getTheoryMaxValue = () => {
+    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
+    return 20;
+  };
+
+  // Get max value for Practical Assessment based on certification level (for non-service_id 39)
+  const getPracticalMaxValue = () => {
+    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
+    return 60;
+  };
+
+  // Get max value for Viva Assessment based on certification level (for service_id 39)
+  const getVivaMaxValue = () => {
+    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
+    return 20;
+  };
+
+  // Get max value for Viva Practical Assessment based on certification level (for service_id 39)
+  const getVivaPracticalMaxValue = () => {
+    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
+    return 60;
+  };
+
+  // Get tooltip message for Theory Assessment max value
+  const getTheoryTooltipMessage = () => {
+    const maxVal = getTheoryMaxValue();
+    if (!maxVal) return "";
+    return `Maximum value that can be entered is ${maxVal}`;
+  };
+
+  // Get tooltip message for Practical Assessment max value
+  const getPracticalTooltipMessage = () => {
+    const maxVal = getPracticalMaxValue();
+    if (!maxVal) return "";
+    return `Maximum value that can be entered is ${maxVal}`;
+  };
+
+  // Get tooltip message for Viva Assessment max value
+  const getVivaTooltipMessage = () => {
+    const maxVal = getVivaMaxValue();
+    if (!maxVal) return "";
+    return `Maximum value that can be entered is ${maxVal}`;
+  };
+
+  // Get tooltip message for Viva Practical Assessment max value
+  const getVivaPracticalTooltipMessage = () => {
+    const maxVal = getVivaPracticalMaxValue();
+    if (!maxVal) return "";
+    return `Maximum value that can be entered is ${maxVal}`;
+  };
+
+  // Helper function to validate Theory Assessment input for diploma
+  const validateTheoryInput = (value) => {
+    if (value === "") return true;
+    const numValue = Number(value);
+    if (isNaN(numValue)) return false;
+    if (isDiplomaCertificationLevel()) {
+      return numValue >= 0 && numValue <= 20;
+    }
+    return numValue >= 0 && numValue <= 100;
+  };
+
+  // Helper function to validate Practical Assessment input for diploma
+  const validatePracticalInput = (value) => {
+    if (value === "") return true;
+    const numValue = Number(value);
+    if (isNaN(numValue)) return false;
+    if (isDiplomaCertificationLevel()) {
+      return numValue >= 0 && numValue <= 60;
+    }
+    return numValue >= 0 && numValue <= 100;
+  };
+
+  // Helper function to validate Viva Assessment input for diploma (service_id 39)
+  const validateVivaInput = (value) => {
+    if (value === "") return true;
+    const numValue = Number(value);
+    if (isNaN(numValue)) return false;
+    if (isDiplomaCertificationLevel()) {
+      return numValue >= 0 && numValue <= 20;
+    }
+    return numValue >= 0 && numValue <= 100;
+  };
+
+  // Helper function to validate Viva Practical Assessment input for diploma (service_id 39)
+  const validateVivaPracticalInput = (value) => {
+    if (value === "") return true;
+    const numValue = Number(value);
+    if (isNaN(numValue)) return false;
+    if (isDiplomaCertificationLevel()) {
+      return numValue >= 0 && numValue <= 60;
+    }
+    return numValue >= 0 && numValue <= 100;
   };
 
   // Check if payment is completed
@@ -167,8 +273,13 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
       if (isServiceId39) {
         // For service_id 39: Check Viva and Practical
-        const vivaValue = traineeVivaAssessments[trainee.id];
-        const practicalValue = traineeVivaPracticalAssessments[trainee.id];
+        // Check both state and fallback to trainee data
+        const vivaValue =
+          traineeVivaAssessments[trainee.id] || trainee.viva_assessment || "";
+        const practicalValue =
+          traineeVivaPracticalAssessments[trainee.id] ||
+          trainee.practical_assessment ||
+          "";
         return (
           vivaValue &&
           vivaValue !== "" &&
@@ -177,8 +288,14 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         );
       } else {
         // For other services: Check Theory and Practical
-        const theoryValue = traineeTheoryAssessments[trainee.id];
-        const practicalValue = traineePracticalAssessments[trainee.id];
+        const theoryValue =
+          traineeTheoryAssessments[trainee.id] ||
+          trainee.theory_assessment ||
+          "";
+        const practicalValue =
+          traineePracticalAssessments[trainee.id] ||
+          trainee.practical_assessment ||
+          "";
         return (
           theoryValue &&
           theoryValue !== "" &&
@@ -206,7 +323,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return true;
   };
 
-  // Check if Submit (55) button should be enabled
+  // Check if Set CA Date (139) button should be enabled
   // Flow: CA Start Date & CA End Date must be set (when not in course)
   const isSubmitEnabled = () => {
     // Must have CA dates valid (either from course or provided)
@@ -216,9 +333,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return true;
   };
 
-  // Check if Submit button should be shown
+  // Check if Set CA Date button should be shown
   const shouldShowSubmitButton = () => {
-    // Show Submit button only when CA marks don't exist
+    // Show Set CA Date button only when CA marks don't exist and role is 9
     return !allCAmarksExist && currentRoleId == 9;
   };
 
@@ -267,7 +384,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return true;
   };
 
-  // Get Submit validation message
+  // Get Set CA Date validation message
   const getSubmitValidationMessage = () => {
     if (!areCADatesValid()) {
       if (!caStartDate || !caEndDate) {
@@ -580,8 +697,13 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         initialTheory[trainee.id] = trainee.theory_assessment || "";
         initialPractical[trainee.id] = trainee.practical_assessment || "";
         initialViva[trainee.id] = trainee.viva_assessment || "";
-        initialVivaPractical[trainee.id] =
-          trainee.viva_practical_assessment || "";
+        // For service_id 39, use practical_assessment for the Practical column
+        if (isServiceId39) {
+          initialVivaPractical[trainee.id] = trainee.practical_assessment || "";
+        } else {
+          initialVivaPractical[trainee.id] =
+            trainee.viva_practical_assessment || "";
+        }
         initialRemarks[trainee.id] = trainee.remarks || "";
       });
 
@@ -623,6 +745,50 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     );
 
     setAllCAmarksExist(allHaveCA);
+  };
+
+  // Handler for deleting a trainee
+  const handleDeleteTrainee = async () => {
+    if (!traineeToDelete) return;
+
+    setActionLoading(true);
+    try {
+      const payload = {
+        traineeId: parseInt(traineeToDelete.id),
+        statusId: 140, // deleted statusId
+        remarks: `Trainee ${traineeToDelete.applicant_name} removed from selected list`,
+        updatedBy: actionId,
+      };
+
+      const response =
+        await CourseEnrollmentService.removeTraineeFromSelectedProgramme(
+          payload,
+          access_token,
+        );
+
+      if (response.status === 200 || response.status === 201) {
+        toast.success(
+          `Trainee ${traineeToDelete.applicant_name} removed successfully!`,
+        );
+        closeDeleteTraineeDialog();
+        await fetchData(); // Refresh the data
+      }
+    } catch (error) {
+      console.error("Error removing trainee:", error);
+      toast.error(error.response?.data?.message || "Failed to remove trainee");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openDeleteTraineeDialog = (trainee) => {
+    setTraineeToDelete(trainee);
+    setDeleteTraineeDialogOpen(true);
+  };
+
+  const closeDeleteTraineeDialog = () => {
+    setDeleteTraineeDialogOpen(false);
+    setTraineeToDelete(null);
   };
 
   // Assessor handlers
@@ -691,36 +857,72 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     setAssessorToDelete(null);
   };
 
-  // Handle theory assessment change
+  // Handle theory assessment change with validation
   const handleTheoryAssessmentChange = (traineeId, value) => {
-    setTraineeTheoryAssessments((prev) => ({
-      ...prev,
-      [traineeId]: value,
-    }));
+    if (isDiplomaCertificationLevel()) {
+      if (validateTheoryInput(value)) {
+        setTraineeTheoryAssessments((prev) => ({
+          ...prev,
+          [traineeId]: value,
+        }));
+      }
+    } else {
+      setTraineeTheoryAssessments((prev) => ({
+        ...prev,
+        [traineeId]: value,
+      }));
+    }
   };
 
-  // Handle practical assessment change
+  // Handle practical assessment change with validation
   const handlePracticalAssessmentChange = (traineeId, value) => {
-    setTraineePracticalAssessments((prev) => ({
-      ...prev,
-      [traineeId]: value,
-    }));
+    if (isDiplomaCertificationLevel()) {
+      if (validatePracticalInput(value)) {
+        setTraineePracticalAssessments((prev) => ({
+          ...prev,
+          [traineeId]: value,
+        }));
+      }
+    } else {
+      setTraineePracticalAssessments((prev) => ({
+        ...prev,
+        [traineeId]: value,
+      }));
+    }
   };
 
-  // Handle viva assessment change for service_id 39
+  // Handle viva assessment change for service_id 39 with validation
   const handleVivaAssessmentChange = (traineeId, value) => {
-    setTraineeVivaAssessments((prev) => ({
-      ...prev,
-      [traineeId]: value,
-    }));
+    if (isServiceId39 && isDiplomaCertificationLevel()) {
+      if (validateVivaInput(value)) {
+        setTraineeVivaAssessments((prev) => ({
+          ...prev,
+          [traineeId]: value,
+        }));
+      }
+    } else {
+      setTraineeVivaAssessments((prev) => ({
+        ...prev,
+        [traineeId]: value,
+      }));
+    }
   };
 
-  // Handle viva practical assessment change for service_id 39
+  // Handle viva practical assessment change for service_id 39 with validation
   const handleVivaPracticalAssessmentChange = (traineeId, value) => {
-    setTraineeVivaPracticalAssessments((prev) => ({
-      ...prev,
-      [traineeId]: value,
-    }));
+    if (isServiceId39 && isDiplomaCertificationLevel()) {
+      if (validateVivaPracticalInput(value)) {
+        setTraineeVivaPracticalAssessments((prev) => ({
+          ...prev,
+          [traineeId]: value,
+        }));
+      }
+    } else {
+      setTraineeVivaPracticalAssessments((prev) => ({
+        ...prev,
+        [traineeId]: value,
+      }));
+    }
   };
 
   // Handle remarks change
@@ -805,7 +1007,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     const statusName = getStatusName(statusId).toLowerCase();
     if (statusName === "selected" || statusName === "approved") {
       return { bgcolor: "#4caf50", color: "white" };
-    } else if (statusName === "pending" || statusName === "submitted") {
+    } else if (statusName === "pending" || statusName === "Set CA Date") {
       return { bgcolor: "#ff9800", color: "white" };
     } else if (statusName === "rejected") {
       return { bgcolor: "#f44336", color: "white" };
@@ -823,10 +1025,77 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   };
 
   const handleAction = async () => {
-    // StatusId 55 = Submit, 57 = Approve, 58 = Reject, 59 = Endorse
+    // StatusId 139 = Set CA Date, 57 = Approve, 58 = Reject, 59 = Endorse
     if (currentAction === 58 && !remarks.trim()) {
       setRemarksError("Remarks are required for rejection");
       return;
+    }
+
+    // Validate assessment values before submitting
+    if (isDiplomaCertificationLevel() && hasInternalAssessmentForCourse) {
+      if (isServiceId39) {
+        // For service_id 39: Validate Viva Assessment (0-20) and Practical Assessment (0-60)
+        const invalidViva = selectedTrainees.some((trainee) => {
+          const value = traineeVivaAssessments[trainee.id];
+          if (value && value !== "") {
+            const numValue = Number(value);
+            return numValue < 0 || numValue > 20;
+          }
+          return false;
+        });
+
+        if (invalidViva) {
+          toast.error("Viva Assessment must be between 0 and 20 for diploma");
+          return;
+        }
+
+        const invalidVivaPractical = selectedTrainees.some((trainee) => {
+          const value = traineeVivaPracticalAssessments[trainee.id];
+          if (value && value !== "") {
+            const numValue = Number(value);
+            return numValue < 0 || numValue > 60;
+          }
+          return false;
+        });
+
+        if (invalidVivaPractical) {
+          toast.error(
+            "Practical Assessment must be between 0 and 60 for diploma",
+          );
+          return;
+        }
+      } else {
+        // For other services: Validate Theory Assessment (0-20) and Practical Assessment (0-60)
+        const invalidTheory = selectedTrainees.some((trainee) => {
+          const value = traineeTheoryAssessments[trainee.id];
+          if (value && value !== "") {
+            const numValue = Number(value);
+            return numValue < 0 || numValue > 20;
+          }
+          return false;
+        });
+
+        if (invalidTheory) {
+          toast.error("Theory Assessment must be between 0 and 20 for diploma");
+          return;
+        }
+
+        const invalidPractical = selectedTrainees.some((trainee) => {
+          const value = traineePracticalAssessments[trainee.id];
+          if (value && value !== "") {
+            const numValue = Number(value);
+            return numValue < 0 || numValue > 60;
+          }
+          return false;
+        });
+
+        if (invalidPractical) {
+          toast.error(
+            "Practical Assessment must be between 0 and 60 for diploma",
+          );
+          return;
+        }
+      }
     }
 
     setActionLoading(true);
@@ -855,7 +1124,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       }
 
       // Prepare traineeMarks list (TraineeMarksdto format) for trainees with internal_assessment
-      if (hasInternalAssessmentForCourse) {
+      if (hasInternalAssessmentForCourse && !isServiceId39) {
         const traineeMarksList = selectedTrainees
           .filter(
             (trainee) =>
@@ -864,18 +1133,21 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           )
           .map((trainee) => ({
             traineeId: parseInt(trainee.id),
-            theoryAssessment:
-              isNumericCertificationLevel() && !isServiceId39
-                ? traineeTheoryAssessments[trainee.id]
-                  ? parseInt(traineeTheoryAssessments[trainee.id])
-                  : null
-                : traineeTheoryAssessments[trainee.id] || null,
-            practicalAssessment:
-              isNumericCertificationLevel() && !isServiceId39
-                ? traineePracticalAssessments[trainee.id]
-                  ? parseInt(traineePracticalAssessments[trainee.id])
-                  : null
-                : traineePracticalAssessments[trainee.id] || null,
+            internalAssessment: isNumericCertificationLevel()
+              ? trainee.internal_assessment
+                ? parseInt(trainee.internal_assessment)
+                : null
+              : trainee.internal_assessment || null,
+            theoryAssessment: isNumericCertificationLevel()
+              ? traineeTheoryAssessments[trainee.id]
+                ? parseInt(traineeTheoryAssessments[trainee.id])
+                : null
+              : traineeTheoryAssessments[trainee.id] || null,
+            practicalAssessment: isNumericCertificationLevel()
+              ? traineePracticalAssessments[trainee.id]
+                ? parseInt(traineePracticalAssessments[trainee.id])
+                : null
+              : traineePracticalAssessments[trainee.id] || null,
             remarks: traineeRemarks[trainee.id] || null,
           }));
 
@@ -894,12 +1166,21 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           )
           .map((trainee) => ({
             traineeId: parseInt(trainee.id),
-            vivaAssessment: traineeVivaAssessments[trainee.id]
-              ? parseInt(traineeVivaAssessments[trainee.id])
-              : null,
-            practicalAssessment: traineeVivaPracticalAssessments[trainee.id]
-              ? parseInt(traineeVivaPracticalAssessments[trainee.id])
-              : null,
+            internalAssessment: isNumericCertificationLevel()
+              ? trainee.internal_assessment
+                ? parseInt(trainee.internal_assessment)
+                : null
+              : trainee.internal_assessment || null,
+            vivaAssessment: isNumericCertificationLevel()
+              ? traineeVivaAssessments[trainee.id]
+                ? parseInt(traineeVivaAssessments[trainee.id])
+                : null
+              : traineeVivaAssessments[trainee.id] || null,
+            practicalAssessment: isNumericCertificationLevel()
+              ? traineeVivaPracticalAssessments[trainee.id]
+                ? parseInt(traineeVivaPracticalAssessments[trainee.id])
+                : null
+              : traineeVivaPracticalAssessments[trainee.id] || null,
             remarks: traineeRemarks[trainee.id] || null,
           }));
 
@@ -925,8 +1206,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
       if (response.status === 200 || response.status === 201) {
         const actionName =
-          currentAction === 55
-            ? "submitted"
+          currentAction === 139
+            ? "Set CA Date"
             : currentAction === 57
               ? "approved"
               : currentAction === 59
@@ -963,143 +1244,70 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const isActionDisabled = () => {
     const statusId = currentStatusId;
-    // StatusId 55 = Submitted, 57 = Approved, 58 = Rejected, 59 = Endorsed
+    // StatusId 139 = Submitted, 57 = Approved, 58 = Rejected, 59 = Endorsed
     return (
-      statusId === 55 || statusId === 57 || statusId === 58 || statusId === 59
+      statusId === 139 || statusId === 57 || statusId === 58 || statusId === 59
     );
   };
 
   const getDialogTitle = () => {
-    if (currentAction === 55) return "Submit Course Selection";
+    if (currentAction === 139) return "Set CA Date Course Selection";
     if (currentAction === 57) return "Approve Course Selection";
     if (currentAction === 59) return "Endorse Course Selection";
     return "Reject Course Selection";
   };
 
+  // FIXED: Simplified the dialog content to reduce duplication
   const getDialogContent = () => {
-    if (currentAction === 55) {
-      return (
-        <DialogContentText>
-          Are you sure you want to submit this course selection?
-          <br />
-          <strong>Application No: {applicationNo}</strong>
-          <br />
-          <strong>Course Name: {courseDetails?.course_name}</strong>
-          <br />
-          <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-          {!hasCADatesInCourse && caStartDate && caEndDate && (
-            <>
-              <br />
-              <strong>CA Start Date: {formatDate(caStartDate)}</strong>
-              <br />
-              <strong>CA End Date: {formatDate(caEndDate)}</strong>
-            </>
-          )}
-          {hasInternalAssessmentForCourse && (
-            <>
-              <br />
-              <br />
-              <strong>
-                Note: CA Mark/Competency values will be saved with this
-                submission.
-              </strong>
-            </>
-          )}
-        </DialogContentText>
-      );
+    // Common content for non-reject actions
+    const getCommonContent = (actionText) => (
+      <DialogContentText>
+        Are you sure you want to {actionText} this course selection?
+        <br />
+        <strong>Application No: {applicationNo}</strong>
+        <br />
+        <strong>Course Name: {courseDetails?.course_name}</strong>
+        <br />
+        <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
+        {paymentStatus && paymentStatus.paymentAdviceNo && (
+          <>
+            <br />
+            <strong>Payment Advice No: {paymentStatus.paymentAdviceNo}</strong>
+          </>
+        )}
+        {!hasCADatesInCourse && caStartDate && caEndDate && (
+          <>
+            <br />
+            <strong>CA Start Date: {formatDate(caStartDate)}</strong>
+            <br />
+            <strong>CA End Date: {formatDate(caEndDate)}</strong>
+          </>
+        )}
+        {hasInternalAssessmentForCourse && (
+          <>
+            <br />
+            <br />
+            <strong>
+              Note:{" "}
+              {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
+              {actionText === "Set CA Date"
+                ? "values will be saved"
+                : "assessments will be saved"}{" "}
+              with this {actionText}.
+            </strong>
+          </>
+        )}
+      </DialogContentText>
+    );
+
+    if (currentAction === 139) {
+      return getCommonContent("Set CA Date");
     } else if (currentAction === 57) {
-      return (
-        <DialogContentText>
-          Are you sure you want to approve this course selection?
-          <br />
-          <strong>Application No: {applicationNo}</strong>
-          <br />
-          <strong>Course Name: {courseDetails?.course_name}</strong>
-          <br />
-          <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-          {paymentStatus && paymentStatus.paymentAdviceNo && (
-            <>
-              <br />
-              <strong>
-                Payment Advice No: {paymentStatus.paymentAdviceNo}
-              </strong>
-            </>
-          )}
-          {!hasCADatesInCourse && caStartDate && caEndDate && (
-            <>
-              <br />
-              <strong>CA Start Date: {formatDate(caStartDate)}</strong>
-              <br />
-              <strong>CA End Date: {formatDate(caEndDate)}</strong>
-            </>
-          )}
-          {hasInternalAssessmentForCourse && (
-            <>
-              <br />
-              <br />
-              <strong>
-                Note:{" "}
-                {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
-                assessments will be saved with this approval.
-              </strong>
-            </>
-          )}
-          {assignedAssessors.length > 0 && (
-            <>
-              <br />
-              <br />
-              <strong>Assigned Assessors: {assignedAssessors.length}</strong>
-            </>
-          )}
-        </DialogContentText>
-      );
+      return getCommonContent("approve");
     } else if (currentAction === 59) {
-      return (
-        <DialogContentText>
-          Are you sure you want to endorse this course selection?
-          <br />
-          <strong>Application No: {applicationNo}</strong>
-          <br />
-          <strong>Course Name: {courseDetails?.course_name}</strong>
-          <br />
-          <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-          {paymentStatus && paymentStatus.paymentAdviceNo && (
-            <>
-              <br />
-              <strong>
-                Payment Advice No: {paymentStatus.paymentAdviceNo}
-              </strong>
-            </>
-          )}
-          {!hasCADatesInCourse && caStartDate && caEndDate && (
-            <>
-              <br />
-              <strong>CA Start Date: {formatDate(caStartDate)}</strong>
-              <br />
-              <strong>CA End Date: {formatDate(caEndDate)}</strong>
-            </>
-          )}
-          {hasInternalAssessmentForCourse && (
-            <>
-              <br />
-              <br />
-              <strong>
-                Note:{" "}
-                {isServiceId39 ? "Viva and Practical" : "Theory and Practical"}{" "}
-                assessments will be saved with this endorsement.
-              </strong>
-            </>
-          )}
-          {assignedAssessors.length > 0 && (
-            <>
-              <br />
-              <br />
-              <strong>Assigned Assessors: {assignedAssessors.length}</strong>
-            </>
-          )}
-        </DialogContentText>
-      );
+      return getCommonContent("endorse");
     } else {
+      // Reject action - requires remarks
       return (
         <>
           <DialogContentText sx={{ mb: 2 }}>
@@ -1149,7 +1357,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   };
 
   const getConfirmButtonColor = () => {
-    if (currentAction === 55) return "primary";
+    if (currentAction === 139) return "primary";
     if (currentAction === 57) return "success";
     if (currentAction === 59) return "info";
     return "error";
@@ -1157,7 +1365,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const getConfirmButtonText = () => {
     if (actionLoading) return <CircularProgress size={24} />;
-    if (currentAction === 55) return "Confirm Submit";
+    if (currentAction === 139) return "Confirm Set CA Date";
     if (currentAction === 57) return "Confirm Approve";
     if (currentAction === 59) return "Confirm Endorse";
     return "Confirm Reject";
@@ -1209,7 +1417,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   // Calculate total number of columns for the table
   const getTableColSpan = () => {
-    let cols = 7; // #, name, cid, contact, email, qualification, status
+    let cols = 6; // #, name, cid, contact, email, qualification
     if (hasCADatesInCourse) cols++;
     if (hasInternalAssessmentForCourse) {
       if (isServiceId39) {
@@ -1221,6 +1429,10 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       if (isNumericCertificationLevel() && !isServiceId39) {
         cols++; // total column for level 111/112
       }
+    }
+    // Add action column if conditions met
+    if (!isActionDisabled() && currentRoleId == 9) {
+      cols++;
     }
     return cols;
   };
@@ -1380,12 +1592,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         </Card>
       )}
 
-      {/* Course Information Card */}
+      {/* Programme Information Card */}
       {courseDetails && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Course Information
+              Programme Information
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={2}>
@@ -1399,7 +1611,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Course Name:
+                  Programme Name:
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
                   {courseDetails.course_name}
@@ -1763,9 +1975,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   <TableCell>Contact</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Qualification</TableCell>
-                  <TableCell>Status</TableCell>
                   {hasCADatesInCourse && (
-                    <TableCell>CA Mark/Competency</TableCell>
+                    <TableCell>Internal Assessment</TableCell>
                   )}
                   {hasInternalAssessmentForCourse && (
                     <>
@@ -1774,12 +1985,20 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                           ? "Viva Assessment"
                           : "Theory Assessment"}
                       </TableCell>
-                      <TableCell>Practical Assessment</TableCell>
+                      <TableCell>
+                        {isServiceId39
+                          ? "Practical Assessment"
+                          : "Practical Assessment"}
+                      </TableCell>
                       {isNumericCertificationLevel() && !isServiceId39 && (
                         <TableCell>Total</TableCell>
                       )}
                       <TableCell>Remarks</TableCell>
                     </>
+                  )}
+                  {/* Add Action column header */}
+                  {!isActionDisabled() && currentRoleId == 9 && (
+                    <TableCell align="center">Action</TableCell>
                   )}
                 </TableRow>
               </TableHead>
@@ -1816,6 +2035,40 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                         return "";
                       };
 
+                      // Helper function to get competency color
+                      const getCompetencyColor = (value) => {
+                        if (value === "91") return "success";
+                        if (value === "92") return "warning";
+                        if (value === "93") return "error";
+                        return "info";
+                      };
+
+                      // Get the theory assessment value - try state first, then fallback to trainee data
+                      const theoryAssessmentValue =
+                        traineeTheoryAssessments[trainee.id] ||
+                        trainee.theory_assessment ||
+                        "";
+
+                      // Get the practical assessment value - try state first, then fallback to trainee data
+                      const practicalAssessmentValue =
+                        traineePracticalAssessments[trainee.id] ||
+                        trainee.practical_assessment ||
+                        "";
+
+                      // Get the viva assessment value - try state first, then fallback to trainee data
+                      const vivaAssessmentValue =
+                        traineeVivaAssessments[trainee.id] ||
+                        trainee.viva_assessment ||
+                        "";
+
+                      // Get the viva practical assessment value - try state first, then fallback to trainee data
+                      const vivaPracticalAssessmentValue =
+                        traineeVivaPracticalAssessments[trainee.id] ||
+                        (isServiceId39
+                          ? trainee.practical_assessment
+                          : trainee.viva_practical_assessment) ||
+                        "";
+
                       return (
                         <TableRow key={trainee.id} hover>
                           <TableCell>
@@ -1831,13 +2084,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                             {getQualificationName(
                               trainee.academic_qualification_id,
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={getStatusName(trainee.status_id)}
-                              size="small"
-                              sx={getStatusColor(trainee.status_id)}
-                            />
                           </TableCell>
                           {hasCADatesInCourse && (
                             <TableCell>
@@ -1855,7 +2101,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                     ) || "N/A"
                                   }
                                   size="small"
-                                  color="info"
+                                  color={getCompetencyColor(
+                                    trainee.internal_assessment,
+                                  )}
                                 />
                               )}
                             </TableCell>
@@ -1868,28 +2116,34 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                   isNumericCertificationLevel() ? (
                                     isServiceId39 ? (
                                       <Tooltip
-                                        title={getReadOnlyTooltip()}
+                                        title={
+                                          isDiplomaCertificationLevel()
+                                            ? getVivaTooltipMessage()
+                                            : getReadOnlyTooltip()
+                                        }
                                         arrow
                                       >
                                         <TextField
                                           type="number"
                                           size="small"
-                                          value={
-                                            traineeVivaAssessments[
-                                              trainee.id
-                                            ] || ""
-                                          }
-                                          onChange={(e) =>
+                                          value={vivaAssessmentValue}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
                                             handleVivaAssessmentChange(
                                               trainee.id,
-                                              e.target.value,
-                                            )
-                                          }
+                                              value,
+                                            );
+                                          }}
                                           fullWidth
                                           slotProps={{
                                             input: {
                                               readOnly: readOnly,
-                                              inputProps: { min: 0, max: 100 },
+                                              inputProps: {
+                                                min: 0,
+                                                max: isDiplomaCertificationLevel()
+                                                  ? 20
+                                                  : 100,
+                                              },
                                             },
                                           }}
                                           sx={{
@@ -1902,28 +2156,34 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                       </Tooltip>
                                     ) : (
                                       <Tooltip
-                                        title={getReadOnlyTooltip()}
+                                        title={
+                                          isDiplomaCertificationLevel()
+                                            ? getTheoryTooltipMessage()
+                                            : getReadOnlyTooltip()
+                                        }
                                         arrow
                                       >
                                         <TextField
                                           type="number"
                                           size="small"
-                                          value={
-                                            traineeTheoryAssessments[
-                                              trainee.id
-                                            ] || ""
-                                          }
-                                          onChange={(e) =>
+                                          value={theoryAssessmentValue}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
                                             handleTheoryAssessmentChange(
                                               trainee.id,
-                                              e.target.value,
-                                            )
-                                          }
+                                              value,
+                                            );
+                                          }}
                                           fullWidth
                                           slotProps={{
                                             input: {
                                               readOnly: readOnly,
-                                              inputProps: { min: 0, max: 100 },
+                                              inputProps: {
+                                                min: 0,
+                                                max: isDiplomaCertificationLevel()
+                                                  ? 20
+                                                  : 100,
+                                              },
                                             },
                                           }}
                                           sx={{
@@ -1945,12 +2205,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                         <Select
                                           value={
                                             isServiceId39
-                                              ? traineeVivaAssessments[
-                                                  trainee.id
-                                                ] || ""
-                                              : traineeTheoryAssessments[
-                                                  trainee.id
-                                                ] || ""
+                                              ? vivaAssessmentValue
+                                              : theoryAssessmentValue
                                           }
                                           onChange={(e) => {
                                             if (isServiceId39) {
@@ -2007,28 +2263,34 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                   isNumericCertificationLevel() ? (
                                     isServiceId39 ? (
                                       <Tooltip
-                                        title={getReadOnlyTooltip()}
+                                        title={
+                                          isDiplomaCertificationLevel()
+                                            ? getVivaPracticalTooltipMessage()
+                                            : getReadOnlyTooltip()
+                                        }
                                         arrow
                                       >
                                         <TextField
                                           type="number"
                                           size="small"
-                                          value={
-                                            traineeVivaPracticalAssessments[
-                                              trainee.id
-                                            ] || ""
-                                          }
-                                          onChange={(e) =>
+                                          value={vivaPracticalAssessmentValue}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
                                             handleVivaPracticalAssessmentChange(
                                               trainee.id,
-                                              e.target.value,
-                                            )
-                                          }
+                                              value,
+                                            );
+                                          }}
                                           fullWidth
                                           slotProps={{
                                             input: {
                                               readOnly: readOnly,
-                                              inputProps: { min: 0, max: 100 },
+                                              inputProps: {
+                                                min: 0,
+                                                max: isDiplomaCertificationLevel()
+                                                  ? 60
+                                                  : 100,
+                                              },
                                             },
                                           }}
                                           sx={{
@@ -2041,28 +2303,34 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                       </Tooltip>
                                     ) : (
                                       <Tooltip
-                                        title={getReadOnlyTooltip()}
+                                        title={
+                                          isDiplomaCertificationLevel()
+                                            ? getPracticalTooltipMessage()
+                                            : getReadOnlyTooltip()
+                                        }
                                         arrow
                                       >
                                         <TextField
                                           type="number"
                                           size="small"
-                                          value={
-                                            traineePracticalAssessments[
-                                              trainee.id
-                                            ] || ""
-                                          }
-                                          onChange={(e) =>
+                                          value={practicalAssessmentValue}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
                                             handlePracticalAssessmentChange(
                                               trainee.id,
-                                              e.target.value,
-                                            )
-                                          }
+                                              value,
+                                            );
+                                          }}
                                           fullWidth
                                           slotProps={{
                                             input: {
                                               readOnly: readOnly,
-                                              inputProps: { min: 0, max: 100 },
+                                              inputProps: {
+                                                min: 0,
+                                                max: isDiplomaCertificationLevel()
+                                                  ? 60
+                                                  : 100,
+                                              },
                                             },
                                           }}
                                           sx={{
@@ -2084,12 +2352,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                         <Select
                                           value={
                                             isServiceId39
-                                              ? traineeVivaPracticalAssessments[
-                                                  trainee.id
-                                                ] || ""
-                                              : traineePracticalAssessments[
-                                                  trainee.id
-                                                ] || ""
+                                              ? vivaPracticalAssessmentValue
+                                              : practicalAssessmentValue
                                           }
                                           onChange={(e) => {
                                             if (isServiceId39) {
@@ -2200,6 +2464,44 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                               </TableCell>
                             </>
                           )}
+                          {/* Add Action column with Delete icon */}
+                          {!isActionDisabled() && currentRoleId == 9 && (
+                            <TableCell align="center">
+                              <Tooltip
+                                title={
+                                  trainee.internal_assessment === 0 ||
+                                  trainee.internal_assessment === 93
+                                    ? "Remove this trainee from the selected list"
+                                    : "Trainee can only be deleted when Internal Assessment is 0 or 93"
+                                }
+                                arrow
+                              >
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() =>
+                                      openDeleteTraineeDialog(trainee)
+                                    }
+                                    disabled={
+                                      !(
+                                        trainee.internal_assessment === 0 ||
+                                        trainee.internal_assessment === 93
+                                      )
+                                    }
+                                    sx={{
+                                      "&:hover": {
+                                        backgroundColor:
+                                          "rgba(211, 47, 47, 0.04)",
+                                      },
+                                    }}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </TableCell>
+                          )}
                         </TableRow>
                       );
                     })
@@ -2307,13 +2609,13 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           }}
         >
           <Box sx={{ display: "flex", gap: 2 }}>
-            {/* Submit Button - Only show when CA marks don't exist (Role 9) */}
+            {/* Set CA Date Button - Only show when CA marks don't exist (Role 9) */}
             {shouldShowSubmitButton() && (
               <Tooltip
                 title={
                   !isSubmitEnabled()
                     ? getSubmitValidationMessage()
-                    : "Submit this course selection"
+                    : "Set CA Date this course selection"
                 }
                 arrow
               >
@@ -2322,7 +2624,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                     variant="contained"
                     color="primary"
                     startIcon={<CheckCircleIcon />}
-                    onClick={() => openDialog(55)}
+                    onClick={() => openDialog(139)}
                     disabled={
                       isActionDisabled() || actionLoading || !isSubmitEnabled()
                     }
@@ -2333,7 +2635,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                       textTransform: "none",
                     }}
                   >
-                    Submit
+                    Set CA Date
                   </Button>
                 </span>
               </Tooltip>
@@ -2515,6 +2817,56 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             startIcon={<DeleteIcon />}
           >
             Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Trainee Confirmation Dialog */}
+      <Dialog
+        open={deleteTraineeDialogOpen}
+        onClose={closeDeleteTraineeDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Confirm Removal</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {traineeToDelete && (
+              <>
+                Are you sure you want to remove{" "}
+                <strong>{traineeToDelete?.applicant_name}</strong> from the
+                selected trainees list?
+                <br />
+                <br />
+                <strong>CID/Reference:</strong>{" "}
+                {traineeToDelete?.cid_no || traineeToDelete?.reference_no}
+                <br />
+                <strong>Email:</strong> {traineeToDelete?.email_id}
+                <br />
+                <strong>Contact:</strong> {traineeToDelete?.mobile_no}
+              </>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            color="primary"
+            variant="outlined"
+            size="small"
+            onClick={closeDeleteTraineeDialog}
+            disabled={actionLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteTrainee}
+            color="error"
+            variant="contained"
+            size="small"
+            startIcon={<DeleteIcon />}
+            disabled={actionLoading}
+          >
+            {actionLoading ? <CircularProgress size={20} /> : "Remove"}
           </Button>
         </DialogActions>
       </Dialog>

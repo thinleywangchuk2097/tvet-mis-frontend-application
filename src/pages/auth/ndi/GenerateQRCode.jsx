@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import PropTypes from "prop-types";
 import {
   Card,
   CardContent,
@@ -51,10 +52,20 @@ const Loader = () => (
   </Box>
 );
 
+// ==================== PROPTYPES FOR LOADER ====================
+Loader.propTypes = {};
+
+// ==================== ERROR MESSAGE COMPONENT ====================
 const ErrorMessage = ({ message }) => (
   <Typography color="error">{message}</Typography>
 );
 
+// ==================== PROPTYPES FOR ERROR MESSAGE ====================
+ErrorMessage.propTypes = {
+  message: PropTypes.string.isRequired,
+};
+
+// ==================== QR CODE DISPLAY COMPONENT ====================
 const QRCodeDisplay = ({ value }) => (
   <Box
     sx={{
@@ -102,6 +113,11 @@ const QRCodeDisplay = ({ value }) => (
     </Box>
   </Box>
 );
+
+// ==================== PROPTYPES FOR QR CODE DISPLAY ====================
+QRCodeDisplay.propTypes = {
+  value: PropTypes.string,
+};
 
 const GenerateQRCode = () => {
   const [qrCodeUrl, setQrCodeUrl] = useState(null);
@@ -340,8 +356,9 @@ const GenerateQRCode = () => {
                   color: "#000000",
                 }}
               >
-                Login with <span style={{ color: "#5AC994" }}>Bhutan NDI</span>{" "}
-                Wallet
+                {"Login with "}
+                <span style={{ color: "#5AC994" }}>Bhutan NDI</span>
+                {" Wallet"}
               </Typography>
               <Button
                 variant="contained"
@@ -383,8 +400,9 @@ const GenerateQRCode = () => {
                 color: "#000000",
               }}
             >
-              Scan with <span style={{ color: "#5AC994" }}>Bhutan NDI </span>
-              Wallet
+              {"Scan with "}
+              <span style={{ color: "#5AC994" }}>Bhutan NDI</span>
+              {" Wallet"}
             </Typography>
           )}
 
@@ -505,7 +523,7 @@ const GenerateQRCode = () => {
                 fontSize: "0.9rem",
               }}
             >
-              Don&apos;t have the Bhutan NDI Wallet?
+              Don&apos;t have the Bhutan NDI Wallet?{" "}
               <span
                 style={{
                   color: "#5AC994",
@@ -513,7 +531,6 @@ const GenerateQRCode = () => {
                   display: isMobile ? "block" : "inline",
                 }}
               >
-                {" "}
                 Download Now!
               </span>
             </Typography>
@@ -628,5 +645,8 @@ const GenerateQRCode = () => {
     </Box>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+GenerateQRCode.propTypes = {};
 
 export default GenerateQRCode;

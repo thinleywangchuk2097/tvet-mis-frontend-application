@@ -322,12 +322,17 @@ const RoleIndex = () => {
   };
 
   const handleDeleteConfirmed = async () => {
+    // Store the role ID before updating state
+    const roleIdToDelete = roleToDelete?.id;
+    const currentRoles = [...roles]; // Copy current roles for rollback
+
     try {
-      const updatedRoles = roles.filter((role) => role.id !== roleToDelete.id);
+      // Optimistically update UI
+      const updatedRoles = roles.filter((role) => role.id !== roleIdToDelete);
       setRoles(updatedRoles);
       setFilteredRoles(updatedRoles);
 
-      const payload = { id: roleToDelete.id };
+      const payload = { id: roleIdToDelete };
       const response = await UserRoleManagementService.deleteRole(
         payload,
         access_token,
@@ -337,8 +342,9 @@ const RoleIndex = () => {
       toast.success(response.data.message || "Role deleted successfully");
     } catch (error) {
       console.error("Error deleting role:", error);
-      setRoles(roles);
-      setFilteredRoles(roles);
+      // Rollback using the stored copy, not the state variable
+      setRoles(currentRoles);
+      setFilteredRoles(currentRoles);
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -372,7 +378,6 @@ const RoleIndex = () => {
     return `Privilege ${id}`;
   };
 
-  // FIXED: Added comparator function to sort()
   const hasChanges = () => {
     if (!editMode) {
       return (
@@ -384,7 +389,6 @@ const RoleIndex = () => {
       const nameChanged = formData.roleName !== currentRole.roleName;
       const descChanged = formData.description !== currentRole.description;
 
-      // Fixed: Added compare function (a, b) => a - b for numeric sorting
       const currentPrivileges = [...formData.assignedPrivilegeId]
         .sort((a, b) => a - b)
         .join(",");

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -35,6 +35,7 @@ import CourseEnrollmentService from "../../../api/services/internal/course/Cours
 import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
+import NcsService from "../../../api/services/internal/ncs/NcsService";
 
 // Helper component for required field indicator
 const RequiredStar = () => (
@@ -57,25 +58,26 @@ const fileToBase64 = (file) =>
     reader.onerror = reject;
   });
 
-const ReAssessment = () => {
+const ReAssessmentIndex = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [openDialog, setOpenDialog] = useState(false);
-  const [courses, setCourses] = useState([]);
+  const [programmes, setProgrammes] = useState([]);
   const [instituteDetails, setInstituteDetails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [certificationLevels, setCertificationLevels] = useState([]);
   const [fundingSources, setFundingSources] = useState([]);
   const [dzongkhags, setDzongkhags] = useState([]);
-  const [approvedCourses, setApprovedCourses] = useState([]);
+  const [approvedProgrammes, setApprovedProgrammes] = useState([]);
   const [statusList, setStatusList] = useState([]);
   const [reassessmentTypes, setReassessmentTypes] = useState([]);
   const [currentReassessmentType, setCurrentReassessmentType] = useState("");
   const [filterReassessmentType, setFilterReassessmentType] = useState("");
-  const [rplCourses, setRplCourses] = useState([]);
-  const [accreditedCourses, setAccreditedCourses] = useState([]);
+  const [filterCertificationLevel, setFilterCertificationLevel] = useState("");
+  const [ncsProgrammes, setNcsProgrammes] = useState([]);
+  const [accreditedProgramme, setAccreditedProgrammes] = useState([]);
 
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -88,7 +90,7 @@ const ReAssessment = () => {
     fetchDzongkhags();
     fetchStatusList();
     fetchReAssessmentServiceName();
-    fetchAllCoursesData();
+    fetchAllNcsProgrammeData();
   }, []);
 
   const fetchInstituteDetails = async () => {
@@ -140,40 +142,44 @@ const ReAssessment = () => {
     }
   };
 
-  const fetchAllCoursesData = async () => {
+  const fetchAllNcsProgrammeData = async () => {
     try {
-      const rplResponse = await CommonService.getAllOccupations();
-      const mappedRplCourses = rplResponse.data.map((occupation) => ({
-        id: occupation.id,
-        name: occupation.occupationName,
+      //const rplResponse = await CommonService.getAllOccupations();
+      const ncsResponse = await NcsService.getAllNcsProgrammes(access_token);
+      console.log("NCS Programmes response:", ncsResponse.data);
+      const mappedNcsProgramme = ncsResponse.data.map((ncs) => ({
+        id: ncs.id,
+        name: ncs.programme_title,
         serviceId: "41",
-        originalData: occupation,
+        originalData: ncs,
       }));
-      setRplCourses(mappedRplCourses);
-      console.log("RPL Courses loaded:", mappedRplCourses);
+      setNcsProgrammes(mappedNcsProgramme);
+      console.log("NCS Programmes loaded:", mappedNcsProgramme);
 
       const accreditedResponse =
         await ApplyAccreditedCourseService.getAccreditedApprovedCourseByUserId(
           registration_no,
           access_token,
         );
-      const mappedAccreditedCourses = accreditedResponse.data.map((course) => ({
-        id: course.id,
-        name: course.course_name,
-        serviceId: "42",
-        originalData: course,
-      }));
-      setAccreditedCourses(mappedAccreditedCourses);
-      console.log("Accredited Courses loaded:", mappedAccreditedCourses);
+      const mappedAccreditedCourses = accreditedResponse.data.map(
+        (programmeData) => ({
+          id: programmeData.id,
+          name: programmeData.programme_title,
+          serviceId: "42",
+          originalData: programmeData,
+        }),
+      );
+      setAccreditedProgrammes(mappedAccreditedCourses);
+      console.log("Accredited Programmes loaded:", mappedAccreditedCourses);
     } catch (error) {
-      console.error("Error fetching all courses data:", error);
-      toast.error("Failed to load courses data");
+      console.error("Error fetching all programmes data:", error);
+      toast.error("Failed to load programmes data");
     }
   };
 
   const fetchEnrolledCourses = async (reassessmentTypeId) => {
     if (!reassessmentTypeId) {
-      setCourses([]);
+      setProgrammes([]);
       return;
     }
 
@@ -184,17 +190,18 @@ const ReAssessment = () => {
           reassessmentTypeId,
           access_token,
         );
-      setCourses(response.data);
+      console.log("Fetched enrolled programmes", response.data);
+      setProgrammes(response.data);
       console.log(
-        "Enrolled Courses for type",
+        "Enrolled Programmes for type",
         reassessmentTypeId,
         ":",
         response.data,
       );
     } catch (error) {
-      console.error("Error fetching courses:", error);
-      setCourses([]);
-      toast.error("Failed to fetch courses");
+      console.error("Error fetching programmes:", error);
+      setProgrammes([]);
+      toast.error("Failed to fetch programmes");
     }
   };
 
@@ -211,7 +218,7 @@ const ReAssessment = () => {
   const fetchApprovedCourses = async (reassessmentTypeId) => {
     try {
       if (!reassessmentTypeId) {
-        setApprovedCourses([]);
+        setApprovedProgrammes([]);
         setCurrentReassessmentType("");
         return;
       }
@@ -219,18 +226,18 @@ const ReAssessment = () => {
       setCurrentReassessmentType(reassessmentTypeId);
 
       if (reassessmentTypeId === "42" || reassessmentTypeId === 42) {
-        setApprovedCourses(accreditedCourses);
-        console.log("Using Accredited Courses:", accreditedCourses);
+        setApprovedProgrammes(accreditedProgramme);
+        console.log("Using Accredited Programmes:", accreditedProgramme);
       } else if (reassessmentTypeId === "41" || reassessmentTypeId === 41) {
-        setApprovedCourses(rplCourses);
-        console.log("Using RPL Courses:", rplCourses);
+        setApprovedProgrammes(ncsProgrammes);
+        console.log("Using NCS Programmes:", ncsProgrammes);
       } else {
-        setApprovedCourses([]);
+        setApprovedProgrammes([]);
       }
     } catch (error) {
-      console.error("Error fetching approved courses:", error);
-      setApprovedCourses([]);
-      toast.error("Failed to fetch courses");
+      console.error("Error fetching approved programmes:", error);
+      setApprovedProgrammes([]);
+      toast.error("Failed to fetch programmes");
     }
   };
 
@@ -242,10 +249,9 @@ const ReAssessment = () => {
     setPage(0);
   };
 
-  const handleViewDetails = (applicationNo, courseId) => {
-    // Navigate with both applicationNo and courseId as route parameters
+  const handleViewDetails = (applicationNo, programmeId) => {
     navigate(
-      `/announcement/reassessment-trainee-selection/${applicationNo}/${courseId}`,
+      `/announcement/reassessment-trainee-selection/${applicationNo}/${programmeId}`,
     );
   };
 
@@ -255,44 +261,53 @@ const ReAssessment = () => {
     return type ? type.service_name : "N/A";
   };
 
-  const getCourseName = (courseId, serviceId) => {
-    if (!courseId) return "N/A";
+  const getProgrammeName = (programmeId, serviceId) => {
+    if (!programmeId) return "N/A";
 
-    let course = null;
+    let programme = null;
 
     if (serviceId === "41" || serviceId === 41) {
-      course = rplCourses.find((c) => String(c.id) === String(courseId));
+      programme = ncsProgrammes.find(
+        (c) => String(c.id) === String(programmeId),
+      );
     } else if (serviceId === "42" || serviceId === 42) {
-      course = accreditedCourses.find((c) => String(c.id) === String(courseId));
+      programme = accreditedProgramme.find(
+        (c) => String(c.id) === String(programmeId),
+      );
     } else {
-      course = approvedCourses.find((c) => String(c.id) === String(courseId));
-      if (!course) {
-        const originalCourse = courses.find(
-          (c) => String(c.course_id) === String(courseId),
-        );
-        return originalCourse ? originalCourse.course_name : courseId;
-      }
+      programme = approvedProgrammes.find(
+        (c) => String(c.id) === String(programmeId),
+      );
     }
 
-    return course ? course.name : courseId;
+    return programme ? programme.name : programmeId;
   };
 
-  const filteredCourses = courses.filter((course) => {
-    const courseName = getCourseName(course.course_id, course.service_id);
-
+  // UPDATED: Added certification level filter to the filtering logic
+  const filteredProgrammes = programmes.filter((programme) => {
+    const programmeName = getProgrammeName(
+      programme.programme_id,
+      programme.service_id,
+    );
     const matchesSearch =
-      courseName?.toLowerCase().includes(search.toLowerCase()) ||
-      course.application_no?.toLowerCase().includes(search.toLowerCase());
+      programmeName?.toLowerCase().includes(search.toLowerCase()) ||
+      programme.application_no?.toLowerCase().includes(search.toLowerCase());
 
-    return matchesSearch;
+    const matchesCertificationLevel =
+      !filterCertificationLevel ||
+      String(programme.certification_level_id) ===
+        String(filterCertificationLevel);
+
+    return matchesSearch && matchesCertificationLevel;
   });
+  console.log("Filtered courses:", filteredProgrammes);
 
   const initialValues = {
     instituteId: institute.institute_id || "",
     reassessmentTypeId: "",
-    courseId: "",
-    feesPerTrainee: "", // Changed from courseFee
-    enrollmentCapacity: "", // Changed from totalNoTrainees
+    programmeId: "",
+    feesPerTrainee: "",
+    enrollmentCapacity: "",
     courseStartDate: "",
     courseEndDate: "",
     certificationLevelId: "",
@@ -304,11 +319,11 @@ const ReAssessment = () => {
 
   const validationSchema = Yup.object().shape({
     reassessmentTypeId: Yup.string().required("Reassessment Type is required"),
-    courseId: Yup.string().required("Course Name is required"),
-    feesPerTrainee: Yup.number() // Changed from courseFee
+    programmeId: Yup.string().required("Programme Name is required"),
+    feesPerTrainee: Yup.number()
       .typeError("Must be a number")
-      .required("Course Fee is required"),
-    enrollmentCapacity: Yup.number() // Changed from totalNoTrainees
+      .required("Programme Fee is required"),
+    enrollmentCapacity: Yup.number()
       .typeError("Must be a number")
       .required("Total number of trainees required"),
     courseStartDate: Yup.date()
@@ -319,7 +334,7 @@ const ReAssessment = () => {
       .required("Course End Date required")
       .min(
         Yup.ref("courseStartDate"),
-        "Course end date cannot be before course start date",
+        "Course end date cannot be before programme start date",
       ),
     certificationLevelId: Yup.string().required(
       "Certification Level is required",
@@ -342,9 +357,9 @@ const ReAssessment = () => {
       const payload = {
         instituteId: values.instituteId,
         serviceId: values.reassessmentTypeId,
-        courseId: values.courseId,
-        feesPerTrainee: values.feesPerTrainee, // Changed from courseFee
-        enrollmentCapacity: values.enrollmentCapacity, // Changed from totalNoTrainees
+        programmeId: values.programmeId,
+        feesPerTrainee: values.feesPerTrainee,
+        enrollmentCapacity: values.enrollmentCapacity,
         courseStartDate: values.courseStartDate,
         courseEndDate: values.courseEndDate,
         certificationLevelId: values.certificationLevelId,
@@ -453,6 +468,7 @@ const ReAssessment = () => {
               onChange={async (e) => {
                 const value = e.target.value;
                 setFilterReassessmentType(value);
+                setFilterCertificationLevel("");
                 setSearch("");
                 setPage(0);
                 await fetchEnrolledCourses(value);
@@ -471,23 +487,47 @@ const ReAssessment = () => {
         </Grid>
 
         {filterReassessmentType && (
-          <Grid item size={{ xs: 12, md: 3 }}>
-            <TextField
-              label="Search by Course or Application No"
-              variant="outlined"
-              size="small"
-              fullWidth
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  height: "36px",
-                  "& input": { padding: "8px 12px" },
-                  "& fieldset": { borderRadius: "4px" },
-                },
-              }}
-            />
-          </Grid>
+          <>
+            <Grid item size={{ xs: 12, md: 2.5 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Certification Level</InputLabel>
+                <Select
+                  value={filterCertificationLevel}
+                  onChange={(e) => {
+                    setFilterCertificationLevel(e.target.value);
+                    setPage(0);
+                  }}
+                  label="Certification Level"
+                  sx={{ height: "36px" }}
+                >
+                  <MenuItem value="">All Certification Levels</MenuItem>
+                  {certificationLevels.map((level) => (
+                    <MenuItem key={level.id} value={level.id}>
+                      {level.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item size={{ xs: 12, md: 2.5 }}>
+              <TextField
+                label="Search by Course or Application No"
+                variant="outlined"
+                size="small"
+                fullWidth
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    height: "36px",
+                    "& input": { padding: "8px 12px" },
+                    "& fieldset": { borderRadius: "4px" },
+                  },
+                }}
+              />
+            </Grid>
+          </>
         )}
 
         <Grid item size={{ xs: 12, md: filterReassessmentType ? 2 : 2 }}>
@@ -511,12 +551,12 @@ const ReAssessment = () => {
               <TableCell>#</TableCell>
               <TableCell>Application No</TableCell>
               <TableCell>Reassessment Type</TableCell>
-              <TableCell>Course</TableCell>
+              <TableCell>Programme Name</TableCell>
               <TableCell>Fees per Trainee (Nu.)</TableCell>
               <TableCell>Enrollment Capacity</TableCell>
               <TableCell>Certification Level</TableCell>
               <TableCell>Funding Source</TableCell>
-              <TableCell>Course Period</TableCell>
+              <TableCell>Programme Period</TableCell>
               <TableCell>Training Location</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Action</TableCell>
@@ -529,50 +569,55 @@ const ReAssessment = () => {
                   Please select a Reassessment Type to view the data
                 </TableCell>
               </TableRow>
-            ) : filteredCourses.length > 0 ? (
-              filteredCourses
+            ) : filteredProgrammes.length > 0 ? (
+              filteredProgrammes
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((course, index) => (
-                  <TableRow key={course.id || index}>
+                .map((programme, index) => (
+                  <TableRow key={programme.id || index}>
                     <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
-                    <TableCell>{course.application_no || "N/A"}</TableCell>
+                    <TableCell>{programme.application_no || "N/A"}</TableCell>
                     <TableCell>
-                      {getReassessmentTypeName(course.service_id)}
+                      {getReassessmentTypeName(programme.service_id)}
                     </TableCell>
                     <TableCell>
-                      {getCourseName(course.course_id, course.service_id)}
+                      {getProgrammeName(
+                        programme.programme_id,
+                        programme.service_id,
+                      )}
                     </TableCell>
                     <TableCell>
                       Nu.{" "}
-                      {course.fees_per_trainee ||
-                        course.feesPerTrainee ||
+                      {programme.fees_per_trainee ||
+                        programme.feesPerTrainee ||
                         "N/A"}
                     </TableCell>
                     <TableCell>
-                      {course.enrollment_capacity ||
-                        course.enrollmentCapacity ||
+                      {programme.enrollment_capacity ||
+                        programme.enrollmentCapacity ||
                         "N/A"}
                     </TableCell>
                     <TableCell>
-                      {getCertificationLevelName(course.certification_level_id)}
+                      {getCertificationLevelName(
+                        programme.certification_level_id,
+                      )}
                     </TableCell>
                     <TableCell>
-                      {getFundingSourceName(course.funding_source_id)}
+                      {getFundingSourceName(programme.funding_source_id)}
                     </TableCell>
                     <TableCell>
-                      {course.course_start_date && course.course_end_date
-                        ? `${new Date(course.course_start_date).toLocaleDateString()} - ${new Date(course.course_end_date).toLocaleDateString()}`
+                      {programme.course_start_date && programme.course_end_date
+                        ? `${new Date(programme.course_start_date).toLocaleDateString()} - ${new Date(programme.course_end_date).toLocaleDateString()}`
                         : "N/A"}
                     </TableCell>
                     <TableCell>
-                      {getDzongkhagName(course.training_location_id)}
+                      {getDzongkhagName(programme.training_location_id)}
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={getStatusName(course.status_id)}
+                        label={getStatusName(programme.status_id)}
                         size="small"
                         sx={{
-                          backgroundColor: getStatusColor(course.status_id),
+                          backgroundColor: getStatusColor(programme.status_id),
                           color: "white",
                           fontWeight: "medium",
                           minWidth: "80px",
@@ -583,14 +628,15 @@ const ReAssessment = () => {
                         }}
                       />
                     </TableCell>
+
                     <TableCell align="center">
                       <IconButton
                         color="primary"
                         size="small"
                         onClick={() =>
                           handleViewDetails(
-                            course.application_no,
-                            course.course_id,
+                            programme.application_no,
+                            programme.programme_id,
                           )
                         }
                         title="View Details"
@@ -609,11 +655,11 @@ const ReAssessment = () => {
             )}
           </TableBody>
         </Table>
-        {filterReassessmentType && filteredCourses.length > 0 && (
+        {filterReassessmentType && filteredProgrammes.length > 0 && (
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
-            count={filteredCourses.length}
+            count={filteredProgrammes.length}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}
@@ -657,11 +703,11 @@ const ReAssessment = () => {
                       onChange={async (e) => {
                         const value = e.target.value;
                         formik.handleChange(e);
-                        formik.setFieldValue("courseId", "");
+                        formik.setFieldValue("programmeId", "");
                         if (value) {
                           await fetchApprovedCourses(value);
                         } else {
-                          setApprovedCourses([]);
+                          setApprovedProgrammes([]);
                         }
                       }}
                       onBlur={formik.handleBlur}
@@ -688,31 +734,31 @@ const ReAssessment = () => {
                       fullWidth
                       label={
                         <>
-                          Course Name <RequiredStar />
+                          Programme Name <RequiredStar />
                         </>
                       }
-                      name="courseId"
+                      name="programmeId"
                       size="small"
                       select
-                      value={formik.values.courseId}
+                      value={formik.values.programmeId}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       error={
-                        formik.touched.courseId &&
-                        Boolean(formik.errors.courseId)
+                        formik.touched.programmeId &&
+                        Boolean(formik.errors.programmeId)
                       }
                       helperText={
-                        formik.touched.courseId && formik.errors.courseId
+                        formik.touched.programmeId && formik.errors.programmeId
                       }
                       disabled={
                         !formik.values.reassessmentTypeId ||
-                        approvedCourses.length === 0
+                        approvedProgrammes.length === 0
                       }
                     >
                       <MenuItem value="">-select-</MenuItem>
-                      {approvedCourses.map((course) => (
-                        <MenuItem key={course.id} value={course.id}>
-                          {course.name}
+                      {approvedProgrammes.map((programme) => (
+                        <MenuItem key={programme.id} value={programme.id}>
+                          {programme.name}
                         </MenuItem>
                       ))}
                     </TextField>
@@ -726,19 +772,19 @@ const ReAssessment = () => {
                           Fees per Trainee (Nu.) <RequiredStar />
                         </>
                       }
-                      name="feesPerTrainee" // Changed from courseFee
+                      name="feesPerTrainee"
                       size="small"
                       type="number"
-                      value={formik.values.feesPerTrainee} // Changed from courseFee
+                      value={formik.values.feesPerTrainee}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       error={
-                        formik.touched.feesPerTrainee && // Changed from courseFee
-                        Boolean(formik.errors.feesPerTrainee) // Changed from courseFee
+                        formik.touched.feesPerTrainee &&
+                        Boolean(formik.errors.feesPerTrainee)
                       }
                       helperText={
                         formik.touched.feesPerTrainee &&
-                        formik.errors.feesPerTrainee // Changed from courseFee
+                        formik.errors.feesPerTrainee
                       }
                     />
                   </Grid>
@@ -783,19 +829,19 @@ const ReAssessment = () => {
                           Enrollment Capacity per Batch <RequiredStar />
                         </>
                       }
-                      name="enrollmentCapacity" // Changed from totalNoTrainees
+                      name="enrollmentCapacity"
                       size="small"
                       type="number"
-                      value={formik.values.enrollmentCapacity} // Changed from totalNoTrainees
+                      value={formik.values.enrollmentCapacity}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       error={
-                        formik.touched.enrollmentCapacity && // Changed from totalNoTrainees
-                        Boolean(formik.errors.enrollmentCapacity) // Changed from totalNoTrainees
+                        formik.touched.enrollmentCapacity &&
+                        Boolean(formik.errors.enrollmentCapacity)
                       }
                       helperText={
                         formik.touched.enrollmentCapacity &&
-                        formik.errors.enrollmentCapacity // Changed from totalNoTrainees
+                        formik.errors.enrollmentCapacity
                       }
                     />
                   </Grid>
@@ -993,4 +1039,4 @@ const ReAssessment = () => {
   );
 };
 
-export default ReAssessment;
+export default ReAssessmentIndex;

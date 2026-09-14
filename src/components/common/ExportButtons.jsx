@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 import { Button, Stack } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 
@@ -22,6 +23,11 @@ const ExportButtons = ({ onExcel, onPdf }) => {
             </Button>
         </Stack>
     );
+};
+
+ExportButtons.propTypes = {
+    onExcel: PropTypes.func.isRequired,
+    onPdf: PropTypes.func.isRequired,
 };
 
 export default ExportButtons;

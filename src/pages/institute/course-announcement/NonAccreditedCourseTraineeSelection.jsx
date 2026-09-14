@@ -654,7 +654,7 @@ const NonAccreditedCourseTraineeSelection = () => {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Course Information
+              Programme Information
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={2}>
@@ -668,7 +668,7 @@ const NonAccreditedCourseTraineeSelection = () => {
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Course Name:
+                  Programme Name:
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
                   {courseDetails.course_name}

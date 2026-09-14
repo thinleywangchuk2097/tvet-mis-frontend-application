@@ -1,12 +1,75 @@
-node_modules
-npm-debug.log*
-.git
+# Git
+.git/
 .gitignore
-.dockerignore
-Dockerfile
-dist
-build
-.env
+.gitattributes
 
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+coverage/
+.nyc_output/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+*.test.js
+*.spec.js
+__tests__/
+__mocks__/
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# CI/CD
+.github/
+.gitlab/
+.azure/
+.aws/
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Secrets (just in case)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+secrets/
+
+#sonarqube scanner files
 sonar-project.properties
 .scannerwork

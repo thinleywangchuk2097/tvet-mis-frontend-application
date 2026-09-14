@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Table,
   TableBody,
@@ -46,6 +47,188 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import CommonService from "../../../api/services/internal/common/CommonService";
 
+// ==================== PROPTYPES ====================
+
+const moduleManagementDialogPropTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,
+  initialData: PropTypes.shape({
+    moduleName: PropTypes.string,
+    moduleCode: PropTypes.string,
+    description: PropTypes.string,
+    duration: PropTypes.string,
+    prerequisites: PropTypes.string,
+    learningOutcomes: PropTypes.string,
+    order: PropTypes.number,
+  }),
+  formik: PropTypes.object.isRequired,
+};
+
+// ==================== MODULE MANAGEMENT DIALOG ====================
+const ModuleManagementDialog = ({
+  open,
+  onClose,
+  onSave,
+  initialData,
+  formik,
+}) => {
+  const [moduleData, setModuleData] = useState(
+    initialData || {
+      moduleName: "",
+      moduleCode: "",
+      description: "",
+      duration: "",
+      prerequisites: "",
+      learningOutcomes: "",
+      order: (formik?.values?.modules?.length || 0) + 1,
+    },
+  );
+
+  useEffect(() => {
+    if (initialData) {
+      setModuleData(initialData);
+    } else {
+      setModuleData({
+        moduleName: "",
+        moduleCode: "",
+        description: "",
+        duration: "",
+        prerequisites: "",
+        learningOutcomes: "",
+        order: (formik?.values?.modules?.length || 0) + 1,
+      });
+    }
+  }, [initialData, formik?.values?.modules?.length]);
+
+  const handleModuleChange = (field, value) => {
+    setModuleData({ ...moduleData, [field]: value });
+  };
+
+  const handleSave = () => {
+    if (!moduleData.moduleName) {
+      toast.error("Module name is required");
+      return;
+    }
+    onSave(moduleData);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        {initialData ? "Edit Module" : "Add New Module"}
+      </DialogTitle>
+      <DialogContent dividers>
+        <Grid container spacing={2}>
+          <Grid item size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Module Name *"
+              value={moduleData.moduleName}
+              onChange={(e) => handleModuleChange("moduleName", e.target.value)}
+              size="small"
+            />
+          </Grid>
+          <Grid item size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Module Code"
+              value={moduleData.moduleCode}
+              onChange={(e) => handleModuleChange("moduleCode", e.target.value)}
+              size="small"
+            />
+          </Grid>
+          <Grid item size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Duration"
+              value={moduleData.duration}
+              onChange={(e) => handleModuleChange("duration", e.target.value)}
+              placeholder="e.g., 2 weeks, 40 hours"
+              size="small"
+            />
+          </Grid>
+          <Grid item size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Order"
+              type="number"
+              value={moduleData.order}
+              onChange={(e) =>
+                handleModuleChange("order", parseInt(e.target.value) || 0)
+              }
+              size="small"
+            />
+          </Grid>
+          <Grid item size={{ xs: 12 }}>
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              label="Description"
+              value={moduleData.description}
+              onChange={(e) =>
+                handleModuleChange("description", e.target.value)
+              }
+              size="small"
+            />
+          </Grid>
+          <Grid item size={{ xs: 12 }}>
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              label="Prerequisites"
+              value={moduleData.prerequisites}
+              onChange={(e) =>
+                handleModuleChange("prerequisites", e.target.value)
+              }
+              placeholder="List any prerequisites for this module"
+              size="small"
+            />
+          </Grid>
+          <Grid item size={{ xs: 12 }}>
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              label="Learning Outcomes"
+              value={moduleData.learningOutcomes}
+              onChange={(e) =>
+                handleModuleChange("learningOutcomes", e.target.value)
+              }
+              placeholder="List the learning outcomes for this module"
+              size="small"
+            />
+          </Grid>
+        </Grid>
+      </DialogContent>
+      <DialogActions>
+        <Button
+          size="small"
+          variant="contained"
+          color="error"
+          onClick={onClose}
+        >
+          Cancel
+        </Button>
+        <Button
+          size="small"
+          variant="contained"
+          color="primary"
+          onClick={handleSave}
+        >
+          {initialData ? "Update Module" : "Add Module"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+ModuleManagementDialog.propTypes = moduleManagementDialogPropTypes;
+
+// ==================== MAIN COMPONENT ====================
 const CreateTotIndex = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -57,7 +240,6 @@ const CreateTotIndex = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
-  const [programs, setPrograms] = useState([]);
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
   const [editingModuleIndex, setEditingModuleIndex] = useState(null);
@@ -79,6 +261,9 @@ const CreateTotIndex = () => {
   const [moduleDeleteFormik, setModuleDeleteFormik] = useState(null);
 
   const access_token = useSelector((state) => state.auth.accessToken);
+
+  // Program management state
+  const [programsData, setProgramsData] = useState([]);
 
   // Fetch dropdown options on component mount
   useEffect(() => {
@@ -106,10 +291,7 @@ const CreateTotIndex = () => {
     }
   };
 
-  // Program management state
-  const [programsData, setProgramsData] = useState([]);
-
-  // Fetch programs and courses on component mount
+  // Fetch programs on component mount
   useEffect(() => {
     fetchPrograms();
   }, []);
@@ -125,7 +307,6 @@ const CreateTotIndex = () => {
     try {
       setLoading(true);
       const response = await TotService.getToTPrograms(access_token);
-      console.log("Fetched programs:", response.data);
 
       const parsedPrograms = (response.data || []).map((program) => {
         let modules = [];
@@ -148,7 +329,7 @@ const CreateTotIndex = () => {
           programCode: program.programCode || program.program_code,
           programTypeId: program.program_type_id || program.programTypeId,
           statusId: program.statusId || program.status_id,
-          createdAt: program.createdAt || program.created_at
+          createdAt: program.createdAt || program.created_at,
         };
       });
 
@@ -165,7 +346,6 @@ const CreateTotIndex = () => {
     try {
       const response =
         await TotService.getToTProgramsAnnouncement(access_token);
-      console.log("Fetched announcements:", response.data);
 
       const mappedAnnouncements = (response.data || []).map((item) => {
         const program = programsData.find(
@@ -193,7 +373,6 @@ const CreateTotIndex = () => {
       });
 
       setAnnouncements(mappedAnnouncements);
-      console.log("Mapped announcements:", mappedAnnouncements);
     } catch (error) {
       console.error("Error fetching announcements:", error);
       toast.error("Failed to fetch announcements");
@@ -428,23 +607,6 @@ const CreateTotIndex = () => {
     }
   };
 
-  const handleProgramChange = async (programId, formik) => {
-    const program = programsData.find(
-      (p) => String(p.id) === String(programId),
-    );
-    setSelectedProgram(program);
-
-    if (program) {
-      formik.setFieldValue("programId", program.id);
-      formik.setFieldValue("programName", program.programName);
-      formik.setFieldValue("programCode", program.programCode);
-      formik.setFieldValue("programTypeId", program.programTypeId);
-      if (program.modules) {
-        formik.setFieldValue("modules", program.modules);
-      }
-    }
-  };
-
   const requiredLabel = (label) => (
     <>
       {label}
@@ -482,8 +644,8 @@ const CreateTotIndex = () => {
       .test(
         "single-module-limit",
         "Single Module programs can only have one module",
-        function (modules) {
-          const programTypeId = this.parent.programTypeId;
+        (modules, context) => {
+          const programTypeId = context.parent.programTypeId;
           if (programTypeId === 120 && modules && modules.length > 1) {
             return false;
           }
@@ -517,8 +679,6 @@ const CreateTotIndex = () => {
       if (editingProgramId) {
         payload.id = editingProgramId;
       }
-
-      console.log("Submitting program payload:", payload);
 
       const response = await TotService.submitTOTProgram(payload, access_token);
 
@@ -613,26 +773,14 @@ const CreateTotIndex = () => {
         statusId: values.statusId || 122,
       };
 
-      // If editing, include the ID in the payload
       if (editingId) {
         payload.id = editingId;
       }
 
-      console.log("Submitting announcement payload:", payload);
-
-      let response;
-      if (editingId) {
-        // Pass the payload with ID included, no need to pass editingId separately
-        response = await TotService.submitTOTProgramAnnouncement(
-          payload,
-          access_token,
-        );
-      } else {
-        response = await TotService.submitTOTProgramAnnouncement(
-          payload,
-          access_token,
-        );
-      }
+      const response = await TotService.submitTOTProgramAnnouncement(
+        payload,
+        access_token,
+      );
 
       if (response.status === 200 || response.status === 201) {
         await fetchAnnouncements();
@@ -699,163 +847,6 @@ const CreateTotIndex = () => {
       month: "long",
       day: "numeric",
     });
-  };
-
-  const ModuleManagementDialog = ({ open, onClose, initialData, formik }) => {
-    const [moduleData, setModuleData] = useState(
-      initialData || {
-        moduleName: "",
-        moduleCode: "",
-        description: "",
-        duration: "",
-        prerequisites: "",
-        learningOutcomes: "",
-        order: (formik?.values?.modules?.length || 0) + 1,
-      },
-    );
-
-    useEffect(() => {
-      if (initialData) {
-        setModuleData(initialData);
-      } else {
-        setModuleData({
-          moduleName: "",
-          moduleCode: "",
-          description: "",
-          duration: "",
-          prerequisites: "",
-          learningOutcomes: "",
-          order: (formik?.values?.modules?.length || 0) + 1,
-        });
-      }
-    }, [initialData, formik?.values?.modules?.length]);
-
-    const handleModuleChange = (field, value) => {
-      setModuleData({ ...moduleData, [field]: value });
-    };
-
-    const handleSave = () => {
-      if (!moduleData.moduleName) {
-        toast.error("Module name is required");
-        return;
-      }
-      handleModuleSubmit(moduleData, formik);
-    };
-
-    return (
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {editingModuleIndex !== null ? "Edit Module" : "Add New Module"}
-        </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={2}>
-            <Grid item size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                label={requiredLabel("Module Name")}
-                value={moduleData.moduleName}
-                onChange={(e) =>
-                  handleModuleChange("moduleName", e.target.value)
-                }
-                size="small"
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                label="Module Code"
-                value={moduleData.moduleCode}
-                onChange={(e) =>
-                  handleModuleChange("moduleCode", e.target.value)
-                }
-                size="small"
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                label="Duration"
-                value={moduleData.duration}
-                onChange={(e) => handleModuleChange("duration", e.target.value)}
-                placeholder="e.g., 2 weeks, 40 hours"
-                size="small"
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                label="Order"
-                type="number"
-                value={moduleData.order}
-                onChange={(e) =>
-                  handleModuleChange("order", parseInt(e.target.value) || 0)
-                }
-                size="small"
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="Description"
-                value={moduleData.description}
-                onChange={(e) =>
-                  handleModuleChange("description", e.target.value)
-                }
-                size="small"
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="Prerequisites"
-                value={moduleData.prerequisites}
-                onChange={(e) =>
-                  handleModuleChange("prerequisites", e.target.value)
-                }
-                placeholder="List any prerequisites for this module"
-                size="small"
-              />
-            </Grid>
-            <Grid item size={{ xs: 12 }}>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="Learning Outcomes"
-                value={moduleData.learningOutcomes}
-                onChange={(e) =>
-                  handleModuleChange("learningOutcomes", e.target.value)
-                }
-                placeholder="List the learning outcomes for this module"
-                size="small"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            size="small"
-            variant="contained"
-            color="error"
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            color="primary"
-            onClick={handleSave}
-          >
-            {editingModuleIndex !== null ? "Update Module" : "Add Module"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    );
   };
 
   return (
@@ -1033,8 +1024,8 @@ const CreateTotIndex = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
-                      No TOT programs available. Click "Create Program" to add
-                      one.
+                      No TOT programs available. Click &quot;Create
+                      Program&quot; to add one.
                     </TableCell>
                   </TableRow>
                 )}
@@ -1220,8 +1211,8 @@ const CreateTotIndex = () => {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete{" "}
-            {deleteType === "announcement" ? "announcement" : "program"} "
-            {deleteItemName}"? This action cannot be undone.
+            {deleteType === "announcement" ? "announcement" : "program"}{" "}
+            {deleteItemName}? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -1253,7 +1244,7 @@ const CreateTotIndex = () => {
         <DialogTitle>Confirm Delete Module</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete module "{moduleDeleteName}"? This
+            Are you sure you want to delete module {moduleDeleteName}? This
             action cannot be undone.
           </DialogContentText>
         </DialogContent>
@@ -1300,7 +1291,7 @@ const CreateTotIndex = () => {
                 <Grid container spacing={2}>
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>{requiredLabel("Program Type")}</InputLabel>
+                      <InputLabel>Program Type *</InputLabel>
                       <Select
                         name="programTypeId"
                         value={formik.values.programTypeId}
@@ -1335,7 +1326,7 @@ const CreateTotIndex = () => {
 
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>{requiredLabel("TOT Program")}</InputLabel>
+                      <InputLabel>TOT Program *</InputLabel>
                       <Select
                         name="programId"
                         value={formik.values.programId}
@@ -1381,7 +1372,7 @@ const CreateTotIndex = () => {
                     <TextField
                       fullWidth
                       type="date"
-                      label={requiredLabel("Application Start Date")}
+                      label="Application Start Date *"
                       name="applicationStartDate"
                       size="small"
                       InputLabelProps={{ shrink: true }}
@@ -1403,7 +1394,7 @@ const CreateTotIndex = () => {
                     <TextField
                       fullWidth
                       type="date"
-                      label={requiredLabel("Application End Date")}
+                      label="Application End Date *"
                       name="applicationEndDate"
                       size="small"
                       InputLabelProps={{ shrink: true }}
@@ -1425,7 +1416,7 @@ const CreateTotIndex = () => {
                     <TextField
                       fullWidth
                       type="date"
-                      label={requiredLabel("Program Start Date")}
+                      label="Program Start Date *"
                       name="programStartDate"
                       size="small"
                       InputLabelProps={{ shrink: true }}
@@ -1447,7 +1438,7 @@ const CreateTotIndex = () => {
                     <TextField
                       fullWidth
                       type="date"
-                      label={requiredLabel("Program End Date")}
+                      label="Program End Date *"
                       name="programEndDate"
                       size="small"
                       InputLabelProps={{ shrink: true }}
@@ -1468,7 +1459,7 @@ const CreateTotIndex = () => {
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth
-                      label={requiredLabel("Maximum Participants")}
+                      label="Maximum Participants *"
                       name="maxParticipants"
                       size="small"
                       value={formik.values.maxParticipants}
@@ -1488,7 +1479,7 @@ const CreateTotIndex = () => {
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth
-                      label={requiredLabel("Venue")}
+                      label="Venue *"
                       name="venue"
                       size="small"
                       value={formik.values.venue}
@@ -1591,7 +1582,7 @@ const CreateTotIndex = () => {
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth
-                      label={requiredLabel("Program Name")}
+                      label="Program Name *"
                       name="programName"
                       size="small"
                       value={formik.values.programName}
@@ -1610,7 +1601,7 @@ const CreateTotIndex = () => {
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth
-                      label={requiredLabel("Program Code")}
+                      label="Program Code *"
                       name="programCode"
                       size="small"
                       value={formik.values.programCode}
@@ -1628,7 +1619,7 @@ const CreateTotIndex = () => {
 
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>{requiredLabel("Program Type")}</InputLabel>
+                      <InputLabel>Program Type *</InputLabel>
                       <Select
                         name="programTypeId"
                         value={formik.values.programTypeId}
@@ -1746,8 +1737,8 @@ const CreateTotIndex = () => {
 
                     {formik.values.modules.length === 0 ? (
                       <Alert severity="info" sx={{ mb: 2 }}>
-                        No modules added yet. Click "Add Module" to create
-                        modules for this program.
+                        No modules added yet. Click &quot;Add Module&quot; to
+                        create modules for this program.
                       </Alert>
                     ) : (
                       <TableContainer component={Paper} variant="outlined">
@@ -1755,9 +1746,7 @@ const CreateTotIndex = () => {
                           <TableHead>
                             <TableRow>
                               <TableCell>#</TableCell>
-                              <TableCell>
-                                {requiredLabel("Module Name")}
-                              </TableCell>
+                              <TableCell>Module Name *</TableCell>
                               <TableCell>Module Code</TableCell>
                               <TableCell>Duration</TableCell>
                               <TableCell>Prerequisites</TableCell>
@@ -1843,6 +1832,9 @@ const CreateTotIndex = () => {
                 <ModuleManagementDialog
                   open={moduleDialogOpen}
                   onClose={handleModuleDialogClose}
+                  onSave={(moduleData) =>
+                    handleModuleSubmit(moduleData, formik)
+                  }
                   initialData={
                     editingModuleIndex !== null
                       ? formik.values.modules[editingModuleIndex]
@@ -1887,5 +1879,8 @@ const CreateTotIndex = () => {
     </Paper>
   );
 };
+
+// ==================== PROPTYPES FOR MAIN COMPONENT ====================
+CreateTotIndex.propTypes = {};
 
 export default CreateTotIndex;
