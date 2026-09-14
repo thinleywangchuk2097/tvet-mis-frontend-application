@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -560,6 +560,7 @@ const CurriculumForm = ({
   sectors,
   occupations,
   certificateLevels,
+  setCertificateLevels,
   curriculumTypes,
   programmeTypes,
   loading,
@@ -597,7 +598,9 @@ const CurriculumForm = ({
     isRevision,
     isBQFCourse,
     formik.values.ncsId,
+    formik.values.programmeTitle,
     fetchProgrammeTitleForEndorse,
+    formik.setFieldValue,
   ]);
 
   // Handle curriculum selection for endorse
@@ -740,6 +743,20 @@ const CurriculumForm = ({
     return "";
   };
 
+  // Get curriculum title placeholder
+  const getCurriculumTitlePlaceholder = () => {
+    if (isBQFCourse) return "Auto-filled from NCS";
+    if (isNonBQFCourse) return "Enter Curriculum Title";
+    return "Select Programme Type first";
+  };
+
+  // Get programme title placeholder
+  const getProgrammeTitlePlaceholder = () => {
+    if (isBQFCourse) return "Auto-filled from NCS";
+    if (isNonBQFCourse) return "Enter Programme Title";
+    return "Select Programme Type first";
+  };
+
   // Render duration validation message
   const renderDurationValidation = () => {
     const { programmeTypeId, certificateLevelId } = formik.values;
@@ -877,16 +894,10 @@ const CurriculumForm = ({
       }
       slotProps={{
         input: {
-          readOnly: isBQFCourse ? true : false,
+          readOnly: isBQFCourse,
         },
       }}
-      placeholder={
-        isBQFCourse
-          ? "Auto-filled from NCS"
-          : isNonBQFCourse
-            ? "Enter Curriculum Title"
-            : "Select Programme Type first"
-      }
+      placeholder={getCurriculumTitlePlaceholder()}
       disabled={!formik.values.programmeTypeId}
     />
   );
@@ -917,7 +928,7 @@ const CurriculumForm = ({
             helperText={formik.touched.sectorId && formik.errors.sectorId}
             slotProps={{
               input: {
-                readOnly: isReadonly ? true : false,
+                readOnly: isReadonly,
               },
             }}
           >
@@ -959,7 +970,7 @@ const CurriculumForm = ({
             }
             slotProps={{
               input: {
-                readOnly: isReadonly ? true : false,
+                readOnly: isReadonly,
               },
             }}
           >
@@ -997,8 +1008,8 @@ const CurriculumForm = ({
           color="success"
           sx={{ display: "block", mt: 0.5 }}
         >
-          ✓ NCS found: "{ncsData.programme_title}" - Programme Title and
-          Curriculum Title auto-filled
+          ✓ NCS found: &quot;{ncsData.programme_title}&quot; - Programme Title
+          and Curriculum Title auto-filled
         </Typography>
       );
     }
@@ -1165,7 +1176,7 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isRevision || isEndorse ? true : false,
+              readOnly: isRevision || isEndorse,
             },
           }}
         >
@@ -1214,7 +1225,7 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isRevision || isEndorse ? true : false,
+              readOnly: isRevision || isEndorse,
             },
           }}
         >
@@ -1276,16 +1287,10 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isBQFCourse || isEndorse || isRevision ? true : false,
+              readOnly: isBQFCourse || isEndorse || isRevision,
             },
           }}
-          placeholder={
-            isBQFCourse
-              ? "Auto-filled from NCS"
-              : isNonBQFCourse
-                ? "Enter Programme Title"
-                : "Select Programme Type first"
-          }
+          placeholder={getProgrammeTitlePlaceholder()}
         />
         {(isEndorse || isRevision) && (
           <Typography variant="caption" color="textSecondary">
@@ -1329,7 +1334,7 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isEndorse || isRevision ? true : false,
+              readOnly: isEndorse || isRevision,
             },
           }}
         />
@@ -1373,7 +1378,7 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isEndorse || isRevision ? true : false,
+              readOnly: isEndorse || isRevision,
             },
           }}
         />
@@ -1412,7 +1417,7 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isEndorse || isRevision ? true : false,
+              readOnly: isEndorse || isRevision,
             },
           }}
         />
@@ -1476,7 +1481,7 @@ const CurriculumForm = ({
           }
           slotProps={{
             input: {
-              readOnly: isEndorse ? true : false,
+              readOnly: isEndorse,
             },
           }}
         />
@@ -1509,7 +1514,7 @@ const CurriculumForm = ({
           helperText={formik.touched.description && formik.errors.description}
           slotProps={{
             input: {
-              readOnly: isEndorse ? true : false,
+              readOnly: isEndorse,
             },
           }}
         />
@@ -1636,7 +1641,6 @@ const CurriculumIndex = () => {
   const fetchSectors = async () => {
     try {
       const response = await CommonService.getAllSectors();
-      console.log("Sectors Response:", response.data);
       setSectors(response.data || []);
     } catch (error) {
       console.error("Error fetching sectors:", error);
@@ -1651,7 +1655,6 @@ const CurriculumIndex = () => {
     setLoadingOccupations(true);
     try {
       const sector = sectors.find((s) => s.id === parseInt(sectorId));
-      console.log("Found sector for occupations:", sector);
 
       if (sector && sector.child && sector.child.length > 0) {
         const occupationsData = sector.child.map((child) => ({
@@ -1660,14 +1663,12 @@ const CurriculumIndex = () => {
             child.occupationName || child.name || `Occupation ${child.id}`,
         }));
         setOccupations(() => occupationsData);
-        console.log("Occupations from sector child:", occupationsData);
       } else {
         try {
           const response =
             await CommonService.getOccupationsBySectorId(sectorId);
           const occData = response.data || [];
           setOccupations(() => occData);
-          console.log("Occupations from API:", occData);
         } catch (apiError) {
           console.error("API fallback failed:", apiError);
           setOccupations(() => []);
@@ -1682,73 +1683,73 @@ const CurriculumIndex = () => {
     }
   };
 
-  const fetchProgrammeTitleForEndorse = async (programmeId, setFieldValue) => {
-    if (!programmeId) {
-      setFieldValue("programmeTitle", "");
-      return;
-    }
+  const fetchProgrammeTitleForEndorse = useCallback(
+    async (programmeId, setFieldValue) => {
+      if (!programmeId) {
+        setFieldValue("programmeTitle", "");
+        return;
+      }
 
-    try {
-      const response = await NcsService.getProgrammeTitleById(
-        programmeId,
-        access_token,
-      );
-      console.log("Programme Title Response for Endorse:", response);
+      try {
+        const response = await NcsService.getProgrammeTitleById(
+          programmeId,
+          access_token,
+        );
 
-      if (
-        response &&
-        response.data &&
-        Array.isArray(response.data) &&
-        response.data.length > 0
-      ) {
-        const item = response.data[0];
-        const title =
-          item.programme_title ||
-          item.courseName ||
-          item.name ||
-          item.occupationName ||
-          item.title;
+        if (
+          response &&
+          response.data &&
+          Array.isArray(response.data) &&
+          response.data.length > 0
+        ) {
+          const item = response.data[0];
+          const title =
+            item.programme_title ||
+            item.courseName ||
+            item.name ||
+            item.occupationName ||
+            item.title;
 
-        if (title) {
-          setFieldValue("programmeTitle", title);
-          console.log("Programme Title set to:", title);
-          toast.info(`Programme Title auto-filled: ${title}`);
+          if (title) {
+            setFieldValue("programmeTitle", title);
+            toast.info(`Programme Title auto-filled: ${title}`);
+          } else {
+            setFieldValue("programmeTitle", "");
+          }
+        } else if (
+          response &&
+          response.data &&
+          typeof response.data === "object" &&
+          !Array.isArray(response.data)
+        ) {
+          const item = response.data;
+          const title =
+            item.programme_title ||
+            item.courseName ||
+            item.name ||
+            item.occupationName ||
+            item.title;
+
+          if (title) {
+            setFieldValue("programmeTitle", title);
+            toast.info(`Programme Title auto-filled: ${title}`);
+          } else {
+            setFieldValue("programmeTitle", "");
+          }
         } else {
           setFieldValue("programmeTitle", "");
         }
-      } else if (
-        response &&
-        response.data &&
-        typeof response.data === "object" &&
-        !Array.isArray(response.data)
-      ) {
-        const item = response.data;
-        const title =
-          item.programme_title ||
-          item.courseName ||
-          item.name ||
-          item.occupationName ||
-          item.title;
-
-        if (title) {
-          setFieldValue("programmeTitle", title);
-          toast.info(`Programme Title auto-filled: ${title}`);
-        } else {
-          setFieldValue("programmeTitle", "");
-        }
-      } else {
+      } catch (error) {
+        console.error("Error fetching programme title:", error);
         setFieldValue("programmeTitle", "");
       }
-    } catch (error) {
-      console.error("Error fetching programme title:", error);
-      setFieldValue("programmeTitle", "");
-    }
-  };
+    },
+    [access_token],
+  );
 
   const fetchCurriculumTypes = async () => {
     try {
       const response = await CommonService.getCurriculumServiceType();
-      console.log("Curriculum Types Response:", response.data);
       setCurriculumTypes(response.data);
     } catch (error) {
       console.error("Error fetching curriculum types:", error);
@@ -1758,7 +1759,6 @@ const CurriculumIndex = () => {
   const fetchProgrammeTypes = async () => {
     try {
       const response = await CommonService.getByParentId(13);
-      console.log("Programme Types Response:", response.data);
       setProgrammeTypes(response.data);
     } catch (error) {
       console.error("Error fetching programme types:", error);
@@ -1781,7 +1781,6 @@ const CurriculumIndex = () => {
       }
 
       const response = await CommonService.getByParentId(parentId);
-      console.log("Certificate Levels Response:", response.data);
       setCertificateLevels(response.data);
     } catch (error) {
       console.error("Error fetching BQF levels:", error);
@@ -1809,7 +1808,6 @@ const CurriculumIndex = () => {
           access_token,
         );
       setData(response.data);
-      console.log("Curriculum Data Response:", response.data);
     } catch (error) {
       console.error("Error fetching curriculum data:", error);
     }
@@ -1818,7 +1816,6 @@ const CurriculumIndex = () => {
   const fetchDropdownData = async () => {
     try {
       const response = await CommonService.getByParentId(4);
-      console.log("Dropdown Data Response:", response.data);
       setDropdownData(response.data);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
@@ -1850,12 +1847,10 @@ const CurriculumIndex = () => {
         certificationId,
         access_token,
       );
-      console.log("NCS Exists Check Response:", response);
 
       if (response.data && response.data.length > 0) {
         setNcsExists(() => true);
         setNcsData(() => response.data[0]);
-        console.log("NCS combination exists:", response.data[0]);
 
         if (response.data[0].programme_title) {
           setFieldValue("curriculumTitle", response.data[0].programme_title);
@@ -1871,7 +1866,6 @@ const CurriculumIndex = () => {
         setFieldValue("curriculumTitle", "");
         setFieldValue("programmeTitle", "");
         setFieldValue("ncsId", "");
-        console.log("NCS combination does not exist - fields cleared");
       }
     } catch (error) {
       console.error("Error checking NCS exists:", error);
@@ -1894,6 +1888,7 @@ const CurriculumIndex = () => {
     fetchCurriculumData();
     fetchDropdownData();
     fetchSectors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ==================== HANDLERS ====================
@@ -2357,8 +2352,6 @@ const CurriculumIndex = () => {
         payload.updatedDate = new Date().toISOString();
       }
 
-      console.log("Submitting payload:", payload);
-
       const response = await CurriculumIndexService.submitCurriculum(
         payload,
         access_token,
@@ -2445,7 +2438,7 @@ const CurriculumIndex = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        List of Programme's Curriculums
+        List of Programme&apos;s Curriculums
       </Typography>
 
       <Grid
@@ -2691,6 +2684,7 @@ const CurriculumIndex = () => {
                   sectors={sectors}
                   occupations={occupations}
                   certificateLevels={certificateLevels}
+                  setCertificateLevels={setCertificateLevels}
                   curriculumTypes={curriculumTypes}
                   programmeTypes={programmeTypes}
                   loading={loading}
@@ -2779,6 +2773,7 @@ const CurriculumIndex = () => {
                   sectors={sectors}
                   occupations={occupations}
                   certificateLevels={certificateLevels}
+                  setCertificateLevels={setCertificateLevels}
                   curriculumTypes={curriculumTypes}
                   programmeTypes={programmeTypes}
                   loading={loading}
@@ -2873,6 +2868,7 @@ const CurriculumIndex = () => {
                   sectors={sectors}
                   occupations={occupations}
                   certificateLevels={certificateLevels}
+                  setCertificateLevels={setCertificateLevels}
                   curriculumTypes={curriculumTypes}
                   programmeTypes={programmeTypes}
                   loading={loading}

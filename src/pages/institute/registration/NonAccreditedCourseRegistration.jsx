@@ -263,6 +263,7 @@ const NonAccreditedCourseRegistration = () => {
             formikRef.current.setFieldValue("practicalHour", "");
             formikRef.current.setFieldValue("ojtHour", "");
             formikRef.current.setFieldValue("certificateLevelId", "");
+            formikRef.current.setFieldValue("programmeTitle", "");
           }
           setSelectedCurriculumId(null);
           return true;
@@ -793,9 +794,6 @@ const NonAccreditedCourseRegistration = () => {
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
-    // FIXED: Removed redundant check - curriculumDuplicateError is already handled in the form validation
-    // The button is disabled when curriculumDuplicateError exists, so this check is unnecessary
-
     setLoading(true);
     try {
       const documents = await Promise.all(
@@ -810,8 +808,8 @@ const NonAccreditedCourseRegistration = () => {
 
       const qualityStandardsList = transformQualityStandards(qualitySelections);
 
+      // Build the base payload
       const payload = {
-        programmeTitle: values.programmeTitle,
         applicantName: values.instituteName,
         theoryHour:
           values.programmeTypeId === "137"
@@ -841,6 +839,21 @@ const NonAccreditedCourseRegistration = () => {
         qualityStandards: qualityStandardsList,
       };
 
+      // Conditionally add programmeTitle:
+      // - If curriculumId exists (and programmeTypeId is not "137"), use curriculum_title as programmeTitle
+      // - If no curriculumId OR programmeTypeId is "137", use user-entered programmeTitle
+      if (values.curriculumId && values.programmeTypeId !== "137") {
+        // Use curriculum_title from the selected curriculum
+        const curriculum = curriculumTypes.find(
+          (t) => String(t.id) === String(values.curriculumId),
+        );
+        payload.programmeTitle =
+          curriculum?.curriculum_title || values.programmeTitle;
+      } else {
+        // Use user-entered programmeTitle
+        payload.programmeTitle = values.programmeTitle;
+      }
+
       console.log("Submitting payload:", payload);
       const response =
         await ApplyNonAccreditedCourseService.submitNonAccreditedCourse(
@@ -861,7 +874,10 @@ const NonAccreditedCourseRegistration = () => {
 
         const newCourse = {
           id: response.data?.id || courses.length + 1,
-          programmeTitle: values.programmeTitle,
+          programmeTitle:
+            values.curriculumId && values.programmeTypeId !== "137"
+              ? curriculum?.curriculum_title || values.programmeTitle
+              : values.programmeTitle,
           programmeTypeId: values.programmeTypeId,
           programmeTypeName: programmeType?.name || "",
           theoryHour:
@@ -966,7 +982,7 @@ const NonAccreditedCourseRegistration = () => {
     return curriculum?.curriculum_title || "-";
   };
 
-  // Auto-fill function
+  // Auto-fill function - now includes programmeTitle
   const autoFillCurriculumFields = (selectedId) => {
     if (selectedId && formikRef.current) {
       const selectedCurriculum = curriculumTypes.find(
@@ -983,6 +999,14 @@ const NonAccreditedCourseRegistration = () => {
         const ojtHours = selectedCurriculum.total_ojt_duration
           ? parseInt(selectedCurriculum.total_ojt_duration)
           : 0;
+
+        // Auto-fill programmeTitle with curriculum_title
+        if (selectedCurriculum.curriculum_title) {
+          formikRef.current.setFieldValue(
+            "programmeTitle",
+            selectedCurriculum.curriculum_title,
+          );
+        }
 
         formikRef.current.setFieldValue(
           "theoryHour",
@@ -1012,6 +1036,7 @@ const NonAccreditedCourseRegistration = () => {
         formikRef.current.setFieldValue("practicalHour", "");
         formikRef.current.setFieldValue("ojtHour", "");
         formikRef.current.setFieldValue("certificateLevelId", "");
+        // Don't clear programmeTitle when curriculum is deselected - keep it as is
       }
     }
     return false;
@@ -1524,15 +1549,17 @@ const NonAccreditedCourseRegistration = () => {
                           onChange={(e) => {
                             const selectedId = e.target.value;
                             formik.handleChange(e);
-                            if (selectedId === "137") {
-                              formik.setFieldValue("curriculumId", "");
-                              formik.setFieldValue("theoryHour", "");
-                              formik.setFieldValue("practicalHour", "");
-                              formik.setFieldValue("ojtHour", "");
-                              formik.setFieldValue("certificateLevelId", "");
-                              setSelectedCurriculumId(null);
-                              setCurriculumDuplicateError("");
-                            }
+
+                            // Clear curriculum-related fields when switching programme type
+                            formik.setFieldValue("curriculumId", "");
+                            formik.setFieldValue("theoryHour", "");
+                            formik.setFieldValue("practicalHour", "");
+                            formik.setFieldValue("ojtHour", "");
+                            formik.setFieldValue("certificateLevelId", "");
+                            formik.setFieldValue("programmeTitle", "");
+
+                            setSelectedCurriculumId(null);
+                            setCurriculumDuplicateError("");
                           }}
                           onBlur={formik.handleBlur}
                           error={
@@ -1788,6 +1815,21 @@ const NonAccreditedCourseRegistration = () => {
                             formik.touched.programmeTitle &&
                             formik.errors.programmeTitle
                           }
+                          // Make it read-only when curriculum is selected
+                          slotProps={{
+                            input: {
+                              readOnly:
+                                !isLessThan140 && !!formik.values.curriculumId,
+                            },
+                          }}
+                          sx={{
+                            "& .MuiInputBase-input.Mui-readOnly": {
+                              backgroundColor:
+                                !isLessThan140 && !!formik.values.curriculumId
+                                  ? "#f5f5f5"
+                                  : "transparent",
+                            },
+                          }}
                         />
                       </Grid>
                       <Grid item size={{ xs: 12, md: 4 }}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -41,6 +41,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import PersonIcon from "@mui/icons-material/Person";
 import SchoolIcon from "@mui/icons-material/School";
 import GradeIcon from "@mui/icons-material/Grade";
+import BlockIcon from "@mui/icons-material/Block";
 import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
@@ -53,8 +54,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [movingTrainees, setMovingTrainees] = useState(false);
   const [courseDetails, setCourseDetails] = useState(null);
-  const [allTrainees, setAllTrainees] = useState([]);
   const [pendingTrainees, setPendingTrainees] = useState([]);
   const [selectedTrainees, setSelectedTrainees] = useState([]);
   const [searchPending, setSearchPending] = useState("");
@@ -63,7 +64,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [traineeDetails, setTraineeDetails] = useState(null);
 
   const access_token = useSelector((state) => state.auth.accessToken);
-  const actionId = useSelector((state) => state.auth.id);
   //Store status IDs for pending and selected
   const [pendingStatusId, setPendingStatusId] = useState(null);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
@@ -131,6 +131,33 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     return levelId === "111" || levelId === "112";
   };
 
+  // Helper function to check if certification level is diploma (111 or 112)
+  const isDiplomaCertificationLevel = () => {
+    const levelId = courseDetails?.certification_level_id;
+    return levelId === "111" || levelId === "112";
+  };
+
+  // Get max value for Internal Assessment based on certification level
+  const getInternalAssessmentMaxValue = () => {
+    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
+    return 20;
+  };
+
+  // Get tooltip message for Internal Assessment max value
+  const getInternalAssessmentTooltipMessage = () => {
+    const maxVal = getInternalAssessmentMaxValue();
+    if (!maxVal) return "";
+    return `Maximum value that can be entered is ${maxVal}`;
+  };
+
+  // Helper function to validate Internal Assessment input for diploma
+  const validateInternalAssessmentInput = (value) => {
+    if (value === "") return true;
+    const numValue = Number(value);
+    if (isNaN(numValue)) return false;
+    return numValue >= 0 && numValue <= 20;
+  };
+
   // Helper function to check if application is endorsed (status_id === 59)
   const isApplicationEndorsed = () => {
     return courseDetails?.application_status_id === "59";
@@ -140,7 +167,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const isPaymentPaid =
     paymentStatusDetails?.paymentStatus?.toLowerCase() === "paid";
 
-  // Check if any trainee has assessments (theory/practical for normal, viva/practical for service_id 39)
   // Only show assessments if application is endorsed
   const hasAssessments =
     isApplicationEndorsed() &&
@@ -171,7 +197,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     fetchPaymentDetail();
   }, []);
 
-  // Fetch course details and applied trainees when dependencies are ready
+  // Fetch programme details and applied trainees when dependencies are ready
   useEffect(() => {
     if (
       academicQualifications.length > 0 &&
@@ -194,19 +220,22 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     if (isApplicationEndorsed()) {
       const hasValues = selectedTrainees.some((trainee) => {
         if (isServiceId39) {
+          const vivaVal = traineeVivaAssessments[trainee.id] || "";
+          const practicalVal =
+            traineeVivaPracticalAssessments[trainee.id] || "";
+
           return (
-            (traineeVivaAssessments[trainee.id] &&
-              traineeVivaAssessments[trainee.id] !== "") ||
-            (traineeVivaPracticalAssessments[trainee.id] &&
-              traineeVivaPracticalAssessments[trainee.id] !== "") ||
+            (vivaVal && vivaVal !== "") ||
+            (practicalVal && practicalVal !== "") ||
             trainee.result_status_id
           );
         } else {
+          const theoryVal = traineeTheoryAssessments[trainee.id] || "";
+          const practicalVal = traineePracticalAssessments[trainee.id] || "";
+
           return (
-            (traineeTheoryAssessments[trainee.id] &&
-              traineeTheoryAssessments[trainee.id] !== "") ||
-            (traineePracticalAssessments[trainee.id] &&
-              traineePracticalAssessments[trainee.id] !== "") ||
+            (theoryVal && theoryVal !== "") ||
+            (practicalVal && practicalVal !== "") ||
             trainee.result_status_id
           );
         }
@@ -307,7 +336,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   };
 
   const fetchData = async () => {
-    await Promise.all([fetchCourseDetails(), fetchCourseAppliedTrainees()]);
+    await Promise.all([fetchProgrammeDetails(), fetchCourseAppliedTrainees()]);
   };
 
   const fetchAcademicCompetency = async () => {
@@ -329,20 +358,19 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  const fetchCourseDetails = async () => {
+  const fetchProgrammeDetails = async () => {
     try {
       const response =
         await CommonService.getCourseAnnouncementByApplicationNo(applicationNo);
-      console.log("course details : ", response.data);
+      console.log("programme details : ", response.data);
 
-      const courseData = Array.isArray(response.data)
+      const programmeData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
-      setCourseDetails(courseData);
-      console.log("Course Details:", courseData);
+      setCourseDetails(programmeData);
     } catch (error) {
-      console.error("Error fetching course details:", error);
-      toast.error("Failed to fetch course details");
+      console.error("Error fetching programme details:", error);
+      toast.error("Failed to fetch programme details");
     }
   };
 
@@ -355,7 +383,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         );
       console.log("Applied Trainees Response:", response.data);
       const trainees = response.data || [];
-      setAllTrainees(trainees);
 
       // Filter trainees based on status IDs from API
       const pending = trainees.filter(
@@ -598,7 +625,48 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  const moveToSelected = () => {
+  // API call to update trainee status
+  const updateTraineeStatus = async (traineeIds, newStatusId) => {
+    try {
+      const traineeStatusList = traineeIds.map((traineeId) => ({
+        traineeId: parseInt(traineeId),
+        statusId: newStatusId,
+      }));
+
+      const payload = {
+        applicationNo: applicationNo,
+        statusId: 55,
+        courseName: courseDetails?.course_name,
+        serviceId: courseDetails?.service_id
+          ? parseInt(courseDetails.service_id)
+          : null,
+        assignedRoleId: 9,
+        traineeIds: traineeStatusList,
+      };
+
+      console.log("Updating trainee status payload:", payload);
+      const response =
+        await CourseEnrollmentService.selectUnselectTrainee(payload);
+
+      if (response.status === 200 || response.status === 201) {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error updating trainee status:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update trainee status",
+      );
+      return false;
+    }
+  };
+
+  const moveToSelected = async () => {
+    if (hasCADates) {
+      toast.error("Cannot move trainees when CA dates are set");
+      return;
+    }
+
     if (selectedPendingRows.length === 0) {
       toast.warning("Please select at least one trainee to move");
       return;
@@ -613,113 +681,180 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       return;
     }
 
-    // Get the selected trainees from pending list
-    const traineesToMove = pendingTrainees.filter((t) =>
-      selectedPendingRows.includes(t.id),
-    );
+    // Check if application is endorsed - if so, check for assessment values
+    if (isApplicationEndorsed()) {
+      const hasValues = selectedPendingRows.some((traineeId) => {
+        const trainee = pendingTrainees.find((t) => t.id === traineeId);
+        if (!trainee) return false;
+        if (isServiceId39) {
+          const vivaVal = traineeVivaAssessments[traineeId] || "";
+          const practicalVal = traineeVivaPracticalAssessments[traineeId] || "";
 
-    // Initialize assessments for newly moved trainees
-    const newInternalAssessments = {};
-    const newTheory = {};
-    const newPractical = {};
-    const newViva = {};
-    const newVivaPractical = {};
+          return (
+            (vivaVal && vivaVal !== "") ||
+            (practicalVal && practicalVal !== "") ||
+            trainee.result_status_id
+          );
+        } else {
+          const theoryVal = traineeTheoryAssessments[traineeId] || "";
+          const practicalVal = traineePracticalAssessments[traineeId] || "";
 
-    traineesToMove.forEach((trainee) => {
-      newInternalAssessments[trainee.id] = "";
-      newTheory[trainee.id] = "";
-      newPractical[trainee.id] = "";
-      newViva[trainee.id] = "";
-      newVivaPractical[trainee.id] = "";
-    });
+          return (
+            (theoryVal && theoryVal !== "") ||
+            (practicalVal && practicalVal !== "") ||
+            trainee.result_status_id
+          );
+        }
+      });
 
-    // Update local state - move from pending to selected
-    const updatedPending = pendingTrainees.filter(
-      (t) => !selectedPendingRows.includes(t.id),
-    );
-    const updatedSelected = [
-      ...selectedTrainees,
-      ...traineesToMove.map((t) => ({
-        ...t,
-        status_id: selectedStatusId.toString(),
-      })),
-    ];
+      if (hasValues) {
+        toast.error(
+          "Cannot move trainees when they have assessment marks or result status. Please clear all assessment values first.",
+        );
+        return;
+      }
+    }
 
-    setPendingTrainees(updatedPending);
-    setSelectedTrainees(updatedSelected);
-    setTraineeInternalAssessments((prev) => ({
-      ...prev,
-      ...newInternalAssessments,
-    }));
-    setTraineeTheoryAssessments((prev) => ({ ...prev, ...newTheory }));
-    setTraineePracticalAssessments((prev) => ({ ...prev, ...newPractical }));
-    setTraineeVivaAssessments((prev) => ({ ...prev, ...newViva }));
-    setTraineeVivaPracticalAssessments((prev) => ({
-      ...prev,
-      ...newVivaPractical,
-    }));
-    setSelectedPendingRows([]);
+    setMovingTrainees(true);
 
-    toast.success(
-      `${selectedPendingRows.length} trainee(s) moved to selected list`,
-    );
+    try {
+      // Update backend API
+      const success = await updateTraineeStatus(
+        selectedPendingRows,
+        selectedStatusId,
+      );
+
+      if (success) {
+        // Get the selected trainees from pending list
+        const traineesToMove = pendingTrainees.filter((t) =>
+          selectedPendingRows.includes(t.id),
+        );
+
+        // Update local state - move from pending to selected
+        const updatedPending = pendingTrainees.filter(
+          (t) => !selectedPendingRows.includes(t.id),
+        );
+        const updatedSelected = [
+          ...selectedTrainees,
+          ...traineesToMove.map((t) => ({
+            ...t,
+            status_id: selectedStatusId.toString(),
+          })),
+        ];
+
+        setPendingTrainees(updatedPending);
+        setSelectedTrainees(updatedSelected);
+        setSelectedPendingRows([]);
+
+        toast.success(
+          `${selectedPendingRows.length} trainee(s) moved to selected list`,
+        );
+      }
+    } catch (error) {
+      console.error("Error moving trainees to selected:", error);
+      toast.error("Failed to move trainees. Please try again.");
+    } finally {
+      setMovingTrainees(false);
+    }
   };
 
-  const moveToPending = () => {
+  const moveToPending = async () => {
+    if (hasCADates) {
+      toast.error("Cannot move trainees when CA dates are set");
+      return;
+    }
+
     if (selectedSelectedRows.length === 0) {
       toast.warning("Please select at least one trainee to move back");
       return;
     }
 
-    // Get the selected trainees from selected list
-    const traineesToMove = selectedTrainees.filter((t) =>
-      selectedSelectedRows.includes(t.id),
-    );
+    // Check if application is endorsed - if so, check for assessment values
+    if (isApplicationEndorsed()) {
+      const hasValues = selectedSelectedRows.some((traineeId) => {
+        const trainee = selectedTrainees.find((t) => t.id === traineeId);
+        if (!trainee) return false;
+        if (isServiceId39) {
+          const vivaVal = traineeVivaAssessments[traineeId] || "";
+          const practicalVal = traineeVivaPracticalAssessments[traineeId] || "";
 
-    // Remove assessments for moved trainees
-    const updatedInternalAssessments = { ...traineeInternalAssessments };
-    const updatedTheory = { ...traineeTheoryAssessments };
-    const updatedPractical = { ...traineePracticalAssessments };
-    const updatedViva = { ...traineeVivaAssessments };
-    const updatedVivaPractical = { ...traineeVivaPracticalAssessments };
+          return (
+            (vivaVal && vivaVal !== "") ||
+            (practicalVal && practicalVal !== "") ||
+            trainee.result_status_id
+          );
+        } else {
+          const theoryVal = traineeTheoryAssessments[traineeId] || "";
+          const practicalVal = traineePracticalAssessments[traineeId] || "";
 
-    traineesToMove.forEach((trainee) => {
-      delete updatedInternalAssessments[trainee.id];
-      delete updatedTheory[trainee.id];
-      delete updatedPractical[trainee.id];
-      delete updatedViva[trainee.id];
-      delete updatedVivaPractical[trainee.id];
-    });
+          return (
+            (theoryVal && theoryVal !== "") ||
+            (practicalVal && practicalVal !== "") ||
+            trainee.result_status_id
+          );
+        }
+      });
 
-    // Update local state - move from selected to pending
-    const updatedSelected = selectedTrainees.filter(
-      (t) => !selectedSelectedRows.includes(t.id),
-    );
-    const updatedPending = [
-      ...pendingTrainees,
-      ...traineesToMove.map((t) => ({
-        ...t,
-        status_id: pendingStatusId.toString(),
-      })),
-    ];
+      if (hasValues) {
+        toast.error(
+          "Cannot move trainees when they have assessment marks or result status. Please clear all assessment values first.",
+        );
+        return;
+      }
+    }
 
-    setSelectedTrainees(updatedSelected);
-    setPendingTrainees(updatedPending);
-    setTraineeInternalAssessments(updatedInternalAssessments);
-    setTraineeTheoryAssessments(updatedTheory);
-    setTraineePracticalAssessments(updatedPractical);
-    setTraineeVivaAssessments(updatedViva);
-    setTraineeVivaPracticalAssessments(updatedVivaPractical);
-    setSelectedSelectedRows([]);
+    setMovingTrainees(true);
 
-    toast.info(
-      `${selectedSelectedRows.length} trainee(s) moved back to pending`,
-    );
+    try {
+      // Update backend API
+      const success = await updateTraineeStatus(
+        selectedSelectedRows,
+        pendingStatusId,
+      );
+
+      if (success) {
+        // Get the selected trainees from selected list
+        const traineesToMove = selectedTrainees.filter((t) =>
+          selectedSelectedRows.includes(t.id),
+        );
+
+        // Update local state - move from selected to pending
+        const updatedSelected = selectedTrainees.filter(
+          (t) => !selectedSelectedRows.includes(t.id),
+        );
+        const updatedPending = [
+          ...pendingTrainees,
+          ...traineesToMove.map((t) => ({
+            ...t,
+            status_id: pendingStatusId.toString(),
+          })),
+        ];
+
+        setSelectedTrainees(updatedSelected);
+        setPendingTrainees(updatedPending);
+        setSelectedSelectedRows([]);
+
+        toast.info(
+          `${selectedSelectedRows.length} trainee(s) moved back to pending`,
+        );
+      }
+    } catch (error) {
+      console.error("Error moving trainees to pending:", error);
+      toast.error("Failed to move trainees. Please try again.");
+    } finally {
+      setMovingTrainees(false);
+    }
   };
 
   const handleFinalizeSelection = async () => {
+    // Check if application has already been submitted
+    if (courseDetails?.application_status_id === "55") {
+      toast.warning("Application has been already submitted");
+      return;
+    }
+
     if (selectedTrainees.length === 0) {
-      toast.warning("No trainees selected for this course");
+      toast.warning("No trainees selected for this programme");
       return;
     }
 
@@ -727,19 +862,22 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     if (isApplicationEndorsed()) {
       const hasValues = selectedTrainees.some((trainee) => {
         if (isServiceId39) {
+          const vivaVal = traineeVivaAssessments[trainee.id] || "";
+          const practicalVal =
+            traineeVivaPracticalAssessments[trainee.id] || "";
+
           return (
-            (traineeVivaAssessments[trainee.id] &&
-              traineeVivaAssessments[trainee.id] !== "") ||
-            (traineeVivaPracticalAssessments[trainee.id] &&
-              traineeVivaPracticalAssessments[trainee.id] !== "") ||
+            (vivaVal && vivaVal !== "") ||
+            (practicalVal && practicalVal !== "") ||
             trainee.result_status_id
           );
         } else {
+          const theoryVal = traineeTheoryAssessments[trainee.id] || "";
+          const practicalVal = traineePracticalAssessments[trainee.id] || "";
+
           return (
-            (traineeTheoryAssessments[trainee.id] &&
-              traineeTheoryAssessments[trainee.id] !== "") ||
-            (traineePracticalAssessments[trainee.id] &&
-              traineePracticalAssessments[trainee.id] !== "") ||
+            (theoryVal && theoryVal !== "") ||
+            (practicalVal && practicalVal !== "") ||
             trainee.result_status_id
           );
         }
@@ -766,6 +904,25 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           `Please enter CA mark/competency for all selected trainees. Missing for: ${missingAssessments.map((t) => t.applicant_name).join(", ")}`,
         );
         return;
+      }
+
+      // Validate internal assessment values for diploma
+      if (isDiplomaCertificationLevel()) {
+        const invalidAssessments = selectedTrainees.filter((trainee) => {
+          const value = traineeInternalAssessments[trainee.id];
+          if (value) {
+            const numValue = parseFloat(value);
+            return numValue < 0 || numValue > 20;
+          }
+          return false;
+        });
+
+        if (invalidAssessments.length > 0) {
+          toast.error(
+            `Internal Assessment must be between 0 and 20 for diploma. Invalid for: ${invalidAssessments.map((t) => t.applicant_name).join(", ")}`,
+          );
+          return;
+        }
       }
     }
 
@@ -855,7 +1012,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       }
 
       console.log("Final selection payload:", payload);
-      const response = await CourseEnrollmentService.selectedTrainee(
+      const response = await CourseEnrollmentService.submitSelectedTrainee(
         payload,
         access_token,
       );
@@ -1183,7 +1340,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           onClick={handleRefresh}
           color="primary"
           title="Refresh"
-          disabled={loading}
+          disabled={loading || movingTrainees}
         >
           <RefreshIcon />
         </IconButton>
@@ -1260,12 +1417,12 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         </Box>
       )}
 
-      {/* Course Information Card */}
+      {/* Programme Information Card */}
       {courseDetails && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Course Information
+              Programme Information
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={2}>
@@ -1279,7 +1436,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Grid>
               <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Course Name:
+                  Programme Name:
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
                   {courseDetails.course_name}
@@ -1353,7 +1510,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           </CardContent>
         </Card>
       )}
-
       {/* Selected and Pending Tables */}
       <Grid container spacing={3}>
         {/* Selected Trainees Table (Top) */}
@@ -1372,7 +1528,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
               />
             </Typography>
             <Divider sx={{ mb: 2 }} />
-
             <TextField
               label="Search Selected Trainees"
               variant="outlined"
@@ -1404,6 +1559,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                             filteredSelected.length
                         }
                         onChange={handleSelectAllSelected}
+                        disabled={hasCADates || movingTrainees}
                       />
                     </TableCell>
                     <TableCell>#</TableCell>
@@ -1413,8 +1569,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>Qualification</TableCell>
                     <TableCell>Status</TableCell>
-                    {/* Only show CA Mark/Competency column if CA dates exist */}
-                    {hasCADates && <TableCell>CA Mark/Competency</TableCell>}
+                    {/* Only show Internal Assessment column if CA dates exist */}
+                    {hasCADates && <TableCell>Internal Assessment</TableCell>}
                     {/* Show assessment columns ONLY if application is endorsed */}
                     {isApplicationEndorsed() && hasAssessments && (
                       <>
@@ -1451,6 +1607,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                               onChange={(e) =>
                                 handleSelectSelected(e, trainee.id)
                               }
+                              disabled={hasCADates || movingTrainees}
                             />
                           </TableCell>
                           <TableCell>
@@ -1478,59 +1635,147 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                           {hasCADates && (
                             <TableCell>
                               {isNumericCertificationLevel() ? (
-                                <TextField
-                                  type="number"
-                                  size="small"
-                                  placeholder="Enter CA mark"
-                                  value={
-                                    traineeInternalAssessments[trainee.id] || ""
+                                <Tooltip
+                                  title={
+                                    isDiplomaCertificationLevel()
+                                      ? getInternalAssessmentTooltipMessage()
+                                      : traineeInternalAssessments[
+                                            trainee.id
+                                          ] &&
+                                          traineeInternalAssessments[
+                                            trainee.id
+                                          ] !== ""
+                                        ? "CA mark is already set and cannot be modified"
+                                        : "Enter CA mark"
                                   }
-                                  onChange={(e) =>
-                                    handleInternalAssessmentChange(
-                                      trainee.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  fullWidth
-                                  slotProps={{
-                                    input: {
-                                      inputProps: { min: 0, max: 100 },
-                                    },
-                                  }}
-                                  sx={{ minWidth: 120 }}
-                                />
-                              ) : (
-                                <FormControl
-                                  size="small"
-                                  fullWidth
-                                  sx={{ minWidth: 150 }}
+                                  arrow
                                 >
-                                  <Select
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    placeholder={`Enter CA mark${isDiplomaCertificationLevel() ? " (0-20)" : ""}`}
                                     value={
                                       traineeInternalAssessments[trainee.id] ||
                                       ""
                                     }
-                                    onChange={(e) =>
-                                      handleInternalAssessmentChange(
-                                        trainee.id,
-                                        e.target.value,
-                                      )
-                                    }
-                                    displayEmpty
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      // Only apply validation for diploma level
+                                      if (isDiplomaCertificationLevel()) {
+                                        if (
+                                          validateInternalAssessmentInput(value)
+                                        ) {
+                                          handleInternalAssessmentChange(
+                                            trainee.id,
+                                            value,
+                                          );
+                                        }
+                                      } else {
+                                        handleInternalAssessmentChange(
+                                          trainee.id,
+                                          value,
+                                        );
+                                      }
+                                    }}
+                                    fullWidth
+                                    slotProps={{
+                                      input: {
+                                        inputProps: {
+                                          min: 0,
+                                          max: isDiplomaCertificationLevel()
+                                            ? 20
+                                            : 100,
+                                        },
+                                        readOnly: false,
+                                      },
+                                    }}
+                                    sx={{
+                                      minWidth: 120,
+                                      ...(traineeInternalAssessments[
+                                        trainee.id
+                                      ] &&
+                                        traineeInternalAssessments[
+                                          trainee.id
+                                        ] !== "" && {
+                                          backgroundColor: "#f5f5f5",
+                                          "& .MuiOutlinedInput-root": {
+                                            "& fieldset": {
+                                              borderColor:
+                                                "rgba(0, 0, 0, 0.23)",
+                                            },
+                                          },
+                                        }),
+                                    }}
+                                  />
+                                </Tooltip>
+                              ) : (
+                                <Tooltip
+                                  title={
+                                    traineeInternalAssessments[trainee.id] &&
+                                    traineeInternalAssessments[trainee.id] !==
+                                      ""
+                                      ? "CA competency is already set and cannot be modified"
+                                      : "Select CA competency"
+                                  }
+                                  arrow
+                                >
+                                  <FormControl
+                                    size="small"
+                                    fullWidth
+                                    sx={{ minWidth: 150 }}
                                   >
-                                    <MenuItem value="" disabled>
-                                      <em>Select Competency</em>
-                                    </MenuItem>
-                                    {academicCompetency.map((competency) => (
-                                      <MenuItem
-                                        key={competency.id}
-                                        value={competency.id}
-                                      >
-                                        {competency.name}
+                                    <Select
+                                      value={
+                                        traineeInternalAssessments[
+                                          trainee.id
+                                        ] || ""
+                                      }
+                                      onChange={(e) =>
+                                        handleInternalAssessmentChange(
+                                          trainee.id,
+                                          e.target.value,
+                                        )
+                                      }
+                                      displayEmpty
+                                      readOnly={
+                                        traineeInternalAssessments[
+                                          trainee.id
+                                        ] &&
+                                        traineeInternalAssessments[
+                                          trainee.id
+                                        ] !== ""
+                                      }
+                                      sx={{
+                                        ...(traineeInternalAssessments[
+                                          trainee.id
+                                        ] &&
+                                          traineeInternalAssessments[
+                                            trainee.id
+                                          ] !== "" && {
+                                            backgroundColor: "#f5f5f5",
+                                            "& .MuiOutlinedInput-root": {
+                                              "& fieldset": {
+                                                borderColor:
+                                                  "rgba(0, 0, 0, 0.23)",
+                                              },
+                                            },
+                                          }),
+                                      }}
+                                    >
+                                      <MenuItem value="" disabled>
+                                        <em>Select Competency</em>
                                       </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
+                                      {academicCompetency.map((competency) => (
+                                        <MenuItem
+                                          key={competency.id}
+                                          value={competency.id}
+                                        >
+                                          {competency.name}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  </FormControl>
+                                </Tooltip>
                               )}
                             </TableCell>
                           )}
@@ -1593,28 +1838,73 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                flexWrap: "wrap",
+                gap: 2,
               }}
             >
               <Typography variant="body2" color="textSecondary">
                 Selected: {selectedSelectedRows.length} trainee(s)
               </Typography>
-              <Box sx={{ display: "flex", gap: 2 }}>
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  onClick={moveToPending}
-                  disabled={
-                    selectedSelectedRows.length === 0 || loading || submitting
-                  }
-                  startIcon={<ArrowBackIcon />}
-                >
-                  Move to Pending ({selectedSelectedRows.length})
-                </Button>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                {/* Move to Pending Button with Tooltip */}
                 <Tooltip
                   title={
-                    isApplicationEndorsed() && hasAssessmentValues
-                      ? "Cannot submit when trainees have assessment marks or result status. Please clear all assessment values first."
-                      : ""
+                    hasCADates
+                      ? "⚠️ Cannot move trainees to pending when CA dates are set. Please clear CA dates first."
+                      : selectedSelectedRows.length === 0
+                        ? "Please select at least one trainee to move back"
+                        : ""
+                  }
+                  arrow
+                >
+                  <span>
+                    <Button
+                      variant="contained"
+                      color={hasCADates ? "grey" : "secondary"}
+                      onClick={moveToPending}
+                      disabled={
+                        selectedSelectedRows.length === 0 ||
+                        loading ||
+                        movingTrainees ||
+                        hasCADates
+                      }
+                      startIcon={
+                        movingTrainees ? (
+                          <CircularProgress size={20} />
+                        ) : hasCADates ? (
+                          <BlockIcon />
+                        ) : (
+                          <ArrowBackIcon />
+                        )
+                      }
+                      sx={{
+                        ...(hasCADates && {
+                          backgroundColor: (theme) => theme.palette.grey[400],
+                          color: (theme) => theme.palette.grey[600],
+                          cursor: "not-allowed",
+                          "&:hover": {
+                            backgroundColor: (theme) => theme.palette.grey[400],
+                          },
+                        }),
+                      }}
+                    >
+                      {movingTrainees
+                        ? "Moving..."
+                        : hasCADates
+                          ? "Movement Disabled"
+                          : `Move to Pending (${selectedSelectedRows.length})`}
+                    </Button>
+                  </span>
+                </Tooltip>
+
+                {/* Submit Button with Tooltip */}
+                <Tooltip
+                  title={
+                    courseDetails?.application_status_id === "55"
+                      ? "Application has been already submitted"
+                      : isApplicationEndorsed() && hasAssessmentValues
+                        ? "Cannot submit when trainees have assessment marks or result status. Please clear all assessment values first."
+                        : ""
                   }
                   arrow
                 >
@@ -1627,7 +1917,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                         loading ||
                         submitting ||
                         selectedTrainees.length === 0 ||
-                        (isApplicationEndorsed() && hasAssessmentValues)
+                        (isApplicationEndorsed() && hasAssessmentValues) ||
+                        courseDetails?.application_status_id === "55"
                       }
                       startIcon={
                         submitting ? (
@@ -1695,6 +1986,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                           selectedPendingRows.length === filteredPending.length
                         }
                         onChange={handleSelectAllPending}
+                        disabled={hasCADates || movingTrainees}
                       />
                     </TableCell>
                     <TableCell>#</TableCell>
@@ -1722,6 +2014,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                               onChange={(e) =>
                                 handleSelectPending(e, trainee.id)
                               }
+                              disabled={hasCADates || movingTrainees}
                             />
                           </TableCell>
                           <TableCell>
@@ -1796,22 +2089,64 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                flexWrap: "wrap",
+                gap: 2,
               }}
             >
               <Typography variant="body2" color="textSecondary">
                 Selected: {selectedPendingRows.length} trainee(s)
               </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={moveToSelected}
-                disabled={
-                  selectedPendingRows.length === 0 || loading || submitting
+
+              {/* Move to Selected Button with Tooltip */}
+              <Tooltip
+                title={
+                  hasCADates
+                    ? "⚠️ Cannot move trainees to selected when CA dates are set. Please clear CA dates first."
+                    : selectedPendingRows.length === 0
+                      ? "Please select at least one trainee to move"
+                      : ""
                 }
-                endIcon={<ArrowForwardIcon />}
+                arrow
               >
-                Move to Selected ({selectedPendingRows.length})
-              </Button>
+                <span>
+                  <Button
+                    variant="contained"
+                    color={hasCADates ? "grey" : "primary"}
+                    onClick={moveToSelected}
+                    disabled={
+                      selectedPendingRows.length === 0 ||
+                      loading ||
+                      movingTrainees ||
+                      hasCADates
+                    }
+                    startIcon={
+                      movingTrainees ? (
+                        <CircularProgress size={20} />
+                      ) : hasCADates ? (
+                        <BlockIcon />
+                      ) : (
+                        <ArrowForwardIcon />
+                      )
+                    }
+                    sx={{
+                      ...(hasCADates && {
+                        backgroundColor: (theme) => theme.palette.grey[400],
+                        color: (theme) => theme.palette.grey[600],
+                        cursor: "not-allowed",
+                        "&:hover": {
+                          backgroundColor: (theme) => theme.palette.grey[400],
+                        },
+                      }),
+                    }}
+                  >
+                    {movingTrainees
+                      ? "Moving..."
+                      : hasCADates
+                        ? "Movement Disabled"
+                        : `Move to Selected (${selectedPendingRows.length})`}
+                  </Button>
+                </span>
+              </Tooltip>
             </Box>
           </Paper>
         </Grid>

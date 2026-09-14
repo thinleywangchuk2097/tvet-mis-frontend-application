@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -72,6 +73,10 @@ const RequiredLabel = ({ children }) => (
   </span>
 );
 
+RequiredLabel.propTypes = {
+  children: PropTypes.node.isRequired,
+};
+
 // Status list constant
 const STATUS_LIST = [
   { id: 1, name: "Active" },
@@ -103,6 +108,7 @@ const TutorIndex = () => {
   useEffect(() => {
     fetchInstituteDetails();
     fetchAcademicQualification();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch tutors when instituteId is available
@@ -110,6 +116,7 @@ const TutorIndex = () => {
     if (instituteId) {
       fetchTutors();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instituteId]);
 
   const fetchInstituteDetails = async () => {
@@ -118,7 +125,6 @@ const TutorIndex = () => {
         await InstituteRegistrationService.getInstituteDetails(registration_no);
       const instId = response.data[0]?.institute_id;
       if (instId) {
-        console.log("Fetched Institute ID:", instId);
         setInstituteId(instId);
       } else {
         toast.error("Institute ID not found");
@@ -135,7 +141,6 @@ const TutorIndex = () => {
     try {
       const AcademicQualification = await CommonService.getByParentId(18);
       setAcademicQualifications(AcademicQualification.data);
-      console.log("Academic Qualification:", AcademicQualification.data);
     } catch (error) {
       console.error("Error fetching Academic Qualification:", error);
       // Fallback qualifications if API fails
@@ -156,10 +161,10 @@ const TutorIndex = () => {
     middleName: tutor.middle_name || "",
     lastName: tutor.last_name,
     email: tutor.email,
-    phone: tutor.mobile_no, // Changed from 'phone' to 'mobile_no' to match API response
+    phone: tutor.mobile_no,
     qualificationId: tutor.qualification_id
       ? parseInt(tutor.qualification_id)
-      : null, // Convert to number
+      : null,
     specialization: tutor.specialization,
     experienceYears: tutor.experience_years
       ? parseInt(tutor.experience_years)
@@ -184,20 +189,16 @@ const TutorIndex = () => {
 
     setLoading(true);
     try {
-      console.log("Fetching tutors with Institute ID:", instituteId);
       const response = await TutorService.getAllTutors(
         instituteId,
         access_token,
       );
-      console.log("Fetch Tutors Response:", response);
 
       if (response && response.data) {
-        // If response.data is an array, map each tutor
         const tutorsData = Array.isArray(response.data)
           ? response.data.map(mapTutorData)
           : [];
         setTutors(tutorsData);
-        console.log("Mapped tutors:", tutorsData);
         if (tutorsData.length === 0) {
           toast.info("No tutors found");
         }
@@ -216,7 +217,6 @@ const TutorIndex = () => {
 
   const getQualificationName = (qualificationId) => {
     if (!qualificationId) return "N/A";
-    // Convert qualificationId to number for comparison
     const id =
       typeof qualificationId === "string"
         ? parseInt(qualificationId)
@@ -233,11 +233,11 @@ const TutorIndex = () => {
   const getStatusColor = (statusId) => {
     switch (statusId) {
       case 1:
-        return "#4caf50"; // Active - Green
+        return "#4caf50";
       case 2:
-        return "#f44336"; // Inactive - Red
+        return "#f44336";
       default:
-        return "#9e9e9e"; // Grey
+        return "#9e9e9e";
     }
   };
 
@@ -299,7 +299,7 @@ const TutorIndex = () => {
         } else {
           toast.success("Tutor deleted successfully!");
         }
-        await fetchTutors(); // Refresh the list
+        await fetchTutors();
       } else {
         toast.error(response?.data?.message || "Failed to delete tutor");
       }
@@ -404,7 +404,6 @@ const TutorIndex = () => {
 
     setLoading(true);
     try {
-      // Prepare data for API with camelCase field names
       const payload = {
         id: dialogMode === "edit" ? values.id : null,
         citizenId: values.citizenId,
@@ -412,11 +411,11 @@ const TutorIndex = () => {
         middleName: values.middleName || "",
         lastName: values.lastName,
         email: values.email,
-        mobileNo: values.phone, // Changed from 'phone' to 'mobileNo' to match backend DTO
+        mobileNo: values.phone,
         qualificationId: parseInt(values.qualificationId),
         specialization: values.specialization,
         experienceYears: parseInt(values.experienceYears),
-        hourlyRate: values.hourlyRate.toString(), // Convert to string as per backend
+        hourlyRate: values.hourlyRate.toString(),
         statusId: parseInt(values.statusId),
         joiningDate: values.joiningDate,
         description: values.description || "",
@@ -429,7 +428,6 @@ const TutorIndex = () => {
 
       if (dialogMode === "add") {
         response = await TutorService.submitTutor(payload, access_token);
-        console.log("Submit Response:", response);
 
         if (response && response.status === 201) {
           const responseData = response.data;
@@ -439,7 +437,7 @@ const TutorIndex = () => {
             );
             resetForm();
             setOpenDialog(false);
-            await fetchTutors(); // Refresh the list
+            await fetchTutors();
           } else {
             toast.error(responseData?.message || "Failed to create tutor");
           }
@@ -455,7 +453,6 @@ const TutorIndex = () => {
         }
       } else if (dialogMode === "edit") {
         response = await TutorService.updateTutor(payload, access_token);
-        console.log("Update Response:", response);
 
         if (response && response.status === 200) {
           const responseData = response.data;
@@ -467,7 +464,7 @@ const TutorIndex = () => {
             toast.success("Tutor updated successfully!");
           }
           setOpenDialog(false);
-          await fetchTutors(); // Refresh the list
+          await fetchTutors();
         } else {
           toast.error(response?.data?.message || "Failed to update tutor");
         }
@@ -1176,14 +1173,14 @@ const TutorIndex = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete "
+            Are you sure you want to delete &quot;
             {tutorToDelete &&
               getFullName(
                 tutorToDelete.firstName,
                 tutorToDelete.middleName,
                 tutorToDelete.lastName,
               )}
-            "?
+            &quot;?
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             This action cannot be undone.

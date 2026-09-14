@@ -42,7 +42,7 @@ class CourseEnrollmentService {
       .catch((error) => error);
   }
 
-    getCourseAppliedTraineesReAssessmentByApplicationNo(application_no) {
+  getCourseAppliedTraineesReAssessmentByApplicationNo(application_no) {
     return apiClient
       .get(
         `/api/v1/public/course-enrollment-trainee/get-reassessment-applicant-details/${application_no}`,
@@ -51,7 +51,7 @@ class CourseEnrollmentService {
       .catch((error) => error);
   }
 
-  selectedTrainee(data, token) {
+  submitSelectedTrainee(data, token) {
     return apiClient
       .post(
         `/api/v1/public/course-enrollment-trainee/selected-trainees`,
@@ -65,7 +65,8 @@ class CourseEnrollmentService {
       .then((response) => response)
       .catch((error) => error);
   }
-   submitReassessmentTrainees(data, token) {
+
+  submitReassessmentTrainees(data, token) {
     return apiClient
       .post(
         `/api/v1/public/course-enrollment-trainee/selected-reassessment-trainees`,
@@ -79,6 +80,7 @@ class CourseEnrollmentService {
       .then((response) => response)
       .catch((error) => error);
   }
+
   updateTraineeApplication(data, token) {
     return apiClient
       .post(
@@ -94,10 +96,10 @@ class CourseEnrollmentService {
       .catch((error) => error);
   }
 
-  getFailedTraineeDetails(user_id,course_id) {
+  getFailedTraineeDetails(user_id, course_id, certification_level_id) {
     return apiClient
       .get(
-        `/api/v1/public/course-enrollment-trainee/get-trainee-details/${user_id}/${course_id}`,
+        `/api/v1/public/course-enrollment-trainee/get-trainee-details/${user_id}/${course_id}/${certification_level_id}`,
       )
       .then((response) => response)
       .catch((error) => error);
@@ -113,6 +115,7 @@ class CourseEnrollmentService {
       .then((response) => response)
       .catch((error) => error);
   }
+
   getReAssessmentServiceName(token) {
     return apiClient
       .get(
@@ -127,7 +130,7 @@ class CourseEnrollmentService {
       .catch((error) => error);
   }
 
-   getTraineeDetailsById(traineeId, token) {
+  getTraineeDetailsById(traineeId, token) {
     return apiClient
       .get(
         `/api/v1/user/management/course-announcement/get-trainee-verification-details/${traineeId}`,
@@ -141,10 +144,25 @@ class CourseEnrollmentService {
       .catch((error) => error);
   }
 
-   fetchAssignedAssessors(application_no, token) {
+  fetchAssignedAssessors(application_no, token) {
     return apiClient
       .get(
         `/api/v1/public/course-enrollment-trainee/get-assigned-assessors/${application_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  removeTraineeFromSelectedProgramme(data, token) {
+    return apiClient
+      .post(
+        `/api/v1/public/course-enrollment-trainee/remove-selected-trainee`,
+        data,
         {
           headers: {
             Authorization: `Bearer ${token}`,

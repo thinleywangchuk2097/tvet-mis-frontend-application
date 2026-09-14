@@ -752,7 +752,7 @@ const DropdownIndex = () => {
           open={open}
           onClose={() => setOpen(false)}
           fullWidth
-          maxWidth={isMobile ? "xs" : "sm"}
+          maxWidth={isMobile ? "xs" : "md"}
           fullScreen={isMobile}
         >
           <form onSubmit={formik.handleSubmit}>
@@ -819,7 +819,7 @@ const DropdownIndex = () => {
                   formik.touched.description && formik.errors.description
                 }
                 multiline
-                rows={isMobile ? 2 : 2}
+                rows={2}
                 sx={{ "& .MuiFormHelperText-root": { fontSize: "0.7rem" } }}
               />
 

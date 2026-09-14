@@ -1,5 +1,5 @@
 // InstituteChange.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import {
   Box,
@@ -686,7 +686,7 @@ const InstituteChange = () => {
   const citizenLookup = useCitizenLookup();
   const stepper = useStepper(0);
 
-  const [formValues, setFormValues] = useState({
+  const [formValues] = useState({
     changeType: "",
     dzongkhag_id: "",
     exact_location: "",
@@ -771,6 +771,7 @@ const InstituteChange = () => {
   // ===== EFFECTS =====
   useEffect(() => {
     masterData.fetchMasterData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ===== HELPERS =====
@@ -881,7 +882,6 @@ const InstituteChange = () => {
     [citizenLookup, formik],
   );
 
-  // FIXED: Simplified the renderChangeSection to avoid duplication
   const renderChangeSection = useCallback(() => {
     const { changeType } = formik.values;
 
@@ -1027,7 +1027,7 @@ const InstituteChange = () => {
                   <FormTextField
                     formik={formik}
                     name="registration_no"
-                    label={isCompany() ? "Registration No" : "Registration No"}
+                    label="Registration No"
                     placeholder="Enter registration number"
                     required
                   />
@@ -1156,9 +1156,7 @@ const InstituteChange = () => {
 
     return null;
   }, [
-    formik.values,
-    formik.handleChange,
-    formik.handleBlur,
+    formik,
     masterData.dzongkhags,
     masterData.ownershipTypes,
     masterData.otherOwnershipTypes,
@@ -1317,13 +1315,7 @@ const InstituteChange = () => {
         </Grid>
       </Paper>
     );
-  }, [
-    formik.values,
-    getChangeSummary,
-    getTypeOfOwnerName,
-    instituteData,
-    masterData,
-  ]);
+  }, [formik, getChangeSummary, getTypeOfOwnerName, instituteData, masterData]);
 
   if (instituteData.loading) {
     return (
@@ -1354,7 +1346,7 @@ const InstituteChange = () => {
             Request for Institute Change
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            Submit a request to change your institute's location, name, or
+            Submit a request to change your institute&apos;s location, name, or
             ownership details
           </Typography>
           {registration_no && (
@@ -1370,7 +1362,7 @@ const InstituteChange = () => {
 
         {/* Stepper */}
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {STEPS.map((label, index) => (
+          {STEPS.map((label) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>
             </Step>
@@ -1435,8 +1427,8 @@ const InstituteChange = () => {
                       ? "Active"
                       : "Pending",
                 },
-              ].map((field, idx) => (
-                <Grid key={idx} item size={{ xs: 12, md: 3 }}>
+              ].map((field) => (
+                <Grid key={field.label} item size={{ xs: 12, md: 3 }}>
                   <InfoDisplay label={field.label} value={field.value} />
                 </Grid>
               ))}

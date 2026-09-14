@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Paper,
   Typography,
@@ -11,18 +11,42 @@ import {
   TableBody,
   TableContainer,
   InputAdornment,
+  CircularProgress,
+  Box,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import { toast } from "react-toastify";
+// import MonitoringReportService from "../../api/services/internal/monitoring/MonitoringReportService";
 
 const MonitoringReport = () => {
   const [search, setSearch] = useState("");
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const reports = []; // empty dummy data
+  const fetchReports = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Replace with actual API call:
+      // const response = await MonitoringReportService.getAllReports();
+      // setReports(response.data || []);
+      setReports([]);
+    } catch (error) {
+      console.error("Failed to load monitoring reports:", error);
+      toast.error("Failed to load monitoring reports");
+      setReports([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   const filteredData = reports.filter(
     (item) =>
       item.applicationNo?.toLowerCase().includes(search.toLowerCase()) ||
-      item.instituteName?.toLowerCase().includes(search.toLowerCase())
+      item.instituteName?.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -39,12 +63,14 @@ const MonitoringReport = () => {
             placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
         </Grid>
@@ -71,9 +97,23 @@ const MonitoringReport = () => {
           </TableHead>
 
           <TableBody>
-            {filteredData.length > 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      py: 2,
+                    }}
+                  >
+                    <CircularProgress size={24} />
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ) : filteredData.length > 0 ? (
               filteredData.map((row, index) => (
-                <TableRow key={index}>
+                <TableRow key={row.id || index}>
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{row.applicationNo}</TableCell>
                   <TableCell>{row.instituteName}</TableCell>

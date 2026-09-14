@@ -52,6 +52,7 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 const moduleManagementDialogPropTypes = {
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,
   initialData: PropTypes.shape({
     moduleName: PropTypes.string,
     moduleCode: PropTypes.string,
@@ -65,7 +66,13 @@ const moduleManagementDialogPropTypes = {
 };
 
 // ==================== MODULE MANAGEMENT DIALOG ====================
-const ModuleManagementDialog = ({ open, onClose, initialData, formik }) => {
+const ModuleManagementDialog = ({
+  open,
+  onClose,
+  onSave,
+  initialData,
+  formik,
+}) => {
   const [moduleData, setModuleData] = useState(
     initialData || {
       moduleName: "",
@@ -98,21 +105,12 @@ const ModuleManagementDialog = ({ open, onClose, initialData, formik }) => {
     setModuleData({ ...moduleData, [field]: value });
   };
 
-  // FIXED: Removed `this` usage by using arrow function
   const handleSave = () => {
     if (!moduleData.moduleName) {
       toast.error("Module name is required");
       return;
     }
-    // Use the parent's handleModuleSubmit function
-    if (formik && formik.handleModuleSubmit) {
-      formik.handleModuleSubmit(moduleData);
-    } else {
-      // Fallback: call the parent's submit handler through props
-      if (window.__moduleSubmitHandler) {
-        window.__moduleSubmitHandler(moduleData);
-      }
-    }
+    onSave(moduleData);
     onClose();
   };
 
@@ -242,7 +240,6 @@ const CreateTotIndex = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
-  const [programs, setPrograms] = useState([]);
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
   const [editingModuleIndex, setEditingModuleIndex] = useState(null);
@@ -264,6 +261,9 @@ const CreateTotIndex = () => {
   const [moduleDeleteFormik, setModuleDeleteFormik] = useState(null);
 
   const access_token = useSelector((state) => state.auth.accessToken);
+
+  // Program management state
+  const [programsData, setProgramsData] = useState([]);
 
   // Fetch dropdown options on component mount
   useEffect(() => {
@@ -291,10 +291,7 @@ const CreateTotIndex = () => {
     }
   };
 
-  // Program management state
-  const [programsData, setProgramsData] = useState([]);
-
-  // Fetch programs and courses on component mount
+  // Fetch programs on component mount
   useEffect(() => {
     fetchPrograms();
   }, []);
@@ -310,7 +307,6 @@ const CreateTotIndex = () => {
     try {
       setLoading(true);
       const response = await TotService.getToTPrograms(access_token);
-      console.log("Fetched programs:", response.data);
 
       const parsedPrograms = (response.data || []).map((program) => {
         let modules = [];
@@ -350,7 +346,6 @@ const CreateTotIndex = () => {
     try {
       const response =
         await TotService.getToTProgramsAnnouncement(access_token);
-      console.log("Fetched announcements:", response.data);
 
       const mappedAnnouncements = (response.data || []).map((item) => {
         const program = programsData.find(
@@ -378,7 +373,6 @@ const CreateTotIndex = () => {
       });
 
       setAnnouncements(mappedAnnouncements);
-      console.log("Mapped announcements:", mappedAnnouncements);
     } catch (error) {
       console.error("Error fetching announcements:", error);
       toast.error("Failed to fetch announcements");
@@ -613,23 +607,6 @@ const CreateTotIndex = () => {
     }
   };
 
-  const handleProgramChange = async (programId, formik) => {
-    const program = programsData.find(
-      (p) => String(p.id) === String(programId),
-    );
-    setSelectedProgram(program);
-
-    if (program) {
-      formik.setFieldValue("programId", program.id);
-      formik.setFieldValue("programName", program.programName);
-      formik.setFieldValue("programCode", program.programCode);
-      formik.setFieldValue("programTypeId", program.programTypeId);
-      if (program.modules) {
-        formik.setFieldValue("modules", program.modules);
-      }
-    }
-  };
-
   const requiredLabel = (label) => (
     <>
       {label}
@@ -667,8 +644,8 @@ const CreateTotIndex = () => {
       .test(
         "single-module-limit",
         "Single Module programs can only have one module",
-        function (modules) {
-          const programTypeId = this.parent.programTypeId;
+        (modules, context) => {
+          const programTypeId = context.parent.programTypeId;
           if (programTypeId === 120 && modules && modules.length > 1) {
             return false;
           }
@@ -702,8 +679,6 @@ const CreateTotIndex = () => {
       if (editingProgramId) {
         payload.id = editingProgramId;
       }
-
-      console.log("Submitting program payload:", payload);
 
       const response = await TotService.submitTOTProgram(payload, access_token);
 
@@ -798,14 +773,10 @@ const CreateTotIndex = () => {
         statusId: values.statusId || 122,
       };
 
-      // If editing, include the ID in the payload
       if (editingId) {
         payload.id = editingId;
       }
 
-      console.log("Submitting announcement payload:", payload);
-
-      // FIXED: Both branches were doing the same thing
       const response = await TotService.submitTOTProgramAnnouncement(
         payload,
         access_token,
@@ -1053,8 +1024,8 @@ const CreateTotIndex = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
-                      No TOT programs available. Click "Create Program" to add
-                      one.
+                      No TOT programs available. Click &quot;Create
+                      Program&quot; to add one.
                     </TableCell>
                   </TableRow>
                 )}
@@ -1240,8 +1211,8 @@ const CreateTotIndex = () => {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete{" "}
-            {deleteType === "announcement" ? "announcement" : "program"} "
-            {deleteItemName}"? This action cannot be undone.
+            {deleteType === "announcement" ? "announcement" : "program"}{" "}
+            {deleteItemName}? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -1273,7 +1244,7 @@ const CreateTotIndex = () => {
         <DialogTitle>Confirm Delete Module</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete module "{moduleDeleteName}"? This
+            Are you sure you want to delete module {moduleDeleteName}? This
             action cannot be undone.
           </DialogContentText>
         </DialogContent>
@@ -1766,8 +1737,8 @@ const CreateTotIndex = () => {
 
                     {formik.values.modules.length === 0 ? (
                       <Alert severity="info" sx={{ mb: 2 }}>
-                        No modules added yet. Click "Add Module" to create
-                        modules for this program.
+                        No modules added yet. Click &quot;Add Module&quot; to
+                        create modules for this program.
                       </Alert>
                     ) : (
                       <TableContainer component={Paper} variant="outlined">
@@ -1861,6 +1832,9 @@ const CreateTotIndex = () => {
                 <ModuleManagementDialog
                   open={moduleDialogOpen}
                   onClose={handleModuleDialogClose}
+                  onSave={(moduleData) =>
+                    handleModuleSubmit(moduleData, formik)
+                  }
                   initialData={
                     editingModuleIndex !== null
                       ? formik.values.modules[editingModuleIndex]

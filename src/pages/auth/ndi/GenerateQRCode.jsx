@@ -356,8 +356,9 @@ const GenerateQRCode = () => {
                   color: "#000000",
                 }}
               >
-                Login with <span style={{ color: "#5AC994" }}>Bhutan NDI</span>{" "}
-                Wallet
+                {"Login with "}
+                <span style={{ color: "#5AC994" }}>Bhutan NDI</span>
+                {" Wallet"}
               </Typography>
               <Button
                 variant="contained"
@@ -399,8 +400,9 @@ const GenerateQRCode = () => {
                 color: "#000000",
               }}
             >
-              Scan with <span style={{ color: "#5AC994" }}>Bhutan NDI</span>{" "}
-              Wallet
+              {"Scan with "}
+              <span style={{ color: "#5AC994" }}>Bhutan NDI</span>
+              {" Wallet"}
             </Typography>
           )}
 
@@ -521,7 +523,7 @@ const GenerateQRCode = () => {
                 fontSize: "0.9rem",
               }}
             >
-              Don&apos;t have the Bhutan NDI Wallet?
+              Don&apos;t have the Bhutan NDI Wallet?{" "}
               <span
                 style={{
                   color: "#5AC994",
@@ -529,7 +531,6 @@ const GenerateQRCode = () => {
                   display: isMobile ? "block" : "inline",
                 }}
               >
-                {" "}
                 Download Now!
               </span>
             </Typography>

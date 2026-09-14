@@ -1,4 +1,4 @@
-// ViewApplyNonAccreditedCourse.jsx
+// ViewNonAccreditedCourseRegistration.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
 import {
@@ -844,7 +844,7 @@ const TabNavigation = ({
 TabNavigation.propTypes = tabNavigationPropTypes;
 
 // ==================== MAIN COMPONENT ====================
-const ViewApplyNonAccreditedCourse = () => {
+const ViewNonAccreditedCourseRegistration = () => {
   const { applicationNo } = useParams();
   const navigate = useNavigate();
   const access_token = useSelector((state) => state.auth.accessToken);
@@ -1531,6 +1531,6 @@ const ViewApplyNonAccreditedCourse = () => {
 };
 
 // ==================== PROPTYPES FOR MAIN COMPONENT ====================
-ViewApplyNonAccreditedCourse.propTypes = {};
+ViewNonAccreditedCourseRegistration.propTypes = {};
 
-export default ViewApplyNonAccreditedCourse;
+export default ViewNonAccreditedCourseRegistration;

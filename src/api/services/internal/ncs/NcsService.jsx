@@ -69,7 +69,21 @@ class NcsService {
       })
       .then((response) => response)
       .catch((error) => {
-        console.error("Error in getProgrammeTitleById:", error);
+        console.error("Error in programme title :", error);
+        return error;
+      });
+  }
+
+   getAllNcsProgrammes(token) {
+    return apiClient
+      .get(`/api/v1/user/management/ncs/get-ncs-programmes`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => {
+        console.error("Error in all ncs programmes:", error);
         return error;
       });
   }
