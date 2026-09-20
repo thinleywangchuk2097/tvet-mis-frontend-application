@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useFormik } from "formik";
 import {
   Paper,
   Typography,
@@ -11,215 +10,367 @@ import {
   TableCell,
   TableBody,
   TableContainer,
-  InputAdornment,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
   Button,
   Box,
   Divider,
   TablePagination,
+  Autocomplete,
+  CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import DownloadIcon from "@mui/icons-material/Download";
-import ExportButtons from "@/components/common/ExportButtons";
+import { toast } from "react-toastify";
 import { exportToExcel } from "@/utils/exportExcel";
 import { useSelector } from "react-redux";
-
 import {
   generateAssessmentCertificatePdf,
   generateAllAssessmentCertificatesPdf,
 } from "@/utils/assessmentCertificatePdf";
 import CertificationService from "../../api/services/internal/certification/CertificationService";
+import CommonService from "../../api/services/internal/common/CommonService";
+
+const CERTIFICATION_LEVEL_PARENT_ID = 27;
+
+/** Always returns an array, no matter what the API shape is. */
+const toArray = (res) => {
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  return [];
+};
 
 const Assessment = () => {
   const [filters, setFilters] = useState({
-    // instituteList: "",
-    //courseList: "",
+    instituteList: "",
+    serviceList: "",
+    programmeList: "",
+    certificationLevelList: "",
     ApplicationNo: "",
-    search: "",
   });
 
-  // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [instituteId, setInstituteId] = useState("");
+  const [serviceId, setServiceId] = useState("");
+  const [certificationLevelId, setCertificationLevelId] = useState("");
+
   const [instituteList, setInstituteList] = useState([]);
-  const [courseList, setCourseList] = useState([]);
+  const [serviceList, setServiceList] = useState([]);
+  const [programmeList, setProgrammeList] = useState([]);
+  const [certificationLevelList, setCertificationLevelList] = useState([]);
+
+  const [reports, setReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+
   const access_token = useSelector((state) => state.auth.accessToken);
 
-  console.log("token", access_token);
-  useEffect(() => {
-    fetchAssessmentInstitutes();
-  }, []);
+  // ============================================================
+  // FETCHERS — all guarded and safe
+  // ============================================================
 
-  useEffect(() => {
-    fetchAssessmentCourses();
-  }, [instituteId]);
-
-  const fetchAssessmentInstitutes = async () => {
+  const fetchAssessmentInstitutes = useCallback(async () => {
+    if (!access_token) return;
     try {
-      const instituteLists =
+      const res =
         await CertificationService.getAssessmentInstitutes(access_token);
-      //console.log("Ass Ins List", instituteLists.data);
-      setInstituteList(instituteLists.data);
+      setInstituteList(toArray(res));
     } catch (error) {
       console.error("Error fetching Institute:", error);
+      setInstituteList([]);
     }
-  };
+  }, [access_token]);
 
-  const fetchAssessmentCourses = async () => {
+  const fetchServices = useCallback(async () => {
+    if (!access_token) return;
     try {
-      const courseLists = await CertificationService.getAssessmentCourses(
+      const res =
+        await CertificationService.getServicesAssessementResult(access_token);
+        console.log("Fetched Services:", res.data);
+      setServiceList(toArray(res));
+    } catch (error) {
+      console.error("Error fetching Services:", error);
+      setServiceList([]);
+    }
+  }, [access_token]);
+
+  const fetchCertificationLevels = useCallback(async () => {
+    try {
+      const res = await CommonService.getByParentId(
+        CERTIFICATION_LEVEL_PARENT_ID,
+      );
+      console.log("Fetched Certification Levels:", res.data);
+      setCertificationLevelList(toArray(res));
+    } catch (error) {
+      console.error("Error fetching Certification Levels:", error);
+      setCertificationLevelList([]);
+    }
+  }, []);
+
+  const fetchProgrammes = useCallback(async () => {
+    if (!access_token) return;
+    try {
+      const res = await CertificationService.getProgrammesCertification(
         instituteId,
+        serviceId,
+        certificationLevelId,
         access_token,
       );
-      console.log("instituteId", courseLists.data);
-      setCourseList(courseLists.data);
+      setProgrammeList(toArray(res));
     } catch (error) {
-      console.error("Error fetching Course:", error);
+      console.error("Error fetching Programmes:", error);
+      setProgrammeList([]);
     }
-  };
+  }, [instituteId, serviceId, certificationLevelId, access_token]);
+
+  const fetchPassedTrainees = useCallback(async () => {
+    const hasApplicationNo = !!filters.ApplicationNo;
+    const hasAllFour =
+      !!instituteId &&
+      !!serviceId &&
+      !!certificationLevelId &&
+      !!filters.programmeList;
+
+    if (hasApplicationNo && hasAllFour) {
+      toast.warning(
+        "Please use either Application No alone, or the four filters together.",
+      );
+      return;
+    }
+    if (!hasApplicationNo && !hasAllFour) {
+      toast.warning(
+        "Enter Application No, or select Institute + Service + Certification Level + Programme.",
+      );
+      return;
+    }
+    if (!access_token) {
+      toast.error("Session not ready. Please wait a moment and try again.");
+      return;
+    }
+
+    setLoadingReports(true);
+    try {
+      const res = hasApplicationNo
+        ? await CertificationService.getListPassTraineeForCertificatePrinting(
+            filters.ApplicationNo,
+            null,
+            null,
+            null,
+            null,
+            access_token,
+          )
+        : await CertificationService.getListPassTraineeForCertificatePrinting(
+            null,
+            instituteId,
+            serviceId,
+            certificationLevelId,
+            filters.programmeList,
+            access_token,
+          );
+      console.log("Fetched passed trainees:", res.data);
+      setReports(toArray(res));
+      setPage(0);
+    } catch (error) {
+      console.error("Error fetching passed trainees:", error);
+      toast.error("Failed to fetch trainee certificate data");
+      setReports([]);
+    } finally {
+      setLoadingReports(false);
+    }
+  }, [
+    filters.ApplicationNo,
+    filters.programmeList,
+    instituteId,
+    serviceId,
+    certificationLevelId,
+    access_token,
+  ]);
+
+  useEffect(() => {
+    if (!access_token) return;
+    void fetchAssessmentInstitutes();
+    void fetchServices();
+    void fetchCertificationLevels();
+  }, [
+    access_token,
+    fetchAssessmentInstitutes,
+    fetchServices,
+    fetchCertificationLevels,
+  ]);
+
+  useEffect(() => {
+    if (instituteId && serviceId && certificationLevelId) {
+      void fetchProgrammes();
+    } else {
+      setProgrammeList([]);
+    }
+  }, [instituteId, serviceId, certificationLevelId, fetchProgrammes]);
+
+  // ============================================================
+  // EXPORT / PDF
+  // ============================================================
 
   const today = new Date().toISOString().split("T")[0];
 
   const handleExcel = () => {
-    const data = filteredReports.map((item, index) => ({
+    const data = reports.map((item, index) => ({
       SlNo: index + 1,
-      Name: item.name,
-      CID: item.cid,
-      Gender: item.gender,
-      Course: item.course,
-      Certificate: item.certificate,
-      Internal: item.internal,
-      Theory: item.theory,
-      Practical: item.practical,
-      Result: item.result,
+      Name: item.applicant_name || item.name || item.trainee_name || "",
+      CID: item.cid_no || item.cid || item.reference_no || "",
+      Gender: item.gender || "",
+      Programme: item.programme_title || item.programme || "",
+      Certificate: item.certification_level || item.certificate || "",
+      InternalAssessment: item.internal_assessment ?? item.internal ?? "",
+      TheoryAssessment: item.theory_assessment ?? item.theory ?? "",
+      PracticalAssessment: item.practical_assessment ?? item.practical ?? "",
+      VivaAssessment: item.viva_assessment ?? item.viva ?? "",
+      Result: item.result_status || item.result || "",
     }));
-
     exportToExcel(data, `Assessment_Result_${today}`);
   };
 
-  // Certificate PDF
-  const handlePdf = (report) => {
-    generateAssessmentCertificatePdf(report);
+  const handlePdf = async (report) => {
+    try {
+      await generateAssessmentCertificatePdf(report);
+    } catch (err) {
+      console.error("❌ Certificate generation failed");
+      console.error("   message:", err?.message);
+      console.error("   stack:", err?.stack);
+      console.error("   error:", err);
+      toast.error(
+        `Could not generate certificate: ${err?.message || "unknown"}`,
+      );
+    }
   };
 
-  // Certificate PDF for All
-  const handleDownloadAll = () => {
-    generateAllAssessmentCertificatesPdf(filteredReports);
+  const handleDownloadAll = async () => {
+    if (!reports.length) return;
+    try {
+      await generateAllAssessmentCertificatesPdf(reports);
+    } catch (err) {
+      console.error("❌ Bulk certificate generation failed");
+      console.error("   message:", err?.message);
+      console.error("   stack:", err?.stack);
+      console.error("   error:", err);
+      toast.error(
+        `Could not generate certificates: ${err?.message || "unknown"}`,
+      );
+    }
   };
 
-  // Sample report data
-  const [reports] = useState([
-    {
-      id: 1,
-      name: "Pema Dorji",
-      cid: "1160400783",
-      gender: "M",
-      course: "Excavator Operator",
-      certificate: "BQF Certificate 2",
-      internal: "Competent",
-      theory: "Competent",
-      practical: "Competent",
-      result: "Competent",
-    },
-    {
-      id: 2,
-      name: "Tashi",
-      cid: "1160400909",
-      gender: "M",
-      course: "Excavator Operator",
-      certificate: "BQF Certificate 2",
-      internal: "Competent",
-      theory: "Competent",
-      practical: "Competent",
-      result: "Competent",
-    },
-    {
-      id: 3,
-      name: "Pema Lhamo",
-      cid: "1160400783",
-      gender: "F",
-      course: "Excavator Operator",
-      certificate: "BQF Certificate 2",
-      internal: "Competent",
-      theory: "Not Competent",
-      practical: "Competent",
-      result: "Not Competent",
-    },
-    {
-      id: 4,
-      name: "Wahgchuk Pemo",
-      cid: "189700202",
-      gender: "F",
-      course: "Excavator Operator",
-      certificate: "BQF Certificate 2",
-      internal: "Competent",
-      theory: "Competent",
-      practical: "Competent",
-      result: "Competent",
-    },
-  ]);
+  // ============================================================
+  // HANDLERS
+  // ============================================================
 
-  // Handle filter changes
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setInstituteId(value);
-    console.log(value);
-    setFilters((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    setPage(0); // Reset to first page when filters change
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPage(0);
   };
 
-  // Clear all filters
+  const handleInstituteChange = (_event, newValue) => {
+    const value = newValue ? newValue.institute_id : "";
+    setInstituteId(value);
+    setFilters((prev) => ({
+      ...prev,
+      instituteList: value,
+      programmeList: "",
+    }));
+    setPage(0);
+  };
+
+  const handleServiceChange = (_event, newValue) => {
+    const value = newValue ? newValue.id : "";
+    setServiceId(value);
+    setCertificationLevelId("");
+    setFilters((prev) => ({
+      ...prev,
+      serviceList: value,
+      certificationLevelList: "",
+      programmeList: "",
+    }));
+    setPage(0);
+  };
+
+  const handleCertificationLevelChange = (_event, newValue) => {
+    const value = newValue ? newValue.id : "";
+    setCertificationLevelId(value);
+    setFilters((prev) => ({
+      ...prev,
+      certificationLevelList: value,
+      programmeList: "",
+    }));
+    setPage(0);
+  };
+
+  const handleSearch = () => {
+    setPage(0);
+    void fetchPassedTrainees();
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
+
   const handleClearFilters = () => {
     setFilters({
       instituteList: "",
-      courseList: "",
-      applicatioNo: "",
-      search: "",
+      serviceList: "",
+      programmeList: "",
+      certificationLevelList: "",
+      ApplicationNo: "",
     });
-    setPage(0); // Reset to first page when clearing filters
+    setInstituteId("");
+    setServiceId("");
+    setCertificationLevelId("");
+    setReports([]);
+    setPage(0);
   };
 
-  // Filter reports based on selected filters
-  const filteredReports = reports.filter((report) => {
-    return (
-      (filters.instituteList === "" || report.type === filters.instituteList) &&
-      (filters.courseList === "" || report.courseList === filters.courseList) &&
-      (filters.applicatioNo === "" ||
-        report.applicatioNo === filters.applicatioNo) &&
-      (filters.search === "" ||
-        report.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        report.courseList.toLowerCase().includes(filters.search.toLowerCase()))
-    );
-  });
-
-  // Handle page change
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  // Handle rows per page change
+  const handleChangePage = (_event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  // Paginated reports
-  const paginatedReports = filteredReports.slice(
+  const safeReports = Array.isArray(reports) ? reports : [];
+  const paginatedReports = safeReports.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage,
   );
 
-  // Download report
-  const handleDownload = (reportId) => {
-    console.log(`Downloading report ${reportId}`);
-  };
+  const selectedInstitute =
+    instituteList.find(
+      (ins) => String(ins.institute_id) === String(filters.instituteList),
+    ) || null;
+  const selectedService =
+    serviceList.find((s) => String(s.id) === String(filters.serviceList)) ||
+    null;
+  const selectedCertificationLevel =
+    certificationLevelList.find(
+      (c) => String(c.id) === String(filters.certificationLevelList),
+    ) || null;
+  const selectedProgramme =
+    programmeList.find((p) => String(p.id) === String(filters.programmeList)) ||
+    null;
+
+  const programmeDisabled = !instituteId || !serviceId || !certificationLevelId;
+
+  const hasApplicationNo = !!filters.ApplicationNo;
+  const hasAllFour =
+    !!instituteId &&
+    !!serviceId &&
+    !!certificationLevelId &&
+    !!filters.programmeList;
+
+  const canSearch =
+    (hasApplicationNo && !hasAllFour) || (!hasApplicationNo && hasAllFour);
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <Paper sx={{ p: 2, mt: 1 }}>
@@ -227,65 +378,124 @@ const Assessment = () => {
         Assessment Certificate
       </Typography>
 
-      {/* Filter Section */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
+        {/* Institute */}
         <Grid item size={{ xs: 12, md: 3 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Institute</InputLabel>
-            <Select
-              name="instituteId"
-              value={filters.instituteList}
-              onChange={handleFilterChange}
-              label="Institute Name"
-            >
-              <MenuItem value="">-Select-</MenuItem>
-              {instituteList.map((ins) => (
-                <MenuItem key={ins.instituteId} value={ins.institute_id}>
-                  {ins.proposed_institute_name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-
-        <Grid item size={{ xs: 12, md: 3 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Course</InputLabel>
-            <Select
-              name="courseList"
-              value={filters.courseList}
-              onChange={handleFilterChange}
-              label="Course"
-            >
-              <MenuItem value="">-select-</MenuItem>
-              {Array.isArray(courseList) &&
-                courseList.map((course) => (
-                  <MenuItem key={course.id} value={course.id}>
-                    {course.course_name}
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
-        </Grid>
-
-        <Grid item size={{ xs: 12, md: 3 }}>
-          <TextField
-            fullWidth
-            label={<span>Appication No </span>}
-            type="number"
-            name="Application"
+          <Autocomplete
             size="small"
+            options={instituteList}
+            value={selectedInstitute}
+            onChange={handleInstituteChange}
+            getOptionLabel={(option) => option.proposed_institute_name || ""}
+            isOptionEqualToValue={(option, value) =>
+              option.institute_id === value.institute_id
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Institute"
+                placeholder="Search..."
+              />
+            )}
           />
         </Grid>
 
-        <Grid item size={{ xs: 12, md: 2 }}>
-          <Box sx={{ display: "flex", gap: 1 }}>
+        {/* Service */}
+        <Grid item size={{ xs: 12, md: 3 }}>
+          <Autocomplete
+            size="small"
+            options={serviceList}
+            value={selectedService}
+            onChange={handleServiceChange}
+            getOptionLabel={(option) => option.service_name || ""}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderInput={(params) => (
+              <TextField {...params} label="Service" placeholder="Search..." />
+            )}
+          />
+        </Grid>
+
+        {/* Certification Level */}
+        <Grid item size={{ xs: 12, md: 3 }}>
+          <Autocomplete
+            size="small"
+            options={certificationLevelList}
+            value={selectedCertificationLevel}
+            onChange={handleCertificationLevelChange}
+            getOptionLabel={(option) => option.name || ""}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Certification Level"
+                placeholder="Search..."
+              />
+            )}
+          />
+        </Grid>
+
+        {/* Programme */}
+        <Grid item size={{ xs: 12, md: 3 }}>
+          <Autocomplete
+            size="small"
+            options={programmeList}
+            value={selectedProgramme}
+            onChange={(_event, newValue) => {
+              const value = newValue ? newValue.id : "";
+              setFilters((prev) => ({ ...prev, programmeList: value }));
+              setPage(0);
+            }}
+            getOptionLabel={(option) => option.programme_title || ""}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            disabled={programmeDisabled}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Programme"
+                placeholder={
+                  programmeDisabled ? "Select all above first" : "Search..."
+                }
+              />
+            )}
+          />
+        </Grid>
+
+        {/* Application No + Search */}
+        <Grid item size={{ xs: 12, md: 6 }}>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+            <TextField
+              fullWidth
+              label="Application No"
+              type="number"
+              name="ApplicationNo"
+              value={filters.ApplicationNo}
+              onChange={handleFilterChange}
+              onKeyDown={handleSearchKeyDown}
+              size="small"
+              helperText="Use this alone, or fill all four filters above."
+            />
+            <Button
+              variant="contained"
+              size="medium"
+              startIcon={<SearchIcon />}
+              onClick={handleSearch}
+              disabled={loadingReports || !canSearch}
+              sx={{ textTransform: "none", minWidth: 120, height: 40 }}
+            >
+              {loadingReports ? "Loading..." : "Search"}
+            </Button>
+          </Box>
+        </Grid>
+
+        {/* Clear / Export */}
+        <Grid item size={{ xs: 12, md: 6 }}>
+          <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
             <Button
               variant="contained"
               size="small"
               color="secondary"
               onClick={handleClearFilters}
-              fullWidth
+              sx={{ minWidth: 120 }}
             >
               Clear
             </Button>
@@ -293,9 +503,9 @@ const Assessment = () => {
               variant="contained"
               size="small"
               startIcon={<DownloadIcon />}
-              disabled={filteredReports.length === 0}
-              fullWidth
+              disabled={safeReports.length === 0}
               onClick={handleExcel}
+              sx={{ minWidth: 120 }}
             >
               Export
             </Button>
@@ -303,59 +513,33 @@ const Assessment = () => {
         </Grid>
       </Grid>
 
-      {/* Divider after filters */}
       <Divider sx={{ my: 2 }} />
 
-      {/* Search - Right aligned */}
-      <Grid container justifyContent="flex-end" sx={{ mb: 2 }}>
-        <Grid item>
-          <TextField
-            size="small"
-            placeholder="Search reports..."
-            name="search"
-            value={filters.search}
-            onChange={handleFilterChange}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Grid>
-      </Grid>
-
-      {/* Reports Table */}
       <TableContainer>
         <Table
           size="small"
           sx={{
             border: "1px solid #ccc",
-            "& th, & td": {
-              border: "1px solid #ccc",
-              padding: "8px",
-            },
+            "& th, & td": { border: "1px solid #ccc", padding: "8px" },
           }}
         >
           <TableHead>
             <TableRow
               sx={{
                 background: "#f5f5f5",
-                "& .MuiTableCell-root": {
-                  fontWeight: "bold",
-                },
+                "& .MuiTableCell-root": { fontWeight: "bold" },
               }}
             >
               <TableCell>#</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>CID/Reference No</TableCell>
               <TableCell>Gender</TableCell>
-              <TableCell>Course</TableCell>
+              <TableCell>Programme</TableCell>
               <TableCell>Certificate</TableCell>
-              <TableCell>Internal</TableCell>
-              <TableCell>Theory</TableCell>
-              <TableCell>Practical</TableCell>
+              <TableCell>Internal Assessment</TableCell>
+              <TableCell>Theory Assessment</TableCell>
+              <TableCell>Practical Assessment</TableCell>
+              <TableCell>Viva Assessment</TableCell>
               <TableCell>Result</TableCell>
               <TableCell align="center">
                 <Button
@@ -363,6 +547,7 @@ const Assessment = () => {
                   size="small"
                   startIcon={<DownloadIcon />}
                   onClick={handleDownloadAll}
+                  disabled={safeReports.length === 0}
                   sx={{ textTransform: "none", fontWeight: "bold" }}
                 >
                   Download All
@@ -372,19 +557,55 @@ const Assessment = () => {
           </TableHead>
 
           <TableBody>
-            {paginatedReports.length > 0 ? (
+            {loadingReports ? (
+              <TableRow>
+                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                  <CircularProgress size={24} />
+                </TableCell>
+              </TableRow>
+            ) : paginatedReports.length > 0 ? (
               paginatedReports.map((report, index) => (
-                <TableRow key={report.id} hover>
+                <TableRow
+                  key={
+                    report.id || report.application_no || report.cid_no || index
+                  }
+                  hover
+                >
                   <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                  <TableCell>{report.name}</TableCell>
-                  <TableCell>{report.cid}</TableCell>
-                  <TableCell>{report.gender}</TableCell>
-                  <TableCell>{report.course}</TableCell>
-                  <TableCell>{report.certificate}</TableCell>
-                  <TableCell>{report.internal}</TableCell>
-                  <TableCell>{report.theory}</TableCell>
-                  <TableCell>{report.practical}</TableCell>
-                  <TableCell>{report.result}</TableCell>
+                  <TableCell>
+                    {report.applicant_name ||
+                      report.name ||
+                      report.trainee_name ||
+                      "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {report.cid_no ||
+                      report.cid ||
+                      report.reference_no ||
+                      "N/A"}
+                  </TableCell>
+                  <TableCell>{report.gender || "N/A"}</TableCell>
+                  <TableCell>
+                    {report.programme_title || report.programme || "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {report.certification_level || report.certificate || "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {report.internal_assessment ?? report.internal ?? "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {report.theory_assessment ?? report.theory ?? "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {report.practical_assessment ?? report.practical ?? "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {report.viva_assessment ?? report.viva ?? "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {report.result_status || report.result || "N/A"}
+                  </TableCell>
                   <TableCell align="center">
                     <Button
                       variant="text"
@@ -400,8 +621,9 @@ const Assessment = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
-                  No reports found matching your criteria
+                <TableCell colSpan={12} align="center" sx={{ py: 3 }}>
+                  No trainee records found. Apply a valid filter and click
+                  Search.
                 </TableCell>
               </TableRow>
             )}
@@ -409,10 +631,8 @@ const Assessment = () => {
         </Table>
       </TableContainer>
 
-      {/* Divider before pagination */}
       <Divider sx={{ my: 2 }} />
 
-      {/* Pagination */}
       <Box
         sx={{
           display: "flex",
@@ -421,23 +641,19 @@ const Assessment = () => {
         }}
       >
         <Typography variant="caption" color="text.secondary">
-          Showing {paginatedReports.length} of {filteredReports.length} reports
+          Showing {paginatedReports.length} of {safeReports.length} reports
         </Typography>
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={filteredReports.length}
+          count={safeReports.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
           sx={{
-            ".MuiTablePagination-select": {
-              borderRadius: 1,
-            },
-            ".MuiTablePagination-displayedRows": {
-              margin: 0,
-            },
+            ".MuiTablePagination-select": { borderRadius: 1 },
+            ".MuiTablePagination-displayedRows": { margin: 0 },
           }}
         />
       </Box>

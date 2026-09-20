@@ -172,6 +172,21 @@ class CourseEnrollmentService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+   getListSelectedBQFTraineeForExcel(application_no, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/accredited-course/get-list-selected-Trainee-bqf/${application_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
 }
 
 export default new CourseEnrollmentService();

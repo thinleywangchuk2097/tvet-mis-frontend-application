@@ -105,6 +105,8 @@ import CreateNcsIndex from "../pages/bqpca/nac/CreateNcsIndex";
 import OnJobTrainingIndex from "../pages/dwps/ojt/OnJobTrainingIndex";
 import OnCampusJobPlacement from "../pages/dwps/ojt/OnCampusJobPlacement";
 import TrainingJobPlacementReportIndex from "../pages/dwps/ojt/TrainingJobPlacementReportIndex";
+//assessment
+import RegularIndex from "../pages/assessment/RegularIndex";
 
 export const privateRoutes = [
   {
@@ -240,6 +242,15 @@ export const privateRoutes = [
       {
         path: "curriculum-index",
         element: <CurriculumIndex />,
+      },
+    ],
+  },
+  {
+    path: "assessment-index",
+    children: [
+      {
+        path: "regular-index",
+        element: <RegularIndex />,
       },
     ],
   },
