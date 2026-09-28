@@ -28,7 +28,6 @@ import {
   Select,
   FormControl,
   Tooltip,
-  Autocomplete,
   Stack,
   Alert,
 } from "@mui/material";
@@ -49,6 +48,22 @@ import { useSelector } from "react-redux";
 import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import UserRoleManagementService from "../../../api/services/internal/userrole/UserRoleManagementService";
+
+// -------- Shared imports --------
+import {
+  validateAssessmentInput,
+  getAssessmentTooltipMessage,
+} from "./shared/utils/assessmentHelpers";
+import {
+  mapRegisteredAssessors,
+  buildAssignedAssessorsWithDetails,
+  getAvailableAssessors,
+  buildAssignmentRecord,
+} from "./shared/utils/assessorHelpers";
+import PaymentStatusCard from "./shared/components/PaymentStatusCard";
+import AssessorAssignmentCard from "./shared/components/AssessorAssignmentCard";
+import DeleteAssessorDialog from "./shared/components/DeleteAssessorDialog";
+import ActionConfirmDialog from "./shared/components/ActionConfirmDialog";
 
 const ViewReAssessmentTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
@@ -117,97 +132,38 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   };
 
   // ============================================================
-  // Get max values based on certification level
+  // ✅ FIX: Single generic validator (replaces 4 duplicated fns)
   // ============================================================
-  const getTheoryMaxValue = () => {
-    if (!isDiplomaCertificationLevel()) return null;
-    return 20;
-  };
-
-  const getPracticalMaxValue = () => {
-    if (!isDiplomaCertificationLevel()) return null;
-    return 60;
-  };
-
-  const getVivaMaxValue = () => {
-    if (!isDiplomaCertificationLevel()) return null;
-    return 20;
-  };
-
-  const getVivaPracticalMaxValue = () => {
-    if (!isDiplomaCertificationLevel()) return null;
-    return 60;
-  };
+  const validateTheoryInput = (value) =>
+    validateAssessmentInput(value, 20, isDiplomaCertificationLevel());
+  const validatePracticalInput = (value) =>
+    validateAssessmentInput(value, 60, isDiplomaCertificationLevel());
+  const validateVivaInput = (value) =>
+    validateAssessmentInput(value, 20, isDiplomaCertificationLevel());
+  const validateVivaPracticalInput = (value) =>
+    validateAssessmentInput(value, 60, isDiplomaCertificationLevel());
 
   // ============================================================
-  // Tooltip messages for max values
+  // Tooltip messages for max values (via shared helper)
   // ============================================================
-  const getTheoryTooltipMessage = () => {
-    const maxVal = getTheoryMaxValue();
-    if (!maxVal) return "";
-    return `Maximum value that can be entered is ${maxVal}`;
-  };
-
-  const getPracticalTooltipMessage = () => {
-    const maxVal = getPracticalMaxValue();
-    if (!maxVal) return "";
-    return `Maximum value that can be entered is ${maxVal}`;
-  };
-
-  const getVivaTooltipMessage = () => {
-    const maxVal = getVivaMaxValue();
-    if (!maxVal) return "";
-    return `Maximum value that can be entered is ${maxVal}`;
-  };
-
-  const getVivaPracticalTooltipMessage = () => {
-    const maxVal = getVivaPracticalMaxValue();
-    if (!maxVal) return "";
-    return `Maximum value that can be entered is ${maxVal}`;
-  };
+  const getTheoryTooltipMessage = () =>
+    getAssessmentTooltipMessage("theory", isDiplomaCertificationLevel());
+  const getPracticalTooltipMessage = () =>
+    getAssessmentTooltipMessage("practical", isDiplomaCertificationLevel());
+  const getVivaTooltipMessage = () =>
+    getAssessmentTooltipMessage("viva", isDiplomaCertificationLevel());
+  const getVivaPracticalTooltipMessage = () =>
+    getAssessmentTooltipMessage("vivaPractical", isDiplomaCertificationLevel());
 
   // ============================================================
-  // Validation helpers
+  // Max values — kept as local helpers so call sites don't change
   // ============================================================
-  const validateTheoryInput = (value) => {
-    if (value === "") return true;
-    const numValue = Number(value);
-    if (isNaN(numValue)) return false;
-    if (isDiplomaCertificationLevel()) {
-      return numValue >= 0 && numValue <= 20;
-    }
-    return numValue >= 0 && numValue <= 100;
-  };
-
-  const validatePracticalInput = (value) => {
-    if (value === "") return true;
-    const numValue = Number(value);
-    if (isNaN(numValue)) return false;
-    if (isDiplomaCertificationLevel()) {
-      return numValue >= 0 && numValue <= 60;
-    }
-    return numValue >= 0 && numValue <= 100;
-  };
-
-  const validateVivaInput = (value) => {
-    if (value === "") return true;
-    const numValue = Number(value);
-    if (isNaN(numValue)) return false;
-    if (isDiplomaCertificationLevel()) {
-      return numValue >= 0 && numValue <= 20;
-    }
-    return numValue >= 0 && numValue <= 100;
-  };
-
-  const validateVivaPracticalInput = (value) => {
-    if (value === "") return true;
-    const numValue = Number(value);
-    if (isNaN(numValue)) return false;
-    if (isDiplomaCertificationLevel()) {
-      return numValue >= 0 && numValue <= 60;
-    }
-    return numValue >= 0 && numValue <= 100;
-  };
+  const getTheoryMaxValue = () => (isDiplomaCertificationLevel() ? 20 : null);
+  const getPracticalMaxValue = () =>
+    isDiplomaCertificationLevel() ? 60 : null;
+  const getVivaMaxValue = () => (isDiplomaCertificationLevel() ? 20 : null);
+  const getVivaPracticalMaxValue = () =>
+    isDiplomaCertificationLevel() ? 60 : null;
 
   const allCAmarksExist = () => {
     if (selectedTrainees.length === 0) return false;
@@ -257,9 +213,11 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
   const isGeneratePAEnabled = () => allCAmarksExist();
 
-  const isApproveEnabled = () => {
-    return areAssessorsAssigned() && allTraineesHaveAssessments();
-  };
+  // ============================================================
+  // ✅ FIX: Single return expression (was if-then-else)
+  // ============================================================
+  const isApproveEnabled = () =>
+    areAssessorsAssigned() && allTraineesHaveAssessments();
 
   const isEndorseEnabled = () => {
     if (!isPaymentCompleted()) return false;
@@ -302,13 +260,13 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return "";
   };
 
-  const getServiceCodeByServiceId = useCallback((serviceId) => {
-    if (!serviceId) return null;
+  const getServiceCodeByServiceId = useCallback((id) => {
+    if (!id) return null;
     const serviceCodeMap = {
       42: 100585,
       41: 100587,
     };
-    return serviceCodeMap[serviceId] || null;
+    return serviceCodeMap[id] || null;
   }, []);
 
   useEffect(() => {
@@ -318,6 +276,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     fetchPaymentStatus();
     fetchAssessors();
     fetchAssignedAssessors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -328,6 +287,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     ) {
       fetchData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applicationNo,
     academicQualifications,
@@ -339,34 +299,20 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     if (courseDetails?.registration_no) {
       fetchInstituteData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseDetails]);
 
   useEffect(() => {
     if (listAssignedAssessors.length > 0 && assessors.length > 0) {
-      const assignedAssessorsWithDetails = listAssignedAssessors
-        .map((assigned) => {
-          const assessorDetail = assessors.find(
-            (ass) => ass.userId === assigned.user_id,
-          );
-          if (assessorDetail) {
-            return {
-              id: assessorDetail.id,
-              userId: assessorDetail.userId,
-              name: assessorDetail.name,
-              email: assessorDetail.email,
-              mobileNo: assessorDetail.mobileNo,
-              designation: assessorDetail.designation || "Assessor",
-              location: assessorDetail.location || "N/A",
-              assignedDate: assigned.created_at || new Date().toISOString(),
-              assignedBy: assigned.assigned_by || actionId,
-            };
-          }
-          return null;
-        })
-        .filter((item) => item !== null);
-
-      setAssignedAssessors(assignedAssessorsWithDetails);
+      setAssignedAssessors(
+        buildAssignedAssessorsWithDetails(
+          listAssignedAssessors,
+          assessors,
+          actionId,
+        ),
+      );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listAssignedAssessors, assessors]);
 
   const fetchAcademicQualification = async () => {
@@ -435,16 +381,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     try {
       const response =
         await UserRoleManagementService.getRegisteredAssessors(access_token);
-      const mappedAssessors = response.data.map((assessor) => ({
-        id: assessor.id,
-        userId: assessor.user_id,
-        name: `${assessor.first_name} ${assessor.middle_name ? assessor.middle_name + " " : ""}${assessor.last_name}`,
-        email: assessor.email_id,
-        mobileNo: assessor.mobile_no,
-        designation: assessor.current_role || "Assessor",
-        location: assessor.location_id || "N/A",
-      }));
-      setAssessors(mappedAssessors);
+      setAssessors(mapRegisteredAssessors(response.data));
     } catch (error) {
       console.error("Error fetching Assessors:", error);
       setAssessors([]);
@@ -573,19 +510,10 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       return;
     }
 
-    const assignmentRecord = {
-      id: selectedAssessorDetails.id,
-      userId: selectedAssessorDetails.userId,
-      name: selectedAssessorDetails.name,
-      email: selectedAssessorDetails.email,
-      mobileNo: selectedAssessorDetails.mobileNo,
-      designation: selectedAssessorDetails.designation || "Assessor",
-      location: selectedAssessorDetails.location || "N/A",
-      assignedDate: new Date().toISOString(),
-      assignedBy: actionId,
-    };
-
-    setAssignedAssessors((prev) => [...prev, assignmentRecord]);
+    setAssignedAssessors((prev) => [
+      ...prev,
+      buildAssignmentRecord(selectedAssessorDetails, actionId),
+    ]);
     toast.success(`${selectedAssessorDetails.name} added successfully`);
     setSelectedAssessor("");
   };
@@ -611,10 +539,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     setAssessorToDelete(null);
   };
 
-  // ============================================================
-  // Assessment change handlers with SILENT validation
-  // (matches the reference component's pattern)
-  // ============================================================
   const handleTheoryAssessmentChange = (traineeId, value) => {
     if (isDiplomaCertificationLevel()) {
       if (validateTheoryInput(value)) {
@@ -689,12 +613,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return competencyMap[competencyId] || competencyId;
   };
 
-  const getStatusName = (statusId) => {
-    if (!statusId) return "Unknown";
-    const status = statusList.find((s) => s.id === parseInt(statusId));
-    return status ? status.name : "Unknown";
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -712,7 +630,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
         ? instituteData[0]
         : instituteData;
 
-    const applicationNo = courseDetails.application_no;
+    const applicationNoLocal = courseDetails.application_no;
     const serviceCode = getServiceCodeByServiceId(courseDetails?.service_id);
 
     if (!serviceCode) {
@@ -740,7 +658,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       "N/A";
 
     navigate(
-      `/birms/common-payment-index/${applicationNo}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId}`,
+      `/birms/common-payment-index/${applicationNoLocal}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId}`,
     );
   };
 
@@ -750,6 +668,48 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     } else {
       toast.error("No redirect URL available");
     }
+  };
+
+  // ============================================================
+  // ✅ FIX: Extract nested ternaries for marks parsing
+  // ============================================================
+  const parseInternalAssessment = (trainee) => {
+    const raw = trainee.internal_assessment;
+    if (raw === null || raw === undefined || raw === "") return null;
+    if (courseDetails?.certification_level_id === "36") {
+      return parseInt(raw);
+    }
+    return raw;
+  };
+
+  const parseTheory = (trainee) => {
+    if (isServiceId41) return null;
+    const raw = traineeTheoryAssessments[trainee.id];
+    if (!raw) return null;
+    if (courseDetails?.certification_level_id === "36") {
+      return parseInt(raw);
+    }
+    return raw;
+  };
+
+  const parsePractical = (trainee) => {
+    if (isServiceId41) return null;
+    const raw = traineePracticalAssessments[trainee.id];
+    if (!raw) return null;
+    if (courseDetails?.certification_level_id === "36") {
+      return parseInt(raw);
+    }
+    return raw;
+  };
+
+  const parseViva = (trainee) => {
+    const raw = traineeVivaAssessments[trainee.id];
+    return raw ? parseInt(raw) : null;
+  };
+
+  const parseVivaPractical = (trainee) => {
+    const raw = traineeVivaPracticalAssessments[trainee.id];
+    return raw ? parseInt(raw) : null;
   };
 
   const handleAction = async () => {
@@ -833,31 +793,12 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
             : "Application approved",
       };
 
-      const getInternalAssessment = (trainee) =>
-        trainee.internal_assessment !== null &&
-        trainee.internal_assessment !== undefined &&
-        trainee.internal_assessment !== ""
-          ? courseDetails?.certification_level_id === "36"
-            ? parseInt(trainee.internal_assessment)
-            : trainee.internal_assessment
-          : null;
-
       if (hasInternalAssessmentForCourse) {
         const traineeMarksList = selectedTrainees.map((trainee) => ({
           traineeId: parseInt(trainee.id),
-          internalAssessment: getInternalAssessment(trainee),
-          theoryAssessment:
-            courseDetails?.certification_level_id === "36" && !isServiceId41
-              ? traineeTheoryAssessments[trainee.id]
-                ? parseInt(traineeTheoryAssessments[trainee.id])
-                : null
-              : traineeTheoryAssessments[trainee.id] || null,
-          practicalAssessment:
-            courseDetails?.certification_level_id === "36" && !isServiceId41
-              ? traineePracticalAssessments[trainee.id]
-                ? parseInt(traineePracticalAssessments[trainee.id])
-                : null
-              : traineePracticalAssessments[trainee.id] || null,
+          internalAssessment: parseInternalAssessment(trainee),
+          theoryAssessment: parseTheory(trainee),
+          practicalAssessment: parsePractical(trainee),
         }));
 
         if (traineeMarksList.length > 0) {
@@ -868,13 +809,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       if (isServiceId41 && hasInternalAssessmentForCourse) {
         const traineeVivaList = selectedTrainees.map((trainee) => ({
           traineeId: parseInt(trainee.id),
-          internalAssessment: getInternalAssessment(trainee),
-          vivaAssessment: traineeVivaAssessments[trainee.id]
-            ? parseInt(traineeVivaAssessments[trainee.id])
-            : null,
-          practicalAssessment: traineeVivaPracticalAssessments[trainee.id]
-            ? parseInt(traineeVivaPracticalAssessments[trainee.id])
-            : null,
+          internalAssessment: parseInternalAssessment(trainee),
+          vivaAssessment: parseViva(trainee),
+          practicalAssessment: parseVivaPractical(trainee),
         }));
 
         if (traineeVivaList.length > 0) {
@@ -887,8 +824,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
           userId: ass.userId,
         }));
       }
-
-      console.log("Payload for action:", payload);
 
       const response = await CourseEnrollmentService.updateTraineeApplication(
         payload,
@@ -995,17 +930,12 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return cols;
   };
 
-  // ============================================================
-  // UPDATED: Uses readOnly (matches reference component) instead of disabled
-  // so onChange still fires but typing is blocked by readOnly + validation
-  // ============================================================
   const renderAssessmentColumn = (trainee) => {
     const isNumeric =
       courseDetails?.certification_level_id === "111" ||
       courseDetails?.certification_level_id === "112";
     const isVivaType = isServiceId41;
 
-    // Determine if fields should be read-only (matches reference logic)
     const readOnly = !isEditable;
 
     const getAssessmentConfig = () => {
@@ -1050,8 +980,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     const renderAssessmentField = (fieldConfig, isNumericField) => {
       const disabledTooltip = getAssessmentDisabledTooltip();
       const maxValueTooltip = fieldConfig.tooltipMessage;
-      const tooltipMsg =
-        disabledTooltip || (maxValueTooltip ? maxValueTooltip : "");
+      const tooltipMsg = disabledTooltip || maxValueTooltip || "";
 
       const fieldContent = isNumericField ? (
         <TextField
@@ -1121,8 +1050,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     );
   };
 
-  const availableAssessors = assessors.filter(
-    (ass) => !assignedAssessors.some((assigned) => assigned.id === ass.id),
+  const availableAssessors = getAvailableAssessors(
+    assessors,
+    assignedAssessors,
   );
 
   const selectedAssessorDetails = assessors.find(
@@ -1141,6 +1071,47 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       </Box>
     );
   }
+
+  // ============================================================
+  // ✅ FIX: Extract nested ternary for dialog body text
+  // ============================================================
+  const dialogActionText = currentAction === 59 ? "endorse" : "approve";
+  const dialogAssessmentsLabel = isServiceId41
+    ? "Viva and Practical"
+    : "Theory and Practical";
+
+  const dialogBody = (
+    <DialogContentText>
+      Are you sure you want to {dialogActionText} this course selection?
+      <br />
+      <strong>Application No: {applicationNo}</strong>
+      <br />
+      <strong>Course Name: {courseDetails?.course_name}</strong>
+      <br />
+      <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
+      <br />
+      <strong>Assigned Assessors: {assignedAssessors.length}</strong>
+      {paymentStatus?.paymentAdviceNo && (
+        <>
+          <br />
+          <strong>Payment Advice No: {paymentStatus.paymentAdviceNo}</strong>
+        </>
+      )}
+      {hasInternalAssessmentForCourse && (
+        <>
+          <br />
+          <br />
+          <strong>
+            Note: {dialogAssessmentsLabel} assessments will be saved with this{" "}
+            {dialogActionTerm}.
+          </strong>
+        </>
+      )}
+    </DialogContentText>
+  );
+
+  const dialogActionTerm =
+    dialogActionText === "endorse" ? "endorsement" : "approval";
 
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 2 }}>
@@ -1168,108 +1139,12 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
         </Box>
       </Box>
 
-      {paymentStatus && (
-        <Card
-          sx={{ mb: 3, bgcolor: isPaymentCompleted() ? "#e8f5e9" : "#fff3e0" }}
-        >
-          <CardContent>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <Typography variant="h6" gutterBottom>
-                Payment Status
-              </Typography>
-              <Chip
-                label={paymentStatus.paymentStatus || "Pending"}
-                color={isPaymentCompleted() ? "success" : "warning"}
-                size="small"
-              />
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              {paymentStatus.paymentAdviceNo && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Payment Advice No:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {paymentStatus.paymentAdviceNo}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.refNo && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Reference No:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {paymentStatus.refNo}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.totalPayableAmount && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Amount:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold" color="primary">
-                    Nu. {paymentStatus.totalPayableAmount}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.paymentDueDate && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Due Date:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {formatDate(paymentStatus.paymentDueDate)}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.paymentMode && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Payment Mode:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {paymentStatus.paymentMode}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.platform && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Platform:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {paymentStatus.platform}
-                  </Typography>
-                </Grid>
-              )}
-            </Grid>
-            {paymentStatus.redirectUrl && !isPaymentCompleted() && (
-              <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  startIcon={<PaymentIcon />}
-                  onClick={() =>
-                    handleRedirectToPayment(paymentStatus.redirectUrl)
-                  }
-                >
-                  Proceed to Payment
-                </Button>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <PaymentStatusCard
+        paymentStatus={paymentStatus}
+        isPaymentCompleted={isPaymentCompleted}
+        onRedirectToPayment={handleRedirectToPayment}
+        formatDate={formatDate}
+      />
 
       {courseDetails && (
         <Card sx={{ mb: 3 }}>
@@ -1334,202 +1209,17 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
       {/* Assessor Assignment Section */}
       {allCAmarksExist() && !isActionDisabled() && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              <EngineeringIcon sx={{ mr: 1, color: "primary.main" }} />
-              <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
-                Assign Assessors
-              </Typography>
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-
-            {assignedAssessors.length > 0 && (
-              <Box sx={{ mb: 3 }}>
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  gutterBottom
-                >
-                  Assigned Assessors ({assignedAssessors.length}):
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {assignedAssessors.map((ass) => (
-                    <Chip
-                      key={ass.id}
-                      label={`${ass.name} (${ass.userId})`}
-                      color="success"
-                      onDelete={
-                        isRole9
-                          ? () => openDeleteAssessorDialog(ass)
-                          : undefined
-                      }
-                      deleteIcon={
-                        isRole9 ? (
-                          <DeleteIcon sx={{ color: "#d32f2f" }} />
-                        ) : undefined
-                      }
-                      sx={{
-                        mb: 1,
-                        "& .MuiChip-deleteIcon": {
-                          color: "#d32f2f",
-                          "&:hover": {
-                            color: "#b71c1c",
-                          },
-                        },
-                      }}
-                    />
-                  ))}
-                </Stack>
-              </Box>
-            )}
-
-            {isRole9 && (
-              <Grid container spacing={2} alignItems="center">
-                <Grid item size={{ xs: 12, md: 8 }}>
-                  <Autocomplete
-                    fullWidth
-                    size="small"
-                    options={availableAssessors}
-                    getOptionLabel={(option) =>
-                      `${option.name} (${option.userId})`
-                    }
-                    value={selectedAssessorDetails || null}
-                    onChange={(event, newValue) => {
-                      setSelectedAssessor(newValue ? newValue.id : "");
-                    }}
-                    filterOptions={(options, state) => {
-                      const searchTerm = state.inputValue.toLowerCase().trim();
-                      if (!searchTerm || searchTerm.length < 2) {
-                        return [];
-                      }
-                      return options.filter(
-                        (option) =>
-                          option.name.toLowerCase().includes(searchTerm) ||
-                          option.userId?.toLowerCase().includes(searchTerm) ||
-                          option.email?.toLowerCase().includes(searchTerm) ||
-                          option.mobileNo?.includes(searchTerm),
-                      );
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Search Assessor by Name or User ID"
-                        placeholder="Type at least 2 characters to search..."
-                      />
-                    )}
-                    renderOption={(props, option) => (
-                      <li {...props}>
-                        <Box>
-                          <Typography variant="body2">{option.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            User ID: {option.userId} | Email:{" "}
-                            {option.email || "N/A"} | Mobile:{" "}
-                            {option.mobileNo || "N/A"}
-                          </Typography>
-                        </Box>
-                      </li>
-                    )}
-                    noOptionsText="No assessors available"
-                    loadingText="Loading..."
-                    disabled={availableAssessors.length === 0}
-                    openOnFocus={false}
-                  />
-                </Grid>
-
-                <Grid item size={{ xs: 12, md: 4 }}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    size="medium"
-                    startIcon={<PersonAddIcon />}
-                    onClick={handleAddAssessor}
-                    disabled={
-                      !selectedAssessor || availableAssessors.length === 0
-                    }
-                    sx={{
-                      fontWeight: 600,
-                      textTransform: "none",
-                      width: "100%",
-                    }}
-                  >
-                    Add Assessor
-                  </Button>
-                </Grid>
-              </Grid>
-            )}
-
-            {!isRole9 && assignedAssessors.length > 0 && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Assessors have been assigned. You cannot add or remove
-                assessors.
-              </Alert>
-            )}
-
-            {selectedAssessor && selectedAssessorDetails && isRole9 && (
-              <Box
-                sx={{
-                  mt: 2,
-                  p: 2,
-                  bgcolor: "action.hover",
-                  borderRadius: 1,
-                }}
-              >
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  Selected Assessor Details:
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item size={{ xs: 12, md: 3 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Name
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {selectedAssessorDetails.name}
-                    </Typography>
-                  </Grid>
-                  <Grid item size={{ xs: 12, md: 3 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      User ID
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {selectedAssessorDetails.userId}
-                    </Typography>
-                  </Grid>
-                  <Grid item size={{ xs: 12, md: 3 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Email
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {selectedAssessorDetails.email || "N/A"}
-                    </Typography>
-                  </Grid>
-                  <Grid item size={{ xs: 12, md: 3 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Mobile No
-                    </Typography>
-                    <Typography variant="body2" fontWeight={500}>
-                      {selectedAssessorDetails.mobileNo || "N/A"}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Box>
-            )}
-
-            {assignedAssessors.length === 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <strong>Required:</strong> At least one assessor must be
-                assigned before approval/endorsement.
-              </Alert>
-            )}
-
-            {assessors.length === 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                No assessors found. Please check if there are active assessor
-                users in the system.
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+        <AssessorAssignmentCard
+          canEdit={isRole9}
+          assignedAssessors={assignedAssessors}
+          availableAssessors={availableAssessors}
+          allAssessors={assessors}
+          selectedAssessor={selectedAssessor}
+          selectedAssessorDetails={selectedAssessorDetails}
+          onSelectAssessor={setSelectedAssessor}
+          onAddAssessor={handleAddAssessor}
+          onOpenDeleteDialog={openDeleteAssessorDialog}
+        />
       )}
 
       <Card>
@@ -1613,10 +1303,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                           </TableCell>
                           {hasInternalAssessmentForCourse && (
                             <TableCell align="center">
-                              {courseDetails?.certification_level_id ===
-                                "111" ||
-                              courseDetails?.certification_level_id ===
-                                "112" ? (
+                              {isDiplomaCertificationLevel() ? (
                                 <Chip
                                   label={trainee.internal_assessment || "N/A"}
                                   size="small"
@@ -1758,110 +1445,30 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
         </Box>
       </Box>
 
-      <Dialog
+      <ActionConfirmDialog
         open={actionDialogOpen}
+        title={getDialogTitle()}
+        bodyText={dialogBody}
+        showRemarks={false}
+        confirmColor={getConfirmButtonColor()}
+        confirmText={
+          actionLoading
+            ? undefined
+            : currentAction === 59
+              ? "Confirm Endorse"
+              : "Confirm Approve"
+        }
+        loading={actionLoading}
         onClose={closeDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{getDialogTitle()}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {currentAction === 59
-              ? "Are you sure you want to endorse this course selection?"
-              : "Are you sure you want to approve this course selection?"}
-            <br />
-            <strong>Application No: {applicationNo}</strong>
-            <br />
-            <strong>Course Name: {courseDetails?.course_name}</strong>
-            <br />
-            <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-            <br />
-            <strong>Assigned Assessors: {assignedAssessors.length}</strong>
-            {paymentStatus && paymentStatus.paymentAdviceNo && (
-              <>
-                <br />
-                <strong>
-                  Payment Advice No: {paymentStatus.paymentAdviceNo}
-                </strong>
-              </>
-            )}
-            {hasInternalAssessmentForCourse && (
-              <>
-                <br />
-                <br />
-                <strong>
-                  Note:{" "}
-                  {isServiceId41
-                    ? "Viva and Practical"
-                    : "Theory and Practical"}{" "}
-                  assessments will be saved with this{" "}
-                  {currentAction === 59 ? "endorsement" : "approval"}.
-                </strong>
-              </>
-            )}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="error"
-            variant="contained"
-            size="small"
-            onClick={closeDialog}
-            disabled={actionLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAction}
-            color={getConfirmButtonColor()}
-            variant="contained"
-            size="small"
-            disabled={actionLoading}
-          >
-            {getConfirmButtonText()}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={handleAction}
+      />
 
-      <Dialog
+      <DeleteAssessorDialog
         open={deleteDialogOpen}
+        assessor={assessorToDelete}
         onClose={closeDeleteDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Confirm Removal</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {assessorToDelete && (
-              <>
-                Are you sure you want to remove{" "}
-                <strong>{assessorToDelete?.name}</strong> (
-                {assessorToDelete?.userId}) from the assessor assignment?
-              </>
-            )}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="outlined"
-            size="small"
-            onClick={closeDeleteDialog}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteAssessor}
-            color="error"
-            variant="contained"
-            size="small"
-            startIcon={<DeleteIcon />}
-          >
-            Remove
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={handleDeleteAssessor}
+      />
     </Paper>
   );
 };

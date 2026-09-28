@@ -3,7 +3,6 @@ import {
   Paper,
   Typography,
   Grid,
-  TextField,
   Button,
   Table,
   TableBody,
@@ -16,35 +15,36 @@ import {
   Chip,
   IconButton,
   Box,
-  Card,
-  CardContent,
   Divider,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Tooltip,
 } from "@mui/material";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import SearchIcon from "@mui/icons-material/Search";
 import VisibilityIcon from "@mui/icons-material/Visibility";
-import CloseIcon from "@mui/icons-material/Close";
-import PersonIcon from "@mui/icons-material/Person";
-import SchoolIcon from "@mui/icons-material/School";
-import GradeIcon from "@mui/icons-material/Grade";
 import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
-import FileDownload from "../../../components/file/FileDownload";
+
+// -------- Shared imports --------
+import { tableStyle } from "./shared/utils/traineeSelectionStyles";
+import {
+  formatDate,
+  getQualificationName,
+  getStatusName,
+  getStatusColor,
+  getResultStatusName,
+  getResultStatusColor,
+} from "./shared/utils/traineeSelectionHelpers";
+import TraineeSearchField from "./shared/components/TraineeSearchField";
+import TraineeDetailsDialog from "./shared/components/TraineeDetailsDialog";
+import ProgrammeInfoCard from "./shared/components/ProgrammeInfoCard";
 
 const NonAccreditedCourseTraineeSelection = () => {
   const { applicationNo } = useParams();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [movingTrainees, setMovingTrainees] = useState(false);
   const [courseDetails, setCourseDetails] = useState(null);
@@ -56,11 +56,11 @@ const NonAccreditedCourseTraineeSelection = () => {
   const [statusList, setStatusList] = useState([]);
   const access_token = useSelector((state) => state.auth.accessToken);
 
-  //Store status IDs for pending and selected
+  // Store status IDs for pending and selected
   const [pendingStatusId, setPendingStatusId] = useState(null);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
 
-  //State for qualifications lookup
+  // State for qualifications lookup
   const [academicQualifications, setAcademicQualifications] = useState([]);
   const [qualificationMap, setQualificationMap] = useState({});
 
@@ -111,13 +111,11 @@ const NonAccreditedCourseTraineeSelection = () => {
       const qualifications = response.data;
       setAcademicQualifications(qualifications);
 
-      // Create a map for quick lookup
       const map = {};
       qualifications.forEach((qual) => {
         map[qual.id] = qual.name;
       });
       setQualificationMap(map);
-      console.log("Academic Qualifications:", qualifications);
     } catch (error) {
       console.error("Error fetching academic qualifications:", error);
     }
@@ -129,7 +127,6 @@ const NonAccreditedCourseTraineeSelection = () => {
       const statuses = statusResponse.data;
       setStatusList(statuses);
 
-      // Find status IDs for 'pending' and 'selected'
       const pendingStatus = statuses.find(
         (status) => status.name.toLowerCase() === "pending",
       );
@@ -137,21 +134,8 @@ const NonAccreditedCourseTraineeSelection = () => {
         (status) => status.name.toLowerCase() === "selected",
       );
 
-      if (pendingStatus) {
-        setPendingStatusId(pendingStatus.id);
-        console.log("Pending Status ID:", pendingStatus.id);
-      } else {
-        console.error("Pending status not found in status list");
-      }
-
-      if (selectedStatus) {
-        setSelectedStatusId(selectedStatus.id);
-        console.log("Selected Status ID:", selectedStatus.id);
-      } else {
-        console.error("Selected status not found in status list");
-      }
-
-      console.log("Status List:", statuses);
+      if (pendingStatus) setPendingStatusId(pendingStatus.id);
+      if (selectedStatus) setSelectedStatusId(selectedStatus.id);
     } catch (error) {
       console.error("Error fetching status list:", error);
     }
@@ -169,7 +153,6 @@ const NonAccreditedCourseTraineeSelection = () => {
         ? response.data[0]
         : response.data;
       setCourseDetails(courseData);
-      console.log("Course Details:", courseData);
     } catch (error) {
       console.error("Error fetching course details:", error);
       toast.error("Failed to fetch course details");
@@ -183,11 +166,9 @@ const NonAccreditedCourseTraineeSelection = () => {
         await CourseEnrollmentService.getCourseAppliedTraineesByApplicationNo(
           applicationNo,
         );
-      console.log("Applied Trainees Response:", response);
       const trainees = response.data || [];
       setAllTrainees(trainees);
 
-      // Filter trainees based on status IDs from API
       const pending = trainees.filter(
         (trainee) => trainee.status_id === pendingStatusId?.toString(),
       );
@@ -197,9 +178,6 @@ const NonAccreditedCourseTraineeSelection = () => {
 
       setPendingTrainees(pending);
       setSelectedTrainees(selected);
-
-      console.log("Pending trainees:", pending);
-      console.log("Selected trainees:", selected);
     } catch (error) {
       console.error("Error fetching applied trainees:", error);
       toast.error("Failed to fetch applied trainees");
@@ -216,14 +194,12 @@ const NonAccreditedCourseTraineeSelection = () => {
         traineeId,
         access_token,
       );
-      // Check if response.data is an array and get the first item
       const details = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
       setTraineeDetails(details);
-      console.log("Trainee Details:", details);
 
-      // Parse documents if they exist
+      // Parse documents
       if (details?.documents) {
         try {
           const parsedDocs =
@@ -248,7 +224,7 @@ const NonAccreditedCourseTraineeSelection = () => {
         setTraineeDocuments([]);
       }
 
-      // Parse trainee marks if they exist
+      // Parse trainee marks
       if (details?.trainee_marks) {
         try {
           const parsedMarks =
@@ -276,79 +252,18 @@ const NonAccreditedCourseTraineeSelection = () => {
     }
   };
 
-  // Function to handle opening the dialog
   const handleViewMore = (traineeId) => {
     setSelectedTraineeId(traineeId);
     setOpenTraineeDialog(true);
     fetchTraineeDetails(traineeId);
   };
 
-  // Function to handle closing the dialog
   const handleCloseDialog = () => {
     setOpenTraineeDialog(false);
     setSelectedTraineeId(null);
     setTraineeDetails(null);
     setTraineeDocuments([]);
     setTraineeMarks([]);
-  };
-
-  // Helper function to format date
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  };
-
-  // Helper function to get qualification name from ID
-  const getQualificationName = (qualificationId) => {
-    if (!qualificationId) return "N/A";
-    return qualificationMap[qualificationId] || qualificationId;
-  };
-
-  // Helper function to get status name from ID
-  const getStatusName = (statusId) => {
-    if (!statusId) return "Unknown";
-    const status = statusList.find((s) => s.id === parseInt(statusId));
-    return status ? status.name : "Unknown";
-  };
-
-  // Helper function to get result status name from ID
-  const getResultStatusName = (resultStatusId) => {
-    if (!resultStatusId) return "N/A";
-    const status = statusList.find((s) => s.id === parseInt(resultStatusId));
-    return status ? status.name : "Unknown";
-  };
-
-  // Helper function to get status color
-  const getStatusColor = (statusId) => {
-    const statusName = getStatusName(statusId).toLowerCase();
-    if (statusName === "selected" || statusName === "approved") {
-      return { bgcolor: "#4caf50", color: "white" };
-    } else if (statusName === "pending" || statusName === "submitted") {
-      return { bgcolor: "#ff9800", color: "white" };
-    } else if (statusName === "rejected") {
-      return { bgcolor: "#f44336", color: "white" };
-    } else if (statusName === "verified") {
-      return { bgcolor: "#2196f3", color: "white" };
-    }
-    return { bgcolor: "#9e9e9e", color: "white" };
-  };
-
-  // Helper function to get result status color
-  const getResultStatusColor = (resultStatusId) => {
-    const statusName = getResultStatusName(resultStatusId).toLowerCase();
-    if (statusName === "passed") {
-      return { bgcolor: "#4caf50", color: "white" };
-    } else if (statusName === "failed") {
-      return { bgcolor: "#f44336", color: "white" };
-    } else if (statusName === "pending") {
-      return { bgcolor: "#ff9800", color: "white" };
-    }
-    return { bgcolor: "#9e9e9e", color: "white" };
   };
 
   const handleSelectPending = (event, traineeId) => {
@@ -406,14 +321,10 @@ const NonAccreditedCourseTraineeSelection = () => {
         traineeIds: traineeStatusList,
       };
 
-      console.log("Updating trainee status payload:", payload);
       const response =
         await CourseEnrollmentService.selectUnselectTrainee(payload);
 
-      if (response.status === 200 || response.status === 201) {
-        return true;
-      }
-      return false;
+      return response.status === 200 || response.status === 201;
     } catch (error) {
       console.error("Error updating trainee status:", error);
       toast.error(
@@ -429,11 +340,12 @@ const NonAccreditedCourseTraineeSelection = () => {
       return;
     }
 
-    // Check if moving would exceed total seats - using enrollment_capacity
     const totalSeats = courseDetails?.enrollment_capacity || 0;
     if (selectedTrainees.length + selectedPendingRows.length > totalSeats) {
       toast.error(
-        `Cannot select more than ${totalSeats} trainees. Only ${totalSeats - selectedTrainees.length} seats available.`,
+        `Cannot select more than ${totalSeats} trainees. Only ${
+          totalSeats - selectedTrainees.length
+        } seats available.`,
       );
       return;
     }
@@ -441,19 +353,16 @@ const NonAccreditedCourseTraineeSelection = () => {
     setMovingTrainees(true);
 
     try {
-      // Update backend API
       const success = await updateTraineeStatus(
         selectedPendingRows,
         selectedStatusId,
       );
 
       if (success) {
-        // Get the selected trainees from pending list
         const traineesToMove = pendingTrainees.filter((t) =>
           selectedPendingRows.includes(t.id),
         );
 
-        // Update local state - move from pending to selected
         const updatedPending = pendingTrainees.filter(
           (t) => !selectedPendingRows.includes(t.id),
         );
@@ -490,19 +399,16 @@ const NonAccreditedCourseTraineeSelection = () => {
     setMovingTrainees(true);
 
     try {
-      // Update backend API
       const success = await updateTraineeStatus(
         selectedSelectedRows,
         pendingStatusId,
       );
 
       if (success) {
-        // Get the selected trainees from selected list
         const traineesToMove = selectedTrainees.filter((t) =>
           selectedSelectedRows.includes(t.id),
         );
 
-        // Update local state - move from selected to pending
         const updatedSelected = selectedTrainees.filter(
           (t) => !selectedSelectedRows.includes(t.id),
         );
@@ -579,33 +485,10 @@ const NonAccreditedCourseTraineeSelection = () => {
     setPageSelected(0);
   };
 
-  const tableStyle = {
-    border: "1px solid",
-    borderColor: "divider",
-    "& th, & td": {
-      border: "1px solid",
-      borderColor: "divider",
-      padding: "8px",
-    },
-    "& th": {
-      fontWeight: 600,
-    },
-  };
-
-  // Style for TextField to remove hover effects
-  const textFieldStyle = {
-    "& .MuiOutlinedInput-root": {
-      "&:hover fieldset": {
-        borderColor: "rgba(0, 0, 0, 0.23)",
-      },
-    },
-  };
-
   // Calculate total columns for selected table
   const getSelectedTableColSpan = () => {
     let cols = 8; // checkbox, #, name, cid, contact, email, qualification, status
 
-    // Add result status column if any trainee has result_status_id
     const hasResultStatus = selectedTrainees.some(
       (trainee) => trainee.result_status_id,
     );
@@ -650,80 +533,15 @@ const NonAccreditedCourseTraineeSelection = () => {
       </Box>
 
       {/* Course Information Card */}
-      {courseDetails && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Programme Information
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Application No:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.application_no}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Programme Name:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.course_name}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Total Seats:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.enrollment_capacity}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Selected Count:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold" color="green">
-                  {selectedTrainees.length}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Course Fee Per Trainee:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  Nu. {courseDetails.fees_per_trainee}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Available Seats:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold" color="primary">
-                  {(courseDetails.enrollment_capacity || 0) -
-                    selectedTrainees.length}
-                </Typography>
-              </Grid>
-              {/* Certification Level */}
-              <Grid item size={{ xs: 12, md: 3 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Certification Level:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.certification_name}
-                </Typography>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
+      <ProgrammeInfoCard
+        title="Programme Information"
+        details={courseDetails}
+        selectedCount={selectedTrainees.length}
+      />
 
       {/* Selected and Pending Tables */}
       <Grid container spacing={3}>
-        {/* Selected Trainees Table (Top) */}
+        {/* Selected Trainees Table */}
         <Grid item size={{ xs: 12, md: 12 }}>
           <Paper elevation={2} sx={{ p: 2 }}>
             <Typography
@@ -740,17 +558,10 @@ const NonAccreditedCourseTraineeSelection = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
 
-            <TextField
+            <TraineeSearchField
               label="Search Selected Trainees"
-              variant="outlined"
-              size="small"
-              fullWidth
               value={searchSelected}
               onChange={(e) => setSearchSelected(e.target.value)}
-              sx={{ mb: 2, ...textFieldStyle }}
-              InputProps={{
-                startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
-              }}
             />
 
             <TableContainer sx={{ maxHeight: 500 }}>
@@ -779,7 +590,6 @@ const NonAccreditedCourseTraineeSelection = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>Qualification</TableCell>
                     <TableCell>Status</TableCell>
-                    {/* Result Status Column - Only show if any trainee has result_status_id */}
                     {selectedTrainees.some(
                       (trainee) => trainee.result_status_id,
                     ) && <TableCell>Result Status</TableCell>}
@@ -818,25 +628,33 @@ const NonAccreditedCourseTraineeSelection = () => {
                           <TableCell>
                             {getQualificationName(
                               trainee.academic_qualification_id,
+                              qualificationMap,
                             )}
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={getStatusName(trainee.status_id)}
+                              label={getStatusName(
+                                trainee.status_id,
+                                statusList,
+                              )}
                               size="small"
-                              sx={getStatusColor(trainee.status_id)}
+                              sx={getStatusColor(
+                                trainee.status_id,
+                                statusList,
+                              )}
                             />
                           </TableCell>
-                          {/* Result Status Cell - Only show if trainee has result_status_id */}
                           {trainee.result_status_id && (
                             <TableCell>
                               <Chip
                                 label={getResultStatusName(
                                   trainee.result_status_id,
+                                  statusList,
                                 )}
                                 size="small"
                                 sx={getResultStatusColor(
                                   trainee.result_status_id,
+                                  statusList,
                                 )}
                               />
                             </TableCell>
@@ -857,7 +675,6 @@ const NonAccreditedCourseTraineeSelection = () => {
               </Table>
             </TableContainer>
 
-            {/* Selected Table Pagination */}
             <TablePagination
               rowsPerPageOptions={[5, 10, 25]}
               component="div"
@@ -899,7 +716,7 @@ const NonAccreditedCourseTraineeSelection = () => {
           </Paper>
         </Grid>
 
-        {/* Pending Trainees Table (Bottom) */}
+        {/* Pending Trainees Table */}
         <Grid item size={{ xs: 12, md: 12 }}>
           <Paper elevation={2} sx={{ p: 2 }}>
             <Typography
@@ -916,17 +733,10 @@ const NonAccreditedCourseTraineeSelection = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
 
-            <TextField
+            <TraineeSearchField
               label="Search Pending Trainees"
-              variant="outlined"
-              size="small"
-              fullWidth
               value={searchPending}
               onChange={(e) => setSearchPending(e.target.value)}
-              sx={{ mb: 2, ...textFieldStyle }}
-              InputProps={{
-                startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
-              }}
             />
 
             <TableContainer sx={{ maxHeight: 400 }}>
@@ -987,13 +797,20 @@ const NonAccreditedCourseTraineeSelection = () => {
                           <TableCell>
                             {getQualificationName(
                               trainee.academic_qualification_id,
+                              qualificationMap,
                             )}
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={getStatusName(trainee.status_id)}
+                              label={getStatusName(
+                                trainee.status_id,
+                                statusList,
+                              )}
                               size="small"
-                              sx={getStatusColor(trainee.status_id)}
+                              sx={getStatusColor(
+                                trainee.status_id,
+                                statusList,
+                              )}
                             />
                           </TableCell>
                           <TableCell align="center">
@@ -1030,7 +847,6 @@ const NonAccreditedCourseTraineeSelection = () => {
               </Table>
             </TableContainer>
 
-            {/* Pending Table Pagination */}
             <TablePagination
               rowsPerPageOptions={[5, 10, 25]}
               component="div"
@@ -1074,335 +890,17 @@ const NonAccreditedCourseTraineeSelection = () => {
       </Grid>
 
       {/* Trainee Details Dialog */}
-      <Dialog
+      <TraineeDetailsDialog
         open={openTraineeDialog}
         onClose={handleCloseDialog}
-        maxWidth="lg"
-        fullWidth
-        slotProps={{
-          paper: {
-            sx: {
-              borderRadius: 2,
-              maxHeight: "80vh",
-            },
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            borderBottom: "1px solid",
-            borderColor: "divider",
-            pb: 2,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Typography variant="h6" fontWeight="bold">
-            Trainee Details
-          </Typography>
-          <IconButton onClick={handleCloseDialog} size="small">
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-
-        <DialogContent sx={{ pt: 3 }}>
-          {traineeDetailsLoading ? (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              minHeight="200px"
-            >
-              <CircularProgress />
-            </Box>
-          ) : traineeDetails ? (
-            <Box>
-              {/* Personal Information Table */}
-              <Box display="flex" alignItems="center" gap={1} mb={2}>
-                <PersonIcon color="primary" />
-                <Typography
-                  variant="subtitle1"
-                  fontWeight="bold"
-                  color="primary"
-                >
-                  Personal Information
-                </Typography>
-              </Box>
-              <TableContainer
-                component={Paper}
-                sx={{
-                  mb: 3,
-                  border: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <Table size="small">
-                  <TableBody>
-                    <TableRow>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          fontWeight: 400,
-                          width: "35%",
-                          bgcolor: "action.hover",
-                        }}
-                      >
-                        Applicant Name
-                      </TableCell>
-                      <TableCell>
-                        {traineeDetails.applicant_name || "N/A"}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          fontWeight: 400,
-                          bgcolor: "action.hover",
-                        }}
-                      >
-                        CID Number
-                      </TableCell>
-                      <TableCell>{traineeDetails.cid_no || "N/A"}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          fontWeight: 400,
-                          bgcolor: "action.hover",
-                        }}
-                      >
-                        Mobile Number
-                      </TableCell>
-                      <TableCell>{traineeDetails.mobile_no || "N/A"}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          fontWeight: 400,
-                          bgcolor: "action.hover",
-                        }}
-                      >
-                        Email Address
-                      </TableCell>
-                      <TableCell>{traineeDetails.email_id || "N/A"}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          fontWeight: 400,
-                          bgcolor: "action.hover",
-                        }}
-                      >
-                        Guardian Name
-                      </TableCell>
-                      <TableCell>
-                        {traineeDetails.guardian_name || "N/A"}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          fontWeight: 400,
-                          bgcolor: "action.hover",
-                        }}
-                      >
-                        Guardian Mobile Number
-                      </TableCell>
-                      <TableCell>
-                        {traineeDetails.guardian_mobile_no || "N/A"}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              {/* Academic Information Table */}
-              <Box display="flex" alignItems="center" gap={1} mb={2}>
-                <SchoolIcon color="primary" />
-                <Typography
-                  variant="subtitle1"
-                  fontWeight="bold"
-                  color="primary"
-                >
-                  Academic Information
-                </Typography>
-              </Box>
-              <TableContainer
-                component={Paper}
-                sx={{
-                  mb: 3,
-                  border: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <Table size="small">
-                  <TableBody>
-                    <TableRow>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          fontWeight: 400,
-                          width: "35%",
-                          bgcolor: "action.hover",
-                        }}
-                      >
-                        Academic Qualification
-                      </TableCell>
-                      <TableCell>
-                        {getQualificationName(
-                          traineeDetails.academic_qualification_id,
-                        ) || "N/A"}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          fontWeight: 400,
-                          bgcolor: "action.hover",
-                        }}
-                      >
-                        Trainee ID
-                      </TableCell>
-                      <TableCell>{traineeDetails.id || "N/A"}</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              {/* Trainee Marks Table - Only show if marks exist */}
-              {traineeMarks.length > 0 && (
-                <>
-                  <Box display="flex" alignItems="center" gap={1} mb={2}>
-                    <GradeIcon color="primary" />
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      color="primary"
-                    >
-                      Trainee Marks
-                    </Typography>
-                  </Box>
-                  <TableContainer
-                    component={Paper}
-                    sx={{
-                      mb: 3,
-                      border: "1px solid",
-                      borderColor: "divider",
-                    }}
-                  >
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow sx={{ bgcolor: "action.hover" }}>
-                          <TableCell sx={{ fontWeight: 400 }}>#</TableCell>
-                          <TableCell sx={{ fontWeight: 400 }}>
-                            Subject
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 400 }} align="right">
-                            Marks
-                          </TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {traineeMarks.map((mark, index) => (
-                          <TableRow key={mark.id || index}>
-                            <TableCell>{index + 1}</TableCell>
-                            <TableCell>{mark.subject || "N/A"}</TableCell>
-                            <TableCell align="right">
-                              <Chip
-                                label={mark.markScore || "N/A"}
-                                size="small"
-                                color={
-                                  parseInt(mark.markScore) >= 50
-                                    ? "success"
-                                    : "error"
-                                }
-                                sx={{ fontWeight: 500, minWidth: 50 }}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {/* Total Row */}
-                        <TableRow sx={{ bgcolor: "action.hover" }}>
-                          <TableCell colSpan={2} sx={{ fontWeight: 600 }}>
-                            Total Marks
-                          </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>
-                            {traineeMarks.reduce(
-                              (total, mark) =>
-                                total + parseInt(mark.markScore || 0),
-                              0,
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </>
-              )}
-
-              {/* Documents Section using FileDownload component */}
-              {traineeDocuments.length > 0 && (
-                <>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    color="primary"
-                    sx={{ mb: 2 }}
-                  >
-                    Documents
-                  </Typography>
-                  <FileDownload
-                    initialFiles={traineeDocuments}
-                    onFileUpload={() => {}}
-                    allowUpload={false}
-                  />
-                </>
-              )}
-            </Box>
-          ) : (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              minHeight="200px"
-            >
-              <Typography color="textSecondary">No data available</Typography>
-            </Box>
-          )}
-        </DialogContent>
-
-        <DialogActions
-          sx={{
-            borderTop: "1px solid",
-            borderColor: "divider",
-            pt: 2,
-            px: 3,
-          }}
-        >
-          <Button
-            onClick={handleCloseDialog}
-            variant="outlined"
-            color="secondary"
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        loading={traineeDetailsLoading}
+        details={traineeDetails}
+        documents={traineeDocuments}
+        marks={traineeMarks}
+        getQualificationName={(id) =>
+          getQualificationName(id, qualificationMap)
+        }
+      />
     </Paper>
   );
 };

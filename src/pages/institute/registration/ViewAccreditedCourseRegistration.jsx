@@ -721,12 +721,15 @@ const ViewAccreditedCourseRegistration = () => {
     setActionLoading(true);
     try {
       const qualityStandardsData = prepareQualityStandardsForBackend();
+
       const assignedRecsPayload = assignedRecs.map((rec) => ({
         userId: rec.userId,
       }));
+
       const assignedAccreditorsPayload = assignedAccreditors.map((acc) => ({
         userId: acc.userId,
       }));
+
       const serviceId =
         selectedStatusId === 127 || selectedStatusId === 126 ? 54 : 26;
 
@@ -742,7 +745,6 @@ const ViewAccreditedCourseRegistration = () => {
         assignedRecs: assignedRecsPayload,
         assignedAccreditors: assignedAccreditorsPayload,
       };
-
       const response =
         await ApplyAccreditedCourseService.verifyAccreditedCourse(
           payload,
@@ -1074,8 +1076,8 @@ const ViewAccreditedCourseRegistration = () => {
             BQF Programme Details
           </Typography>
           <Alert severity="error">
-            BQF Programme with Application No:{" "}
-            <strong>{applicationNo}</strong> not found
+            BQF Programme with Application No: <strong>{applicationNo}</strong>{" "}
+            not found
           </Alert>
         </Paper>
       </Box>

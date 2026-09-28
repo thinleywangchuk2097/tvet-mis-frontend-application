@@ -1,639 +1,55 @@
-// OnJobTrainingIndex.jsx
+// src/pages/dwps/ojt/OnJobTrainingIndex.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import PropTypes from "prop-types";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  TextField,
-  Button,
-  TablePagination,
-  Grid,
-  Typography,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  MenuItem,
-  Link,
-  IconButton,
-  Tooltip,
-  FormControl,
-  InputLabel,
-  Select,
-  Chip,
-  Tab,
-  Tabs,
-  Box,
-} from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
+import { Grid } from "@mui/material";
 import LaunchIcon from "@mui/icons-material/Launch";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import BusinessIcon from "@mui/icons-material/Business";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import AssignmentIcon from "@mui/icons-material/Assignment";
-import { Formik, Form } from "formik";
-import * as Yup from "yup";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
+import * as Yup from "yup";
+
 import FileUpload from "../../../components/file/FileUpload";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import OJTService from "../../../api/services/internal/ojt/OJTService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
-// ==================== CONSTANTS ====================
-const TABLE_STYLE = {
-  border: "1px solid",
-  borderColor: "divider",
-  "& th, & td": { border: "1px solid", borderColor: "divider" },
-};
+import EntityManager from "./shared/EntityManager";
+import FormField from "./shared/FormField";
+import StatusChip from "./shared/StatusChip";
+import EmploymentStatusChip from "./shared/EmploymentStatusChip";
+import DocumentLinks from "./shared/DocumentLinks";
+import {
+  useApiFetch,
+  useDialogState,
+  useSelectedItem,
+  usePagination,
+} from "./shared/hooks";
+import {
+  fileToBase64,
+  getStatusName,
+  getEmploymentStatusName,
+  getDzongkhagName,
+} from "./shared/utils.jsx";
+import { formComponentPropTypes } from "./shared/propTypes";
+import {
+  PARENT_ID_STATUS,
+  PARENT_ID_EMPLOYMENT_STATUS,
+} from "./shared/constants";
 
+// ==================== TABS ====================
 const TABS = [
   { label: "Firms/Companies", icon: <BusinessIcon />, type: "firm" },
   { label: "OJT Agreements", icon: <AssignmentIcon />, type: "ojt" },
   { label: "Trainee Placements", icon: <PersonAddIcon />, type: "placement" },
 ];
 
-const STATUS_COLORS = {
-  approve: "success",
-  complete: "success",
-  reject: "error",
-  cancel: "error",
-  pending: "warning",
-  review: "warning",
-};
+const ENTITY_KEYS = ["firm", "ojt", "placement"];
 
-const EMPLOYMENT_COLORS = {
-  Employed: "success",
-  Unemployed: "error",
-  Student: "info",
-  Intern: "info",
-  Contract: "warning",
-  Probation: "secondary",
-};
-
-// ==================== UTILITY FUNCTIONS ====================
-const fileToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () =>
-      resolve({
-        name: file.name,
-        content: reader.result.split(",")[1],
-        contentType: file.type || "application/octet-stream",
-      });
-    reader.onerror = reject;
-  });
-
-const requiredLabel = (label) => (
-  <>
-    {label}
-    <Typography component="span" sx={{ color: "red" }}>
-      *
-    </Typography>
-  </>
-);
-
-const getStatusName = (id, dropdownData) =>
-  dropdownData.find((s) => s.id === parseInt(id))?.name || "Pending";
-
-const getStatusColor = (id, dropdownData) => {
-  const name = getStatusName(id, dropdownData)?.toLowerCase() || "";
-  for (const [key, color] of Object.entries(STATUS_COLORS)) {
-    if (name.includes(key)) return color;
-  }
-  return "default";
-};
-
-const getEmploymentStatusName = (id, employmentStatuses) =>
-  employmentStatuses.find((s) => String(s.id) === String(id))?.name ||
-  "Not Set";
-
-const getEmploymentStatusColor = (name) => EMPLOYMENT_COLORS[name] || "default";
-
-const getDzongkhagName = (id, dzongkhags) => {
-  if (!id) return "N/A";
-  const found = dzongkhags.find((d) => {
-    const dId = d.id || d.dzonkhagId;
-    return String(dId) === String(id);
-  });
-  return found?.dzonkhagName || found?.name || "N/A";
-};
-
-const getDocumentLinks = (str) => {
-  try {
-    return str
-      ? JSON.parse(str).map((d) => ({
-          id: d.id,
-          name: d.documentName,
-          url: d.url,
-        }))
-      : [];
-  } catch {
-    return [];
-  }
-};
-
-// ==================== CUSTOM HOOKS ====================
-const useApiFetch = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const fetchData = useCallback(async (serviceFn, params, errorMsg) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await serviceFn(...params);
-      return response.data || [];
-    } catch (err) {
-      console.error(errorMsg, err);
-      setError(err);
-      toast.error(errorMsg);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { loading, error, fetchData };
-};
-
-const useDialogState = () => {
-  const [dialogState, setDialogState] = useState({
-    ojt: { open: false, edit: false, view: false },
-    firm: { open: false, edit: false },
-    placement: { open: false },
-    delete: { open: false, item: null, type: "" },
-  });
-
-  const openDialog = useCallback((type, options = {}) => {
-    setDialogState((prev) => ({
-      ...prev,
-      [type]: { ...prev[type], ...options, open: true },
-    }));
-  }, []);
-
-  const closeDialog = useCallback((type) => {
-    setDialogState((prev) => ({
-      ...prev,
-      [type]: { ...prev[type], open: false },
-    }));
-  }, []);
-
-  const openDeleteDialog = useCallback((item, type) => {
-    setDialogState((prev) => ({
-      ...prev,
-      delete: { open: true, item, type },
-    }));
-  }, []);
-
-  const closeDeleteDialog = useCallback(() => {
-    setDialogState((prev) => ({
-      ...prev,
-      delete: { open: false, item: null, type: "" },
-    }));
-  }, []);
-
-  return {
-    dialogState,
-    openDialog,
-    closeDialog,
-    openDeleteDialog,
-    closeDeleteDialog,
-  };
-};
-
-const useSelectedItem = () => {
-  const [selected, setSelected] = useState({
-    ojt: null,
-    firm: null,
-    placement: null,
-  });
-
-  const selectItem = useCallback((type, item) => {
-    setSelected((prev) => ({ ...prev, [type]: item }));
-  }, []);
-
-  const clearSelected = useCallback((type) => {
-    setSelected((prev) => ({ ...prev, [type]: null }));
-  }, []);
-
-  return { selected, selectItem, clearSelected };
-};
-
-const usePagination = () => {
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  const handleChangePage = (_, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (e) => {
-    setRowsPerPage(+e.target.value);
-    setPage(0);
-  };
-
-  return {
-    page,
-    rowsPerPage,
-    handleChangePage,
-    handleChangeRowsPerPage,
-  };
-};
-
-// ==================== PROPTYPES ====================
-
-const statusChipPropTypes = {
-  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  dropdownData: PropTypes.array,
-};
-
-const employmentStatusChipPropTypes = {
-  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  employmentStatuses: PropTypes.array,
-};
-
-const documentLinksPropTypes = {
-  documents: PropTypes.oneOfType([PropTypes.string, PropTypes.array]),
-  onDownload: PropTypes.func.isRequired,
-  downloading: PropTypes.bool,
-};
-
-const formFieldPropTypes = {
-  formik: PropTypes.object.isRequired,
-  name: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  type: PropTypes.string,
-  required: PropTypes.bool,
-  select: PropTypes.bool,
-  options: PropTypes.array,
-  optionLabelKey: PropTypes.string,
-};
-
-const reusableTablePropTypes = {
-  columns: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      label: PropTypes.string,
-      field: PropTypes.string,
-      render: PropTypes.func,
-    }),
-  ).isRequired,
-  data: PropTypes.array.isRequired,
-  page: PropTypes.number,
-  rowsPerPage: PropTypes.number,
-  loading: PropTypes.bool,
-  actions: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string,
-      icon: PropTypes.node,
-      tooltip: PropTypes.string,
-      color: PropTypes.string,
-      onClick: PropTypes.func,
-      disabled: PropTypes.func,
-    }),
-  ),
-  emptyMessage: PropTypes.string,
-};
-
-const deleteConfirmationDialogPropTypes = {
-  open: PropTypes.bool.isRequired,
-  item: PropTypes.object,
-  type: PropTypes.string,
-  onClose: PropTypes.func.isRequired,
-  onConfirm: PropTypes.func.isRequired,
-};
-
-const viewDialogPropTypes = {
-  open: PropTypes.bool.isRequired,
-  title: PropTypes.string.isRequired,
-  fields: PropTypes.arrayOf(
-    PropTypes.shape({
-      label: PropTypes.string,
-      value: PropTypes.any,
-      multiline: PropTypes.bool,
-      rows: PropTypes.number,
-    }),
-  ).isRequired,
-  onClose: PropTypes.func.isRequired,
-};
-
-const addButtonPropTypes = {
-  onClick: PropTypes.func.isRequired,
-  label: PropTypes.string.isRequired,
-};
-
-// PropTypes for the FormComponent rendered inside ENTITY_CONFIGS.
-// This resolves the SonarQube "missing in props validation" issues for
-// formik, formik.values, formik.values.files, formik.setFieldValue,
-// context, and all context.* nested accesses (dzongkhags, firmData,
-// ojtData, ojtData.map, courses, employmentStatuses, etc.)
-const formComponentPropTypes = {
-  formik: PropTypes.shape({
-    values: PropTypes.object.isRequired,
-    errors: PropTypes.object,
-    touched: PropTypes.object,
-    handleChange: PropTypes.func.isRequired,
-    handleBlur: PropTypes.func.isRequired,
-    setFieldValue: PropTypes.func.isRequired,
-    resetForm: PropTypes.func,
-    isValid: PropTypes.bool,
-  }).isRequired,
-  context: PropTypes.shape({
-    selected: PropTypes.object,
-    openDialog: PropTypes.func,
-    handleDelete: PropTypes.func,
-    selectItem: PropTypes.func,
-    getCompanyName: PropTypes.func,
-    getAgreementTitle: PropTypes.func,
-    dropdownData: PropTypes.array,
-    employmentStatuses: PropTypes.array,
-    dzongkhags: PropTypes.array,
-    firmData: PropTypes.array,
-    ojtData: PropTypes.array,
-    courses: PropTypes.array,
-    downloading: PropTypes.bool,
-    handleDownload: PropTypes.func,
-    access_token: PropTypes.string,
-    instituteId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    actionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  }).isRequired,
-};
-
-// ==================== REUSABLE COMPONENTS ====================
-const StatusChip = ({ id, dropdownData }) => (
-  <Chip
-    label={getStatusName(id, dropdownData)}
-    color={getStatusColor(id, dropdownData)}
-    size="small"
-  />
-);
-
-StatusChip.propTypes = statusChipPropTypes;
-
-const EmploymentStatusChip = ({ id, employmentStatuses }) => {
-  const name = getEmploymentStatusName(id, employmentStatuses);
-  return (
-    <Chip
-      label={name}
-      color={id ? getEmploymentStatusColor(name) : "default"}
-      size="small"
-    />
-  );
-};
-
-EmploymentStatusChip.propTypes = employmentStatusChipPropTypes;
-
-const DocumentLinks = ({ documents, onDownload, downloading }) => {
-  const docs = getDocumentLinks(documents);
-  if (!docs.length) return <span>N/A</span>;
-  return docs.map((d, idx) => (
-    <div
-      key={d.id || idx}
-      style={{ display: "flex", alignItems: "center", gap: 8 }}
-    >
-      <Link component="button" variant="body2" onClick={() => onDownload(d)}>
-        {d.name}
-      </Link>
-      <IconButton
-        size="small"
-        onClick={() => onDownload(d)}
-        disabled={downloading}
-      >
-        <LaunchIcon fontSize="small" />
-      </IconButton>
-    </div>
-  ));
-};
-
-DocumentLinks.propTypes = documentLinksPropTypes;
-
-const FormField = ({
-  formik,
-  name,
-  label,
-  type = "text",
-  required = true,
-  select = false,
-  options = [],
-  optionLabelKey = "name",
-  ...props
-}) => {
-  const handleChange = (event) => {
-    formik.setFieldValue(name, event.target.value);
-  };
-
-  const fieldProps = {
-    fullWidth: true,
-    select,
-    type,
-    label: required ? requiredLabel(label) : label,
-    name,
-    size: "small",
-    value: formik.values[name] || "",
-    onChange: handleChange,
-    onBlur: formik.handleBlur,
-    error: formik.touched[name] && Boolean(formik.errors[name]),
-    helperText: formik.touched[name] && formik.errors[name],
-    ...props,
-  };
-
-  if (select) {
-    return (
-      <TextField {...fieldProps}>
-        <MenuItem value="">-select-</MenuItem>
-        {options.map((opt) => {
-          const displayValue =
-            opt[optionLabelKey] ||
-            opt.name ||
-            opt.company_name ||
-            opt.agreement_title ||
-            opt.course_name ||
-            opt.dzonkhagName ||
-            opt.dzonkhag ||
-            opt.label ||
-            opt.id ||
-            "Unknown";
-          return (
-            <MenuItem key={opt.id} value={String(opt.id)}>
-              {displayValue}
-            </MenuItem>
-          );
-        })}
-      </TextField>
-    );
-  }
-
-  return <TextField {...fieldProps} />;
-};
-
-FormField.propTypes = formFieldPropTypes;
-
-const ReusableTable = ({
-  columns,
-  data,
-  page,
-  rowsPerPage,
-  loading,
-  actions,
-  emptyMessage = "No data found",
-}) => (
-  <TableContainer component={Paper} elevation={1}>
-    <Table size="small" sx={TABLE_STYLE}>
-      <TableHead>
-        <TableRow>
-          <TableCell>#</TableCell>
-          {columns.map((col) => (
-            <TableCell key={col.id}>{col.label}</TableCell>
-          ))}
-          {actions && <TableCell>Actions</TableCell>}
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {data.length > 0 ? (
-          data
-            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-            .map((item, index) => (
-              <TableRow key={item.id}>
-                <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
-                {columns.map((col) => (
-                  <TableCell key={col.id}>
-                    {col.render ? col.render(item) : item[col.field] || "N/A"}
-                  </TableCell>
-                ))}
-                {actions && (
-                  <TableCell>
-                    {actions.map((action) => (
-                      <Tooltip key={action.id} title={action.tooltip}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={() => action.onClick(item)}
-                            color={action.color || "primary"}
-                            disabled={
-                              action.disabled ? action.disabled(item) : false
-                            }
-                          >
-                            {action.icon}
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    ))}
-                  </TableCell>
-                )}
-              </TableRow>
-            ))
-        ) : (
-          <TableRow>
-            <TableCell
-              colSpan={columns.length + (actions ? 2 : 1)}
-              align="center"
-            >
-              {loading ? "Loading..." : emptyMessage}
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
-  </TableContainer>
-);
-
-ReusableTable.propTypes = reusableTablePropTypes;
-
-const DeleteConfirmationDialog = ({ open, item, type, onClose, onConfirm }) => {
-  const messages = {
-    firm: `Delete firm "<strong>${item?.company_name}</strong>"?`,
-    ojt: `Delete OJT agreement "<strong>${item?.agreement_title}</strong>"?`,
-    placement: `Delete placement for "<strong>${item?.trainee_name}</strong>"?`,
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle sx={{ color: "error.main" }}>Confirm Delete</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
-          <span
-            dangerouslySetInnerHTML={{
-              __html: messages[type] || "Delete this record?",
-            }}
-          />
-          <br />
-          This action cannot be undone.
-        </DialogContentText>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} size="small" variant="outlined">
-          Cancel
-        </Button>
-        <Button
-          onClick={onConfirm}
-          size="small"
-          color="error"
-          variant="contained"
-        >
-          Delete
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
-DeleteConfirmationDialog.propTypes = deleteConfirmationDialogPropTypes;
-
-const ViewDialog = ({ open, title, fields, onClose }) => (
-  <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-    <DialogTitle>{title}</DialogTitle>
-    <DialogContent dividers>
-      <Grid container spacing={2}>
-        {fields.map((field, i) => (
-          <Grid key={i} size={{ xs: 12, md: i < 4 ? 6 : 12 }}>
-            <TextField
-              fullWidth
-              label={field.label}
-              value={field.value || "N/A"}
-              size="small"
-              slotProps={{ input: { readOnly: true } }}
-              multiline={field.multiline}
-              rows={field.rows || 1}
-            />
-          </Grid>
-        ))}
-      </Grid>
-    </DialogContent>
-    <DialogActions>
-      <Button onClick={onClose} variant="contained">
-        Close
-      </Button>
-    </DialogActions>
-  </Dialog>
-);
-
-ViewDialog.propTypes = viewDialogPropTypes;
-
-const AddButton = ({ onClick, label }) => (
-  <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-    <Button
-      variant="contained"
-      color="primary"
-      size="small"
-      startIcon={<AddIcon />}
-      onClick={onClick}
-    >
-      {label}
-    </Button>
-  </Box>
-);
-
-AddButton.propTypes = addButtonPropTypes;
-
-// ==================== FORM COMPONENTS (extracted for clean PropTypes) ====================
-
+// ==================== FORM COMPONENTS ====================
 const FirmFormComponent = ({ formik, context }) => (
   <Grid container spacing={2}>
     <Grid size={{ xs: 12, md: 6 }}>
@@ -698,7 +114,6 @@ const FirmFormComponent = ({ formik, context }) => (
     </Grid>
   </Grid>
 );
-
 FirmFormComponent.propTypes = formComponentPropTypes;
 
 const OjtFormComponent = ({ formik, context }) => (
@@ -786,7 +201,6 @@ const OjtFormComponent = ({ formik, context }) => (
     </Grid>
   </Grid>
 );
-
 OjtFormComponent.propTypes = formComponentPropTypes;
 
 const PlacementFormComponent = ({ formik, context }) => (
@@ -856,17 +270,15 @@ const PlacementFormComponent = ({ formik, context }) => (
     </Grid>
   </Grid>
 );
-
 PlacementFormComponent.propTypes = formComponentPropTypes;
 
-// ==================== ENTITY CONFIGURATIONS ====================
-const ENTITY_CONFIGS = {
+// ==================== ENTITY CONFIG ====================
+const buildEntityConfigs = () => ({
   firm: {
     label: "Firm",
     addLabel: "Add Firm",
     editLabel: "Edit Firm",
     emptyMessage: "No firms found",
-    tabIndex: 0,
     getInitialValues: (item) => ({
       registrationNo: item?.registration_no || "",
       firmName: item?.company_name || "",
@@ -889,6 +301,24 @@ const ENTITY_CONFIGS = {
       address: Yup.string().required("Address is required"),
       description: Yup.string(),
     }),
+    payloadFn: (values, context) => ({
+      registrationNo: values.registrationNo,
+      companyName: values.firmName,
+      contactPersonName: values.contactPerson,
+      contactPersonMobileNo: values.contactPhone,
+      contactPersonEmail: values.contactEmail,
+      dzongkhagId: values.dzongkhag,
+      address: values.address,
+      description: values.description,
+      instituteId: context.instituteId || null,
+      createdBy: context.actionId,
+    }),
+    service: {
+      submit: (payload, token, isEdit, id) =>
+        isEdit
+          ? OJTService.updateFirm({ id, ...payload }, token)
+          : OJTService.submitOJTCompany(payload, token),
+    },
     columns: (context) => [
       { id: "regNo", label: "Registration No", field: "registration_no" },
       { id: "name", label: "Firm Name", field: "company_name" },
@@ -920,34 +350,15 @@ const ENTITY_CONFIGS = {
         onClick: (i) => context.handleDelete(i, "firm"),
       },
     ],
-    service: {
-      submit: (context) => (payload) =>
-        context.selected.firm
-          ? OJTService.updateFirm(payload, context.access_token)
-          : OJTService.submitOJTCompany(payload, context.access_token),
-      delete: OJTService.deleteFirm,
-    },
-    payloadFn: (values, isEdit, context) => ({
-      registrationNo: values.registrationNo,
-      companyName: values.firmName,
-      contactPersonName: values.contactPerson,
-      contactPersonMobileNo: values.contactPhone,
-      contactPersonEmail: values.contactEmail,
-      dzongkhagId: values.dzongkhag,
-      address: values.address,
-      description: values.description,
-      instituteId: context.instituteId || null,
-      createdBy: context.actionId,
-      ...(isEdit && { id: context.selected.firm?.id }),
-    }),
     FormComponent: FirmFormComponent,
   },
   ojt: {
     label: "OJT Agreement",
     addLabel: "Add OJT Agreement",
     editLabel: "Edit OJT Agreement",
+    viewTitle: "OJT Agreement Details",
     emptyMessage: "No OJT agreements found",
-    tabIndex: 1,
+    dialogMaxWidth: "lg",
     getInitialValues: (item) => ({
       firmId: item?.company_id ? String(item.company_id) : "",
       agreementTitle: item?.agreement_title || "",
@@ -974,6 +385,25 @@ const ENTITY_CONFIGS = {
       description: Yup.string(),
       files: Yup.array(),
     }),
+    payloadFn: (values, context) => ({
+      companyId: values.firmId,
+      agreementTitle: values.agreementTitle,
+      agreementDate: values.agreementDate,
+      startDate: values.startDate,
+      endDate: values.endDate,
+      totalTraineeNo: values.numberOfTrainees,
+      superVisorName: values.supervisorName,
+      supervisorContactNo: values.supervisorContact,
+      description: values.description,
+      instituteId: context.instituteId || null,
+      createdBy: context.actionId,
+      statusId: 55,
+      serviceId: 26,
+      assignedRoleId: 21,
+    }),
+    service: {
+      submit: (payload, token) => OJTService.submitOJTAgrement(payload, token),
+    },
     columns: (context) => [
       { id: "title", label: "Agreement Title", field: "agreement_title" },
       {
@@ -1040,29 +470,6 @@ const ENTITY_CONFIGS = {
         onClick: (i) => context.handleDelete(i, "ojt"),
       },
     ],
-    service: {
-      submit: (context) => (payload) =>
-        OJTService.submitOJTAgrement(payload, context.access_token),
-      delete: OJTService.deleteOjtAgreement,
-    },
-    payloadFn: (values, isEdit, context) => ({
-      companyId: values.firmId,
-      agreementTitle: values.agreementTitle,
-      agreementDate: values.agreementDate,
-      startDate: values.startDate,
-      endDate: values.endDate,
-      totalTraineeNo: values.numberOfTrainees,
-      superVisorName: values.supervisorName,
-      supervisorContactNo: values.supervisorContact,
-      description: values.description,
-      documents: values.files || [],
-      instituteId: context.instituteId || null,
-      createdBy: context.actionId,
-      statusId: 55,
-      serviceId: 26,
-      assignedRoleId: 21,
-      ...(isEdit && { id: context.selected.ojt?.id }),
-    }),
     viewFields: (item, context) => [
       { label: "Agreement Title", value: item.agreement_title },
       { label: "Company Name", value: context.getCompanyName(item.company_id) },
@@ -1098,8 +505,8 @@ const ENTITY_CONFIGS = {
     label: "Placement",
     addLabel: "Record Placement",
     editLabel: "Placement Details",
+    viewTitle: "Placement Details",
     emptyMessage: "No placements found",
-    tabIndex: 2,
     getInitialValues: () => ({
       ojtAgreementId: "",
       traineeCid: "",
@@ -1120,6 +527,24 @@ const ENTITY_CONFIGS = {
       salary: Yup.number().min(0, "Salary must be positive"),
       remarks: Yup.string(),
     }),
+    payloadFn: (values, context) => ({
+      ojtAgreementId: values.ojtAgreementId,
+      traineeCid: values.traineeCid,
+      traineeName: values.traineeName,
+      courseId: values.courseId,
+      position: values.position,
+      employmentStatus: values.employmentStatus,
+      salary: values.salary,
+      remarks: values.remarks,
+      instituteId: context.instituteId || null,
+      createdBy: context.actionId,
+      statusId: 65,
+      placementDate: new Date().toISOString().split("T")[0],
+      startDate: new Date().toISOString().split("T")[0],
+    }),
+    service: {
+      submit: (payload, token) => OJTService.submitOJTTrainee(payload, token),
+    },
     columns: (context) => [
       { id: "cid", label: "Trainee CID", field: "trainee_cid" },
       { id: "name", label: "Trainee Name", field: "trainee_name" },
@@ -1160,26 +585,6 @@ const ENTITY_CONFIGS = {
         onClick: (i) => context.handleDelete(i, "placement"),
       },
     ],
-    service: {
-      submit: (context) => (payload) =>
-        OJTService.submitOJTTrainee(payload, context.access_token),
-      delete: OJTService.deletePlacement,
-    },
-    payloadFn: (values, isEdit, context) => ({
-      ojtAgreementId: values.ojtAgreementId,
-      traineeCid: values.traineeCid,
-      traineeName: values.traineeName,
-      courseId: values.courseId,
-      position: values.position,
-      employmentStatus: values.employmentStatus,
-      salary: values.salary,
-      remarks: values.remarks,
-      instituteId: context.instituteId || null,
-      createdBy: context.actionId,
-      statusId: 65,
-      placementDate: new Date().toISOString().split("T")[0],
-      startDate: new Date().toISOString().split("T")[0],
-    }),
     viewFields: (item, context) => [
       { label: "Trainee CID", value: item.trainee_cid },
       { label: "Trainee Name", value: item.trainee_name },
@@ -1205,28 +610,23 @@ const ENTITY_CONFIGS = {
     ],
     FormComponent: PlacementFormComponent,
   },
-};
+});
 
 // ==================== MAIN COMPONENT ====================
 const OnJobTrainingIndex = () => {
-  // ===== HOOKS =====
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("");
 
   const apiFetch = useApiFetch();
-  const dialog = useDialogState();
-  const selected = useSelectedItem();
+  const dialog = useDialogState(ENTITY_KEYS);
+  const selected = useSelectedItem(ENTITY_KEYS);
   const pagination = usePagination();
 
-  // ===== REDUX =====
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
 
-  // ===== STATE =====
   const [ojtData, setOjtData] = useState([]);
   const [firmData, setFirmData] = useState([]);
   const [placementData, setPlacementData] = useState([]);
@@ -1236,11 +636,11 @@ const OnJobTrainingIndex = () => {
   const [dzongkhags, setDzongkhags] = useState([]);
   const [instituteId, setInstituteId] = useState(null);
 
-  // ===== DATA FETCHING =====
+  // ---- fetchers ----
   const fetchDropdownData = useCallback(async () => {
     const data = await apiFetch.fetchData(
       CommonService.getByParentId,
-      [4],
+      [PARENT_ID_STATUS],
       "Failed to load dropdown",
     );
     setDropdownData(data);
@@ -1249,7 +649,7 @@ const OnJobTrainingIndex = () => {
   const fetchEmploymentStatuses = useCallback(async () => {
     const data = await apiFetch.fetchData(
       CommonService.getByParentId,
-      [17],
+      [PARENT_ID_EMPLOYMENT_STATUS],
       "Failed to load employment statuses",
     );
     setEmploymentStatuses(data);
@@ -1275,7 +675,7 @@ const OnJobTrainingIndex = () => {
       const response =
         await InstituteRegistrationService.getInstituteDetails(registration_no);
       setInstituteId(response.data[0]?.institute_id);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load institute details");
     }
   }, [registration_no]);
@@ -1317,17 +717,16 @@ const OnJobTrainingIndex = () => {
     setPlacementData(data);
   }, [instituteId, access_token, apiFetch]);
 
-  // ===== EFFECTS =====
+  // ---- effects ----
   useEffect(() => {
-    const loadIndependent = async () => {
+    (async () => {
       await Promise.all([
         fetchDropdownData(),
         fetchInstituteDetails(),
         fetchDzongkhags(),
         fetchEmploymentStatuses(),
       ]);
-    };
-    loadIndependent();
+    })();
   }, [
     fetchDropdownData,
     fetchInstituteDetails,
@@ -1337,15 +736,14 @@ const OnJobTrainingIndex = () => {
 
   useEffect(() => {
     if (instituteId && access_token) {
-      const loadDependent = async () => {
+      (async () => {
         await Promise.all([
           fetchFirmData(),
           fetchOjtData(),
           fetchPlacementData(),
           fetchCourses(),
         ]);
-      };
-      loadDependent();
+      })();
     }
   }, [
     instituteId,
@@ -1356,60 +754,7 @@ const OnJobTrainingIndex = () => {
     fetchCourses,
   ]);
 
-  // ===== HELPERS =====
-  const handleTabChange = (_, newValue) => {
-    setTabValue(newValue);
-    pagination.handleChangePage(null, 0);
-  };
-
-  const handleSearchClear = () => {
-    setSearch("");
-    setStatusFilter("");
-  };
-
-  const filterData = useCallback(
-    (data, fields) => {
-      if (!data) return [];
-      let filtered = data;
-      if (search) {
-        filtered = filtered.filter((item) =>
-          fields.some((f) =>
-            item[f]?.toString().toLowerCase().includes(search.toLowerCase()),
-          ),
-        );
-      }
-      if (statusFilter && tabValue === 1) {
-        filtered = filtered.filter(
-          (item) => String(item.status_id) === statusFilter,
-        );
-      }
-      return filtered;
-    },
-    [search, statusFilter, tabValue],
-  );
-
-  const filteredData = useMemo(
-    () => ({
-      firm: filterData(firmData, [
-        "company_name",
-        "contact_person_name",
-        "dzongkhag_id",
-      ]),
-      ojt: filterData(ojtData, [
-        "agreement_title",
-        "super_visor_name",
-        "description",
-      ]),
-      placement: filterData(placementData, [
-        "trainee_name",
-        "trainee_cid",
-        "agreement_id",
-        "position",
-      ]),
-    }),
-    [firmData, ojtData, placementData, filterData],
-  );
-
+  // ---- helpers ----
   const getCompanyName = useCallback(
     (id) =>
       firmData.find((f) => String(f.id) === String(id))?.company_name || "N/A",
@@ -1423,9 +768,30 @@ const OnJobTrainingIndex = () => {
     [ojtData],
   );
 
-  const handleDelete = (item, type) => dialog.openDeleteDialog(item, type);
+  const handleDownload = useCallback(async (file) => {
+    if (!file.url) return toast.error("File URL not found");
+    setDownloading(true);
+    try {
+      const response = await CommonService.fetchDocument(file.name, file.url);
+      const blob = new Blob([response.data], {
+        type: response.headers["content-type"],
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success("File downloaded!");
+    } catch {
+      toast.error("Failed to download file");
+    } finally {
+      setDownloading(false);
+    }
+  }, []);
 
-  const handleDeleteConfirm = async () => {
+  // ---- delete ----
+  const handleDeleteConfirm = useCallback(async () => {
     const { item, type } = dialog.dialogState.delete;
     const deleteServices = {
       firm: {
@@ -1444,10 +810,8 @@ const OnJobTrainingIndex = () => {
         msg: `Placement for "${item.trainee_name}" deleted`,
       },
     };
-
     const service = deleteServices[type];
     if (!service) return;
-
     try {
       await service.fn(item.id, access_token);
       toast.success(service.msg);
@@ -1456,347 +820,133 @@ const OnJobTrainingIndex = () => {
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to delete");
     }
-  };
+  }, [dialog, access_token, fetchFirmData, fetchOjtData, fetchPlacementData]);
 
-  const handleDownload = async (file) => {
-    if (!file.url) return toast.error("File URL not found");
-    setDownloading(true);
-    try {
-      const response = await CommonService.fetchDocument(file.name, file.url);
-      const blob = new Blob([response.data], {
-        type: response.headers["content-type"],
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.name;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.success("File downloaded!");
-    } catch (error) {
-      toast.error("Failed to download file");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  // ===== FORM SUBMISSIONS =====
-  const submitForm = async (values, config, resetForm, isEdit, entityType) => {
-    setLoading(true);
-    try {
-      const context = {
-        selected,
-        access_token,
-        instituteId,
-        actionId,
-        firmData,
-        ojtData,
-        courses,
-        employmentStatuses,
-        dropdownData,
-        dzongkhags,
-        downloading,
-        handleDownload,
-        handleDelete,
-        selectItem: selected.selectItem,
-        openDialog: dialog.openDialog,
-        getCompanyName,
-        getAgreementTitle,
-      };
-
-      const configData = ENTITY_CONFIGS[entityType];
-      const documents = values.files
-        ? await Promise.all(values.files.map(fileToBase64))
-        : [];
-      const payload = configData.payloadFn(values, isEdit, {
-        ...context,
-        documents,
-      });
-      const serviceFn = configData.service.submit(context);
-
-      const response = await serviceFn(payload);
-
-      if (response.status === 200 || response.status === 201) {
-        toast.success(
-          isEdit
-            ? `${configData.label} updated!`
-            : `${configData.label} submitted!`,
-        );
-        await config.refetchFn();
-        resetForm();
-        return true;
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Operation failed");
-    } finally {
-      setLoading(false);
-    }
-    return false;
-  };
-
-  // ===== RENDER HELPERS =====
-  const renderTable = (type, data) => {
-    const context = {
-      selected,
-      openDialog: dialog.openDialog,
-      handleDelete,
-      getCompanyName,
-      getAgreementTitle,
-      dropdownData,
-      employmentStatuses,
-      downloading,
-      handleDownload,
-      access_token,
-      instituteId,
-      actionId,
-      dzongkhags,
-      firmData,
-      ojtData,
-      courses,
-    };
-
-    const config = ENTITY_CONFIGS[type];
-    const columns =
-      typeof config.columns === "function"
-        ? config.columns(context)
-        : config.columns;
-    const actions =
-      typeof config.actions === "function"
-        ? config.actions(context)
-        : config.actions;
-    const labels = {
-      firm: { add: "Add Firm" },
-      ojt: { add: "Add OJT Agreement" },
-      placement: { add: "Record Placement" },
-    };
-
-    return (
-      <>
-        <AddButton
-          onClick={() => {
-            selected.clearSelected(type);
-            dialog.openDialog(type, { open: true });
-          }}
-          label={labels[type].add}
-        />
-        <ReusableTable
-          columns={columns}
-          data={data}
-          page={pagination.page}
-          rowsPerPage={pagination.rowsPerPage}
-          loading={loading}
-          actions={actions}
-          emptyMessage={config.emptyMessage}
-        />
-      </>
-    );
-  };
-
-  const renderDialog = (type) => {
-    const isEdit = dialog.dialogState[type]?.edit;
-    const isView = dialog.dialogState[type]?.view;
-    const isOpen = dialog.dialogState[type]?.open || isEdit || isView;
-    const item = selected.selected[type];
-
-    const context = {
-      selected,
-      openDialog: dialog.openDialog,
-      handleDelete,
-      getCompanyName,
-      getAgreementTitle,
-      dropdownData,
-      employmentStatuses,
-      downloading,
-      handleDownload,
-      access_token,
-      instituteId,
-      actionId,
-      dzongkhags,
-      firmData,
-      ojtData,
-      courses,
-    };
-
-    const config = ENTITY_CONFIGS[type];
-
-    // View Dialog
-    if (isView && (type === "ojt" || type === "placement")) {
-      const fields =
-        typeof config.viewFields === "function"
-          ? config.viewFields(item, context)
+  // ---- submit ----
+  const submitForm = useCallback(
+    async (values, config, isEdit, id) => {
+      setLoading(true);
+      try {
+        const context = { instituteId, actionId };
+        const documents = values.files
+          ? await Promise.all(values.files.map(fileToBase64))
           : [];
-      return (
-        <ViewDialog
-          open={isOpen}
-          title={type === "ojt" ? "OJT Agreement Details" : "Placement Details"}
-          onClose={() => {
-            dialog.closeDialog(type);
-            selected.clearSelected(type);
-          }}
-          fields={fields}
-        />
-      );
-    }
+        const payload = config.payloadFn(values, context);
+        if (documents.length > 0) payload.documents = documents;
+        if (isEdit && id) payload.id = id;
 
-    // Add/Edit Dialog
-    const FormComponent = config.FormComponent;
-    const title = isEdit ? config.editLabel : config.addLabel;
+        const serviceFn = config.service.submit;
+        const response = await serviceFn(payload, access_token, isEdit, id);
 
-    return (
-      <Dialog
-        open={isOpen}
-        onClose={() => dialog.closeDialog(type)}
-        maxWidth={type === "ojt" ? "lg" : "md"}
-        fullWidth
-      >
-        <DialogTitle>{title}</DialogTitle>
-        <Formik
-          initialValues={config.getInitialValues(item)}
-          validationSchema={config.schema}
-          onSubmit={async (values, helpers) => {
-            const refetchMap = {
-              firm: fetchFirmData,
-              ojt: fetchOjtData,
-              placement: fetchPlacementData,
-            };
-            const success = await submitForm(
-              values,
-              { refetchFn: refetchMap[type] },
-              helpers.resetForm,
-              isEdit,
-              type,
-            );
-            if (success) {
-              dialog.closeDialog(type);
-              selected.clearSelected(type);
-            }
-          }}
-          enableReinitialize
-        >
-          {(formik) => (
-            <Form>
-              <DialogContent dividers>
-                <FormComponent formik={formik} context={context} />
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="error"
-                  onClick={() => dialog.closeDialog(type)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="small"
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  disabled={loading}
-                >
-                  {loading ? "Saving..." : isEdit ? "Update" : "Submit"}
-                </Button>
-              </DialogActions>
-            </Form>
-          )}
-        </Formik>
-      </Dialog>
-    );
-  };
+        if (response.status === 200 || response.status === 201) {
+          toast.success(
+            isEdit ? `${config.label} updated!` : `${config.label} submitted!`,
+          );
+          await config.refetchFn();
+          return true;
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Operation failed");
+      } finally {
+        setLoading(false);
+      }
+      return false;
+    },
+    [instituteId, actionId, access_token],
+  );
 
-  // ===== MAIN RENDER =====
-  const currentType = TABS[tabValue].type;
-  const currentData = filteredData[currentType];
+  // ---- memoized props ----
+  const entityConfigs = useMemo(() => buildEntityConfigs(), []);
+
+  const dataMap = useMemo(
+    () => ({
+      firm: firmData,
+      ojt: ojtData,
+      placement: placementData,
+    }),
+    [firmData, ojtData, placementData],
+  );
+
+  const searchFieldsMap = useMemo(
+    () => ({
+      firm: ["company_name", "contact_person_name", "dzongkhag_id"],
+      ojt: ["agreement_title", "super_visor_name", "description"],
+      placement: ["trainee_name", "trainee_cid", "agreement_id", "position"],
+    }),
+    [],
+  );
+
+  const contextExtra = useMemo(
+    () => ({
+      dropdownData,
+      employmentStatuses,
+      dzongkhags,
+      firmData,
+      ojtData,
+      courses,
+      downloading,
+      handleDownload,
+      getCompanyName,
+      getAgreementTitle,
+      access_token,
+      instituteId,
+      actionId,
+    }),
+    [
+      dropdownData,
+      employmentStatuses,
+      dzongkhags,
+      firmData,
+      ojtData,
+      courses,
+      downloading,
+      handleDownload,
+      getCompanyName,
+      getAgreementTitle,
+      access_token,
+      instituteId,
+      actionId,
+    ],
+  );
+
+  const refetchMap = useMemo(
+    () => ({
+      firm: fetchFirmData,
+      ojt: fetchOjtData,
+      placement: fetchPlacementData,
+    }),
+    [fetchFirmData, fetchOjtData, fetchPlacementData],
+  );
+
+  const statusFilterMemo = useMemo(
+    () => ({
+      enabled: true,
+      tabIndex: 1,
+      value: statusFilter,
+      onChange: setStatusFilter,
+      options: dropdownData,
+    }),
+    [statusFilter, dropdownData],
+  );
 
   return (
-    <Paper elevation={3} sx={{ p: 2, m: 1 }}>
-      <Typography variant="h5" gutterBottom>
-        On-Job Training Management
-      </Typography>
-
-      <Tabs
-        value={tabValue}
-        onChange={handleTabChange}
-        sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
-      >
-        {TABS.map((tab, i) => (
-          <Tab key={i} label={tab.label} icon={tab.icon} iconPosition="start" />
-        ))}
-      </Tabs>
-
-      <Grid container spacing={1} alignItems="center" sx={{ mb: 2 }}>
-        <Grid size={{ xs: 12, md: 3 }}>
-          <TextField
-            label="Search"
-            size="small"
-            fullWidth
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ "& .MuiOutlinedInput-root": { height: 36 } }}
-          />
-        </Grid>
-        {tabValue === 1 && (
-          <Grid size={{ xs: 12, md: 2 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                label="Status"
-                sx={{ height: 36 }}
-              >
-                <MenuItem value="">All Status</MenuItem>
-                {dropdownData.map((s) => (
-                  <MenuItem key={s.id} value={s.id.toString()}>
-                    {s.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        )}
-        <Grid size={{ xs: 12, md: 1 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleSearchClear}
-            sx={{ height: 36, width: "100%" }}
-          >
-            Clear
-          </Button>
-        </Grid>
-      </Grid>
-
-      {renderTable(currentType, currentData)}
-
-      <TablePagination
-        rowsPerPageOptions={[5, 10, 25]}
-        component="div"
-        count={currentData.length}
-        rowsPerPage={pagination.rowsPerPage}
-        page={pagination.page}
-        onPageChange={pagination.handleChangePage}
-        onRowsPerPageChange={pagination.handleChangeRowsPerPage}
-      />
-
-      {/* Delete Dialog */}
-      <DeleteConfirmationDialog
-        open={dialog.dialogState.delete.open}
-        item={dialog.dialogState.delete.item}
-        type={dialog.dialogState.delete.type}
-        onClose={dialog.closeDeleteDialog}
-        onConfirm={handleDeleteConfirm}
-      />
-
-      {/* Entity Dialogs */}
-      {renderDialog("firm")}
-      {renderDialog("ojt")}
-      {renderDialog("placement")}
-    </Paper>
+    <EntityManager
+      title="On-Job Training Management"
+      tabs={TABS}
+      entityConfigs={entityConfigs}
+      dataMap={dataMap}
+      searchFieldsMap={searchFieldsMap}
+      loading={loading}
+      dialog={dialog}
+      selected={selected}
+      pagination={pagination}
+      statusFilter={statusFilterMemo}
+      contextExtra={contextExtra}
+      onDeleteConfirm={handleDeleteConfirm}
+      onSubmitForm={submitForm}
+      refetchMap={refetchMap}
+    />
   );
 };
-
-// ==================== PROPTYPES FOR MAIN COMPONENT ====================
-OnJobTrainingIndex.propTypes = {};
 
 export default OnJobTrainingIndex;

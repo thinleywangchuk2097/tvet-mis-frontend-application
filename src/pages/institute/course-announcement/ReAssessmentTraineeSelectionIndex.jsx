@@ -16,25 +16,14 @@ import {
   Chip,
   IconButton,
   Box,
-  Card,
-  CardContent,
   Divider,
   CircularProgress,
-  MenuItem,
-  Select,
-  FormControl,
   Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import SearchIcon from "@mui/icons-material/Search";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -42,6 +31,28 @@ import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
+
+// -------- Shared imports --------
+import {
+  tableStyleReassessment as tableStyle,
+  headerCellStyle,
+  bodyCellStyle,
+} from "./shared/utils/traineeSelectionStyles";
+import {
+  formatDate,
+  getQualificationName,
+  getStatusName,
+  getStatusColor,
+  getResultStatusName,
+  getResultStatusColor,
+  getCompetencyName,
+} from "./shared/utils/traineeSelectionHelpers";
+import ReadOnlyDropdown from "./shared/components/ReadOnlyDropdown";
+import ReadOnlyTextField from "./shared/components/ReadOnlyTextField";
+import TraineeSearchField from "./shared/components/TraineeSearchField";
+import DeleteTraineeDialog from "./shared/components/DeleteTraineeDialog";
+import ProgrammeInfoCard from "./shared/components/ProgrammeInfoCard";
+import MoveButton from "./shared/components/MoveButton";
 
 const ReAssessmentTraineeSelectionIndex = () => {
   const { applicationNo, programmeId } = useParams();
@@ -95,17 +106,13 @@ const ReAssessmentTraineeSelectionIndex = () => {
   const showOtherAssessmentsAndResultStatus =
     programmeDetails?.application_status_id === "59";
 
-  // ============================================================
   // Submit is disabled for statuses 55, 57, AND 59
-  // ============================================================
   const isSubmitDisabledByStatus =
     programmeDetails?.application_status_id === "55" ||
     programmeDetails?.application_status_id === "57" ||
     programmeDetails?.application_status_id === "59";
 
-  // ============================================================
-  // UPDATED: Move buttons now use the SAME disable condition as Submit
-  // ============================================================
+  // Move buttons use the SAME disable condition as Submit
   const isMoveDisabledByStatus = isSubmitDisabledByStatus;
 
   // Human-readable reason for why Submit is disabled
@@ -197,6 +204,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
     ) {
       fetchData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applicationNo,
     academicQualifications,
@@ -238,7 +246,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
-  //Sequential fetch — ensures certificationLevelId is available
+  // Sequential fetch — ensures certificationLevelId is available
   const fetchData = async () => {
     const details = await fetchProgrammeDetails();
     await fetchFailedTraineesLists(details?.certification_level_id);
@@ -270,7 +278,6 @@ const ReAssessmentTraineeSelectionIndex = () => {
         ? response.data[0]
         : response.data;
       setProgrammeDetails(courseData);
-      console.log("Fetched programme details:", courseData);
       return courseData;
     } catch (error) {
       console.error("Error fetching re-assessment details:", error);
@@ -279,7 +286,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
-  //  Accepts certificationLevelId and passes it to the service
+  // Accepts certificationLevelId and passes it to the service
   const fetchFailedTraineesLists = async (certificationLevelId) => {
     try {
       setLoading(true);
@@ -298,9 +305,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
             certificationLevelId,
           );
         trainees = failedResponse.data || [];
-        console.log("Fetched trainees inside:", trainees);
       }
-      console.log("Fetched trainees:", trainees);
       trainees = trainees || [];
 
       const pending = trainees.filter(
@@ -340,64 +345,6 @@ const ReAssessmentTraineeSelectionIndex = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  };
-
-  const getQualificationName = (qualificationId) => {
-    if (!qualificationId) return "N/A";
-    return qualificationMap[qualificationId] || qualificationId;
-  };
-
-  const getStatusName = (statusId) => {
-    if (!statusId) return "Unknown";
-    const status = statusList.find((s) => s.id === parseInt(statusId));
-    return status ? status.name : "Unknown";
-  };
-
-  const getResultStatusName = (resultStatusId) => {
-    if (!resultStatusId) return "N/A";
-    const status = statusList.find((s) => s.id === parseInt(resultStatusId));
-    return status ? status.name : "Unknown";
-  };
-
-  const getStatusColor = (statusId) => {
-    const statusName = getStatusName(statusId).toLowerCase();
-    if (statusName === "selected" || statusName === "approved") {
-      return { bgcolor: "#4caf50", color: "white" };
-    } else if (statusName === "pending" || statusName === "submitted") {
-      return { bgcolor: "#ff9800", color: "white" };
-    } else if (statusName === "rejected") {
-      return { bgcolor: "#f44336", color: "white" };
-    } else if (statusName === "verified") {
-      return { bgcolor: "#2196f3", color: "white" };
-    }
-    return { bgcolor: "#9e9e9e", color: "white" };
-  };
-
-  const getResultStatusColor = (resultStatusId) => {
-    const statusName = getResultStatusName(resultStatusId).toLowerCase();
-    if (statusName === "passed") {
-      return { bgcolor: "#4caf50", color: "white" };
-    } else if (statusName === "failed") {
-      return { bgcolor: "#f44336", color: "white" };
-    } else if (statusName === "pending") {
-      return { bgcolor: "#ff9800", color: "white" };
-    }
-    return { bgcolor: "#9e9e9e", color: "white" };
-  };
-
-  const getCompetencyName = (competencyId) => {
-    if (!competencyId) return "";
-    return competencyMap[competencyId] || competencyId;
   };
 
   const handleSelectPending = (event, traineeId) => {
@@ -445,7 +392,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
     const totalSeats = programmeDetails?.enrollment_capacity || 0;
     if (selectedTrainees.length + selectedPendingRows.length > totalSeats) {
       toast.error(
-        `Cannot select more than ${totalSeats} trainees. Only ${totalSeats - selectedTrainees.length} seats available.`,
+        `Cannot select more than ${totalSeats} trainees. Only ${
+          totalSeats - selectedTrainees.length
+        } seats available.`,
       );
       return;
     }
@@ -564,7 +513,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
 
       if (missingAssessments.length > 0) {
         toast.error(
-          `Please enter CA mark/competency for all selected trainees. Missing for: ${missingAssessments.map((t) => t.applicant_name).join(", ")}`,
+          `Please enter CA mark/competency for all selected trainees. Missing for: ${missingAssessments
+            .map((t) => t.applicant_name)
+            .join(", ")}`,
         );
         return;
       }
@@ -653,7 +604,6 @@ const ReAssessmentTraineeSelectionIndex = () => {
       if (isServiceId41 && traineeVivaAssessmentsList.length > 0) {
         payload.traineeVivaAssessments = traineeVivaAssessmentsList;
       }
-      console.log("Finalizing selection with payload:", payload);
 
       const response = await CourseEnrollmentService.submitReassessmentTrainees(
         payload,
@@ -714,144 +664,32 @@ const ReAssessmentTraineeSelectionIndex = () => {
     setPageSelected(0);
   };
 
-  // ============================================================
-  // TABLE STYLES — shared between both tables for aligned columns
-  // ============================================================
-  const tableStyle = {
-    border: "1px solid",
-    borderColor: "divider",
-    tableLayout: "auto",
-    "& th, & td": {
-      border: "1px solid",
-      borderColor: "divider",
-      padding: "8px",
-      whiteSpace: "nowrap",
-      verticalAlign: "middle",
-      textAlign: "center",
-    },
-  };
-
-  const headerCellStyle = {
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    fontSize: "0.8rem",
-    padding: "8px",
-    textAlign: "center",
-  };
-
-  const bodyCellStyle = {
-    whiteSpace: "nowrap",
-    fontSize: "0.8rem",
-    padding: "8px",
-    verticalAlign: "middle",
-    textAlign: "center",
-  };
-
-  const textFieldStyle = {
-    "& .MuiOutlinedInput-root": {
-      "&:hover fieldset": {
-        borderColor: "rgba(0, 0, 0, 0.23)",
-      },
-    },
-  };
-
-  // Style for disabled Select to keep text color same as other column values
-  const disabledSelectSx = {
-    "& .MuiInputBase-root.Mui-disabled": {
-      backgroundColor: "transparent",
-    },
-    "& .MuiSelect-select.Mui-disabled": {
-      color: "text.primary !important",
-      WebkitTextFillColor: "inherit !important",
-      opacity: 1,
-      textAlign: "center",
-    },
-    "& .MuiOutlinedInput-notchedOutline": {
-      borderColor: "rgba(0, 0, 0, 0.23)",
-    },
-  };
-
-  // Style for disabled TextField to keep text color same as other column values
-  const disabledTextFieldSx = {
-    minWidth: 100,
-    "& .MuiInputBase-root.Mui-disabled": {
-      backgroundColor: "transparent",
-    },
-    "& .MuiInputBase-input.Mui-disabled": {
-      color: "text.primary !important",
-      WebkitTextFillColor: "inherit !important",
-      opacity: 1,
-      textAlign: "center",
-    },
-    "& .MuiOutlinedInput-notchedOutline": {
-      borderColor: "rgba(0, 0, 0, 0.23)",
-    },
-  };
-
-  // Reusable readonly dropdown component
-  const ReadOnlyDropdown = ({ value, placeholder = "Select Competency" }) => (
-    <FormControl
-      size="small"
-      fullWidth
-      sx={{ minWidth: 130, display: "flex", justifyContent: "center" }}
-    >
-      <Select
-        value={value || ""}
-        displayEmpty
-        disabled
-        renderValue={(selected) => {
-          if (!selected || selected === "") {
-            return <em style={{ color: "#9e9e9e" }}>{placeholder}</em>;
-          }
-          return getCompetencyName(selected);
-        }}
-        sx={disabledSelectSx}
-      >
-        <MenuItem value="" disabled>
-          <em>{placeholder}</em>
-        </MenuItem>
-        {academicCompetency.map((competency) => (
-          <MenuItem key={competency.id} value={competency.id}>
-            {competency.name}
-          </MenuItem>
-        ))}
-      </Select>
-    </FormControl>
-  );
-
-  // Reusable readonly text field component (for numeric certification levels)
-  const ReadOnlyTextField = ({ value }) => (
-    <TextField
-      type="number"
-      size="small"
-      value={value || ""}
-      fullWidth
-      disabled
-      sx={disabledTextFieldSx}
-    />
-  );
-
   // Render either readonly dropdown or text field based on certification level
   const renderAssessmentValue = (value) => {
-    return isNumericCertificationLevel() ? (
-      <ReadOnlyTextField value={value} />
-    ) : (
-      <ReadOnlyDropdown value={value} />
+    if (isNumericCertificationLevel()) {
+      return <ReadOnlyTextField value={value} />;
+    }
+    return (
+      <ReadOnlyDropdown
+        value={value}
+        academicCompetency={academicCompetency}
+        getCompetencyName={(id) => getCompetencyName(id, competencyMap)}
+      />
     );
   };
 
   // Column span helpers
   const getSelectedTableColSpan = () => {
-    let cols = 9; // checkbox, #, name, cid, contact, email, qualification, status, (result status)
+    let cols = 9;
     cols++; // internal assessment
     if (showOtherAssessmentsAndResultStatus) {
-      cols += 2; // theory/viva + practical (only when app status = 59)
+      cols += 2;
     }
     return cols;
   };
 
   const getPendingTableColSpan = () => {
-    let cols = 8; // checkbox, #, name, cid, contact, email, qualification, result status
+    let cols = 8;
     cols++; // internal assessment
     cols += 2; // theory/viva + practical
     cols++; // action
@@ -966,95 +804,11 @@ const ReAssessmentTraineeSelectionIndex = () => {
       </Box>
 
       {/* Re-Assessment Information Card */}
-      {programmeDetails && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Re-Assessment Information
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Application No:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {programmeDetails.application_no}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Programme Name:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {programmeDetails.course_name}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Total Seats:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {programmeDetails.enrollment_capacity}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Selected Count:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold" color="green">
-                  {selectedTrainees.length}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Fees Per Trainee:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  Nu. {programmeDetails.fees_per_trainee}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Available Seats:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold" color="primary">
-                  {(programmeDetails.enrollment_capacity || 0) -
-                    selectedTrainees.length}
-                </Typography>
-              </Grid>
-              {programmeDetails.ca_start_date && (
-                <Grid item size={{ xs: 12, md: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    CA Start Date:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold" color="primary">
-                    {formatDate(programmeDetails.ca_start_date)}
-                  </Typography>
-                </Grid>
-              )}
-              {programmeDetails.ca_end_date && (
-                <Grid item size={{ xs: 12, md: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    CA End Date:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold" color="primary">
-                    {formatDate(programmeDetails.ca_end_date)}
-                  </Typography>
-                </Grid>
-              )}
-              <Grid item size={{ xs: 12, md: 3 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Certification Level:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {programmeDetails.certification_name}
-                </Typography>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
+      <ProgrammeInfoCard
+        title="Re-Assessment Information"
+        details={programmeDetails}
+        selectedCount={selectedTrainees.length}
+      />
 
       <Grid container spacing={3}>
         {/* Selected Trainees Table */}
@@ -1082,19 +836,10 @@ const ReAssessmentTraineeSelectionIndex = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
 
-            <TextField
+            <TraineeSearchField
               label="Search Selected Trainees"
-              variant="outlined"
-              size="small"
-              fullWidth
               value={searchSelected}
               onChange={(e) => setSearchSelected(e.target.value)}
-              sx={{ mb: 2, ...textFieldStyle }}
-              slotProps={{
-                input: {
-                  startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
-                },
-              }}
             />
 
             <TableContainer sx={{ maxHeight: 500 }}>
@@ -1134,14 +879,12 @@ const ReAssessmentTraineeSelectionIndex = () => {
                     <TableCell sx={headerCellStyle}>Email</TableCell>
                     <TableCell sx={headerCellStyle}>Qualification</TableCell>
                     <TableCell sx={headerCellStyle}>Status</TableCell>
-                    {/* Result Status — only when application_status_id === "59" */}
                     {showOtherAssessmentsAndResultStatus && (
                       <TableCell sx={headerCellStyle}>Result Status</TableCell>
                     )}
                     <TableCell sx={headerCellStyle}>
                       Internal Assessment
                     </TableCell>
-                    {/* Other Assessment columns — only when application_status_id === "59" */}
                     {showOtherAssessmentsAndResultStatus &&
                       (isServiceId41 ? (
                         <>
@@ -1202,26 +945,34 @@ const ReAssessmentTraineeSelectionIndex = () => {
                           <TableCell sx={bodyCellStyle}>
                             {getQualificationName(
                               trainee.academic_qualification_id,
+                              qualificationMap,
                             )}
                           </TableCell>
                           <TableCell sx={bodyCellStyle}>
                             <Chip
-                              label={getStatusName(trainee.status_id)}
+                              label={getStatusName(
+                                trainee.status_id,
+                                statusList,
+                              )}
                               size="small"
-                              sx={getStatusColor(trainee.status_id)}
+                              sx={getStatusColor(
+                                trainee.status_id,
+                                statusList,
+                              )}
                             />
                           </TableCell>
-                          {/* Result Status — only when application_status_id === "59" */}
                           {showOtherAssessmentsAndResultStatus && (
                             <TableCell sx={bodyCellStyle}>
                               {trainee.result_status_id ? (
                                 <Chip
                                   label={getResultStatusName(
                                     trainee.result_status_id,
+                                    statusList,
                                   )}
                                   size="small"
                                   sx={getResultStatusColor(
                                     trainee.result_status_id,
+                                    statusList,
                                   )}
                                 />
                               ) : (
@@ -1234,7 +985,6 @@ const ReAssessmentTraineeSelectionIndex = () => {
                               traineeInternalAssessments[trainee.id],
                             )}
                           </TableCell>
-                          {/* Other Assessment columns — only when application_status_id === "59" */}
                           {showOtherAssessmentsAndResultStatus &&
                             renderSelectedAssessmentColumns(trainee)}
                         </TableRow>
@@ -1275,7 +1025,6 @@ const ReAssessmentTraineeSelectionIndex = () => {
                 Selected: {selectedSelectedRows.length} trainee(s)
               </Typography>
               <Box sx={{ display: "flex", gap: 2 }}>
-                {/* Move to Pending with tooltip — uses same disable condition as Submit */}
                 <Tooltip title={getMoveToPendingTooltip()} arrow>
                   <span>
                     <Button
@@ -1295,7 +1044,6 @@ const ReAssessmentTraineeSelectionIndex = () => {
                   </span>
                 </Tooltip>
 
-                {/* Submit with tooltip — disabled for statuses 55, 57, 59 */}
                 <Tooltip title={getSubmitDisabledTooltip()} arrow>
                   <span>
                     <Button
@@ -1344,19 +1092,10 @@ const ReAssessmentTraineeSelectionIndex = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
 
-            <TextField
+            <TraineeSearchField
               label="Search Pending Trainees"
-              variant="outlined"
-              size="small"
-              fullWidth
               value={searchPending}
               onChange={(e) => setSearchPending(e.target.value)}
-              sx={{ mb: 2, ...textFieldStyle }}
-              slotProps={{
-                input: {
-                  startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
-                },
-              }}
             />
 
             <TableContainer sx={{ maxHeight: 400 }}>
@@ -1458,6 +1197,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
                           <TableCell sx={bodyCellStyle}>
                             {getQualificationName(
                               trainee.academic_qualification_id,
+                              qualificationMap,
                             )}
                           </TableCell>
                           <TableCell sx={bodyCellStyle}>
@@ -1465,10 +1205,12 @@ const ReAssessmentTraineeSelectionIndex = () => {
                               <Chip
                                 label={getResultStatusName(
                                   trainee.result_status_id,
+                                  statusList,
                                 )}
                                 size="small"
                                 sx={getResultStatusColor(
                                   trainee.result_status_id,
+                                  statusList,
                                 )}
                               />
                             ) : (
@@ -1545,7 +1287,6 @@ const ReAssessmentTraineeSelectionIndex = () => {
               <Typography variant="body2" color="textSecondary">
                 Selected: {selectedPendingRows.length} trainee(s)
               </Typography>
-              {/* Move to Selected with tooltip — uses same disable condition as Submit */}
               <Tooltip title={getMoveToSelectedTooltip()} arrow>
                 <span>
                   <Button
@@ -1570,54 +1311,13 @@ const ReAssessmentTraineeSelectionIndex = () => {
       </Grid>
 
       {/* Delete Trainee Confirmation Dialog */}
-      <Dialog
+      <DeleteTraineeDialog
         open={deleteTraineeDialogOpen}
+        trainee={traineeToDelete}
+        loading={actionLoading}
         onClose={closeDeleteTraineeDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Confirm Removal</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {traineeToDelete && (
-              <>
-                Are you sure you want to remove{" "}
-                <strong>{traineeToDelete?.applicant_name}</strong> from the
-                pending trainees list?
-                <br />
-                <br />
-                <strong>CID/Reference:</strong>{" "}
-                {traineeToDelete?.cid_no || traineeToDelete?.reference_no}
-                <br />
-                <strong>Email:</strong> {traineeToDelete?.email_id}
-                <br />
-                <strong>Contact:</strong> {traineeToDelete?.mobile_no}
-              </>
-            )}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="outlined"
-            size="small"
-            onClick={closeDeleteTraineeDialog}
-            disabled={actionLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeletePendingTrainee}
-            color="error"
-            variant="contained"
-            size="small"
-            startIcon={<DeleteIcon />}
-            disabled={actionLoading}
-          >
-            {actionLoading ? <CircularProgress size={20} /> : "Remove"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={handleDeletePendingTrainee}
+      />
     </Paper>
   );
 };

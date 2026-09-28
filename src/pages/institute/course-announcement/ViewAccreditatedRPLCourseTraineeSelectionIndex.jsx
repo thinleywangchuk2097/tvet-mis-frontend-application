@@ -20,30 +20,26 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  MenuItem,
+  Select,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
-  MenuItem,
-  Select,
   FormControl,
   Tooltip,
-  Autocomplete,
-  Stack,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import PaymentIcon from "@mui/icons-material/Payment";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EngineeringIcon from "@mui/icons-material/Engineering";
-import { toast } from "react-toastify";
 import ManageHistoryIcon from "@mui/icons-material/ManageHistory";
+import PaymentIcon from "@mui/icons-material/Payment";
+import DeleteIcon from "@mui/icons-material/Delete";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
+import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import { useSelector } from "react-redux";
@@ -51,9 +47,26 @@ import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPayme
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import UserRoleManagementService from "../../../api/services/internal/userrole/UserRoleManagementService";
 
+// -------- Shared imports --------
+import {
+  validateAssessmentInput,
+  getAssessmentTooltipMessage,
+} from "./shared/utils/assessmentHelpers";
+import {
+  mapRegisteredAssessors,
+  buildAssignedAssessorsWithDetails,
+  getAvailableAssessors,
+  buildAssignmentRecord,
+} from "./shared/utils/assessorHelpers";
+import PaymentStatusCard from "./shared/components/PaymentStatusCard";
+import AssessorAssignmentCard from "./shared/components/AssessorAssignmentCard";
+import DeleteAssessorDialog from "./shared/components/DeleteAssessorDialog";
+import ActionConfirmDialog from "./shared/components/ActionConfirmDialog";
+
 const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
   const navigate = useNavigate();
+
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [courseDetails, setCourseDetails] = useState(null);
@@ -64,51 +77,47 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [currentStatusId, setCurrentStatusId] = useState(null);
 
-  //assessors
+  // Assessors
   const [assessors, setAssessors] = useState([]);
   const [selectedAssessor, setSelectedAssessor] = useState("");
   const [assignedAssessors, setAssignedAssessors] = useState([]);
   const [listAssignedAssessors, setListAssignedAssessors] = useState([]);
-  // State for CA dates (only used when they don't exist in course details)
+
+  // CA dates (only used when not present in courseDetails)
   const [caStartDate, setCaStartDate] = useState("");
   const [caEndDate, setCaEndDate] = useState("");
   const [paymentStatus, setPaymentStatus] = useState(null);
 
-  // State for qualifications lookup
+  // Lookup
   const [academicQualifications, setAcademicQualifications] = useState([]);
   const [qualificationMap, setQualificationMap] = useState({});
-
-  // State for academic competencies lookup
   const [academicCompetency, setAcademicCompetency] = useState([]);
   const [competencyMap, setCompetencyMap] = useState({});
 
-  // State for storing theory and practical assessments (directly editable)
+  // Assessments
   const [traineeTheoryAssessments, setTraineeTheoryAssessments] = useState({});
   const [traineePracticalAssessments, setTraineePracticalAssessments] =
     useState({});
-
-  // State for storing viva and practical assessments for service_id 39
   const [traineeVivaAssessments, setTraineeVivaAssessments] = useState({});
   const [traineeVivaPracticalAssessments, setTraineeVivaPracticalAssessments] =
     useState({});
 
-  // State for storing remarks for each trainee
+  // Per-trainee remarks
   const [traineeRemarks, setTraineeRemarks] = useState({});
 
-  // State to track if all CA marks exist
   const [allCAmarksExist, setAllCAmarksExist] = useState(false);
 
-  // Dialog states
+  // Dialog state
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [currentAction, setCurrentAction] = useState(null);
   const [remarks, setRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
 
-  // Assessor delete confirmation dialog
+  // Assessor delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assessorToDelete, setAssessorToDelete] = useState(null);
 
-  // Trainee delete confirmation dialog
+  // Trainee delete dialog
   const [deleteTraineeDialogOpen, setDeleteTraineeDialogOpen] = useState(false);
   const [traineeToDelete, setTraineeToDelete] = useState(null);
 
@@ -120,160 +129,77 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const actionId = useSelector((state) => state.auth.id);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
 
-  // Check if CA dates exist in course details
   const hasCADatesInCourse =
     courseDetails?.ca_start_date && courseDetails?.ca_end_date;
 
-  // Check if any trainee has internal_assessment (to determine if we need theory/practical columns)
   const [hasInternalAssessmentForCourse, setHasInternalAssessmentForCourse] =
     useState(false);
 
-  // Check if service_id is 39 for Viva assessments
   const isServiceId39 = courseDetails?.service_id === "39";
 
-  // Helper function to check if certification level requires numeric input (only 111 and 112)
   const isNumericCertificationLevel = () => {
     const levelId = courseDetails?.certification_level_id;
     return levelId === "111" || levelId === "112";
   };
 
-  // Helper function to check if certification level is diploma (111 or 112)
   const isDiplomaCertificationLevel = () => {
     const levelId = courseDetails?.certification_level_id;
     return levelId === "111" || levelId === "112";
   };
 
-  // Get max value for Theory Assessment based on certification level (for non-service_id 39)
-  const getTheoryMaxValue = () => {
-    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
-    return 20;
-  };
+  // ============================================================
+  // Assessment validation via shared helper
+  // ============================================================
+  const validateTheoryInput = (value) =>
+    validateAssessmentInput(value, 20, isDiplomaCertificationLevel());
+  const validatePracticalInput = (value) =>
+    validateAssessmentInput(value, 60, isDiplomaCertificationLevel());
+  const validateVivaInput = (value) =>
+    validateAssessmentInput(value, 20, isDiplomaCertificationLevel());
+  const validateVivaPracticalInput = (value) =>
+    validateAssessmentInput(value, 60, isDiplomaCertificationLevel());
 
-  // Get max value for Practical Assessment based on certification level (for non-service_id 39)
-  const getPracticalMaxValue = () => {
-    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
-    return 60;
-  };
+  // Max values kept local so existing call sites don't change
+  const getTheoryMaxValue = () => (isDiplomaCertificationLevel() ? 20 : null);
+  const getPracticalMaxValue = () =>
+    isDiplomaCertificationLevel() ? 60 : null;
+  const getVivaMaxValue = () => (isDiplomaCertificationLevel() ? 20 : null);
+  const getVivaPracticalMaxValue = () =>
+    isDiplomaCertificationLevel() ? 60 : null;
 
-  // Get max value for Viva Assessment based on certification level (for service_id 39)
-  const getVivaMaxValue = () => {
-    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
-    return 20;
-  };
+  const getTheoryTooltipMessage = () =>
+    getAssessmentTooltipMessage("theory", isDiplomaCertificationLevel());
+  const getPracticalTooltipMessage = () =>
+    getAssessmentTooltipMessage("practical", isDiplomaCertificationLevel());
+  const getVivaTooltipMessage = () =>
+    getAssessmentTooltipMessage("viva", isDiplomaCertificationLevel());
+  const getVivaPracticalTooltipMessage = () =>
+    getAssessmentTooltipMessage("vivaPractical", isDiplomaCertificationLevel());
 
-  // Get max value for Viva Practical Assessment based on certification level (for service_id 39)
-  const getVivaPracticalMaxValue = () => {
-    if (!isDiplomaCertificationLevel()) return null; // No max for certificate level
-    return 60;
-  };
+  // ============================================================
+  // Business rules
+  // ============================================================
+  const isPaymentCompleted = () =>
+    paymentStatus && paymentStatus.paymentStatus === "paid";
 
-  // Get tooltip message for Theory Assessment max value
-  const getTheoryTooltipMessage = () => {
-    const maxVal = getTheoryMaxValue();
-    if (!maxVal) return "";
-    return `Maximum value that can be entered is ${maxVal}`;
-  };
-
-  // Get tooltip message for Practical Assessment max value
-  const getPracticalTooltipMessage = () => {
-    const maxVal = getPracticalMaxValue();
-    if (!maxVal) return "";
-    return `Maximum value that can be entered is ${maxVal}`;
-  };
-
-  // Get tooltip message for Viva Assessment max value
-  const getVivaTooltipMessage = () => {
-    const maxVal = getVivaMaxValue();
-    if (!maxVal) return "";
-    return `Maximum value that can be entered is ${maxVal}`;
-  };
-
-  // Get tooltip message for Viva Practical Assessment max value
-  const getVivaPracticalTooltipMessage = () => {
-    const maxVal = getVivaPracticalMaxValue();
-    if (!maxVal) return "";
-    return `Maximum value that can be entered is ${maxVal}`;
-  };
-
-  // Helper function to validate Theory Assessment input for diploma
-  const validateTheoryInput = (value) => {
-    if (value === "") return true;
-    const numValue = Number(value);
-    if (isNaN(numValue)) return false;
-    if (isDiplomaCertificationLevel()) {
-      return numValue >= 0 && numValue <= 20;
-    }
-    return numValue >= 0 && numValue <= 100;
-  };
-
-  // Helper function to validate Practical Assessment input for diploma
-  const validatePracticalInput = (value) => {
-    if (value === "") return true;
-    const numValue = Number(value);
-    if (isNaN(numValue)) return false;
-    if (isDiplomaCertificationLevel()) {
-      return numValue >= 0 && numValue <= 60;
-    }
-    return numValue >= 0 && numValue <= 100;
-  };
-
-  // Helper function to validate Viva Assessment input for diploma (service_id 39)
-  const validateVivaInput = (value) => {
-    if (value === "") return true;
-    const numValue = Number(value);
-    if (isNaN(numValue)) return false;
-    if (isDiplomaCertificationLevel()) {
-      return numValue >= 0 && numValue <= 20;
-    }
-    return numValue >= 0 && numValue <= 100;
-  };
-
-  // Helper function to validate Viva Practical Assessment input for diploma (service_id 39)
-  const validateVivaPracticalInput = (value) => {
-    if (value === "") return true;
-    const numValue = Number(value);
-    if (isNaN(numValue)) return false;
-    if (isDiplomaCertificationLevel()) {
-      return numValue >= 0 && numValue <= 60;
-    }
-    return numValue >= 0 && numValue <= 100;
-  };
-
-  // Check if payment is completed
-  const isPaymentCompleted = () => {
-    return paymentStatus && paymentStatus.paymentStatus === "paid";
-  };
-
-  // Check if CA dates are valid (when they need to be provided)
   const areCADatesValid = () => {
-    if (hasCADatesInCourse) {
-      return true; // CA dates already exist in course, no need to validate
-    }
-    // When CA dates don't exist in course, both must be provided and end date >= start date
+    if (hasCADatesInCourse) return true;
     return (
       caStartDate && caEndDate && new Date(caEndDate) >= new Date(caStartDate)
     );
   };
 
-  // Check if all trainees have assessment values
   const allTraineesHaveAssessments = () => {
-    if (!hasInternalAssessmentForCourse) {
-      return true; // No assessment columns, so validation passes
-    }
+    if (!hasInternalAssessmentForCourse) return true;
 
-    // Check if all selected trainees have assessment values
     return selectedTrainees.every((trainee) => {
       const hasInternalAssessment =
         trainee.internal_assessment !== null &&
         trainee.internal_assessment !== "";
 
-      if (!hasInternalAssessment) {
-        return true; // Skip validation for trainees without CA marks
-      }
+      if (!hasInternalAssessment) return true;
 
       if (isServiceId39) {
-        // For service_id 39: Check Viva and Practical
-        // Check both state and fallback to trainee data
         const vivaValue =
           traineeVivaAssessments[trainee.id] || trainee.viva_assessment || "";
         const practicalValue =
@@ -287,7 +213,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           practicalValue !== ""
         );
       } else {
-        // For other services: Check Theory and Practical
         const theoryValue =
           traineeTheoryAssessments[trainee.id] ||
           trainee.theory_assessment ||
@@ -306,85 +231,41 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     });
   };
 
-  // Check if assessors are assigned (when CA marks exist)
   const areAssessorsAssigned = () => {
-    if (!allCAmarksExist) {
-      return false; // If CA marks don't exist, assessors are not required yet
-    }
+    if (!allCAmarksExist) return false;
     return assignedAssessors.length > 0 || listAssignedAssessors.length > 0;
   };
 
-  // Check if Generate PA button should be enabled
   const isGeneratePAEnabled = () => {
-    // Must have all CA marks exist
-    if (!allCAmarksExist) {
-      return false;
-    }
+    if (!allCAmarksExist) return false;
     return true;
   };
 
-  // Check if Set CA Date (139) button should be enabled
-  // Flow: CA Start Date & CA End Date must be set (when not in course)
   const isSubmitEnabled = () => {
-    // Must have CA dates valid (either from course or provided)
-    if (!areCADatesValid()) {
-      return false;
-    }
+    if (!areCADatesValid()) return false;
     return true;
   };
 
-  // Check if Set CA Date button should be shown
-  const shouldShowSubmitButton = () => {
-    // Show Set CA Date button only when CA marks don't exist and role is 9
-    return !allCAmarksExist && currentRoleId == 9;
-  };
+  const shouldShowSubmitButton = () => !allCAmarksExist && currentRoleId == 9;
 
-  // Check if Approve button should be shown
-  const shouldShowApproveButton = () => {
-    // Approve button only shows when payment is paid
-    return isPaymentCompleted() && currentRoleId == 9;
-  };
+  const shouldShowApproveButton = () =>
+    isPaymentCompleted() && currentRoleId == 9;
 
-  // Check if Approve button should be enabled
-  // Flow: Assessors Assigned → All Assessments Filled → Approve
   const isApproveEnabled = () => {
-    // 1. Must have assessors assigned
-    if (!areAssessorsAssigned()) {
-      return false;
-    }
-    // 2. Must have all assessment values filled
-    if (!allTraineesHaveAssessments()) {
-      return false;
-    }
-    // 3. Must have CA dates valid (either from course or provided)
-    if (!areCADatesValid()) {
-      return false;
-    }
+    if (!areAssessorsAssigned()) return false;
+    if (!allTraineesHaveAssessments()) return false;
+    if (!areCADatesValid()) return false;
     return true;
   };
 
-  // Check if Endorse (59) button should be enabled
   const isEndorseEnabled = () => {
-    // Must have CA dates valid (either from course or provided)
-    if (!areCADatesValid()) {
-      return false;
-    }
-    // Must have payment completed
-    if (!isPaymentCompleted()) {
-      return false;
-    }
-    // Must have assessors assigned
-    if (!areAssessorsAssigned()) {
-      return false;
-    }
-    // Must have all assessment values filled
-    if (!allTraineesHaveAssessments()) {
-      return false;
-    }
+    if (!areCADatesValid()) return false;
+    if (!isPaymentCompleted()) return false;
+    if (!areAssessorsAssigned()) return false;
+    if (!allTraineesHaveAssessments()) return false;
     return true;
   };
 
-  // Get Set CA Date validation message
   const getSubmitValidationMessage = () => {
     if (!areCADatesValid()) {
       if (!caStartDate || !caEndDate) {
@@ -397,7 +278,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return "";
   };
 
-  // Get Approve/Endorse validation message
   const getApprovalValidationMessage = () => {
     if (!areCADatesValid()) {
       return "Please provide both CA Start Date and CA End Date";
@@ -415,27 +295,21 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return "";
   };
 
-  // Check if assessment fields should be read-only
-  const isAssessmentReadOnly = () => {
-    // If payment is not completed OR role is 22, assessments should be read-only
-    return !isPaymentCompleted() || currentRoleId == 22;
-  };
+  const isAssessmentReadOnly = () =>
+    !isPaymentCompleted() || currentRoleId == 22;
 
-  // Helper function to get service code based on service_id
   const getServiceCodeByServiceId = useCallback((serviceId) => {
     if (!serviceId) return null;
-
-    // Map service_id to service codes
     const serviceCodeMap = {
-      39: 100586, // RPL course
-      37: 100584, // Accredited course
-      // Add more mappings as needed
+      39: 100586,
+      37: 100584,
     };
-
     return serviceCodeMap[serviceId] || null;
   }, []);
 
-  // Fetch data on component mount
+  // ============================================================
+  // Effects
+  // ============================================================
   useEffect(() => {
     fetchAcademicQualification();
     fetchStatusList();
@@ -443,9 +317,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     fetchAssessors();
     fetchPaymentStatus();
     fetchAssignedAssessors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch course details and selected trainees when dependencies are ready
   useEffect(() => {
     if (
       academicQualifications.length > 0 &&
@@ -454,6 +328,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     ) {
       fetchData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applicationNo,
     academicQualifications,
@@ -461,58 +336,40 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     academicCompetency,
   ]);
 
-  // Fetch institute data when courseDetails is available
   useEffect(() => {
     if (courseDetails?.registration_no) {
       fetchInstituteData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseDetails]);
 
-  // Check CA marks whenever selectedTrainees changes
   useEffect(() => {
     checkCAmarksExist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrainees]);
 
-  // Populate assigned assessors when both lists are available
   useEffect(() => {
     if (listAssignedAssessors.length > 0 && assessors.length > 0) {
-      const assignedAssessorsWithDetails = listAssignedAssessors
-        .map((assigned) => {
-          const assessorDetail = assessors.find(
-            (ass) => ass.userId === assigned.user_id,
-          );
-          if (assessorDetail) {
-            return {
-              id: assessorDetail.id,
-              userId: assessorDetail.userId,
-              name: assessorDetail.name,
-              email: assessorDetail.email,
-              mobileNo: assessorDetail.mobileNo,
-              designation: assessorDetail.designation || "Assessor",
-              location: assessorDetail.location || "N/A",
-              assignedDate: assigned.created_at || new Date().toISOString(),
-              assignedBy: assigned.assigned_by || actionId,
-            };
-          }
-          return null;
-        })
-        .filter((item) => item !== null);
-
-      setAssignedAssessors(assignedAssessorsWithDetails);
-      console.log(
-        "Assigned assessors with details:",
-        assignedAssessorsWithDetails,
+      setAssignedAssessors(
+        buildAssignedAssessorsWithDetails(
+          listAssignedAssessors,
+          assessors,
+          actionId,
+        ),
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listAssignedAssessors, assessors]);
 
+  // ============================================================
+  // Fetchers
+  // ============================================================
   const fetchAcademicQualification = async () => {
     try {
       const response = await CommonService.getByParentId(18);
       const qualifications = response.data;
       setAcademicQualifications(qualifications);
 
-      // Create a map for quick lookup
       const map = {};
       qualifications.forEach((qual) => {
         map[qual.id] = qual.name;
@@ -529,13 +386,11 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       const competencies = response.data;
       setAcademicCompetency(competencies);
 
-      // Create a map for competency lookup
       const map = {};
       competencies.forEach((comp) => {
         map[comp.id] = comp.name;
       });
       setCompetencyMap(map);
-      console.log("Academic Competencies:", competencies);
     } catch (error) {
       console.error("Error fetching academic competencies:", error);
     }
@@ -547,7 +402,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       const statuses = statusResponse.data;
       setStatusList(statuses);
 
-      // Find status ID for 'selected'
       const selectedStatus = statuses.find(
         (status) => status.name.toLowerCase() === "selected",
       );
@@ -575,16 +429,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         : response.data;
       setCourseDetails(courseData);
       setCurrentStatusId(courseData?.status_id);
-      console.log("course details", response.data);
-      // Only set CA dates in state if they DON'T exist in course details
-      if (!courseData?.ca_start_date) {
-        setCaStartDate("");
-      }
-      if (!courseData?.ca_end_date) {
-        setCaEndDate("");
-      }
-
-      console.log("Course Details:", courseData);
+      if (!courseData?.ca_start_date) setCaStartDate("");
+      if (!courseData?.ca_end_date) setCaEndDate("");
     } catch (error) {
       console.error("Error fetching course details:", error);
       toast.error("Failed to fetch course details");
@@ -595,18 +441,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     try {
       const response =
         await UserRoleManagementService.getRegisteredAssessors(access_token);
-      // Map the API response to the format expected by the component
-      const mappedAssessors = response.data.map((assessor) => ({
-        id: assessor.id,
-        userId: assessor.user_id,
-        name: `${assessor.first_name} ${assessor.middle_name ? assessor.middle_name + " " : ""}${assessor.last_name}`,
-        email: assessor.email_id,
-        mobileNo: assessor.mobile_no,
-        designation: assessor.current_role || "Assessor",
-        location: assessor.location_id || "N/A",
-      }));
-      setAssessors(mappedAssessors);
-      console.log("Assessor fetched:", mappedAssessors);
+      setAssessors(mapRegisteredAssessors(response.data));
     } catch (error) {
       console.error("Error fetching Assessor:", error);
       setAssessors([]);
@@ -618,7 +453,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       const response =
         await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
       setPaymentStatus(response.data);
-      console.log("Payment status fetched:", response.data);
     } catch (error) {
       console.error("Error fetching payment status:", error);
       setPaymentStatus(null);
@@ -632,7 +466,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         access_token,
       );
       setListAssignedAssessors(response.data);
-      console.log("List of Assigned assessors fetched:", response.data);
     } catch (error) {
       console.error("Error fetching assigned assessors:", error);
       setListAssignedAssessors([]);
@@ -641,20 +474,15 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const fetchInstituteData = async () => {
     try {
-      if (!courseDetails?.registration_no) {
-        console.log("No registration number available yet");
-        return;
-      }
+      if (!courseDetails?.registration_no) return;
       const response = await InstituteRegistrationService.getInstituteDetails(
         courseDetails.registration_no,
       );
-      // Check if response.data is an array and get the first element
       const data =
         Array.isArray(response.data) && response.data.length > 0
           ? response.data[0]
           : response.data;
       setInstituteData(data);
-      console.log("Institute data fetched:", data);
     } catch (error) {
       console.error("Error fetching institute data:", error);
       setInstituteData(null);
@@ -670,15 +498,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         );
 
       const trainees = response.data || [];
-      console.log("Fetched trainees:", trainees);
-      // Filter only selected trainees
       const selected = trainees.filter(
         (trainee) => trainee.status_id === selectedStatusId?.toString(),
       );
 
       setSelectedTrainees(selected);
 
-      // Check if any trainee has internal_assessment
       const hasInternal = selected.some(
         (trainee) =>
           trainee.internal_assessment !== null &&
@@ -686,7 +511,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       );
       setHasInternalAssessmentForCourse(hasInternal);
 
-      // Initialize theory and practical assessments from API data
       const initialTheory = {};
       const initialPractical = {};
       const initialViva = {};
@@ -697,7 +521,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         initialTheory[trainee.id] = trainee.theory_assessment || "";
         initialPractical[trainee.id] = trainee.practical_assessment || "";
         initialViva[trainee.id] = trainee.viva_assessment || "";
-        // For service_id 39, use practical_assessment for the Practical column
         if (isServiceId39) {
           initialVivaPractical[trainee.id] = trainee.practical_assessment || "";
         } else {
@@ -713,7 +536,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       setTraineeVivaPracticalAssessments(initialVivaPractical);
       setTraineeRemarks(initialRemarks);
 
-      // Check CA marks existence
       const allHaveCA = selected.every(
         (trainee) =>
           trainee.internal_assessment !== null &&
@@ -729,25 +551,23 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  // Function to check if all selected trainees have CA marks
   const checkCAmarksExist = () => {
     if (selectedTrainees.length === 0) {
       setAllCAmarksExist(false);
       return;
     }
-
-    // Check if all trainees have internal_assessment (CA marks)
     const allHaveCA = selectedTrainees.every(
       (trainee) =>
         trainee.internal_assessment !== null &&
         trainee.internal_assessment !== "" &&
         trainee.internal_assessment !== undefined,
     );
-
     setAllCAmarksExist(allHaveCA);
   };
 
-  // Handler for deleting a trainee
+  // ============================================================
+  // Trainee delete
+  // ============================================================
   const handleDeleteTrainee = async () => {
     if (!traineeToDelete) return;
 
@@ -755,7 +575,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     try {
       const payload = {
         traineeId: parseInt(traineeToDelete.id),
-        statusId: 140, // deleted statusId
+        statusId: 140,
         remarks: `Trainee ${traineeToDelete.applicant_name} removed from selected list`,
         updatedBy: actionId,
       };
@@ -771,7 +591,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           `Trainee ${traineeToDelete.applicant_name} removed successfully!`,
         );
         closeDeleteTraineeDialog();
-        await fetchData(); // Refresh the data
+        await fetchData();
       }
     } catch (error) {
       console.error("Error removing trainee:", error);
@@ -791,14 +611,15 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     setTraineeToDelete(null);
   };
 
-  // Assessor handlers
+  // ============================================================
+  // Assessor assignment
+  // ============================================================
   const handleAddAssessor = () => {
     if (!selectedAssessor) {
       toast.error("Please select an assessor to add");
       return;
     }
 
-    // Check if assessor is already added
     if (
       assignedAssessors.some(
         (ass) => ass.id.toString() === selectedAssessor.toString(),
@@ -808,7 +629,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       return;
     }
 
-    // Find selected assessor details
     const selectedAssessorDetails = assessors.find(
       (ass) => ass.id.toString() === selectedAssessor.toString(),
     );
@@ -818,20 +638,10 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       return;
     }
 
-    // Create assignment record
-    const assignmentRecord = {
-      id: selectedAssessorDetails.id,
-      userId: selectedAssessorDetails.userId,
-      name: selectedAssessorDetails.name,
-      email: selectedAssessorDetails.email,
-      mobileNo: selectedAssessorDetails.mobileNo,
-      designation: selectedAssessorDetails.designation || "Assessor",
-      location: selectedAssessorDetails.location || "N/A",
-      assignedDate: new Date().toISOString(),
-      assignedBy: actionId,
-    };
-
-    setAssignedAssessors((prev) => [...prev, assignmentRecord]);
+    setAssignedAssessors((prev) => [
+      ...prev,
+      buildAssignmentRecord(selectedAssessorDetails, actionId),
+    ]);
     toast.success(`${selectedAssessorDetails.name} added successfully`);
     setSelectedAssessor("");
   };
@@ -857,7 +667,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     setAssessorToDelete(null);
   };
 
-  // Handle theory assessment change with validation
+  // ============================================================
+  // Assessment change handlers
+  // ============================================================
   const handleTheoryAssessmentChange = (traineeId, value) => {
     if (isDiplomaCertificationLevel()) {
       if (validateTheoryInput(value)) {
@@ -874,7 +686,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  // Handle practical assessment change with validation
   const handlePracticalAssessmentChange = (traineeId, value) => {
     if (isDiplomaCertificationLevel()) {
       if (validatePracticalInput(value)) {
@@ -891,7 +702,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  // Handle viva assessment change for service_id 39 with validation
   const handleVivaAssessmentChange = (traineeId, value) => {
     if (isServiceId39 && isDiplomaCertificationLevel()) {
       if (validateVivaInput(value)) {
@@ -908,7 +718,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  // Handle viva practical assessment change for service_id 39 with validation
   const handleVivaPracticalAssessmentChange = (traineeId, value) => {
     if (isServiceId39 && isDiplomaCertificationLevel()) {
       if (validateVivaPracticalInput(value)) {
@@ -925,7 +734,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  // Handle remarks change
   const handleRemarksChange = (traineeId, value) => {
     setTraineeRemarks((prev) => ({
       ...prev,
@@ -933,33 +741,29 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }));
   };
 
-  // Handle Generate PA
+  // ============================================================
+  // Payment
+  // ============================================================
   const handleGeneratePA = () => {
     if (!courseDetails) {
       toast.error("Course data not found");
       return;
     }
 
-    // Get institute data (handle both array and object)
     const institute =
       Array.isArray(instituteData) && instituteData.length > 0
         ? instituteData[0]
         : instituteData;
 
-    // Get mobile and email from institute data if available, otherwise from course details
     const taxPayerEmail =
       institute?.email_id || courseDetails.institute_email || "N/A";
     const taxPayerMobileNo =
       institute?.mobile_no || courseDetails.institue_mobile_number || "N/A";
     const instituteId =
       institute?.institute_id || courseDetails.registration_no || "N/A";
+    const applicationNoLocal = courseDetails.application_no;
 
-    // Prepare the data for BIRMS payment
-    const applicationNo = courseDetails.application_no;
-
-    // Determine service code based on service_id
     const serviceCode = getServiceCodeByServiceId(courseDetails?.service_id);
-
     if (!serviceCode) {
       toast.error("Unsupported service for payment generation");
       return;
@@ -968,13 +772,11 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     const taxPayerNo = courseDetails.registration_no || "N/A";
     const taxPayerName = courseDetails.institute_name || "N/A";
 
-    // Navigate to BIRMS payment page
     navigate(
-      `/birms/common-payment-index/${applicationNo}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId}`,
+      `/birms/common-payment-index/${applicationNoLocal}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId}`,
     );
   };
 
-  // Function to handle redirect to payment
   const handleRedirectToPayment = (redirectUrl) => {
     if (redirectUrl) {
       window.open(redirectUrl, "_blank");
@@ -983,58 +785,70 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     }
   };
 
-  // Helper function to get qualification name from ID
+  // ============================================================
+  // Lookups / formatting
+  // ============================================================
   const getQualificationName = (qualificationId) => {
     if (!qualificationId) return "N/A";
     return qualificationMap[qualificationId] || qualificationId;
   };
 
-  // Helper function to get competency name from ID
   const getCompetencyName = (competencyId) => {
     if (!competencyId) return "N/A";
     return competencyMap[competencyId] || competencyId;
   };
 
-  // Helper function to get status name from ID
-  const getStatusName = (statusId) => {
-    if (!statusId) return "Unknown";
-    const status = statusList.find((s) => s.id === parseInt(statusId));
-    return status ? status.name : "Unknown";
-  };
-
-  // Helper function to get status color
-  const getStatusColor = (statusId) => {
-    const statusName = getStatusName(statusId).toLowerCase();
-    if (statusName === "selected" || statusName === "approved") {
-      return { bgcolor: "#4caf50", color: "white" };
-    } else if (statusName === "pending" || statusName === "Set CA Date") {
-      return { bgcolor: "#ff9800", color: "white" };
-    } else if (statusName === "rejected") {
-      return { bgcolor: "#f44336", color: "white" };
-    } else if (statusName === "verified") {
-      return { bgcolor: "#2196f3", color: "white" };
-    }
-    return { bgcolor: "#9e9e9e", color: "white" };
-  };
-
-  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleDateString();
   };
 
+  // ============================================================
+  // Marks parsing
+  // ============================================================
+  const parseInternalAssessment = (trainee) => {
+    if (!trainee.internal_assessment) return null;
+    return isNumericCertificationLevel()
+      ? parseInt(trainee.internal_assessment)
+      : trainee.internal_assessment;
+  };
+
+  const parseTheory = (trainee) => {
+    const raw = traineeTheoryAssessments[trainee.id];
+    if (!raw) return null;
+    return isNumericCertificationLevel() ? parseInt(raw) : raw;
+  };
+
+  const parsePractical = (trainee) => {
+    const raw = traineePracticalAssessments[trainee.id];
+    if (!raw) return null;
+    return isNumericCertificationLevel() ? parseInt(raw) : raw;
+  };
+
+  const parseViva = (trainee) => {
+    const raw = traineeVivaAssessments[trainee.id];
+    if (!raw) return null;
+    return isNumericCertificationLevel() ? parseInt(raw) : raw;
+  };
+
+  const parseVivaPractical = (trainee) => {
+    const raw = traineeVivaPracticalAssessments[trainee.id];
+    if (!raw) return null;
+    return isNumericCertificationLevel() ? parseInt(raw) : raw;
+  };
+
+  // ============================================================
+  // Actions
+  // ============================================================
   const handleAction = async () => {
-    // StatusId 139 = Set CA Date, 57 = Approve, 58 = Reject, 59 = Endorse
     if (currentAction === 58 && !remarks.trim()) {
       setRemarksError("Remarks are required for rejection");
       return;
     }
 
-    // Validate assessment values before submitting
     if (isDiplomaCertificationLevel() && hasInternalAssessmentForCourse) {
       if (isServiceId39) {
-        // For service_id 39: Validate Viva Assessment (0-20) and Practical Assessment (0-60)
         const invalidViva = selectedTrainees.some((trainee) => {
           const value = traineeVivaAssessments[trainee.id];
           if (value && value !== "") {
@@ -1043,7 +857,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           }
           return false;
         });
-
         if (invalidViva) {
           toast.error("Viva Assessment must be between 0 and 20 for diploma");
           return;
@@ -1057,7 +870,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           }
           return false;
         });
-
         if (invalidVivaPractical) {
           toast.error(
             "Practical Assessment must be between 0 and 60 for diploma",
@@ -1065,7 +877,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           return;
         }
       } else {
-        // For other services: Validate Theory Assessment (0-20) and Practical Assessment (0-60)
         const invalidTheory = selectedTrainees.some((trainee) => {
           const value = traineeTheoryAssessments[trainee.id];
           if (value && value !== "") {
@@ -1074,7 +885,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           }
           return false;
         });
-
         if (invalidTheory) {
           toast.error("Theory Assessment must be between 0 and 20 for diploma");
           return;
@@ -1088,7 +898,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           }
           return false;
         });
-
         if (invalidPractical) {
           toast.error(
             "Practical Assessment must be between 0 and 60 for diploma",
@@ -1100,11 +909,10 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
     setActionLoading(true);
     try {
-      // Prepare the payload with SelectedTraineedto structure
       const payload = {
         applicationNo: applicationNo,
         statusId: currentAction,
-        certificationlevelId: courseDetails?.certification_level_id,
+        certificationLevelId: courseDetails?.certification_level_id,
         courseName: courseDetails?.course_name,
         serviceId: courseDetails?.service_id
           ? parseInt(courseDetails.service_id)
@@ -1114,8 +922,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           currentAction === 58 ? remarks : remarks || "Application submitted",
       };
 
-      // Only add CA dates to payload if they DON'T exist in course details
-      // and user has provided them
       if (!hasCADatesInCourse) {
         if (caStartDate && caEndDate) {
           payload.caStartDate = caStartDate;
@@ -1123,7 +929,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         }
       }
 
-      // Prepare traineeMarks list (TraineeMarksdto format) for trainees with internal_assessment
       if (hasInternalAssessmentForCourse && !isServiceId39) {
         const traineeMarksList = selectedTrainees
           .filter(
@@ -1133,30 +938,14 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           )
           .map((trainee) => ({
             traineeId: parseInt(trainee.id),
-            internalAssessment: isNumericCertificationLevel()
-              ? trainee.internal_assessment
-                ? parseInt(trainee.internal_assessment)
-                : null
-              : trainee.internal_assessment || null,
-            theoryAssessment: isNumericCertificationLevel()
-              ? traineeTheoryAssessments[trainee.id]
-                ? parseInt(traineeTheoryAssessments[trainee.id])
-                : null
-              : traineeTheoryAssessments[trainee.id] || null,
-            practicalAssessment: isNumericCertificationLevel()
-              ? traineePracticalAssessments[trainee.id]
-                ? parseInt(traineePracticalAssessments[trainee.id])
-                : null
-              : traineePracticalAssessments[trainee.id] || null,
+            internalAssessment: parseInternalAssessment(trainee),
+            theoryAssessment: parseTheory(trainee),
+            practicalAssessment: parsePractical(trainee),
             remarks: traineeRemarks[trainee.id] || null,
           }));
-
-        if (traineeMarksList.length > 0) {
-          payload.traineeMarks = traineeMarksList;
-        }
+        if (traineeMarksList.length > 0) payload.traineeMarks = traineeMarksList;
       }
 
-      // Prepare traineeVivaAssessments list for service_id 39
       if (isServiceId39 && hasInternalAssessmentForCourse) {
         const traineeVivaList = selectedTrainees
           .filter(
@@ -1166,39 +955,21 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           )
           .map((trainee) => ({
             traineeId: parseInt(trainee.id),
-            internalAssessment: isNumericCertificationLevel()
-              ? trainee.internal_assessment
-                ? parseInt(trainee.internal_assessment)
-                : null
-              : trainee.internal_assessment || null,
-            vivaAssessment: isNumericCertificationLevel()
-              ? traineeVivaAssessments[trainee.id]
-                ? parseInt(traineeVivaAssessments[trainee.id])
-                : null
-              : traineeVivaAssessments[trainee.id] || null,
-            practicalAssessment: isNumericCertificationLevel()
-              ? traineeVivaPracticalAssessments[trainee.id]
-                ? parseInt(traineeVivaPracticalAssessments[trainee.id])
-                : null
-              : traineeVivaPracticalAssessments[trainee.id] || null,
+            internalAssessment: parseInternalAssessment(trainee),
+            vivaAssessment: parseViva(trainee),
+            practicalAssessment: parseVivaPractical(trainee),
             remarks: traineeRemarks[trainee.id] || null,
           }));
-
-        if (traineeVivaList.length > 0) {
+        if (traineeVivaList.length > 0)
           payload.traineeVivaAssessments = traineeVivaList;
-        }
       }
 
-      // Add assigned assessors to payload
       if (assignedAssessors.length > 0) {
         payload.assignedAssessors = assignedAssessors.map((ass) => ({
           userId: ass.userId,
         }));
       }
 
-      console.log("Final payload:", payload);
-
-      // Call the API to update the application with marks
       const response = await CourseEnrollmentService.updateTraineeApplication(
         payload,
         access_token,
@@ -1244,7 +1015,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const isActionDisabled = () => {
     const statusId = currentStatusId;
-    // StatusId 139 = Submitted, 57 = Approved, 58 = Rejected, 59 = Endorsed
     return (
       statusId === 139 || statusId === 57 || statusId === 58 || statusId === 59
     );
@@ -1257,11 +1027,103 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return "Reject Course Selection";
   };
 
-  // FIXED: Simplified the dialog content to reduce duplication
-  const getDialogContent = () => {
-    // Common content for non-reject actions
+  const getConfirmButtonColor = () => {
+    if (currentAction === 139) return "primary";
+    if (currentAction === 57) return "success";
+    if (currentAction === 59) return "info";
+    return "error";
+  };
+
+  const getConfirmButtonText = () => {
+    if (actionLoading) return undefined;
+    if (currentAction === 139) return "Confirm Set CA Date";
+    if (currentAction === 57) return "Confirm Approve";
+    if (currentAction === 59) return "Confirm Endorse";
+    return "Confirm Reject";
+  };
+
+  const handleRefresh = () => {
+    fetchData();
+    fetchPaymentStatus();
+    toast.info("Data refreshed");
+  };
+
+  const handleGoBack = () => navigate(-1);
+
+  const filteredTrainees = selectedTrainees.filter(
+    (trainee) =>
+      trainee.applicant_name
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      trainee.email_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      trainee.mobile_no?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      trainee.cid_no?.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  const handleChangePage = (event, newPage) => setPage(newPage);
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const tableStyle = {
+    border: "1px solid",
+    borderColor: "divider",
+    "& th, & td": {
+      border: "1px solid",
+      borderColor: "divider",
+      padding: "8px",
+    },
+    "& th": {
+      fontWeight: 600,
+    },
+  };
+
+  const getTableColSpan = () => {
+    let cols = 6;
+    if (hasCADatesInCourse) cols++;
+    if (hasInternalAssessmentForCourse) {
+      if (isServiceId39) {
+        cols += 2;
+      } else {
+        cols += 2;
+      }
+      cols++;
+      if (isNumericCertificationLevel() && !isServiceId39) cols++;
+    }
+    if (!isActionDisabled() && currentRoleId == 9) cols++;
+    return cols;
+  };
+
+  const availableAssessors = getAvailableAssessors(
+    assessors,
+    assignedAssessors,
+  );
+
+  const selectedAssessorDetails = assessors.find(
+    (ass) => ass.id.toString() === selectedAssessor?.toString(),
+  );
+
+  if (loading && !courseDetails && selectedTrainees.length === 0) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // ============================================================
+  // Dialog body — extracted for readability
+  // ============================================================
+  const getDialogBody = () => {
     const getCommonContent = (actionText) => (
-      <DialogContentText>
+      <div>
         Are you sure you want to {actionText} this course selection?
         <br />
         <strong>Application No: {applicationNo}</strong>
@@ -1297,168 +1159,40 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             </strong>
           </>
         )}
-      </DialogContentText>
+      </div>
     );
 
-    if (currentAction === 139) {
-      return getCommonContent("Set CA Date");
-    } else if (currentAction === 57) {
-      return getCommonContent("approve");
-    } else if (currentAction === 59) {
-      return getCommonContent("endorse");
-    } else {
-      // Reject action - requires remarks
-      return (
-        <>
-          <DialogContentText sx={{ mb: 2 }}>
-            Please provide remarks for rejecting this course selection:
-            <br />
-            <strong>Application No: {applicationNo}</strong>
-            <br />
-            <strong>Course Name: {courseDetails?.course_name}</strong>
-            <br />
-            <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
-            {paymentStatus && paymentStatus.paymentAdviceNo && (
-              <>
-                <br />
-                <strong>
-                  Payment Advice No: {paymentStatus.paymentAdviceNo}
-                </strong>
-              </>
-            )}
-            {!hasCADatesInCourse && caStartDate && caEndDate && (
-              <>
-                <br />
-                <strong>CA Start Date: {formatDate(caStartDate)}</strong>
-                <br />
-                <strong>CA End Date: {formatDate(caEndDate)}</strong>
-              </>
-            )}
-          </DialogContentText>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Remarks"
-            fullWidth
-            multiline
-            rows={4}
-            value={remarks}
-            onChange={(e) => {
-              setRemarks(e.target.value);
-              setRemarksError("");
-            }}
-            error={!!remarksError}
-            helperText={remarksError}
-            required
-          />
-        </>
-      );
-    }
-  };
+    if (currentAction === 139) return getCommonContent("Set CA Date");
+    if (currentAction === 57) return getCommonContent("approve");
+    if (currentAction === 59) return getCommonContent("endorse");
 
-  const getConfirmButtonColor = () => {
-    if (currentAction === 139) return "primary";
-    if (currentAction === 57) return "success";
-    if (currentAction === 59) return "info";
-    return "error";
-  };
-
-  const getConfirmButtonText = () => {
-    if (actionLoading) return <CircularProgress size={24} />;
-    if (currentAction === 139) return "Confirm Set CA Date";
-    if (currentAction === 57) return "Confirm Approve";
-    if (currentAction === 59) return "Confirm Endorse";
-    return "Confirm Reject";
-  };
-
-  const handleRefresh = () => {
-    fetchData();
-    fetchPaymentStatus();
-    toast.info("Data refreshed");
-  };
-
-  const handleGoBack = () => {
-    navigate(-1);
-  };
-
-  // Filter selected trainees based on search
-  const filteredTrainees = selectedTrainees.filter(
-    (trainee) =>
-      trainee.applicant_name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      trainee.email_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      trainee.mobile_no?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      trainee.cid_no?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  // Pagination handlers
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const tableStyle = {
-    border: "1px solid",
-    borderColor: "divider",
-    "& th, & td": {
-      border: "1px solid",
-      borderColor: "divider",
-      padding: "8px",
-    },
-    "& th": {
-      fontWeight: 600,
-    },
-  };
-
-  // Calculate total number of columns for the table
-  const getTableColSpan = () => {
-    let cols = 6; // #, name, cid, contact, email, qualification
-    if (hasCADatesInCourse) cols++;
-    if (hasInternalAssessmentForCourse) {
-      if (isServiceId39) {
-        cols += 2; // viva and practical for service_id 39
-      } else {
-        cols += 2; // theory and practical for other services
-      }
-      cols++; // remarks column
-      if (isNumericCertificationLevel() && !isServiceId39) {
-        cols++; // total column for level 111/112
-      }
-    }
-    // Add action column if conditions met
-    if (!isActionDisabled() && currentRoleId == 9) {
-      cols++;
-    }
-    return cols;
-  };
-
-  // Get available assessors (not yet assigned)
-  const availableAssessors = assessors.filter(
-    (ass) => !assignedAssessors.some((assigned) => assigned.id === ass.id),
-  );
-
-  // Get selected assessor details
-  const selectedAssessorDetails = assessors.find(
-    (ass) => ass.id.toString() === selectedAssessor?.toString(),
-  );
-
-  if (loading && !courseDetails && selectedTrainees.length === 0) {
+    // Reject — includes remarks textarea handled by ActionConfirmDialog
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
+      <div>
+        Please provide remarks for rejecting this course selection:
+        <br />
+        <strong>Application No: {applicationNo}</strong>
+        <br />
+        <strong>Course Name: {courseDetails?.course_name}</strong>
+        <br />
+        <strong>Total Selected Trainees: {selectedTrainees.length}</strong>
+        {paymentStatus && paymentStatus.paymentAdviceNo && (
+          <>
+            <br />
+            <strong>Payment Advice No: {paymentStatus.paymentAdviceNo}</strong>
+          </>
+        )}
+        {!hasCADatesInCourse && caStartDate && caEndDate && (
+          <>
+            <br />
+            <strong>CA Start Date: {formatDate(caStartDate)}</strong>
+            <br />
+            <strong>CA End Date: {formatDate(caEndDate)}</strong>
+          </>
+        )}
+      </div>
     );
-  }
+  };
 
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 2 }}>
@@ -1487,110 +1221,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         </Box>
       </Box>
 
-      {/* Payment Status Card */}
-      {paymentStatus && (
-        <Card
-          sx={{ mb: 3, bgcolor: isPaymentCompleted() ? "#e8f5e9" : "#fff3e0" }}
-        >
-          <CardContent>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <Typography variant="h6" gutterBottom>
-                Payment Status
-              </Typography>
-              <Chip
-                label={paymentStatus.paymentStatus || "Pending"}
-                color={isPaymentCompleted() ? "success" : "warning"}
-                size="small"
-              />
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              {paymentStatus.paymentAdviceNo && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Payment Advice No:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {paymentStatus.paymentAdviceNo}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.refNo && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Reference No:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {paymentStatus.refNo}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.totalPayableAmount && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Amount:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold" color="primary">
-                    Nu. {paymentStatus.totalPayableAmount}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.paymentDueDate && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Due Date:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {formatDate(paymentStatus.paymentDueDate)}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.paymentMode && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Payment Mode:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {paymentStatus.paymentMode}
-                  </Typography>
-                </Grid>
-              )}
-              {paymentStatus.platform && (
-                <Grid item size={{ xs: 12, md: 3 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Platform:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {paymentStatus.platform}
-                  </Typography>
-                </Grid>
-              )}
-            </Grid>
-            {/* Only show Proceed to Payment button if payment is NOT completed */}
-            {paymentStatus.redirectUrl && !isPaymentCompleted() && (
-              <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  startIcon={<PaymentIcon />}
-                  onClick={() =>
-                    handleRedirectToPayment(paymentStatus.redirectUrl)
-                  }
-                >
-                  Proceed to Payment
-                </Button>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <PaymentStatusCard
+        paymentStatus={paymentStatus}
+        isPaymentCompleted={isPaymentCompleted}
+        onRedirectToPayment={handleRedirectToPayment}
+        formatDate={formatDate}
+      />
 
       {/* Programme Information Card */}
       {courseDetails && (
@@ -1641,7 +1277,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   Nu. {courseDetails.fees_per_trainee}
                 </Typography>
               </Grid>
-              {/* Show CA dates from course details if they exist */}
               {courseDetails.ca_start_date && (
                 <Grid item size={{ xs: 12, md: 2 }}>
                   <Typography variant="body2" color="textSecondary">
@@ -1662,7 +1297,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   </Typography>
                 </Grid>
               )}
-              {/* Certification Level */}
               <Grid item size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Certification Level:
@@ -1676,7 +1310,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         </Card>
       )}
 
-      {/* CA Dates Section - Only show if CA dates don't exist in course details */}
+      {/* CA Dates Section — only when not in courseDetails */}
       {!hasCADatesInCourse && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
@@ -1694,9 +1328,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   size="small"
                   value={caStartDate}
                   onChange={(e) => setCaStartDate(e.target.value)}
-                  slotProps={{
-                    inputLabel: { shrink: true },
-                  }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   disabled={isActionDisabled()}
                 />
               </Grid>
@@ -1711,11 +1343,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   onChange={(e) => setCaEndDate(e.target.value)}
                   slotProps={{
                     inputLabel: { shrink: true },
-                    input: {
-                      inputProps: {
-                        min: caStartDate || undefined,
-                      },
-                    },
+                    input: { inputProps: { min: caStartDate || undefined } },
                   }}
                   disabled={isActionDisabled()}
                 />
@@ -1732,209 +1360,19 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         </Card>
       )}
 
-      {/* Assessor Assignment Section - Only show when all CA marks exist */}
+      {/* Assessor Assignment Section */}
       {allCAmarksExist && !isActionDisabled() && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              <EngineeringIcon sx={{ mr: 1, color: "primary.main" }} />
-              <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
-                Assign Assessors
-              </Typography>
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-
-            {/* Selected Assessors Display */}
-            {assignedAssessors.length > 0 && (
-              <Box sx={{ mb: 3 }}>
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  gutterBottom
-                >
-                  Assigned Assessors ({assignedAssessors.length}):
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {assignedAssessors.map((ass) => (
-                    <Chip
-                      key={ass.id}
-                      label={`${ass.name} (${ass.userId})`}
-                      color="success"
-                      onDelete={
-                        currentRoleId == 9
-                          ? () => openDeleteAssessorDialog(ass)
-                          : undefined
-                      }
-                      deleteIcon={
-                        currentRoleId == 9 ? (
-                          <DeleteIcon sx={{ color: "#d32f2f" }} />
-                        ) : undefined
-                      }
-                      sx={{
-                        mb: 1,
-                        "& .MuiChip-deleteIcon": {
-                          color: "#d32f2f",
-                          "&:hover": {
-                            color: "#b71c1c",
-                          },
-                        },
-                      }}
-                    />
-                  ))}
-                </Stack>
-              </Box>
-            )}
-
-            {/* Add Assessor Section - Only for Role 9 */}
-            {currentRoleId == 9 && (
-              <Grid container spacing={2} alignItems="center">
-                <Grid item size={{ xs: 12, md: 8 }}>
-                  <Autocomplete
-                    fullWidth
-                    size="small"
-                    options={availableAssessors}
-                    getOptionLabel={(option) =>
-                      `${option.name} (${option.userId})`
-                    }
-                    value={selectedAssessorDetails || null}
-                    onChange={(event, newValue) => {
-                      setSelectedAssessor(newValue ? newValue.id : "");
-                    }}
-                    filterOptions={(options, state) => {
-                      const searchTerm = state.inputValue.toLowerCase().trim();
-                      if (!searchTerm || searchTerm.length < 2) {
-                        return [];
-                      }
-                      return options.filter(
-                        (option) =>
-                          option.name.toLowerCase().includes(searchTerm) ||
-                          option.userId?.toLowerCase().includes(searchTerm) ||
-                          option.email?.toLowerCase().includes(searchTerm) ||
-                          option.mobileNo?.includes(searchTerm),
-                      );
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Search Assessor by Name or User ID"
-                        placeholder="Type at least 2 characters to search..."
-                      />
-                    )}
-                    renderOption={(props, option) => (
-                      <li {...props}>
-                        <Box>
-                          <Typography variant="body2">{option.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            User ID: {option.userId} | Email:{" "}
-                            {option.email || "N/A"} | Mobile:{" "}
-                            {option.mobileNo || "N/A"}
-                          </Typography>
-                        </Box>
-                      </li>
-                    )}
-                    noOptionsText="No assessors available"
-                    loadingText="Loading..."
-                    disabled={availableAssessors.length === 0}
-                    openOnFocus={false}
-                  />
-                </Grid>
-
-                <Grid item size={{ xs: 12, md: 4 }}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    size="medium"
-                    startIcon={<PersonAddIcon />}
-                    onClick={handleAddAssessor}
-                    disabled={
-                      !selectedAssessor || availableAssessors.length === 0
-                    }
-                    sx={{
-                      fontWeight: 600,
-                      textTransform: "none",
-                      width: "100%",
-                    }}
-                  >
-                    Add Assessor
-                  </Button>
-                </Grid>
-              </Grid>
-            )}
-
-            {/* For Role 22 - Show message that assessors are already assigned */}
-            {currentRoleId == 22 && assignedAssessors.length > 0 && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Assessors have been assigned. You cannot add or remove
-                assessors.
-              </Alert>
-            )}
-
-            {selectedAssessor &&
-              selectedAssessorDetails &&
-              currentRoleId == 9 && (
-                <Box
-                  sx={{
-                    mt: 2,
-                    p: 2,
-                    bgcolor: "action.hover",
-                    borderRadius: 1,
-                  }}
-                >
-                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                    Selected Assessor Details:
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item size={{ xs: 12, md: 3 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Name
-                      </Typography>
-                      <Typography variant="body2" fontWeight={500}>
-                        {selectedAssessorDetails.name}
-                      </Typography>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 3 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        User ID
-                      </Typography>
-                      <Typography variant="body2" fontWeight={500}>
-                        {selectedAssessorDetails.userId}
-                      </Typography>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 3 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Email
-                      </Typography>
-                      <Typography variant="body2" fontWeight={500}>
-                        {selectedAssessorDetails.email || "N/A"}
-                      </Typography>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 3 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Mobile No
-                      </Typography>
-                      <Typography variant="body2" fontWeight={500}>
-                        {selectedAssessorDetails.mobileNo || "N/A"}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Box>
-              )}
-
-            {assignedAssessors.length === 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <strong>Required:</strong> At least one assessor must be
-                assigned before approval.
-              </Alert>
-            )}
-
-            {assessors.length === 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                No assessors found. Please check if there are active assessor
-                users in the system.
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+        <AssessorAssignmentCard
+          canEdit={currentRoleId == 9}
+          assignedAssessors={assignedAssessors}
+          availableAssessors={availableAssessors}
+          allAssessors={assessors}
+          selectedAssessor={selectedAssessor}
+          selectedAssessorDetails={selectedAssessorDetails}
+          onSelectAssessor={setSelectedAssessor}
+          onAddAssessor={handleAddAssessor}
+          onOpenDeleteDialog={openDeleteAssessorDialog}
+        />
       )}
 
       {/* Selected Trainees Table */}
@@ -1985,18 +1423,13 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                           ? "Viva Assessment"
                           : "Theory Assessment"}
                       </TableCell>
-                      <TableCell>
-                        {isServiceId39
-                          ? "Practical Assessment"
-                          : "Practical Assessment"}
-                      </TableCell>
+                      <TableCell>Practical Assessment</TableCell>
                       {isNumericCertificationLevel() && !isServiceId39 && (
                         <TableCell>Total</TableCell>
                       )}
                       <TableCell>Remarks</TableCell>
                     </>
                   )}
-                  {/* Add Action column header */}
                   {!isActionDisabled() && currentRoleId == 9 && (
                     <TableCell align="center">Action</TableCell>
                   )}
@@ -2013,18 +1446,17 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
                       const readOnly = isAssessmentReadOnly();
 
-                      const theoryValue =
-                        isNumericCertificationLevel() && !isServiceId39
-                          ? parseInt(traineeTheoryAssessments[trainee.id]) || 0
-                          : 0;
-                      const practicalValue =
-                        isNumericCertificationLevel() && !isServiceId39
-                          ? parseInt(traineePracticalAssessments[trainee.id]) ||
-                            0
-                          : 0;
+                      let theoryValue = 0;
+                      let practicalValue = 0;
+                      if (isNumericCertificationLevel() && !isServiceId39) {
+                        theoryValue =
+                          parseInt(traineeTheoryAssessments[trainee.id]) || 0;
+                        practicalValue =
+                          parseInt(traineePracticalAssessments[trainee.id]) ||
+                          0;
+                      }
                       const totalValue = theoryValue + practicalValue;
 
-                      // Show tooltip when read-only due to role 22
                       const getReadOnlyTooltip = () => {
                         if (currentRoleId == 22) {
                           return "Assessment fields are read-only for Endorser role";
@@ -2035,7 +1467,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                         return "";
                       };
 
-                      // Helper function to get competency color
                       const getCompetencyColor = (value) => {
                         if (value === "91") return "success";
                         if (value === "92") return "warning";
@@ -2043,25 +1474,21 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                         return "info";
                       };
 
-                      // Get the theory assessment value - try state first, then fallback to trainee data
                       const theoryAssessmentValue =
                         traineeTheoryAssessments[trainee.id] ||
                         trainee.theory_assessment ||
                         "";
 
-                      // Get the practical assessment value - try state first, then fallback to trainee data
                       const practicalAssessmentValue =
                         traineePracticalAssessments[trainee.id] ||
                         trainee.practical_assessment ||
                         "";
 
-                      // Get the viva assessment value - try state first, then fallback to trainee data
                       const vivaAssessmentValue =
                         traineeVivaAssessments[trainee.id] ||
                         trainee.viva_assessment ||
                         "";
 
-                      // Get the viva practical assessment value - try state first, then fallback to trainee data
                       const vivaPracticalAssessmentValue =
                         traineeVivaPracticalAssessments[trainee.id] ||
                         (isServiceId39
@@ -2110,7 +1537,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                           )}
                           {hasInternalAssessmentForCourse && (
                             <>
-                              {/* Theory/Viva Assessment Column */}
+                              {/* Theory/Viva Assessment */}
                               <TableCell>
                                 {hasInternalAssessment ? (
                                   isNumericCertificationLevel() ? (
@@ -2127,13 +1554,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                           type="number"
                                           size="small"
                                           value={vivaAssessmentValue}
-                                          onChange={(e) => {
-                                            const value = e.target.value;
+                                          onChange={(e) =>
                                             handleVivaAssessmentChange(
                                               trainee.id,
-                                              value,
-                                            );
-                                          }}
+                                              e.target.value,
+                                            )
+                                          }
                                           fullWidth
                                           slotProps={{
                                             input: {
@@ -2167,13 +1593,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                           type="number"
                                           size="small"
                                           value={theoryAssessmentValue}
-                                          onChange={(e) => {
-                                            const value = e.target.value;
+                                          onChange={(e) =>
                                             handleTheoryAssessmentChange(
                                               trainee.id,
-                                              value,
-                                            );
-                                          }}
+                                              e.target.value,
+                                            )
+                                          }
                                           fullWidth
                                           slotProps={{
                                             input: {
@@ -2257,7 +1682,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                 )}
                               </TableCell>
 
-                              {/* Practical Assessment Column */}
+                              {/* Practical Assessment */}
                               <TableCell>
                                 {hasInternalAssessment ? (
                                   isNumericCertificationLevel() ? (
@@ -2274,13 +1699,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                           type="number"
                                           size="small"
                                           value={vivaPracticalAssessmentValue}
-                                          onChange={(e) => {
-                                            const value = e.target.value;
+                                          onChange={(e) =>
                                             handleVivaPracticalAssessmentChange(
                                               trainee.id,
-                                              value,
-                                            );
-                                          }}
+                                              e.target.value,
+                                            )
+                                          }
                                           fullWidth
                                           slotProps={{
                                             input: {
@@ -2314,13 +1738,12 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                           type="number"
                                           size="small"
                                           value={practicalAssessmentValue}
-                                          onChange={(e) => {
-                                            const value = e.target.value;
+                                          onChange={(e) =>
                                             handlePracticalAssessmentChange(
                                               trainee.id,
-                                              value,
-                                            );
-                                          }}
+                                              e.target.value,
+                                            )
+                                          }
                                           fullWidth
                                           slotProps={{
                                             input: {
@@ -2426,7 +1849,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                   </TableCell>
                                 )}
 
-                              {/* Remarks Column */}
+                              {/* Remarks */}
                               <TableCell>
                                 <Tooltip
                                   title={
@@ -2464,7 +1887,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                               </TableCell>
                             </>
                           )}
-                          {/* Add Action column with Delete icon */}
                           {!isActionDisabled() && currentRoleId == 9 && (
                             <TableCell align="center">
                               <Tooltip
@@ -2528,7 +1950,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
+      {/* Action Buttons Bar */}
       <Box
         sx={{ display: "flex", justifyContent: "space-between", gap: 2, mt: 3 }}
       >
@@ -2567,7 +1989,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             </span>
           </Tooltip>
 
-          {/* Only show Proceed to Payment button if payment exists and is NOT completed */}
           {paymentStatus &&
             paymentStatus.redirectUrl &&
             !isPaymentCompleted() && (
@@ -2609,7 +2030,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           }}
         >
           <Box sx={{ display: "flex", gap: 2 }}>
-            {/* Set CA Date Button - Only show when CA marks don't exist (Role 9) */}
             {shouldShowSubmitButton() && (
               <Tooltip
                 title={
@@ -2641,7 +2061,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Tooltip>
             )}
 
-            {/* Approve Button - Only shows when payment is paid (Role 9) */}
             {shouldShowApproveButton() && (
               <Tooltip
                 title={
@@ -2673,7 +2092,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Tooltip>
             )}
 
-            {/* Endorse Button - Role 22 only */}
             {currentRoleId == 22 && (
               <Tooltip
                 title={
@@ -2705,7 +2123,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               </Tooltip>
             )}
 
-            {/* Reject Button - Both roles */}
             <Button
               variant="contained"
               color="error"
@@ -2717,7 +2134,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
               Reject
             </Button>
           </Box>
-          {/* Show validation messages */}
+
           {shouldShowSubmitButton() && !isSubmitEnabled() && (
             <Typography
               variant="caption"
@@ -2749,77 +2166,31 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       </Box>
 
       {/* Action Dialog */}
-      <Dialog
+      <ActionConfirmDialog
         open={actionDialogOpen}
+        title={getDialogTitle()}
+        bodyText={getDialogBody()}
+        showRemarks={currentAction === 58}
+        remarks={remarks}
+        remarksError={remarksError}
+        onRemarksChange={(v) => {
+          setRemarks(v);
+          setRemarksError("");
+        }}
+        confirmColor={getConfirmButtonColor()}
+        confirmText={getConfirmButtonText()}
+        loading={actionLoading}
         onClose={closeDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{getDialogTitle()}</DialogTitle>
-        <DialogContent>{getDialogContent()}</DialogContent>
-        <DialogActions>
-          <Button
-            color="error"
-            variant="contained"
-            size="small"
-            onClick={closeDialog}
-            disabled={actionLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAction}
-            color={getConfirmButtonColor()}
-            variant="contained"
-            size="small"
-            disabled={
-              actionLoading || (currentAction === 58 && !remarks.trim())
-            }
-          >
-            {getConfirmButtonText()}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={handleAction}
+      />
 
       {/* Delete Assessor Confirmation Dialog */}
-      <Dialog
+      <DeleteAssessorDialog
         open={deleteDialogOpen}
+        assessor={assessorToDelete}
         onClose={closeDeleteDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Confirm Removal</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {assessorToDelete && (
-              <>
-                Are you sure you want to remove{" "}
-                <strong>{assessorToDelete?.name}</strong> (
-                {assessorToDelete?.userId}) from the assessor assignment?
-              </>
-            )}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="outlined"
-            size="small"
-            onClick={closeDeleteDialog}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteAssessor}
-            color="error"
-            variant="contained"
-            size="small"
-            startIcon={<DeleteIcon />}
-          >
-            Remove
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={handleDeleteAssessor}
+      />
 
       {/* Delete Trainee Confirmation Dialog */}
       <Dialog

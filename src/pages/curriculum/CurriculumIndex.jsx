@@ -30,6 +30,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
+import PropTypes from "prop-types";
 import FileUpload from "../../components/file/FileUpload";
 import CurriculumIndexService from "../../api/services/internal/course/CurriculumIndexService";
 import CommonService from "../../api/services/internal/common/CommonService";
@@ -1536,6 +1537,78 @@ const CurriculumForm = ({
       </Grid>
     </Grid>
   );
+};
+
+// ==================== PROP TYPES FOR CURRICULUM FORM ====================
+
+CurriculumForm.propTypes = {
+  formik: PropTypes.shape({
+    values: PropTypes.shape({
+      providerName: PropTypes.string,
+      registrationNo: PropTypes.string,
+      curriculumTypeId: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.number,
+      ]),
+      programmeTypeId: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.number,
+      ]),
+      curriculumTitle: PropTypes.string,
+      endorseApplicationNo: PropTypes.string,
+      programmeTitle: PropTypes.string,
+      ncsId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      description: PropTypes.string,
+      certificateLevelId: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.number,
+      ]),
+      sectorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      occupationId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      entryRequirement: PropTypes.string,
+      totalTheoryDuration: PropTypes.string,
+      totalPracticalDuration: PropTypes.string,
+      totalOjtDuration: PropTypes.string,
+      totalProgramDuration: PropTypes.string,
+      files: PropTypes.array,
+    }).isRequired,
+    setFieldValue: PropTypes.func.isRequired,
+    handleChange: PropTypes.func.isRequired,
+    handleBlur: PropTypes.func.isRequired,
+    touched: PropTypes.object.isRequired,
+    errors: PropTypes.object.isRequired,
+    isValid: PropTypes.bool,
+    isSubmitting: PropTypes.bool,
+  }).isRequired,
+  isEndorse: PropTypes.bool,
+  isAdd: PropTypes.bool,
+  isRevision: PropTypes.bool,
+  data: PropTypes.array,
+  sectors: PropTypes.array,
+  occupations: PropTypes.array,
+  certificateLevels: PropTypes.array,
+  setCertificateLevels: PropTypes.func.isRequired,
+  curriculumTypes: PropTypes.array,
+  programmeTypes: PropTypes.array,
+  loading: PropTypes.bool,
+  endorseLoading: PropTypes.bool,
+  editLoading: PropTypes.bool,
+  loadingOccupations: PropTypes.bool,
+  isLoadingCertificateLevels: PropTypes.bool,
+  checkingExisting: PropTypes.bool,
+  ncsExists: PropTypes.bool,
+  ncsData: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    programme_title: PropTypes.string,
+  }),
+  fetchOccupationsBySector: PropTypes.func.isRequired,
+  fetchCertificateLevels: PropTypes.func.isRequired,
+  fetchProgrammeTitleForEndorse: PropTypes.func.isRequired,
+  checkNcsExists: PropTypes.func.isRequired,
+  setSelectedSectorId: PropTypes.func.isRequired,
+  setOccupations: PropTypes.func.isRequired,
+  setNcsExists: PropTypes.func.isRequired,
+  setNcsData: PropTypes.func.isRequired,
 };
 
 // ==================== MAIN COMPONENT ====================

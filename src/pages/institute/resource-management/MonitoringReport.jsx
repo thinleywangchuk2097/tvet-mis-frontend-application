@@ -16,7 +16,6 @@ import {
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { toast } from "react-toastify";
-// import MonitoringReportService from "../../api/services/internal/monitoring/MonitoringReportService";
 
 const MonitoringReport = () => {
   const [search, setSearch] = useState("");
@@ -26,9 +25,7 @@ const MonitoringReport = () => {
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      // Replace with actual API call:
-      // const response = await MonitoringReportService.getAllReports();
-      // setReports(response.data || []);
+      // TODO: Replace with actual API call once MonitoringReportService is available
       setReports([]);
     } catch (error) {
       console.error("Failed to load monitoring reports:", error);
@@ -48,6 +45,48 @@ const MonitoringReport = () => {
       item.applicationNo?.toLowerCase().includes(search.toLowerCase()) ||
       item.instituteName?.toLowerCase().includes(search.toLowerCase()),
   );
+
+  // ============================================================
+  // ✅ FIX: Extract nested ternary into an independent render fn
+  // ============================================================
+  const renderTableBody = () => {
+    if (loading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={4} align="center">
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                py: 2,
+              }}
+            >
+              <CircularProgress size={24} />
+            </Box>
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (filteredData.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={4} align="center">
+            No data available
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return filteredData.map((row, index) => (
+      <TableRow key={row.id || index}>
+        <TableCell>{index + 1}</TableCell>
+        <TableCell>{row.applicationNo}</TableCell>
+        <TableCell>{row.instituteName}</TableCell>
+        <TableCell>{row.dateOfVisit}</TableCell>
+      </TableRow>
+    ));
+  };
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -96,38 +135,7 @@ const MonitoringReport = () => {
             </TableRow>
           </TableHead>
 
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={4} align="center">
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "center",
-                      py: 2,
-                    }}
-                  >
-                    <CircularProgress size={24} />
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ) : filteredData.length > 0 ? (
-              filteredData.map((row, index) => (
-                <TableRow key={row.id || index}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{row.applicationNo}</TableCell>
-                  <TableCell>{row.instituteName}</TableCell>
-                  <TableCell>{row.dateOfVisit}</TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={4} align="center">
-                  No data available
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
+          <TableBody>{renderTableBody()}</TableBody>
         </Table>
       </TableContainer>
     </Paper>
