@@ -16,19 +16,25 @@ export const ViewDialog = ({ open, title, fields, onClose }) => (
     <DialogTitle>{title}</DialogTitle>
     <DialogContent dividers>
       <Grid container spacing={2}>
-        {fields.map((field, i) => (
-          <Grid key={i} size={{ xs: 12, md: i < 4 ? 6 : 12 }}>
-            <TextField
-              fullWidth
-              label={field.label}
-              value={field.value || "N/A"}
-              size="small"
-              slotProps={{ input: { readOnly: true } }}
-              multiline={field.multiline}
-              rows={field.rows || 1}
-            />
-          </Grid>
-        ))}
+        {fields.map((field) => {
+          const columnSize = field.md ?? (field.multiline ? 12 : 6);
+          return (
+            <Grid
+              key={field.name ?? field.label}
+              size={{ xs: 12, md: columnSize }}
+            >
+              <TextField
+                fullWidth
+                label={field.label}
+                value={field.value ?? "N/A"}
+                size="small"
+                slotProps={{ input: { readOnly: true } }}
+                multiline={field.multiline}
+                rows={field.rows || 1}
+              />
+            </Grid>
+          );
+        })}
       </Grid>
     </DialogContent>
     <DialogActions>

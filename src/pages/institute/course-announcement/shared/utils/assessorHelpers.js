@@ -1,11 +1,17 @@
 /**
+ * Joins name parts into a single display string, skipping empty ones.
+ */
+const buildFullName = ({ first_name, middle_name, last_name }) =>
+  [first_name, middle_name, last_name].filter(Boolean).join(" ");
+
+/**
  * Maps the raw API assessor list into UI-friendly objects.
  */
 export const mapRegisteredAssessors = (rawAssessors) =>
   (rawAssessors || []).map((a) => ({
     id: a.id,
     userId: a.user_id,
-    name: `${a.first_name} ${a.middle_name ? `${a.middle_name} ` : ""}${a.last_name}`,
+    name: buildFullName(a),
     email: a.email_id,
     mobileNo: a.mobile_no,
     designation: a.current_role || "Assessor",

@@ -19,27 +19,16 @@ import {
   CardContent,
   Divider,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
   MenuItem,
   Select,
   FormControl,
   Tooltip,
-  Stack,
-  Alert,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import PaymentIcon from "@mui/icons-material/Payment";
 import ManageHistoryIcon from "@mui/icons-material/ManageHistory";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EngineeringIcon from "@mui/icons-material/Engineering";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
@@ -75,7 +64,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const [serviceId, setServiceId] = useState(null);
   const [selectedTrainees, setSelectedTrainees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusList, setStatusList] = useState([]);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [currentStatusId, setCurrentStatusId] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState(null);
@@ -132,7 +120,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   };
 
   // ============================================================
-  // ✅ FIX: Single generic validator (replaces 4 duplicated fns)
+  // Assessment validation via shared helper
   // ============================================================
   const validateTheoryInput = (value) =>
     validateAssessmentInput(value, 20, isDiplomaCertificationLevel());
@@ -156,7 +144,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     getAssessmentTooltipMessage("vivaPractical", isDiplomaCertificationLevel());
 
   // ============================================================
-  // Max values — kept as local helpers so call sites don't change
+  // Max values
   // ============================================================
   const getTheoryMaxValue = () => (isDiplomaCertificationLevel() ? 20 : null);
   const getPracticalMaxValue = () =>
@@ -165,6 +153,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const getVivaPracticalMaxValue = () =>
     isDiplomaCertificationLevel() ? 60 : null;
 
+  // ============================================================
+  // Business rules
+  // ============================================================
   const allCAmarksExist = () => {
     if (selectedTrainees.length === 0) return false;
     return selectedTrainees.every(
@@ -213,18 +204,13 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
   const isGeneratePAEnabled = () => allCAmarksExist();
 
-  // ============================================================
-  // ✅ FIX: Single return expression (was if-then-else)
-  // ============================================================
   const isApproveEnabled = () =>
     areAssessorsAssigned() && allTraineesHaveAssessments();
 
-  const isEndorseEnabled = () => {
-    if (!isPaymentCompleted()) return false;
-    if (!areAssessorsAssigned()) return false;
-    if (!allTraineesHaveAssessments()) return false;
-    return true;
-  };
+  const isEndorseEnabled = () =>
+    isPaymentCompleted() &&
+    areAssessorsAssigned() &&
+    allTraineesHaveAssessments();
 
   const getAssessmentDisabledTooltip = () => {
     if (!isRole9) return "You do not have permission to edit assessments";
@@ -269,6 +255,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return serviceCodeMap[id] || null;
   }, []);
 
+  // ============================================================
+  // Effects
+  // ============================================================
   useEffect(() => {
     fetchAcademicQualification();
     fetchStatusList();
@@ -315,6 +304,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listAssignedAssessors, assessors]);
 
+  // ============================================================
+  // Fetchers
+  // ============================================================
   const fetchAcademicQualification = async () => {
     try {
       const response = await CommonService.getByParentId(18);
@@ -350,7 +342,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     try {
       const statusResponse = await CommonService.getByParentId(4);
       const statuses = statusResponse.data;
-      setStatusList(statuses);
 
       const selectedStatus = statuses.find(
         (status) => status.name.toLowerCase() === "selected",
@@ -486,6 +477,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
+  // ============================================================
+  // Assessor assignment
+  // ============================================================
   const handleAddAssessor = () => {
     if (!selectedAssessor) {
       toast.error("Please select an assessor to add");
@@ -539,6 +533,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     setAssessorToDelete(null);
   };
 
+  // ============================================================
+  // Assessment change handlers
+  // ============================================================
   const handleTheoryAssessmentChange = (traineeId, value) => {
     if (isDiplomaCertificationLevel()) {
       if (validateTheoryInput(value)) {
@@ -603,6 +600,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
+  // ============================================================
+  // Lookups / formatting
+  // ============================================================
   const getQualificationName = (qualificationId) => {
     if (!qualificationId) return "N/A";
     return qualificationMap[qualificationId] || qualificationId;
@@ -619,6 +619,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return date.toLocaleDateString();
   };
 
+  // ============================================================
+  // Payment
+  // ============================================================
   const handleGeneratePA = () => {
     if (!courseDetails) {
       toast.error("Course data not found");
@@ -671,7 +674,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   };
 
   // ============================================================
-  // ✅ FIX: Extract nested ternaries for marks parsing
+  // Marks parsing
   // ============================================================
   const parseInternalAssessment = (trainee) => {
     const raw = trainee.internal_assessment;
@@ -712,8 +715,10 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return raw ? parseInt(raw) : null;
   };
 
+  // ============================================================
+  // Actions
+  // ============================================================
   const handleAction = async () => {
-    // Validate assessment values before submitting for diploma
     if (isDiplomaCertificationLevel() && hasInternalAssessmentForCourse) {
       if (isServiceId41) {
         const invalidViva = selectedTrainees.some((trainee) => {
@@ -873,11 +878,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
   const getConfirmButtonColor = () => {
     return currentAction === 59 ? "info" : "success";
-  };
-
-  const getConfirmButtonText = () => {
-    if (actionLoading) return <CircularProgress size={24} />;
-    return currentAction === 59 ? "Confirm Endorse" : "Confirm Approve";
   };
 
   const handleRefresh = () => {
@@ -1073,15 +1073,25 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   }
 
   // ============================================================
-  // ✅ FIX: Extract nested ternary for dialog body text
+  // Dialog derived values — declared before use
   // ============================================================
   const dialogActionText = currentAction === 59 ? "endorse" : "approve";
   const dialogAssessmentsLabel = isServiceId41
     ? "Viva and Practical"
     : "Theory and Practical";
 
+  // Confirm button label (extracted from previous nested ternary)
+  let confirmButtonText;
+  if (actionLoading) {
+    confirmButtonText = undefined;
+  } else if (currentAction === 59) {
+    confirmButtonText = "Confirm Endorse";
+  } else {
+    confirmButtonText = "Confirm Approve";
+  }
+
   const dialogBody = (
-    <DialogContentText>
+    <div>
       Are you sure you want to {dialogActionText} this course selection?
       <br />
       <strong>Application No: {applicationNo}</strong>
@@ -1103,15 +1113,12 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
           <br />
           <strong>
             Note: {dialogAssessmentsLabel} assessments will be saved with this{" "}
-            {dialogActionTerm}.
+            {dialogActionText === "endorse" ? "endorsement" : "approval"}.
           </strong>
         </>
       )}
-    </DialogContentText>
+    </div>
   );
-
-  const dialogActionTerm =
-    dialogActionText === "endorse" ? "endorsement" : "approval";
 
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 2 }}>
@@ -1154,7 +1161,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={2}>
-              <Grid item size={{ xs: 12, md: 2 }}>
+              <Grid size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Application No:
                 </Typography>
@@ -1162,7 +1169,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   {courseDetails.application_no}
                 </Typography>
               </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
+              <Grid size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Course Name:
                 </Typography>
@@ -1170,7 +1177,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   {courseDetails.course_name}
                 </Typography>
               </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
+              <Grid size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Total Seats:
                 </Typography>
@@ -1178,7 +1185,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   {courseDetails.enrollment_capacity}
                 </Typography>
               </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
+              <Grid size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Selected Count:
                 </Typography>
@@ -1186,7 +1193,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   {selectedTrainees.length}
                 </Typography>
               </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
+              <Grid size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Fees Per Trainee:
                 </Typography>
@@ -1194,7 +1201,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   Nu. {courseDetails.fees_per_trainee}
                 </Typography>
               </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
+              <Grid size={{ xs: 12, md: 2 }}>
                 <Typography variant="body2" color="textSecondary">
                   Certification Level:
                 </Typography>
@@ -1451,13 +1458,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
         bodyText={dialogBody}
         showRemarks={false}
         confirmColor={getConfirmButtonColor()}
-        confirmText={
-          actionLoading
-            ? undefined
-            : currentAction === 59
-              ? "Confirm Endorse"
-              : "Confirm Approve"
-        }
+        confirmText={confirmButtonText}
         loading={actionLoading}
         onClose={closeDialog}
         onConfirm={handleAction}

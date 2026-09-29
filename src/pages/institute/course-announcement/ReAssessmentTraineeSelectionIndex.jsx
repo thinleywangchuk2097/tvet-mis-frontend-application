@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Typography,
   Grid,
-  TextField,
   Button,
   Table,
   TableBody,
@@ -39,7 +38,6 @@ import {
   bodyCellStyle,
 } from "./shared/utils/traineeSelectionStyles";
 import {
-  formatDate,
   getQualificationName,
   getStatusName,
   getStatusColor,
@@ -52,7 +50,6 @@ import ReadOnlyTextField from "./shared/components/ReadOnlyTextField";
 import TraineeSearchField from "./shared/components/TraineeSearchField";
 import DeleteTraineeDialog from "./shared/components/DeleteTraineeDialog";
 import ProgrammeInfoCard from "./shared/components/ProgrammeInfoCard";
-import MoveButton from "./shared/components/MoveButton";
 
 const ReAssessmentTraineeSelectionIndex = () => {
   const { applicationNo, programmeId } = useParams();

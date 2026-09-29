@@ -85,7 +85,7 @@ const Assessment = () => {
     try {
       const res =
         await CertificationService.getServicesAssessementResult(access_token);
-        console.log("Fetched Services:", res.data);
+      console.log("Fetched Services:", res.data);
       setServiceList(toArray(res));
     } catch (error) {
       console.error("Error fetching Services:", error);
@@ -122,6 +122,38 @@ const Assessment = () => {
     }
   }, [instituteId, serviceId, certificationLevelId, access_token]);
 
+  const fetchByApplicationNo = useCallback(
+    (applicationNo) =>
+      CertificationService.getListPassTraineeForCertificatePrinting(
+        applicationNo,
+        null,
+        null,
+        null,
+        null,
+        access_token,
+      ),
+    [access_token],
+  );
+
+  const fetchByFilters = useCallback(
+    () =>
+      CertificationService.getListPassTraineeForCertificatePrinting(
+        null,
+        instituteId,
+        serviceId,
+        certificationLevelId,
+        filters.programmeList,
+        access_token,
+      ),
+    [
+      instituteId,
+      serviceId,
+      certificationLevelId,
+      filters.programmeList,
+      access_token,
+    ],
+  );
+
   const fetchPassedTrainees = useCallback(async () => {
     const hasApplicationNo = !!filters.ApplicationNo;
     const hasAllFour =
@@ -149,23 +181,13 @@ const Assessment = () => {
 
     setLoadingReports(true);
     try {
-      const res = hasApplicationNo
-        ? await CertificationService.getListPassTraineeForCertificatePrinting(
-            filters.ApplicationNo,
-            null,
-            null,
-            null,
-            null,
-            access_token,
-          )
-        : await CertificationService.getListPassTraineeForCertificatePrinting(
-            null,
-            instituteId,
-            serviceId,
-            certificationLevelId,
-            filters.programmeList,
-            access_token,
-          );
+      let res;
+      if (hasApplicationNo) {
+        res = await fetchByApplicationNo(filters.ApplicationNo);
+      } else {
+        res = await fetchByFilters();
+      }
+
       console.log("Fetched passed trainees:", res.data);
       setReports(toArray(res));
       setPage(0);
@@ -178,18 +200,20 @@ const Assessment = () => {
     }
   }, [
     filters.ApplicationNo,
-    filters.programmeList,
     instituteId,
     serviceId,
     certificationLevelId,
+    filters.programmeList,
     access_token,
+    fetchByApplicationNo,
+    fetchByFilters,
   ]);
 
   useEffect(() => {
     if (!access_token) return;
-    void fetchAssessmentInstitutes();
-    void fetchServices();
-    void fetchCertificationLevels();
+    fetchAssessmentInstitutes();
+    fetchServices();
+    fetchCertificationLevels();
   }, [
     access_token,
     fetchAssessmentInstitutes,
@@ -199,7 +223,7 @@ const Assessment = () => {
 
   useEffect(() => {
     if (instituteId && serviceId && certificationLevelId) {
-      void fetchProgrammes();
+      fetchProgrammes();
     } else {
       setProgrammeList([]);
     }
@@ -304,7 +328,7 @@ const Assessment = () => {
 
   const handleSearch = () => {
     setPage(0);
-    void fetchPassedTrainees();
+    fetchPassedTrainees();
   };
 
   const handleSearchKeyDown = (e) => {

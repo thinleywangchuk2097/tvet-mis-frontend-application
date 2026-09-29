@@ -13,6 +13,12 @@ const InfoField = ({ label, value, color }) => (
   </Grid>
 );
 
+InfoField.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  color: PropTypes.string,
+};
+
 const ProgrammeInfoCard = ({
   title = "Programme Information",
   details,

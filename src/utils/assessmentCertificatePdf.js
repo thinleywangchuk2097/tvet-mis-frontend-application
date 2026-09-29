@@ -31,13 +31,13 @@ import {
 const pick = (obj, keys, fallback = "-") => {
   for (const k of keys) {
     const v = obj?.[k];
-    if (v !== undefined && v !== null && v !== "") return String(v);
+    if (v != null && v !== "") return String(v);
   }
   return fallback;
 };
 
 const toCompetentLabel = (value) => {
-  const v = String(value || "").trim();
+  const v = String(value ?? "").trim();
   if (!v) return "COMPETENT";
   if (v.toLowerCase() === "passed") return "COMPETENT";
   if (v.toLowerCase() === "failed") return "NOT YET COMPETENT";
@@ -51,9 +51,16 @@ const formatIssuedIn = (value) => {
   return `${month}, ${d.getFullYear()}`;
 };
 
+/** Computes the horizontal start position for a given alignment. */
+const alignX = (align, x, width) => {
+  if (align === "center") return x - width / 2;
+  if (align === "right") return x - width;
+  return x;
+};
+
 const drawText = (page, text, opts, fonts) => {
   if (!opts || opts.x == null || opts.y == null) {
-    console.warn("⚠️ [cert-pdf] drawText missing opts:", { text, opts });
+    console.warn(" [cert-pdf] drawText missing opts:", { text, opts });
     return 0;
   }
   const font = fonts[opts.font || "regular"];
@@ -61,12 +68,7 @@ const drawText = (page, text, opts, fonts) => {
   const color = rgb(...(opts.color || COLORS.black));
   const width = font.widthOfTextAtSize(text, size);
 
-  const x =
-    opts.align === "center"
-      ? opts.x - width / 2
-      : opts.align === "right"
-        ? opts.x - width
-        : opts.x;
+  const x = alignX(opts.align, opts.x, width);
 
   page.drawText(text, { x, y: opts.y, size, font, color });
   return width;
@@ -114,7 +116,7 @@ const parseUnits = (raw) => {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
-    console.warn("⚠️ [cert-pdf] could not parse ncs_units:", err, raw);
+    console.warn(" [cert-pdf] could not parse ncs_units:", err, raw);
     return [];
   }
 };
@@ -123,11 +125,8 @@ const isDiplomaLevel = (data) => {
   const id = String(data?.certification_level_id ?? "");
   if (id === "111" || id === "112") return true;
 
-  const name = String(data?.certification_level || "");
-  if (/diploma/i.test(name)) return true;
-  if (/certificate/i.test(name)) return false;
-
-  return false;
+  const name = String(data?.certification_level ?? "");
+  return /diploma/i.test(name) && !/certificate/i.test(name);
 };
 
 const isRplService = (data) => {
@@ -450,7 +449,7 @@ const stampTraineeOnTemplate = (pages, data, fonts) => {
 ===================================================== */
 
 export const generateAssessmentCertificatePdf = async (data) => {
-  console.log("🟦 [cert-pdf] start, name =", data?.applicant_name);
+  console.log("[cert-pdf] start, name =", data?.applicant_name);
 
   const templateBytes = await getTemplateBytes();
   const pdfDoc = await PDFDocument.load(templateBytes);
@@ -475,7 +474,7 @@ export const generateAssessmentCertificatePdf = async (data) => {
   console.log("   ✓ saved:", bytes.byteLength, "bytes");
 
   downloadBlob(bytes, `Assessment_Certificate_${safeName}.pdf`);
-  console.log("   ✅ done");
+  console.log("   done");
 };
 
 /* =====================================================

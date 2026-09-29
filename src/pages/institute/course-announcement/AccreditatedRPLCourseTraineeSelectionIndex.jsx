@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -139,9 +139,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   const isApplicationEndorsed = () => {
     return courseDetails?.application_status_id === "59";
   };
-
-  const isPaymentPaid =
-    paymentStatusDetails?.paymentStatus?.toLowerCase() === "paid";
 
   const hasAssessments =
     isApplicationEndorsed() &&

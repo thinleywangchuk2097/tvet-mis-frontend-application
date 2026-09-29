@@ -55,12 +55,8 @@ const EntityManager = ({
 
   const { selected: selectedMap, selectItem, clearSelected } = selected;
 
-  const {
-    page,
-    rowsPerPage,
-    handleChangePage,
-    handleChangeRowsPerPage,
-  } = pagination;
+  const { page, rowsPerPage, handleChangePage, handleChangeRowsPerPage } =
+    pagination;
 
   const statusFilterEnabled = statusFilter?.enabled;
   const statusFilterTabIndex = statusFilter?.tabIndex;
@@ -214,6 +210,14 @@ const EntityManager = ({
     const FormComponent = config.FormComponent;
     const dialogTitle = isEdit ? config.editLabel : config.addLabel;
 
+    // Resolve submit button label without a nested ternary.
+    let submitLabel = "Submit";
+    if (loading) {
+      submitLabel = "Saving...";
+    } else if (isEdit) {
+      submitLabel = "Update";
+    }
+
     const handleSubmit = async (values, helpers) => {
       const success = await onSubmitForm(
         values,
@@ -271,7 +275,7 @@ const EntityManager = ({
                   color="primary"
                   disabled={loading}
                 >
-                  {loading ? "Saving..." : isEdit ? "Update" : "Submit"}
+                  {submitLabel}
                 </Button>
               </DialogActions>
             </Form>
@@ -292,8 +296,13 @@ const EntityManager = ({
         onChange={handleTabChange}
         sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
       >
-        {tabs.map((tab, i) => (
-          <Tab key={i} label={tab.label} icon={tab.icon} iconPosition="start" />
+        {tabs.map((tab) => (
+          <Tab
+            key={tab.type}
+            label={tab.label}
+            icon={tab.icon}
+            iconPosition="start"
+          />
         ))}
       </Tabs>
 

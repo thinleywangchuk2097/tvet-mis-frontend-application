@@ -73,7 +73,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [instituteData, setInstituteData] = useState(null);
   const [selectedTrainees, setSelectedTrainees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusList, setStatusList] = useState([]);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [currentStatusId, setCurrentStatusId] = useState(null);
 
@@ -159,14 +158,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const validateVivaPracticalInput = (value) =>
     validateAssessmentInput(value, 60, isDiplomaCertificationLevel());
 
-  // Max values kept local so existing call sites don't change
-  const getTheoryMaxValue = () => (isDiplomaCertificationLevel() ? 20 : null);
-  const getPracticalMaxValue = () =>
-    isDiplomaCertificationLevel() ? 60 : null;
-  const getVivaMaxValue = () => (isDiplomaCertificationLevel() ? 20 : null);
-  const getVivaPracticalMaxValue = () =>
-    isDiplomaCertificationLevel() ? 60 : null;
-
   const getTheoryTooltipMessage = () =>
     getAssessmentTooltipMessage("theory", isDiplomaCertificationLevel());
   const getPracticalTooltipMessage = () =>
@@ -231,40 +222,27 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     });
   };
 
-  const areAssessorsAssigned = () => {
-    if (!allCAmarksExist) return false;
-    return assignedAssessors.length > 0 || listAssignedAssessors.length > 0;
-  };
+  const areAssessorsAssigned = () =>
+    allCAmarksExist &&
+    (assignedAssessors.length > 0 || listAssignedAssessors.length > 0);
 
-  const isGeneratePAEnabled = () => {
-    if (!allCAmarksExist) return false;
-    return true;
-  };
+  const isGeneratePAEnabled = () => allCAmarksExist;
 
-  const isSubmitEnabled = () => {
-    if (!areCADatesValid()) return false;
-    return true;
-  };
+  const isSubmitEnabled = () => areCADatesValid();
 
   const shouldShowSubmitButton = () => !allCAmarksExist && currentRoleId == 9;
 
   const shouldShowApproveButton = () =>
     isPaymentCompleted() && currentRoleId == 9;
 
-  const isApproveEnabled = () => {
-    if (!areAssessorsAssigned()) return false;
-    if (!allTraineesHaveAssessments()) return false;
-    if (!areCADatesValid()) return false;
-    return true;
-  };
+  const isApproveEnabled = () =>
+    areAssessorsAssigned() && allTraineesHaveAssessments() && areCADatesValid();
 
-  const isEndorseEnabled = () => {
-    if (!areCADatesValid()) return false;
-    if (!isPaymentCompleted()) return false;
-    if (!areAssessorsAssigned()) return false;
-    if (!allTraineesHaveAssessments()) return false;
-    return true;
-  };
+  const isEndorseEnabled = () =>
+    areCADatesValid() &&
+    isPaymentCompleted() &&
+    areAssessorsAssigned() &&
+    allTraineesHaveAssessments();
 
   const getSubmitValidationMessage = () => {
     if (!areCADatesValid()) {
@@ -400,7 +378,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     try {
       const statusResponse = await CommonService.getByParentId(4);
       const statuses = statusResponse.data;
-      setStatusList(statuses);
 
       const selectedStatus = statuses.find(
         (status) => status.name.toLowerCase() === "selected",
@@ -943,7 +920,8 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             practicalAssessment: parsePractical(trainee),
             remarks: traineeRemarks[trainee.id] || null,
           }));
-        if (traineeMarksList.length > 0) payload.traineeMarks = traineeMarksList;
+        if (traineeMarksList.length > 0)
+          payload.traineeMarks = traineeMarksList;
       }
 
       if (isServiceId39 && hasInternalAssessmentForCourse) {

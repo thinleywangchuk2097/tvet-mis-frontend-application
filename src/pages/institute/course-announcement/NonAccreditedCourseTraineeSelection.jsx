@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -32,7 +32,6 @@ import { useSelector } from "react-redux";
 // -------- Shared imports --------
 import { tableStyle } from "./shared/utils/traineeSelectionStyles";
 import {
-  formatDate,
   getQualificationName,
   getStatusName,
   getStatusColor,
@@ -48,7 +47,6 @@ const NonAccreditedCourseTraineeSelection = () => {
   const [loading, setLoading] = useState(false);
   const [movingTrainees, setMovingTrainees] = useState(false);
   const [courseDetails, setCourseDetails] = useState(null);
-  const [allTrainees, setAllTrainees] = useState([]);
   const [pendingTrainees, setPendingTrainees] = useState([]);
   const [selectedTrainees, setSelectedTrainees] = useState([]);
   const [searchPending, setSearchPending] = useState("");
@@ -77,7 +75,6 @@ const NonAccreditedCourseTraineeSelection = () => {
 
   // Dialog states for trainee details
   const [openTraineeDialog, setOpenTraineeDialog] = useState(false);
-  const [selectedTraineeId, setSelectedTraineeId] = useState(null);
   const [traineeDetails, setTraineeDetails] = useState(null);
   const [traineeDetailsLoading, setTraineeDetailsLoading] = useState(false);
   const [traineeDocuments, setTraineeDocuments] = useState([]);
@@ -167,8 +164,6 @@ const NonAccreditedCourseTraineeSelection = () => {
           applicationNo,
         );
       const trainees = response.data || [];
-      setAllTrainees(trainees);
-
       const pending = trainees.filter(
         (trainee) => trainee.status_id === pendingStatusId?.toString(),
       );
@@ -253,14 +248,12 @@ const NonAccreditedCourseTraineeSelection = () => {
   };
 
   const handleViewMore = (traineeId) => {
-    setSelectedTraineeId(traineeId);
     setOpenTraineeDialog(true);
     fetchTraineeDetails(traineeId);
   };
 
   const handleCloseDialog = () => {
     setOpenTraineeDialog(false);
-    setSelectedTraineeId(null);
     setTraineeDetails(null);
     setTraineeDocuments([]);
     setTraineeMarks([]);

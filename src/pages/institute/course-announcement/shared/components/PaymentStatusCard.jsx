@@ -22,6 +22,12 @@ const PaymentField = ({ label, value, color }) => (
   </Grid>
 );
 
+PaymentField.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  color: PropTypes.string,
+};
+
 const PaymentStatusCard = ({
   paymentStatus,
   isPaymentCompleted,
@@ -76,7 +82,10 @@ const PaymentStatusCard = ({
             />
           )}
           {paymentStatus.paymentMode && (
-            <PaymentField label="Payment Mode" value={paymentStatus.paymentMode} />
+            <PaymentField
+              label="Payment Mode"
+              value={paymentStatus.paymentMode}
+            />
           )}
           {paymentStatus.platform && (
             <PaymentField label="Platform" value={paymentStatus.platform} />
