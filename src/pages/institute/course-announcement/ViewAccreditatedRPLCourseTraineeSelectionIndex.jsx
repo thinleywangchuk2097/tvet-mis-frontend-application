@@ -35,7 +35,6 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import ManageHistoryIcon from "@mui/icons-material/ManageHistory";
 import PaymentIcon from "@mui/icons-material/Payment";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
@@ -62,6 +61,8 @@ import PaymentStatusCard from "./shared/components/PaymentStatusCard";
 import AssessorAssignmentCard from "./shared/components/AssessorAssignmentCard";
 import DeleteAssessorDialog from "./shared/components/DeleteAssessorDialog";
 import ActionConfirmDialog from "./shared/components/ActionConfirmDialog";
+import SectionCard from "./shared/components/SectionCard";
+import GeneratePaymentButton from "./shared/components/GeneratePaymentButton";
 
 const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
@@ -1208,84 +1209,78 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
       {/* Programme Information Card */}
       {courseDetails && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Programme Information
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Application No:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.application_no}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Programme Name:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.course_name}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Total Seats:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.enrollment_capacity}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Selected Count:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold" color="green">
-                  {selectedTrainees.length}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Fees Per Trainee
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  Nu. {courseDetails.fees_per_trainee}
-                </Typography>
-              </Grid>
-              {courseDetails.ca_start_date && (
-                <Grid item size={{ xs: 12, md: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    CA Start Date:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold" color="primary">
-                    {formatDate(courseDetails.ca_start_date)}
-                  </Typography>
-                </Grid>
-              )}
-              {courseDetails.ca_end_date && (
-                <Grid item size={{ xs: 12, md: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    CA End Date:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold" color="primary">
-                    {formatDate(courseDetails.ca_end_date)}
-                  </Typography>
-                </Grid>
-              )}
-              <Grid item size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Certification Level:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.certification_name}
-                </Typography>
-              </Grid>
+        <SectionCard title="Programme Information">
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Application No:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {courseDetails.application_no}
+              </Typography>
             </Grid>
-          </CardContent>
-        </Card>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Programme Name:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {courseDetails.course_name}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Total Seats:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {courseDetails.enrollment_capacity}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Selected Count:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold" color="green">
+                {selectedTrainees.length}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Fees Per Trainee
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                Nu. {courseDetails.fees_per_trainee}
+              </Typography>
+            </Grid>
+            {courseDetails.ca_start_date && (
+              <Grid size={{ xs: 12, md: 2 }}>
+                <Typography variant="body2" color="textSecondary">
+                  CA Start Date:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold" color="primary">
+                  {formatDate(courseDetails.ca_start_date)}
+                </Typography>
+              </Grid>
+            )}
+            {courseDetails.ca_end_date && (
+              <Grid size={{ xs: 12, md: 2 }}>
+                <Typography variant="body2" color="textSecondary">
+                  CA End Date:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold" color="primary">
+                  {formatDate(courseDetails.ca_end_date)}
+                </Typography>
+              </Grid>
+            )}
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Certification Level:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {courseDetails.certification_name}
+              </Typography>
+            </Grid>
+          </Grid>
+        </SectionCard>
       )}
 
       {/* CA Dates Section — only when not in courseDetails */}
@@ -1297,7 +1292,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={3}>
-              <Grid item size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <TextField
                   type="date"
                   fullWidth
@@ -1310,7 +1305,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   disabled={isActionDisabled()}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <TextField
                   type="date"
                   fullWidth
@@ -1933,39 +1928,13 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         sx={{ display: "flex", justifyContent: "space-between", gap: 2, mt: 3 }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Tooltip
-            title={
-              !isGeneratePAEnabled()
-                ? "CA Mark/Competency values are required for all selected trainees to generate payment"
-                : paymentStatus
-                  ? "Payment already generated"
-                  : "Generate Payment Advice"
-            }
-            arrow
-          >
-            <span>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<ManageHistoryIcon />}
-                onClick={handleGeneratePA}
-                disabled={
-                  isActionDisabled() ||
-                  actionLoading ||
-                  !isGeneratePAEnabled() ||
-                  !!paymentStatus
-                }
-                sx={{
-                  px: 3,
-                  py: 0.5,
-                  fontWeight: 600,
-                  textTransform: "none",
-                }}
-              >
-                Generate PA
-              </Button>
-            </span>
-          </Tooltip>
+          <GeneratePaymentButton
+            onClick={handleGeneratePA}
+            disabled={isActionDisabled()}
+            loading={actionLoading}
+            canGenerate={isGeneratePAEnabled()}
+            hasPayment={Boolean(paymentStatus)}
+          />
 
           {paymentStatus &&
             paymentStatus.redirectUrl &&

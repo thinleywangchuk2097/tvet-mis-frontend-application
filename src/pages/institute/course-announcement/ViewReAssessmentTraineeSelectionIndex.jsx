@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Paper,
   Typography,
@@ -28,7 +28,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ManageHistoryIcon from "@mui/icons-material/ManageHistory";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import { toast } from "react-toastify";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
@@ -53,6 +52,8 @@ import PaymentStatusCard from "./shared/components/PaymentStatusCard";
 import AssessorAssignmentCard from "./shared/components/AssessorAssignmentCard";
 import DeleteAssessorDialog from "./shared/components/DeleteAssessorDialog";
 import ActionConfirmDialog from "./shared/components/ActionConfirmDialog";
+import SectionCard from "./shared/components/SectionCard";
+import GeneratePaymentButton from "./shared/components/GeneratePaymentButton";
 
 const ViewReAssessmentTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
@@ -111,17 +112,12 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
   const isServiceId41 = serviceId === "41";
 
-  // ============================================================
-  // Helper function to check if certification level is diploma (111 or 112)
-  // ============================================================
   const isDiplomaCertificationLevel = () => {
     const levelId = courseDetails?.certification_level_id;
     return levelId === "111" || levelId === "112";
   };
 
-  // ============================================================
   // Assessment validation via shared helper
-  // ============================================================
   const validateTheoryInput = (value) =>
     validateAssessmentInput(value, 20, isDiplomaCertificationLevel());
   const validatePracticalInput = (value) =>
@@ -131,9 +127,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const validateVivaPracticalInput = (value) =>
     validateAssessmentInput(value, 60, isDiplomaCertificationLevel());
 
-  // ============================================================
-  // Tooltip messages for max values (via shared helper)
-  // ============================================================
   const getTheoryTooltipMessage = () =>
     getAssessmentTooltipMessage("theory", isDiplomaCertificationLevel());
   const getPracticalTooltipMessage = () =>
@@ -143,9 +136,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const getVivaPracticalTooltipMessage = () =>
     getAssessmentTooltipMessage("vivaPractical", isDiplomaCertificationLevel());
 
-  // ============================================================
-  // Max values
-  // ============================================================
   const getTheoryMaxValue = () => (isDiplomaCertificationLevel() ? 20 : null);
   const getPracticalMaxValue = () =>
     isDiplomaCertificationLevel() ? 60 : null;
@@ -153,9 +143,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const getVivaPracticalMaxValue = () =>
     isDiplomaCertificationLevel() ? 60 : null;
 
-  // ============================================================
   // Business rules
-  // ============================================================
   const allCAmarksExist = () => {
     if (selectedTrainees.length === 0) return false;
     return selectedTrainees.every(
@@ -255,9 +243,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return serviceCodeMap[id] || null;
   }, []);
 
-  // ============================================================
   // Effects
-  // ============================================================
   useEffect(() => {
     fetchAcademicQualification();
     fetchStatusList();
@@ -304,9 +290,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listAssignedAssessors, assessors]);
 
-  // ============================================================
   // Fetchers
-  // ============================================================
   const fetchAcademicQualification = async () => {
     try {
       const response = await CommonService.getByParentId(18);
@@ -477,9 +461,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
-  // ============================================================
   // Assessor assignment
-  // ============================================================
   const handleAddAssessor = () => {
     if (!selectedAssessor) {
       toast.error("Please select an assessor to add");
@@ -533,9 +515,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     setAssessorToDelete(null);
   };
 
-  // ============================================================
   // Assessment change handlers
-  // ============================================================
   const handleTheoryAssessmentChange = (traineeId, value) => {
     if (isDiplomaCertificationLevel()) {
       if (validateTheoryInput(value)) {
@@ -600,9 +580,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
-  // ============================================================
-  // Lookups / formatting
-  // ============================================================
+  // Lookups
   const getQualificationName = (qualificationId) => {
     if (!qualificationId) return "N/A";
     return qualificationMap[qualificationId] || qualificationId;
@@ -619,9 +597,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return date.toLocaleDateString();
   };
 
-  // ============================================================
   // Payment
-  // ============================================================
   const handleGeneratePA = () => {
     if (!courseDetails) {
       toast.error("Course data not found");
@@ -673,9 +649,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
-  // ============================================================
   // Marks parsing
-  // ============================================================
   const parseInternalAssessment = (trainee) => {
     const raw = trainee.internal_assessment;
     if (raw === null || raw === undefined || raw === "") return null;
@@ -715,9 +689,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     return raw ? parseInt(raw) : null;
   };
 
-  // ============================================================
   // Actions
-  // ============================================================
   const handleAction = async () => {
     if (isDiplomaCertificationLevel() && hasInternalAssessmentForCourse) {
       if (isServiceId41) {
@@ -1072,15 +1044,12 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     );
   }
 
-  // ============================================================
   // Dialog derived values — declared before use
-  // ============================================================
   const dialogActionText = currentAction === 59 ? "endorse" : "approve";
   const dialogAssessmentsLabel = isServiceId41
     ? "Viva and Practical"
     : "Theory and Practical";
 
-  // Confirm button label (extracted from previous nested ternary)
   let confirmButtonText;
   if (actionLoading) {
     confirmButtonText = undefined;
@@ -1154,64 +1123,58 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       />
 
       {courseDetails && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Programme Information
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Application No:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.application_no}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Course Name:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.course_name}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Total Seats:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.enrollment_capacity}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Selected Count:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold" color="green">
-                  {selectedTrainees.length}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Fees Per Trainee:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  Nu. {courseDetails.fees_per_trainee}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Certification Level:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold">
-                  {courseDetails.certification_name}
-                </Typography>
-              </Grid>
+        <SectionCard title="Programme Information">
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Application No:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {courseDetails.application_no}
+              </Typography>
             </Grid>
-          </CardContent>
-        </Card>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Course Name:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {courseDetails.course_name}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Total Seats:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {courseDetails.enrollment_capacity}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Selected Count:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold" color="green">
+                {selectedTrainees.length}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Fees Per Trainee:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                Nu. {courseDetails.fees_per_trainee}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <Typography variant="body2" color="textSecondary">
+                Certification Level:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {courseDetails.certification_name}
+              </Typography>
+            </Grid>
+          </Grid>
+        </SectionCard>
       )}
 
       {/* Assessor Assignment Section */}
@@ -1362,39 +1325,13 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           {isRole9 && (
-            <Tooltip
-              title={
-                !isGeneratePAEnabled()
-                  ? "CA Mark/Competency values are required for all selected trainees to generate payment"
-                  : paymentStatus
-                    ? "Payment already generated"
-                    : "Generate Payment Advice"
-              }
-              arrow
-            >
-              <span>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<ManageHistoryIcon />}
-                  onClick={handleGeneratePA}
-                  disabled={
-                    isActionDisabled() ||
-                    actionLoading ||
-                    !isGeneratePAEnabled() ||
-                    !!paymentStatus
-                  }
-                  sx={{
-                    px: 3,
-                    py: 0.5,
-                    fontWeight: 600,
-                    textTransform: "none",
-                  }}
-                >
-                  Generate PA
-                </Button>
-              </span>
-            </Tooltip>
+            <GeneratePaymentButton
+              onClick={handleGeneratePA}
+              disabled={isActionDisabled()}
+              loading={actionLoading}
+              canGenerate={isGeneratePAEnabled()}
+              hasPayment={Boolean(paymentStatus)}
+            />
           )}
         </Box>
 
