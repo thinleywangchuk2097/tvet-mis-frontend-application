@@ -49,16 +49,25 @@ const trainerTablePropTypes = {
       specialization: PropTypes.string,
     }),
   ).isRequired,
+  selectedTrainers: PropTypes.object.isRequired,
+  onSelectTrainer: PropTypes.func.isRequired,
+  onSelectAllTrainers: PropTypes.func.isRequired,
+  onApplyTrainers: PropTypes.func.isRequired,
+  loading: PropTypes.bool,
 };
 
 // ==================== TRAINER TABLE COMPONENT ====================
-const TrainerTable = ({ announcementId, trainersList }) => {
+const TrainerTable = ({
+  announcementId,
+  trainersList,
+  selectedTrainers,
+  onSelectTrainer,
+  onSelectAllTrainers,
+  onApplyTrainers,
+  loading,
+}) => {
   const [trainerPage, setTrainerPage] = useState(0);
   const [trainerRowsPerPage, setTrainerRowsPerPage] = useState(5);
-
-  // Access selectedTrainers from parent context
-  const [selectedTrainers, setSelectedTrainers] = useState({});
-  const [loading, setLoading] = useState(false);
 
   const handleTrainerPageChange = (event, newPage) => setTrainerPage(newPage);
   const handleTrainerRowsPerPageChange = (event) => {
@@ -66,44 +75,15 @@ const TrainerTable = ({ announcementId, trainersList }) => {
     setTrainerPage(0);
   };
 
+  const currentSelected = selectedTrainers[announcementId] || [];
+
   const isAllSelected = () => {
-    const selected = selectedTrainers[announcementId] || [];
-    return trainersList.length > 0 && selected.length === trainersList.length;
+    return (
+      trainersList.length > 0 && currentSelected.length === trainersList.length
+    );
   };
 
-  const selectedCount = (selectedTrainers[announcementId] || []).length;
-
-  const handleSelectTrainer = (announcementId, trainerId) => {
-    setSelectedTrainers((prev) => {
-      const currentSelected = prev[announcementId] || [];
-      if (currentSelected.includes(trainerId)) {
-        return {
-          ...prev,
-          [announcementId]: currentSelected.filter((id) => id !== trainerId),
-        };
-      } else {
-        return {
-          ...prev,
-          [announcementId]: [...currentSelected, trainerId],
-        };
-      }
-    });
-  };
-
-  const handleSelectAllTrainers = (announcementId, event) => {
-    const trainerList = trainersList || [];
-    if (event.target.checked) {
-      setSelectedTrainers((prev) => ({
-        ...prev,
-        [announcementId]: trainerList.map((t) => t.id),
-      }));
-    } else {
-      setSelectedTrainers((prev) => ({
-        ...prev,
-        [announcementId]: [],
-      }));
-    }
-  };
+  const selectedCount = currentSelected.length;
 
   if (trainersList.length === 0) {
     return (
@@ -122,7 +102,7 @@ const TrainerTable = ({ announcementId, trainersList }) => {
               <TableCell padding="checkbox">
                 <Checkbox
                   checked={isAllSelected()}
-                  onChange={(e) => handleSelectAllTrainers(announcementId, e)}
+                  onChange={(e) => onSelectAllTrainers(announcementId, e)}
                 />
               </TableCell>
               <TableCell>#</TableCell>
@@ -143,25 +123,21 @@ const TrainerTable = ({ announcementId, trainersList }) => {
                 trainerPage * trainerRowsPerPage + trainerRowsPerPage,
               )
               .map((trainer, index) => {
-                const isSelected = (
-                  selectedTrainers[announcementId] || []
-                ).includes(trainer.id);
+                const isSelected = currentSelected.includes(trainer.id);
                 return (
                   <TableRow
                     key={trainer.id}
                     hover
                     selected={isSelected}
                     sx={{ cursor: "pointer" }}
-                    onClick={() =>
-                      handleSelectTrainer(announcementId, trainer.id)
-                    }
+                    onClick={() => onSelectTrainer(announcementId, trainer.id)}
                   >
                     <TableCell padding="checkbox">
                       <Checkbox
                         checked={isSelected}
                         onClick={(e) => e.stopPropagation()}
                         onChange={() =>
-                          handleSelectTrainer(announcementId, trainer.id)
+                          onSelectTrainer(announcementId, trainer.id)
                         }
                       />
                     </TableCell>
@@ -233,7 +209,7 @@ const TrainerTable = ({ announcementId, trainersList }) => {
           variant="contained"
           color="success"
           startIcon={<SendIcon />}
-          onClick={() => handleApplyTrainers(announcementId)}
+          onClick={() => onApplyTrainers(announcementId)}
           disabled={selectedCount === 0 || loading}
           size="small"
         >
@@ -907,6 +883,11 @@ const ApplyTrainerToTProgram = () => {
                                 <TrainerTable
                                   announcementId={item.id}
                                   trainersList={announcementTrainers}
+                                  selectedTrainers={selectedTrainers}
+                                  onSelectTrainer={handleSelectTrainer}
+                                  onSelectAllTrainers={handleSelectAllTrainers}
+                                  onApplyTrainers={handleApplyTrainers}
+                                  loading={loading}
                                 />
                               )}
                             </Box>

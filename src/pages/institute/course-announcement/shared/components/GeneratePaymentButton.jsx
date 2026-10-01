@@ -2,6 +2,16 @@ import PropTypes from "prop-types";
 import { Button, Tooltip } from "@mui/material";
 import ManageHistoryIcon from "@mui/icons-material/ManageHistory";
 
+const getTooltipTitle = (canGenerate, hasPayment) => {
+  if (!canGenerate) {
+    return "CA Mark/Competency values are required for all selected trainees to generate payment";
+  }
+  if (hasPayment) {
+    return "Payment already generated";
+  }
+  return "Generate Payment Advice";
+};
+
 const GeneratePaymentButton = ({
   onClick,
   disabled,
@@ -9,11 +19,7 @@ const GeneratePaymentButton = ({
   hasPayment,
   loading,
 }) => {
-  const tooltipTitle = !canGenerate
-    ? "CA Mark/Competency values are required for all selected trainees to generate payment"
-    : hasPayment
-      ? "Payment already generated"
-      : "Generate Payment Advice";
+  const tooltipTitle = getTooltipTitle(canGenerate, hasPayment);
 
   return (
     <Tooltip title={tooltipTitle} arrow>

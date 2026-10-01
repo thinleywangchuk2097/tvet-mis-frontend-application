@@ -81,10 +81,24 @@ const ViewTracerSend = () => {
     try {
       const response =
         await PublicTracerService.getTracerQuestionDropdownType();
-      setTracerQuestionDropdownType(response.data);
-      console.log("Tracer Question Dropdown Types:", response.data);
+
+      console.log("Tracer Question Dropdown Types (raw):", response);
+
+      let types = [];
+
+      if (Array.isArray(response)) {
+        types = response;
+      } else if (Array.isArray(response?.data)) {
+        types = response.data;
+      } else if (Array.isArray(response?.data?.data)) {
+        types = response.data.data;
+      }
+
+      setTracerQuestionDropdownType(types);
+      console.log("Tracer Question Dropdown Types:", types);
     } catch (error) {
       console.error("Error fetching tracer question dropdown types:", error);
+      setTracerQuestionDropdownType([]);
     }
   };
 
@@ -94,22 +108,38 @@ const ViewTracerSend = () => {
         await PublicTracerService.getTracerDetailsByApplicationNo(
           applicationNo,
         );
-      const questions = Array.isArray(response)
-        ? response
-        : response.data || [];
+
+      console.log("Tracer details response:", response);
+
+      let questions = [];
+
+      if (Array.isArray(response)) {
+        questions = response;
+      } else if (Array.isArray(response?.data)) {
+        questions = response.data;
+      } else if (Array.isArray(response?.data?.data)) {
+        questions = response.data.data;
+      } else if (Array.isArray(response?.data?.questions)) {
+        questions = response.data.questions;
+      } else if (Array.isArray(response?.questions)) {
+        questions = response.questions;
+      }
+
       setTracerDetails(questions);
       setError(null);
     } catch (err) {
       console.error("Error fetching tracer details:", err);
       setError("Failed to load tracer details. Please try again.");
+      setTracerDetails([]);
     }
   };
 
   const getQuestionTypeValue = (typeId) => {
     if (!typeId) return null;
-    const questionType = tracerQuestionDropdownType.find(
-      (t) => t.id === typeId.toString(),
-    );
+    const types = Array.isArray(tracerQuestionDropdownType)
+      ? tracerQuestionDropdownType
+      : [];
+    const questionType = types.find((t) => t.id === typeId.toString());
     return questionType ? questionType.value : null;
   };
 
@@ -169,6 +199,8 @@ const ViewTracerSend = () => {
   const initializeFormValues = (questions) => {
     const initialValues = {};
 
+    if (!Array.isArray(questions)) return initialValues;
+
     questions.forEach((question) => {
       const subQuestions = parseSubQuestions(question.sub_questions);
 
@@ -216,7 +248,9 @@ const ViewTracerSend = () => {
   const validateForm = (values) => {
     const errors = {};
 
-    tracerDetails.forEach((question) => {
+    const safeTracerDetails = Array.isArray(tracerDetails) ? tracerDetails : [];
+
+    safeTracerDetails.forEach((question) => {
       const subQuestions = parseSubQuestions(question.sub_questions);
 
       if (subQuestions && subQuestions.length > 0) {
@@ -313,11 +347,13 @@ const ViewTracerSend = () => {
     return errors;
   };
 
+  const safeTracerDetails = Array.isArray(tracerDetails) ? tracerDetails : [];
+
   const transformedSurvey = {
     applicationNo: surveyData?.data?.applicationNo,
     parentTracerTypeName: surveyData?.data?.applicationName,
     subTracerTypeName: "",
-    questions: tracerDetails.map((item) => {
+    questions: safeTracerDetails.map((item) => {
       const subQuestions = parseSubQuestions(item.sub_questions);
       return {
         id: item.id,
@@ -344,7 +380,7 @@ const ViewTracerSend = () => {
   const [initialValues, setInitialValues] = useState({});
 
   useEffect(() => {
-    if (tracerDetails.length > 0) {
+    if (Array.isArray(tracerDetails) && tracerDetails.length > 0) {
       const values = initializeFormValues(tracerDetails);
       setInitialValues(values);
     }
