@@ -879,7 +879,7 @@ const SectorOccupationIndex = () => {
                 <TextField
                   fullWidth
                   margin="dense"
-                  label="ISCO Code"
+                  label="BSCO/ISCO Code"
                   name="newIscoCode"
                   size="small"
                   value={formik.values.newIscoCode}

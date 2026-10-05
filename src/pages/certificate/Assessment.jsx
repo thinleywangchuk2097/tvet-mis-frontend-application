@@ -53,20 +53,13 @@ const Assessment = () => {
   const [instituteId, setInstituteId] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [certificationLevelId, setCertificationLevelId] = useState("");
-
   const [instituteList, setInstituteList] = useState([]);
   const [serviceList, setServiceList] = useState([]);
   const [programmeList, setProgrammeList] = useState([]);
   const [certificationLevelList, setCertificationLevelList] = useState([]);
-
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
-
   const access_token = useSelector((state) => state.auth.accessToken);
-
-  // ============================================================
-  // FETCHERS — all guarded and safe
-  // ============================================================
 
   const fetchAssessmentInstitutes = useCallback(async () => {
     if (!access_token) return;
@@ -271,7 +264,7 @@ const Assessment = () => {
     try {
       await generateAllAssessmentCertificatesPdf(reports);
     } catch (err) {
-      console.error("❌ Bulk certificate generation failed");
+      console.error("Bulk certificate generation failed");
       console.error("   message:", err?.message);
       console.error("   stack:", err?.stack);
       console.error("   error:", err);

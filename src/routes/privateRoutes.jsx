@@ -64,6 +64,8 @@ import ViewApplyTrainerToTProgram from "../pages/dwps/tot/ViewApplyTrainerToTPro
 //Certificate
 import Assessment from "../pages/certificate/Assessment";
 import CertificateIndex from "../pages/certificate/CertificateIndex";
+import RegistrationCertificateIndex from "../pages/certificate/RegistrationCertificateIndex";
+
 //birms
 import BirmsAgencyPaymentIndex from "../pages/birms/private/BirmsAgencyPaymentIndex";
 import BirmsInstitutePaymentIndex from "../pages/birms/private/BirmsInstitutePaymentIndex";
@@ -382,7 +384,8 @@ export const privateRoutes = [
     path: "certificate",
     children: [
       { path: "assessment", element: <Assessment /> },
-      { path: "trainee-certificate", element: <CertificateIndex /> },
+      { path: "bqf-certificate", element: <CertificateIndex /> },
+      { path: "registration-certificate", element: <RegistrationCertificateIndex /> }
     ],
   },
   //without children

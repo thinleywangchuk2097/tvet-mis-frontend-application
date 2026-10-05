@@ -31,6 +31,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Tooltip,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -162,6 +163,34 @@ const GenerateTracerIndex = () => {
     return questionType?.value === "radio";
   };
 
+  // Question types that support a "max selections" limit
+  const isMultiChoiceType = (typeId) => {
+    const questionType = tracerQuestionDropdownType.find(
+      (t) => t.id === typeId,
+    );
+    const value = questionType?.value;
+    return ["checkbox", "multiSelect"].includes(value);
+  };
+
+  // Question types eligible to be a "parent" for show/hide conditions
+  const isEligibleConditionSource = (typeId) => {
+    const questionType = tracerQuestionDropdownType.find(
+      (t) => t.id === typeId,
+    );
+    const value = questionType?.value;
+    return ["radio", "checkbox", "dropdown", "multiSelect"].includes(value);
+  };
+
+  // Helper: parse showWhenOption into an array of trigger options
+  const parseShowWhenOptions = (showWhenOption) => {
+    if (!showWhenOption) return [];
+    if (Array.isArray(showWhenOption)) return showWhenOption;
+    return String(showWhenOption)
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s !== "");
+  };
+
   const createValidationSchema = () => {
     return Yup.object({
       tracerTitle: Yup.string().required("Tracer title is required"),
@@ -192,7 +221,8 @@ const GenerateTracerIndex = () => {
           }),
           showWhenOption: Yup.string().when("showCondition", {
             is: (val) => val === "option",
-            then: (schema) => schema.required("Please select an option"),
+            then: (schema) =>
+              schema.required("Please select at least one option"),
             otherwise: (schema) => schema.notRequired(),
           }),
           options: Yup.array().when("questionTypeId", {
@@ -232,7 +262,8 @@ const GenerateTracerIndex = () => {
               }),
               showWhenOption: Yup.string().when("showCondition", {
                 is: (val) => val === "option",
-                then: (schema) => schema.required("Please select an option"),
+                then: (schema) =>
+                  schema.required("Please select at least one option"),
                 otherwise: (schema) => schema.notRequired(),
               }),
               options: Yup.array().when("questionTypeId", {
@@ -278,6 +309,7 @@ const GenerateTracerIndex = () => {
           options: [""],
           multipleTextFields: [""],
           ratingScale: 5,
+          maxSelections: 0,
         },
       ],
     },
@@ -308,30 +340,41 @@ const GenerateTracerIndex = () => {
               questionData.ratingScale = q.ratingScale;
             }
 
+            if (isMultiChoiceType(q.questionTypeId)) {
+              questionData.maxSelections = q.maxSelections || 0;
+            }
+
             questionData.subQuestions =
-              q.subQuestions?.map((sub, subIndex) => ({
-                subQuestionOrder: subIndex + 1,
-                questionText: sub.questionText,
-                questionTypeId: sub.questionTypeId,
-                required: sub.required ? 1 : 0,
-                showCondition: sub.showCondition || "always",
-                dependsOnQuestionId: sub.dependsOnQuestionId || null,
-                showWhenOption: sub.showWhenOption || "",
-                options: sub.options?.filter((opt) => opt.trim() !== "") || [],
-                multipleTextFields:
-                  sub.multipleTextFields?.filter(
-                    (field) => field.trim() !== "",
-                  ) || [],
-                ratingScale: isRating(sub.questionTypeId)
-                  ? sub.ratingScale
-                  : undefined,
-              })) || [];
+              q.subQuestions?.map((sub, subIndex) => {
+                const subData = {
+                  subQuestionOrder: subIndex + 1,
+                  questionText: sub.questionText,
+                  questionTypeId: sub.questionTypeId,
+                  required: sub.required ? 1 : 0,
+                  showCondition: sub.showCondition || "always",
+                  dependsOnQuestionId: sub.dependsOnQuestionId || null,
+                  showWhenOption: sub.showWhenOption || "",
+                  options:
+                    sub.options?.filter((opt) => opt.trim() !== "") || [],
+                  multipleTextFields:
+                    sub.multipleTextFields?.filter(
+                      (field) => field.trim() !== "",
+                    ) || [],
+                  ratingScale: isRating(sub.questionTypeId)
+                    ? sub.ratingScale
+                    : undefined,
+                };
+                if (isMultiChoiceType(sub.questionTypeId)) {
+                  subData.maxSelections = sub.maxSelections || 0;
+                }
+                return subData;
+              }) || [];
 
             return questionData;
           }),
         };
-        
-        console.log("payload : ", submissionData)
+
+        console.log("payload : ", submissionData);
 
         const response = await GenerateTracerService.saveTracerQuestions(
           submissionData,
@@ -363,7 +406,13 @@ const GenerateTracerIndex = () => {
     }
   }, [tracerQuestionDropdownType]);
 
-  const getPreviousRadioQuestions = (currentQuestionId) => {
+  /**
+   * Returns all previous questions that can act as a source for show/hide
+   * conditions: Single Choice (Radio), Multiple Choice (Checkbox),
+   * Single Select Dropdown, and Multi-Select Dropdown — but only when they
+   * have at least one option.
+   */
+  const getPreviousEligibleQuestions = (currentQuestionId) => {
     const currentIndex = formik.values.questions.findIndex((q) => {
       const qId = typeof q.id === "string" ? parseInt(q.id) : q.id;
       const currId =
@@ -383,16 +432,25 @@ const GenerateTracerIndex = () => {
       if (qId === currId) return false;
       if (index >= currentIndex) return false;
 
-      const typeValue = getQuestionTypeValue(q.questionTypeId);
-      const isRadio = typeValue === "radio";
+      const eligible = isEligibleConditionSource(q.questionTypeId);
       return (
-        isRadio &&
+        eligible &&
         q.options &&
         q.options.some((opt) => opt && opt.trim() !== "")
       );
     });
   };
 
+  /**
+   * Determines whether a conditional question should be visible based on
+   * the current state of its parent question.
+   *
+   * Rules:
+   *  - "always" → visible.
+   *  - "option" → visible ONLY when the parent has a value that matches at
+   *    least one of the configured trigger options. Until the user makes a
+   *    selection on the parent, the child stays hidden.
+   */
   const isQuestionVisible = (question, allQuestions, selectedValues) => {
     if (question.showCondition === "always") {
       return true;
@@ -407,12 +465,36 @@ const GenerateTracerIndex = () => {
             : question.dependsOnQuestionId;
         return qId === dId;
       });
-      if (!dependsOnQuestion) return true;
 
+      // Broken dependency — hide the child
+      if (!dependsOnQuestion) return false;
+
+      const parentTypeValue = getQuestionTypeValue(
+        dependsOnQuestion.questionTypeId,
+      );
       const selectedValue = selectedValues[dependsOnQuestion.id];
-      if (!selectedValue) return true;
+      const triggerOptions = parseShowWhenOptions(question.showWhenOption);
 
-      return selectedValue === question.showWhenOption;
+      // No trigger options configured yet — hide the child
+      if (triggerOptions.length === 0) return false;
+
+      // Checkbox / MultiSelect parents hold an array of selected values
+      if (parentTypeValue === "checkbox" || parentTypeValue === "multiSelect") {
+        const selectedArr = Array.isArray(selectedValue)
+          ? selectedValue
+          : selectedValue
+            ? [selectedValue]
+            : [];
+        // No selection on parent yet — hide the child
+        if (selectedArr.length === 0) return false;
+        // Show if ANY configured trigger option is currently selected
+        return triggerOptions.some((opt) => selectedArr.includes(opt));
+      }
+
+      // Radio / Dropdown parents hold a single selected value
+      // No selection on parent yet — hide the child
+      if (!selectedValue) return false;
+      return triggerOptions.includes(selectedValue);
     }
 
     return true;
@@ -457,6 +539,7 @@ const GenerateTracerIndex = () => {
       options: [""],
       multipleTextFields: [""],
       ratingScale: 5,
+      maxSelections: 0,
     };
     formik.setFieldValue("questions", [
       ...formik.values.questions,
@@ -589,6 +672,7 @@ const GenerateTracerIndex = () => {
               options: [""],
               multipleTextFields: [""],
               ratingScale: 5,
+              maxSelections: 0,
             },
           ],
         };
@@ -895,13 +979,25 @@ const GenerateTracerIndex = () => {
     );
   };
 
-  const renderOriginalMultiSelect = (options, questionId, disabled = false) => {
+  const renderOriginalMultiSelect = (
+    options,
+    questionId,
+    disabled = false,
+    maxSelections = 0,
+  ) => {
     const selectedValues = multiSelectValues[questionId] || [];
+    const limitReached =
+      maxSelections > 0 && selectedValues.length >= maxSelections;
+
     const handleChange = (event) => {
-      const value = event.target.value;
+      let value = event.target.value;
+      value = typeof value === "string" ? value.split(",") : value;
+      if (maxSelections > 0 && value.length > maxSelections) {
+        value = value.slice(0, maxSelections);
+      }
       setMultiSelectValues((prev) => ({
         ...prev,
-        [questionId]: typeof value === "string" ? value.split(",") : value,
+        [questionId]: value,
       }));
     };
 
@@ -923,13 +1019,27 @@ const GenerateTracerIndex = () => {
         >
           {options
             .filter((opt) => opt.trim() !== "")
-            .map((option, idx) => (
-              <MenuItem key={idx} value={option}>
-                <Checkbox checked={selectedValues.indexOf(option) > -1} />
-                <ListItemText primary={option} />
-              </MenuItem>
-            ))}
+            .map((option, idx) => {
+              const isSelected = selectedValues.indexOf(option) > -1;
+              const optionDisabled = limitReached && !isSelected;
+              return (
+                <MenuItem key={idx} value={option} disabled={optionDisabled}>
+                  <Checkbox checked={isSelected} />
+                  <ListItemText primary={option} />
+                </MenuItem>
+              );
+            })}
         </Select>
+        {maxSelections > 0 && (
+          <Typography
+            variant="caption"
+            color={limitReached ? "warning" : "text.secondary"}
+            sx={{ mt: 0.5, display: "block" }}
+          >
+            {selectedValues.length}/{maxSelections} selected
+            {limitReached ? " — limit reached" : ""}
+          </Typography>
+        )}
       </FormControl>
     );
   };
@@ -1044,6 +1154,8 @@ const GenerateTracerIndex = () => {
     subId = null,
   ) => {
     const questionTypeValue = getQuestionTypeValue(question.questionTypeId);
+    const showMaxSelections =
+      questionTypeValue === "checkbox" || questionTypeValue === "multiSelect";
 
     switch (questionTypeValue) {
       case "radio":
@@ -1112,6 +1224,59 @@ const GenerateTracerIndex = () => {
             >
               Add Option
             </Button>
+
+            {showMaxSelections && (
+              <Box
+                sx={{
+                  mt: 2,
+                  p: 2,
+                  borderRadius: 1,
+                  border: "1px dashed",
+                  borderColor: "divider",
+                }}
+              >
+                <Typography variant="subtitle2" gutterBottom>
+                  Selection Limit
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 240 }}>
+                  <InputLabel>Max selections allowed</InputLabel>
+                  <Select
+                    value={question.maxSelections || 0}
+                    label="Max selections allowed"
+                    onChange={(e) =>
+                      isSubQuestion
+                        ? updateSubQuestion(
+                            parentId,
+                            subId,
+                            "maxSelections",
+                            e.target.value,
+                          )
+                        : updateQuestion(
+                            question.id,
+                            "maxSelections",
+                            e.target.value,
+                          )
+                    }
+                  >
+                    <MenuItem value={0}>No limit</MenuItem>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                      <MenuItem key={n} value={n}>
+                        {n}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 1, display: "block" }}
+                >
+                  {question.maxSelections > 0
+                    ? `Users can select up to ${question.maxSelections} option(s).`
+                    : "Users can select any number of options."}
+                </Typography>
+              </Box>
+            )}
           </Box>
         );
 
@@ -1229,7 +1394,7 @@ const GenerateTracerIndex = () => {
     const dependsOnQuestionId = question.dependsOnQuestionId || null;
     const showWhenOption = question.showWhenOption || "";
 
-    const previousRadioQuestions = getPreviousRadioQuestions(question.id);
+    const previousEligibleQuestions = getPreviousEligibleQuestions(question.id);
 
     let dependentOptions = [];
     let dependentQuestionType = null;
@@ -1252,6 +1417,12 @@ const GenerateTracerIndex = () => {
       }
     }
 
+    // Current trigger options (array form) for the multi-select
+    const selectedTriggerOptions = parseShowWhenOptions(showWhenOption);
+    const isMultipleOptionParent =
+      dependentQuestionType === "checkbox" ||
+      dependentQuestionType === "multiSelect";
+
     return (
       <Box sx={{ mt: 2, p: 2, borderRadius: 1 }}>
         <Typography
@@ -1273,22 +1444,49 @@ const GenerateTracerIndex = () => {
                 onChange={(e) => {
                   const value = e.target.value;
                   if (isSubQuestion) {
-                    updateSubQuestion(parentId, subId, "showCondition", value);
-                    if (value === "always") {
-                      updateSubQuestion(
-                        parentId,
-                        subId,
-                        "dependsOnQuestionId",
-                        null,
-                      );
-                      updateSubQuestion(parentId, subId, "showWhenOption", "");
-                    }
+                    const updatedQuestions = formik.values.questions.map(
+                      (q) => {
+                        if (q.id === parentId) {
+                          return {
+                            ...q,
+                            subQuestions: q.subQuestions.map((sub) => {
+                              if (sub.id === subId) {
+                                return {
+                                  ...sub,
+                                  showCondition: value,
+                                  ...(value === "always" && {
+                                    dependsOnQuestionId: null,
+                                    showWhenOption: "",
+                                  }),
+                                };
+                              }
+                              return sub;
+                            }),
+                          };
+                        }
+                        return q;
+                      },
+                    );
+                    formik.setFieldValue("questions", updatedQuestions);
+                    setForceUpdate((prev) => !prev);
                   } else {
-                    updateQuestion(question.id, "showCondition", value);
-                    if (value === "always") {
-                      updateQuestion(question.id, "dependsOnQuestionId", null);
-                      updateQuestion(question.id, "showWhenOption", "");
-                    }
+                    const updatedQuestions = formik.values.questions.map(
+                      (q) => {
+                        if (q.id === question.id) {
+                          return {
+                            ...q,
+                            showCondition: value,
+                            ...(value === "always" && {
+                              dependsOnQuestionId: null,
+                              showWhenOption: "",
+                            }),
+                          };
+                        }
+                        return q;
+                      },
+                    );
+                    formik.setFieldValue("questions", updatedQuestions);
+                    setForceUpdate((prev) => !prev);
                   }
                 }}
               >
@@ -1302,10 +1500,10 @@ const GenerateTracerIndex = () => {
             <>
               <Grid size={{ xs: 12, md: 4 }}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Previous Radio Question</InputLabel>
+                  <InputLabel>Previous Question</InputLabel>
                   <Select
                     value={dependsOnQuestionId || ""}
-                    label="Previous Radio Question"
+                    label="Previous Question"
                     onChange={(e) => {
                       const value = e.target.value;
 
@@ -1351,34 +1549,60 @@ const GenerateTracerIndex = () => {
                     }}
                   >
                     <MenuItem value="">
-                      <em>Select a previous radio question</em>
+                      <em>Select a previous question</em>
                     </MenuItem>
-                    {previousRadioQuestions.length > 0 ? (
-                      previousRadioQuestions.map((q) => {
+                    {previousEligibleQuestions.length > 0 ? (
+                      previousEligibleQuestions.map((q) => {
                         const qIndex = formik.values.questions.indexOf(q);
                         const optionsCount =
                           q.options?.filter((o) => o && o.trim() !== "")
                             .length || 0;
+                        const typeLabel = getQuestionTypeLabel(
+                          q.questionTypeId,
+                        );
                         return (
                           <MenuItem key={q.id} value={q.id}>
-                            Q{qIndex + 1}: {q.questionText || "Untitled"} (
-                            {optionsCount} options)
+                            <Tooltip
+                              title={
+                                typeLabel
+                                  ? `${typeLabel} • ${optionsCount} option(s)`
+                                  : `${optionsCount} option(s)`
+                              }
+                              placement="right"
+                              arrow
+                            >
+                              <Box
+                                component="span"
+                                sx={{
+                                  display: "block",
+                                  width: "100%",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                Q{qIndex + 1}: {q.questionText || "Untitled"} (
+                                {optionsCount} options)
+                              </Box>
+                            </Tooltip>
                           </MenuItem>
                         );
                       })
                     ) : (
                       <MenuItem disabled>
-                        <em>No previous radio questions with options</em>
+                        <em>No previous questions with options available</em>
                       </MenuItem>
                     )}
                   </Select>
-                  {previousRadioQuestions.length === 0 && (
+                  {previousEligibleQuestions.length === 0 && (
                     <Typography
                       variant="caption"
                       color="warning"
                       sx={{ mt: 1, display: "block" }}
                     >
-                      Please add a previous radio question with options first.
+                      Please add a previous Single Choice (Radio), Multiple
+                      Choice (Checkbox), Single Select Dropdown or Multi-Select
+                      Dropdown question with options first.
                     </Typography>
                   )}
                   {dependsOnQuestionId && (
@@ -1404,12 +1628,26 @@ const GenerateTracerIndex = () => {
 
               <Grid size={{ xs: 12, md: 4 }}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Select Option to Show</InputLabel>
+                  <InputLabel>
+                    {isMultipleOptionParent
+                      ? "Select Options to Show"
+                      : "Select Option to Show"}
+                  </InputLabel>
                   <Select
-                    value={showWhenOption || ""}
-                    label="Select Option to Show"
+                    multiple={isMultipleOptionParent}
+                    value={
+                      isMultipleOptionParent
+                        ? selectedTriggerOptions
+                        : showWhenOption || ""
+                    }
+                    label={
+                      isMultipleOptionParent
+                        ? "Select Options to Show"
+                        : "Select Option to Show"
+                    }
                     onChange={(e) => {
-                      const value = e.target.value;
+                      const raw = e.target.value;
+                      const value = Array.isArray(raw) ? raw.join(",") : raw;
                       if (isSubQuestion) {
                         updateSubQuestion(
                           parentId,
@@ -1421,16 +1659,51 @@ const GenerateTracerIndex = () => {
                         updateQuestion(question.id, "showWhenOption", value);
                       }
                     }}
+                    input={
+                      isMultipleOptionParent ? (
+                        <OutlinedInput label="Select Options to Show" />
+                      ) : undefined
+                    }
+                    renderValue={
+                      isMultipleOptionParent
+                        ? (selected) => (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 0.5,
+                              }}
+                            >
+                              {selected.map((value) => (
+                                <Chip key={value} label={value} size="small" />
+                              ))}
+                            </Box>
+                          )
+                        : undefined
+                    }
                     disabled={
                       !dependsOnQuestionId || dependentOptions.length === 0
                     }
                   >
-                    <MenuItem value="">
-                      <em>Select an option</em>
-                    </MenuItem>
+                    {!isMultipleOptionParent && (
+                      <MenuItem value="">
+                        <em>Select an option</em>
+                      </MenuItem>
+                    )}
                     {dependentOptions.map((option) => (
                       <MenuItem key={option} value={option}>
-                        {option}
+                        {isMultipleOptionParent && (
+                          <Checkbox
+                            checked={
+                              selectedTriggerOptions.indexOf(option) > -1
+                            }
+                          />
+                        )}
+                        {isMultipleOptionParent ? (
+                          <ListItemText primary={option} />
+                        ) : (
+                          option
+                        )}
                       </MenuItem>
                     ))}
                   </Select>
@@ -1440,7 +1713,7 @@ const GenerateTracerIndex = () => {
                       color="info"
                       sx={{ mt: 1, display: "block" }}
                     >
-                      Please select a previous radio question first.
+                      Please select a previous question first.
                     </Typography>
                   )}
                   {dependsOnQuestionId && dependentOptions.length === 0 && (
@@ -1459,8 +1732,10 @@ const GenerateTracerIndex = () => {
                       color="success"
                       sx={{ mt: 1, display: "block" }}
                     >
-                      {dependentOptions.length} option(s) available. Select one
-                      to show this question.
+                      {dependentOptions.length} option(s) available.{" "}
+                      {isMultipleOptionParent
+                        ? "Select one or more options to show this question."
+                        : "Select one to show this question."}
                     </Typography>
                   )}
                 </FormControl>
@@ -1499,18 +1774,56 @@ const GenerateTracerIndex = () => {
           </RadioGroup>
         );
 
-      case "checkbox":
+      case "checkbox": {
+        const currentSelected = multiSelectValues[questionId] || [];
+        const maxSel = question.maxSelections || 0;
+        const limitReached = maxSel > 0 && currentSelected.length >= maxSel;
         return (
           <FormGroup>
-            {(question.options || [""]).map((opt, idx) => (
-              <FormControlLabel
-                key={idx}
-                control={<Checkbox />}
-                label={opt || `Option ${idx + 1}`}
-              />
-            ))}
+            {(question.options || [""]).map((opt, idx) => {
+              const checked = currentSelected.includes(opt);
+              const optionDisabled = limitReached && !checked;
+              return (
+                <FormControlLabel
+                  key={idx}
+                  disabled={optionDisabled}
+                  control={
+                    <Checkbox
+                      checked={checked}
+                      onChange={(e) => {
+                        setMultiSelectValues((prev) => {
+                          const existing = prev[questionId] || [];
+                          let next;
+                          if (e.target.checked) {
+                            next =
+                              maxSel > 0 && existing.length >= maxSel
+                                ? existing
+                                : [...existing, opt];
+                          } else {
+                            next = existing.filter((v) => v !== opt);
+                          }
+                          return { ...prev, [questionId]: next };
+                        });
+                      }}
+                    />
+                  }
+                  label={opt || `Option ${idx + 1}`}
+                />
+              );
+            })}
+            {maxSel > 0 && (
+              <Typography
+                variant="caption"
+                color={limitReached ? "warning" : "text.secondary"}
+                sx={{ mt: 0.5 }}
+              >
+                {currentSelected.length}/{maxSel} selected
+                {limitReached ? " — limit reached" : ""}
+              </Typography>
+            )}
           </FormGroup>
         );
+      }
 
       case "dropdown":
         return renderUnderlinedDropdown(
@@ -1524,6 +1837,7 @@ const GenerateTracerIndex = () => {
           question.options || [],
           questionId || question.id,
           false,
+          question.maxSelections || 0,
         );
 
       case "multipleText":
@@ -1668,6 +1982,12 @@ const GenerateTracerIndex = () => {
                     if (!question.options || question.options.length === 0) {
                       updateQuestion(question.id, "options", [""]);
                     }
+                    if (
+                      ["checkbox", "multiSelect"].includes(newTypeValue) &&
+                      question.maxSelections === undefined
+                    ) {
+                      updateQuestion(question.id, "maxSelections", 0);
+                    }
                   } else if (newTypeValue === "multipleText") {
                     if (
                       !question.multipleTextFields ||
@@ -1708,7 +2028,7 @@ const GenerateTracerIndex = () => {
           )}
 
           <Grid size={{ xs: 12 }}>
-            <Accordion>
+            <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box
                   sx={{
@@ -1752,7 +2072,9 @@ const GenerateTracerIndex = () => {
                   {question.showCondition === "option" &&
                     question.showWhenOption && (
                       <Chip
-                        label={`Show when: ${question.showWhenOption}`}
+                        label={`Show when: ${parseShowWhenOptions(
+                          question.showWhenOption,
+                        ).join(", ")}`}
                         size="small"
                         color="primary"
                       />
@@ -1839,6 +2161,19 @@ const GenerateTracerIndex = () => {
                                       [""],
                                     );
                                   }
+                                  if (
+                                    ["checkbox", "multiSelect"].includes(
+                                      newTypeValue,
+                                    ) &&
+                                    sub.maxSelections === undefined
+                                  ) {
+                                    updateSubQuestion(
+                                      question.id,
+                                      sub.id,
+                                      "maxSelections",
+                                      0,
+                                    );
+                                  }
                                 }
                               }}
                             >
@@ -1878,7 +2213,7 @@ const GenerateTracerIndex = () => {
                           </Grid>
                         )}
                         <Grid size={{ xs: 12 }}>
-                          <Accordion>
+                          <Accordion defaultExpanded>
                             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                               <Box
                                 sx={{
@@ -2232,7 +2567,9 @@ const GenerateTracerIndex = () => {
                     {question.showCondition === "option" &&
                       question.showWhenOption && (
                         <Chip
-                          label={`Show when: ${question.showWhenOption}`}
+                          label={`Show when: ${parseShowWhenOptions(
+                            question.showWhenOption,
+                          ).join(", ")}`}
                           size="small"
                           color="primary"
                         />
@@ -2322,16 +2659,20 @@ const GenerateTracerIndex = () => {
             );
           })}
 
-          {Object.values(visibleQuestions).every((v) => v === false) && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ textAlign: "center", py: 2 }}
-            >
-              No questions are currently visible. Please select options to show
-              questions.
-            </Typography>
-          )}
+          {formik.values.questions.length > 0 &&
+            Object.values(visibleQuestions).every((v) => v === false) &&
+            formik.values.questions.some(
+              (q) => q.showCondition === "option" && q.dependsOnQuestionId,
+            ) && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ textAlign: "center", py: 2 }}
+              >
+                No questions are currently visible. Please select options above
+                to reveal conditional questions.
+              </Typography>
+            )}
         </Paper>
       </Box>
     </Paper>
