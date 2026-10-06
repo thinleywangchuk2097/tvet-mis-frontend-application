@@ -1,8 +1,8 @@
-// ViewTracerSend.jsx - With redirect to home page after successful submission
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useFormik } from "formik";
 import { toast } from "react-toastify";
+import PropTypes from "prop-types";
 import {
   Paper,
   Typography,
@@ -34,6 +34,21 @@ import {
 import StarIcon from "@mui/icons-material/Star";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PublicTracerService from "../../../api/services/internal/tracer/PublicTracerService";
+
+// ============ Shared PropTypes shapes ============
+const optionShape = PropTypes.shape({
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  text: PropTypes.string,
+});
+
+const fieldKeyType = PropTypes.oneOfType([PropTypes.string, PropTypes.number]);
+
+const fieldValueType = PropTypes.oneOfType([
+  PropTypes.string,
+  PropTypes.number,
+  PropTypes.array,
+  PropTypes.object,
+]);
 
 // ============ Pure Helper Functions (outside component) ============
 
@@ -270,6 +285,14 @@ const RadioField = ({
   </FormControl>
 );
 
+RadioField.propTypes = {
+  fieldKey: fieldKeyType,
+  fieldValue: fieldValueType,
+  fieldError: PropTypes.string,
+  options: PropTypes.arrayOf(optionShape).isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
 const CheckboxField = ({ fieldValue, fieldError, options, onChange }) => (
   <FormControl error={!!fieldError} component="fieldset" fullWidth>
     <FormGroup>
@@ -290,6 +313,13 @@ const CheckboxField = ({ fieldValue, fieldError, options, onChange }) => (
     {fieldError && <FormHelperText error>{fieldError}</FormHelperText>}
   </FormControl>
 );
+
+CheckboxField.propTypes = {
+  fieldValue: PropTypes.array,
+  fieldError: PropTypes.string,
+  options: PropTypes.arrayOf(optionShape).isRequired,
+  onChange: PropTypes.func.isRequired,
+};
 
 const DropdownField = ({ fieldValue, fieldError, options, onChange }) => (
   <FormControl fullWidth variant="standard" error={!!fieldError}>
@@ -313,6 +343,13 @@ const DropdownField = ({ fieldValue, fieldError, options, onChange }) => (
     {fieldError && <FormHelperText error>{fieldError}</FormHelperText>}
   </FormControl>
 );
+
+DropdownField.propTypes = {
+  fieldValue: fieldValueType,
+  fieldError: PropTypes.string,
+  options: PropTypes.arrayOf(optionShape).isRequired,
+  onChange: PropTypes.func.isRequired,
+};
 
 const MultiSelectField = ({ fieldValue, fieldError, options, onChange }) => {
   const selectedValues = fieldValue || [];
@@ -350,6 +387,13 @@ const MultiSelectField = ({ fieldValue, fieldError, options, onChange }) => {
   );
 };
 
+MultiSelectField.propTypes = {
+  fieldValue: PropTypes.array,
+  fieldError: PropTypes.string,
+  options: PropTypes.arrayOf(optionShape).isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
 const MultipleTextField = ({
   textFields,
   multiValues,
@@ -377,6 +421,14 @@ const MultipleTextField = ({
     {fieldError && <FormHelperText error>{fieldError}</FormHelperText>}
   </Box>
 );
+
+MultipleTextField.propTypes = {
+  textFields: PropTypes.arrayOf(optionShape).isRequired,
+  multiValues: PropTypes.object,
+  isRequired: PropTypes.bool,
+  fieldError: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
 
 const RatingField = ({ fieldValue, fieldError, ratingScale, onChange }) => (
   <Box>
@@ -426,6 +478,13 @@ const RatingField = ({ fieldValue, fieldError, ratingScale, onChange }) => (
   </Box>
 );
 
+RatingField.propTypes = {
+  fieldValue: fieldValueType,
+  fieldError: PropTypes.string,
+  ratingScale: PropTypes.number,
+  onChange: PropTypes.func.isRequired,
+};
+
 const TextFieldInput = ({
   fieldKey,
   fieldValue,
@@ -447,6 +506,14 @@ const TextFieldInput = ({
   />
 );
 
+TextFieldInput.propTypes = {
+  fieldKey: fieldKeyType.isRequired,
+  fieldValue: fieldValueType,
+  fieldError: PropTypes.string,
+  isTextarea: PropTypes.bool,
+  onChange: PropTypes.func.isRequired,
+};
+
 const DateField = ({ fieldKey, fieldValue, fieldError, onChange }) => (
   <TextField
     type="date"
@@ -460,6 +527,13 @@ const DateField = ({ fieldKey, fieldValue, fieldError, onChange }) => (
     sx={{ width: "100%" }}
   />
 );
+
+DateField.propTypes = {
+  fieldKey: fieldKeyType.isRequired,
+  fieldValue: PropTypes.string,
+  fieldError: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
 
 // ============ Main Component ============
 

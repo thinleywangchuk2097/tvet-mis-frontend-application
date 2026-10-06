@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// GenerateTracerIndex.jsx
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Paper,
@@ -50,6 +51,62 @@ import { useSelector } from "react-redux";
 import GenerateTracerService from "../../../api/services/internal/tracer/GenerateTracerService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 
+// ==================== PURE HELPERS (module scope) ====================
+
+// Question-type values that support answer options
+const OPTION_BASED_TYPES = ["radio", "checkbox", "dropdown", "multiSelect"];
+const MULTI_CHOICE_TYPES = ["checkbox", "multiSelect"];
+
+// Normalize a value (scalar or array) into an array
+const toArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value) return [value];
+  return [];
+};
+
+// Parse showWhenOption into an array of trigger option strings
+const parseShowWhenOptions = (showWhenOption) => {
+  if (!showWhenOption) return [];
+  if (Array.isArray(showWhenOption)) return showWhenOption;
+  return String(showWhenOption)
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+};
+
+// Flatten all questions (top-level + sub) with ordering metadata
+const flattenQuestions = (questions) => {
+  const flat = [];
+  questions.forEach((q, qi) => {
+    flat.push({ ...q, __order: qi * 1000, __parentClientId: null });
+    (q.subQuestions || []).forEach((sub, si) => {
+      flat.push({
+        ...sub,
+        __order: qi * 1000 + si + 1,
+        __parentClientId: q.clientId,
+      });
+    });
+  });
+  return flat;
+};
+
+// Pure predicate: does the parent's selected value match a trigger option?
+const matchesTrigger = (parentTypeValue, selectedValue, triggerOptions) => {
+  if (triggerOptions.length === 0) return false;
+
+  if (MULTI_CHOICE_TYPES.includes(parentTypeValue)) {
+    const selectedArr = toArray(selectedValue);
+    if (selectedArr.length === 0) return false;
+    return triggerOptions.some((opt) => selectedArr.includes(opt));
+  }
+
+  if (!selectedValue) return false;
+  return triggerOptions.includes(selectedValue);
+};
+
+// Build a composite React key for a list item
+const buildKey = (prefix, index, value) => `${prefix}-${index}-${value ?? ""}`;
+
 const GenerateTracerIndex = () => {
   const [loading, setLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -72,9 +129,13 @@ const GenerateTracerIndex = () => {
 
   const access_token = useSelector((state) => state.auth.accessToken);
 
+  const clientIdRef = useRef(1);
+  const nextClientId = () => `q-${clientIdRef.current++}`;
+
   useEffect(() => {
     fetchTracerQuestionDropdownType();
     fetchParentTracerTypes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchTracerQuestionDropdownType = async () => {
@@ -102,7 +163,6 @@ const GenerateTracerIndex = () => {
       setSubTracerTypes([]);
       return;
     }
-
     setIsLoadingSubTypes(true);
     try {
       const response = await CommonService.getByParentId(parentId);
@@ -120,6 +180,9 @@ const GenerateTracerIndex = () => {
     await fetchSubTracerTypes(selectedParentId);
   };
 
+  // ==================== QUESTION TYPE INTROSPECTION ====================
+  // Single lookup + factory-generated predicates (fixes duplicated logic)
+
   const getQuestionTypeValue = (typeId) => {
     const questionType = tracerQuestionDropdownType.find(
       (t) => t.id === typeId,
@@ -134,64 +197,109 @@ const GenerateTracerIndex = () => {
     return questionType ? questionType.label : null;
   };
 
-  const requiresOptions = (typeId) => {
-    const questionType = tracerQuestionDropdownType.find(
-      (t) => t.id === typeId,
-    );
-    const value = questionType?.value;
-    return ["radio", "checkbox", "dropdown", "multiSelect"].includes(value);
-  };
+  const isQuestionType = (value) => (typeId) =>
+    getQuestionTypeValue(typeId) === value;
 
-  const isMultipleText = (typeId) => {
-    const questionType = tracerQuestionDropdownType.find(
-      (t) => t.id === typeId,
-    );
-    return questionType?.value === "multipleText";
-  };
+  const isMultipleText = isQuestionType("multipleText");
+  const isRating = isQuestionType("rating");
 
-  const isRating = (typeId) => {
-    const questionType = tracerQuestionDropdownType.find(
-      (t) => t.id === typeId,
-    );
-    return questionType?.value === "rating";
-  };
+  const requiresOptions = (typeId) =>
+    OPTION_BASED_TYPES.includes(getQuestionTypeValue(typeId));
 
-  const isRadioType = (typeId) => {
-    const questionType = tracerQuestionDropdownType.find(
-      (t) => t.id === typeId,
-    );
-    return questionType?.value === "radio";
-  };
+  const isMultiChoiceType = (typeId) =>
+    MULTI_CHOICE_TYPES.includes(getQuestionTypeValue(typeId));
 
-  // Question types that support a "max selections" limit
-  const isMultiChoiceType = (typeId) => {
-    const questionType = tracerQuestionDropdownType.find(
-      (t) => t.id === typeId,
-    );
-    const value = questionType?.value;
-    return ["checkbox", "multiSelect"].includes(value);
-  };
+  const isEligibleConditionSource = (typeId) =>
+    OPTION_BASED_TYPES.includes(getQuestionTypeValue(typeId));
 
-  // Question types eligible to be a "parent" for show/hide conditions
-  const isEligibleConditionSource = (typeId) => {
-    const questionType = tracerQuestionDropdownType.find(
-      (t) => t.id === typeId,
-    );
-    const value = questionType?.value;
-    return ["radio", "checkbox", "dropdown", "multiSelect"].includes(value);
-  };
-
-  // Helper: parse showWhenOption into an array of trigger options
-  const parseShowWhenOptions = (showWhenOption) => {
-    if (!showWhenOption) return [];
-    if (Array.isArray(showWhenOption)) return showWhenOption;
-    return String(showWhenOption)
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s !== "");
-  };
+  // ==================== VALIDATION SCHEMA ====================
 
   const createValidationSchema = () => {
+    const questionShape = (isSub = false) =>
+      Yup.object().shape({
+        clientId: Yup.string().required(),
+        questionText: Yup.string().required(
+          isSub ? "Sub-question text is required" : "Question text is required",
+        ),
+        questionTypeId: isSub
+          ? Yup.string().required("Sub-question type is required")
+          : Yup.string().when("subQuestions", {
+              is: (subQuestions) => subQuestions && subQuestions.length > 0,
+              then: (schema) => schema.notRequired(),
+              otherwise: (schema) =>
+                schema.required("Question type is required"),
+            }),
+        required: Yup.boolean(),
+        showCondition: Yup.string(),
+        dependsOnClientId: Yup.string().when("showCondition", {
+          is: (val) => val && val !== "always",
+          then: (schema) =>
+            schema.required("Please select a question to depend on"),
+          otherwise: (schema) => schema.notRequired(),
+        }),
+        showWhenOption: Yup.string().when("showCondition", {
+          is: (val) => val === "option",
+          then: (schema) =>
+            schema.required("Please select at least one option"),
+          otherwise: (schema) => schema.notRequired(),
+        }),
+        options: Yup.array().when("questionTypeId", {
+          is: (val) => val && requiresOptions(val),
+          then: (schema) =>
+            schema
+              .of(Yup.string().required("Option text is required"))
+              .min(1, "At least one option is required"),
+        }),
+        multipleTextFields: Yup.array().when("questionTypeId", {
+          is: (val) => val && isMultipleText(val),
+          then: (schema) =>
+            schema
+              .of(Yup.string().required("Field label is required"))
+              .min(1, "At least one field is required"),
+        }),
+        ratingScale: Yup.number().when("questionTypeId", {
+          is: (val) => val && isRating(val),
+          then: (schema) => schema.required("Rating scale is required"),
+        }),
+      });
+
+    const subQuestionShape = Yup.object().shape({
+      clientId: Yup.string().required(),
+      questionText: Yup.string().required("Sub-question text is required"),
+      questionTypeId: Yup.string().required("Sub-question type is required"),
+      required: Yup.boolean(),
+      showCondition: Yup.string(),
+      dependsOnClientId: Yup.string().when("showCondition", {
+        is: (val) => val && val !== "always",
+        then: (schema) =>
+          schema.required("Please select a question to depend on"),
+        otherwise: (schema) => schema.notRequired(),
+      }),
+      showWhenOption: Yup.string().when("showCondition", {
+        is: (val) => val === "option",
+        then: (schema) => schema.required("Please select at least one option"),
+        otherwise: (schema) => schema.notRequired(),
+      }),
+      options: Yup.array().when("questionTypeId", {
+        is: (val) => val && requiresOptions(val),
+        then: (schema) =>
+          schema
+            .of(Yup.string().required("Option text is required"))
+            .min(1, "At least one option is required"),
+      }),
+      multipleTextFields: Yup.array().when("questionTypeId", {
+        is: (val) => val && isMultipleText(val),
+        then: (schema) =>
+          schema
+            .of(Yup.string().required("Field label is required"))
+            .min(1, "At least one field is required"),
+      }),
+      ratingScale: Yup.number().when("questionTypeId", {
+        is: (val) => val && isRating(val),
+        then: (schema) => schema.required("Rating scale is required"),
+      }),
+    });
+
     return Yup.object({
       tracerTitle: Yup.string().required("Tracer title is required"),
       parentTracerTypeId: Yup.string().required(
@@ -203,93 +311,14 @@ const GenerateTracerIndex = () => {
         otherwise: (schema) => schema.notRequired(),
       }),
       questions: Yup.array().of(
-        Yup.object().shape({
-          id: Yup.number().required(),
-          questionText: Yup.string().required("Question text is required"),
-          questionTypeId: Yup.string().when("subQuestions", {
-            is: (subQuestions) => subQuestions && subQuestions.length > 0,
-            then: (schema) => schema.notRequired(),
-            otherwise: (schema) => schema.required("Question type is required"),
-          }),
-          required: Yup.boolean(),
-          showCondition: Yup.string(),
-          dependsOnQuestionId: Yup.number().when("showCondition", {
-            is: (val) => val && val !== "always",
-            then: (schema) =>
-              schema.required("Please select a question to depend on"),
-            otherwise: (schema) => schema.notRequired(),
-          }),
-          showWhenOption: Yup.string().when("showCondition", {
-            is: (val) => val === "option",
-            then: (schema) =>
-              schema.required("Please select at least one option"),
-            otherwise: (schema) => schema.notRequired(),
-          }),
-          options: Yup.array().when("questionTypeId", {
-            is: (val) => val && requiresOptions(val),
-            then: (schema) =>
-              schema
-                .of(Yup.string().required("Option text is required"))
-                .min(1, "At least one option is required"),
-          }),
-          multipleTextFields: Yup.array().when("questionTypeId", {
-            is: (val) => val && isMultipleText(val),
-            then: (schema) =>
-              schema
-                .of(Yup.string().required("Field label is required"))
-                .min(1, "At least one field is required"),
-          }),
-          ratingScale: Yup.number().when("questionTypeId", {
-            is: (val) => val && isRating(val),
-            then: (schema) => schema.required("Rating scale is required"),
-          }),
-          subQuestions: Yup.array().of(
-            Yup.object().shape({
-              id: Yup.number().required(),
-              questionText: Yup.string().required(
-                "Sub-question text is required",
-              ),
-              questionTypeId: Yup.string().required(
-                "Sub-question type is required",
-              ),
-              required: Yup.boolean(),
-              showCondition: Yup.string(),
-              dependsOnQuestionId: Yup.number().when("showCondition", {
-                is: (val) => val && val !== "always",
-                then: (schema) =>
-                  schema.required("Please select a question to depend on"),
-                otherwise: (schema) => schema.notRequired(),
-              }),
-              showWhenOption: Yup.string().when("showCondition", {
-                is: (val) => val === "option",
-                then: (schema) =>
-                  schema.required("Please select at least one option"),
-                otherwise: (schema) => schema.notRequired(),
-              }),
-              options: Yup.array().when("questionTypeId", {
-                is: (val) => val && requiresOptions(val),
-                then: (schema) =>
-                  schema
-                    .of(Yup.string().required("Option text is required"))
-                    .min(1, "At least one option is required"),
-              }),
-              multipleTextFields: Yup.array().when("questionTypeId", {
-                is: (val) => val && isMultipleText(val),
-                then: (schema) =>
-                  schema
-                    .of(Yup.string().required("Field label is required"))
-                    .min(1, "At least one field is required"),
-              }),
-              ratingScale: Yup.number().when("questionTypeId", {
-                is: (val) => val && isRating(val),
-                then: (schema) => schema.required("Rating scale is required"),
-              }),
-            }),
-          ),
+        questionShape().shape({
+          subQuestions: Yup.array().of(subQuestionShape),
         }),
       ),
     });
   };
+
+  // ==================== FORMIK ====================
 
   const formik = useFormik({
     initialValues: {
@@ -298,12 +327,12 @@ const GenerateTracerIndex = () => {
       subTracerTypeId: "",
       questions: [
         {
-          id: Date.now(),
+          clientId: nextClientId(),
           questionText: "",
           questionTypeId: "",
           required: false,
           showCondition: "always",
-          dependsOnQuestionId: null,
+          dependsOnClientId: null,
           showWhenOption: "",
           subQuestions: [],
           options: [""],
@@ -317,61 +346,68 @@ const GenerateTracerIndex = () => {
     onSubmit: async (values) => {
       setLoading(true);
       try {
+        const mapSubQuestion = (sub, subIndex) => {
+          const subData = {
+            clientId: sub.clientId,
+            subQuestionOrder: subIndex + 1,
+            questionText: sub.questionText,
+            questionTypeId: sub.questionTypeId
+              ? Number(sub.questionTypeId)
+              : null,
+            required: sub.required ? 1 : 0,
+            showCondition: sub.showCondition || "always",
+            dependsOnClientId: sub.dependsOnClientId || null,
+            showWhenOption: sub.showWhenOption || "",
+            options: sub.options?.filter((opt) => opt.trim() !== "") || [],
+            multipleTextFields:
+              sub.multipleTextFields?.filter((f) => f.trim() !== "") || [],
+          };
+          if (isRating(sub.questionTypeId)) {
+            subData.ratingScale = sub.ratingScale
+              ? Number(sub.ratingScale)
+              : null;
+          }
+          if (isMultiChoiceType(sub.questionTypeId)) {
+            subData.maxSelections = sub.maxSelections
+              ? Number(sub.maxSelections)
+              : 0;
+          }
+          return subData;
+        };
+
+        const mapQuestion = (q, index) => {
+          const questionData = {
+            clientId: q.clientId,
+            questionOrder: index + 1,
+            questionText: q.questionText,
+            questionTypeId: q.questionTypeId ? Number(q.questionTypeId) : null,
+            required: q.required ? 1 : 0,
+            showCondition: q.showCondition || "always",
+            dependsOnClientId: q.dependsOnClientId || null,
+            showWhenOption: q.showWhenOption || "",
+            options: q.options?.filter((opt) => opt.trim() !== "") || [],
+            multipleTextFields:
+              q.multipleTextFields?.filter((f) => f.trim() !== "") || [],
+          };
+          if (isRating(q.questionTypeId)) {
+            questionData.ratingScale = q.ratingScale
+              ? Number(q.ratingScale)
+              : null;
+          }
+          if (isMultiChoiceType(q.questionTypeId)) {
+            questionData.maxSelections = q.maxSelections
+              ? Number(q.maxSelections)
+              : 0;
+          }
+          questionData.subQuestions = q.subQuestions?.map(mapSubQuestion) || [];
+          return questionData;
+        };
+
         const submissionData = {
           tracerTitle: values.tracerTitle,
           parentTracerTypeId: values.parentTracerTypeId,
           subTracerTypeId: values.subTracerTypeId,
-          questions: values.questions.map((q, index) => {
-            const questionData = {
-              questionOrder: index + 1,
-              questionText: q.questionText,
-              questionTypeId: q.questionTypeId,
-              required: q.required ? 1 : 0,
-              showCondition: q.showCondition || "always",
-              dependsOnQuestionId: q.dependsOnQuestionId || null,
-              showWhenOption: q.showWhenOption || "",
-              options: q.options?.filter((opt) => opt.trim() !== "") || [],
-              multipleTextFields:
-                q.multipleTextFields?.filter((field) => field.trim() !== "") ||
-                [],
-            };
-
-            if (isRating(q.questionTypeId)) {
-              questionData.ratingScale = q.ratingScale;
-            }
-
-            if (isMultiChoiceType(q.questionTypeId)) {
-              questionData.maxSelections = q.maxSelections || 0;
-            }
-
-            questionData.subQuestions =
-              q.subQuestions?.map((sub, subIndex) => {
-                const subData = {
-                  subQuestionOrder: subIndex + 1,
-                  questionText: sub.questionText,
-                  questionTypeId: sub.questionTypeId,
-                  required: sub.required ? 1 : 0,
-                  showCondition: sub.showCondition || "always",
-                  dependsOnQuestionId: sub.dependsOnQuestionId || null,
-                  showWhenOption: sub.showWhenOption || "",
-                  options:
-                    sub.options?.filter((opt) => opt.trim() !== "") || [],
-                  multipleTextFields:
-                    sub.multipleTextFields?.filter(
-                      (field) => field.trim() !== "",
-                    ) || [],
-                  ratingScale: isRating(sub.questionTypeId)
-                    ? sub.ratingScale
-                    : undefined,
-                };
-                if (isMultiChoiceType(sub.questionTypeId)) {
-                  subData.maxSelections = sub.maxSelections || 0;
-                }
-                return subData;
-              }) || [];
-
-            return questionData;
-          }),
+          questions: values.questions.map(mapQuestion),
         };
 
         console.log("payload : ", submissionData);
@@ -404,120 +440,106 @@ const GenerateTracerIndex = () => {
     if (tracerQuestionDropdownType.length > 0) {
       formik.validationSchema = createValidationSchema();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracerQuestionDropdownType]);
 
-  /**
-   * Returns all previous questions that can act as a source for show/hide
-   * conditions: Single Choice (Radio), Multiple Choice (Checkbox),
-   * Single Select Dropdown, and Multi-Select Dropdown — but only when they
-   * have at least one option.
-   */
-  const getPreviousEligibleQuestions = (currentQuestionId) => {
-    const currentIndex = formik.values.questions.findIndex((q) => {
-      const qId = typeof q.id === "string" ? parseInt(q.id) : q.id;
-      const currId =
-        typeof currentQuestionId === "string"
-          ? parseInt(currentQuestionId)
-          : currentQuestionId;
-      return qId === currId;
+  // ==================== LABELING ====================
+
+  const buildFlatWithLabels = () => {
+    const allFlat = [];
+    formik.values.questions.forEach((q, qi) => {
+      allFlat.push({
+        clientId: q.clientId,
+        label: `Q${qi + 1}`,
+        questionText: q.questionText,
+        data: q,
+      });
+      (q.subQuestions || []).forEach((sub, si) => {
+        allFlat.push({
+          clientId: sub.clientId,
+          label: `Q${qi + 1}.${si + 1}`,
+          questionText: sub.questionText,
+          data: sub,
+        });
+      });
     });
+    return allFlat;
+  };
 
-    return formik.values.questions.filter((q, index) => {
-      const qId = typeof q.id === "string" ? parseInt(q.id) : q.id;
-      const currId =
-        typeof currentQuestionId === "string"
-          ? parseInt(currentQuestionId)
-          : currentQuestionId;
+  const getLabelForClientId = (clientId) =>
+    buildFlatWithLabels().find((x) => x.clientId === clientId)?.label || "Q?";
 
-      if (qId === currId) return false;
+  const getQuestionTextForClientId = (clientId) =>
+    buildFlatWithLabels().find((x) => x.clientId === clientId)?.questionText ||
+    "Unknown";
+
+  // ==================== CONDITION LOGIC ====================
+
+  const isEligibleSource = (q) =>
+    isEligibleConditionSource(q.questionTypeId) &&
+    q.options &&
+    q.options.some((opt) => opt && opt.trim() !== "");
+
+  const getPreviousEligibleQuestions = (currentClientId) => {
+    const flat = flattenQuestions(formik.values.questions);
+    const currentIndex = flat.findIndex((q) => q.clientId === currentClientId);
+    if (currentIndex === -1) return [];
+
+    const current = flat[currentIndex];
+
+    return flat.filter((q, index) => {
+      if (q.clientId === currentClientId) return false;
       if (index >= currentIndex) return false;
-
-      const eligible = isEligibleConditionSource(q.questionTypeId);
-      return (
-        eligible &&
-        q.options &&
-        q.options.some((opt) => opt && opt.trim() !== "")
-      );
+      if (
+        current.__parentClientId &&
+        q.__parentClientId === current.__parentClientId
+      ) {
+        return false;
+      }
+      return isEligibleSource(q);
     });
   };
 
-  /**
-   * Determines whether a conditional question should be visible based on
-   * the current state of its parent question.
-   *
-   * Rules:
-   *  - "always" → visible.
-   *  - "option" → visible ONLY when the parent has a value that matches at
-   *    least one of the configured trigger options. Until the user makes a
-   *    selection on the parent, the child stays hidden.
-   */
-  const isQuestionVisible = (question, allQuestions, selectedValues) => {
-    if (question.showCondition === "always") {
+  const isQuestionVisible = (question, allFlat, selectedValues) => {
+    if (question.showCondition === "always") return true;
+    if (question.showCondition !== "option" || !question.dependsOnClientId) {
       return true;
     }
 
-    if (question.showCondition === "option" && question.dependsOnQuestionId) {
-      const dependsOnQuestion = allQuestions.find((q) => {
-        const qId = typeof q.id === "string" ? parseInt(q.id) : q.id;
-        const dId =
-          typeof question.dependsOnQuestionId === "string"
-            ? parseInt(question.dependsOnQuestionId)
-            : question.dependsOnQuestionId;
-        return qId === dId;
-      });
+    const dependsOnQuestion = allFlat.find(
+      (q) => q.clientId === question.dependsOnClientId,
+    );
+    if (!dependsOnQuestion) return false;
 
-      // Broken dependency — hide the child
-      if (!dependsOnQuestion) return false;
+    const parentTypeValue = getQuestionTypeValue(
+      dependsOnQuestion.questionTypeId,
+    );
+    const selectedValue = selectedValues[dependsOnQuestion.clientId];
+    const triggerOptions = parseShowWhenOptions(question.showWhenOption);
 
-      const parentTypeValue = getQuestionTypeValue(
-        dependsOnQuestion.questionTypeId,
-      );
-      const selectedValue = selectedValues[dependsOnQuestion.id];
-      const triggerOptions = parseShowWhenOptions(question.showWhenOption);
-
-      // No trigger options configured yet — hide the child
-      if (triggerOptions.length === 0) return false;
-
-      // Checkbox / MultiSelect parents hold an array of selected values
-      if (parentTypeValue === "checkbox" || parentTypeValue === "multiSelect") {
-        const selectedArr = Array.isArray(selectedValue)
-          ? selectedValue
-          : selectedValue
-            ? [selectedValue]
-            : [];
-        // No selection on parent yet — hide the child
-        if (selectedArr.length === 0) return false;
-        // Show if ANY configured trigger option is currently selected
-        return triggerOptions.some((opt) => selectedArr.includes(opt));
-      }
-
-      // Radio / Dropdown parents hold a single selected value
-      // No selection on parent yet — hide the child
-      if (!selectedValue) return false;
-      return triggerOptions.includes(selectedValue);
-    }
-
-    return true;
+    return matchesTrigger(parentTypeValue, selectedValue, triggerOptions);
   };
 
   useEffect(() => {
-    const updateVisibility = () => {
-      const visibility = {};
-      const allQuestions = formik.values.questions;
+    const allFlat = [];
+    formik.values.questions.forEach((q) => {
+      allFlat.push(q);
+      (q.subQuestions || []).forEach((sub) => allFlat.push(sub));
+    });
 
-      allQuestions.forEach((question) => {
-        const visible = isQuestionVisible(question, allQuestions, {
-          ...dropdownValues,
-          ...multiSelectValues,
-          ...textInputValues,
-        });
-        visibility[question.id] = visible;
-      });
-
-      setVisibleQuestions(visibility);
+    const selectedValues = {
+      ...dropdownValues,
+      ...multiSelectValues,
+      ...textInputValues,
     };
 
-    updateVisibility();
+    const visibility = {};
+    allFlat.forEach((q) => {
+      visibility[q.clientId] = isQuestionVisible(q, allFlat, selectedValues);
+    });
+
+    setVisibleQuestions(visibility);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     formik.values.questions,
     dropdownValues,
@@ -526,31 +548,34 @@ const GenerateTracerIndex = () => {
     forceUpdate,
   ]);
 
+  // ==================== QUESTION MUTATIONS ====================
+
+  const makeNewQuestion = () => ({
+    clientId: nextClientId(),
+    questionText: "",
+    questionTypeId: "",
+    required: false,
+    showCondition: "always",
+    dependsOnClientId: null,
+    showWhenOption: "",
+    subQuestions: [],
+    options: [""],
+    multipleTextFields: [""],
+    ratingScale: 5,
+    maxSelections: 0,
+  });
+
   const addQuestion = () => {
-    const newQuestion = {
-      id: Date.now(),
-      questionText: "",
-      questionTypeId: "",
-      required: false,
-      showCondition: "always",
-      dependsOnQuestionId: null,
-      showWhenOption: "",
-      subQuestions: [],
-      options: [""],
-      multipleTextFields: [""],
-      ratingScale: 5,
-      maxSelections: 0,
-    };
     formik.setFieldValue("questions", [
       ...formik.values.questions,
-      newQuestion,
+      makeNewQuestion(),
     ]);
     setActiveTab(formik.values.questions.length);
   };
 
-  const deleteQuestion = (questionId) => {
+  const deleteQuestion = (clientId) => {
     const newQuestions = formik.values.questions.filter(
-      (q) => q.id !== questionId,
+      (q) => q.clientId !== clientId,
     );
     formik.setFieldValue("questions", newQuestions);
     if (activeTab >= newQuestions.length) {
@@ -558,33 +583,28 @@ const GenerateTracerIndex = () => {
     }
   };
 
-  const updateQuestion = (questionId, field, value) => {
+  const updateQuestion = (clientId, field, value) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (q.id === questionId) {
-        if (field === "dependsOnQuestionId") {
-          return {
-            ...q,
-            [field]: value,
-            showWhenOption: "",
-          };
-        }
-        return { ...q, [field]: value };
+      if (q.clientId !== clientId) return q;
+      if (field === "dependsOnClientId") {
+        return { ...q, [field]: value, showWhenOption: "" };
       }
-      return q;
+      return { ...q, [field]: value };
     });
     formik.setFieldValue("questions", updatedQuestions);
     setForceUpdate((prev) => !prev);
   };
 
-  const addOption = (questionId, isSubQuestion = false, subId = null) => {
+  const addOption = (clientId, isSubQuestion = false, subId = null) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (!isSubQuestion && q.id === questionId) {
+      if (!isSubQuestion && q.clientId === clientId) {
         return { ...q, options: [...(q.options || [""]), ""] };
-      } else if (isSubQuestion && q.id === questionId) {
+      }
+      if (isSubQuestion && q.clientId === clientId) {
         return {
           ...q,
           subQuestions: q.subQuestions.map((sub) =>
-            sub.id === subId
+            sub.clientId === subId
               ? { ...sub, options: [...(sub.options || [""]), ""] }
               : sub,
           ),
@@ -596,27 +616,26 @@ const GenerateTracerIndex = () => {
   };
 
   const updateOption = (
-    questionId,
+    clientId,
     index,
     value,
     isSubQuestion = false,
     subId = null,
   ) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (!isSubQuestion && q.id === questionId) {
+      if (!isSubQuestion && q.clientId === clientId) {
         const newOptions = [...(q.options || [""])];
         newOptions[index] = value;
         return { ...q, options: newOptions };
-      } else if (isSubQuestion && q.id === questionId) {
+      }
+      if (isSubQuestion && q.clientId === clientId) {
         return {
           ...q,
           subQuestions: q.subQuestions.map((sub) => {
-            if (sub.id === subId) {
-              const newOptions = [...(sub.options || [""])];
-              newOptions[index] = value;
-              return { ...sub, options: newOptions };
-            }
-            return sub;
+            if (sub.clientId !== subId) return sub;
+            const newOptions = [...(sub.options || [""])];
+            newOptions[index] = value;
+            return { ...sub, options: newOptions };
           }),
         };
       }
@@ -626,26 +645,28 @@ const GenerateTracerIndex = () => {
   };
 
   const deleteOption = (
-    questionId,
+    clientId,
     index,
     isSubQuestion = false,
     subId = null,
   ) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (!isSubQuestion && q.id === questionId) {
+      if (!isSubQuestion && q.clientId === clientId) {
         const newOptions = (q.options || [""]).filter((_, i) => i !== index);
         return { ...q, options: newOptions.length ? newOptions : [""] };
-      } else if (isSubQuestion && q.id === questionId) {
+      }
+      if (isSubQuestion && q.clientId === clientId) {
         return {
           ...q,
           subQuestions: q.subQuestions.map((sub) => {
-            if (sub.id === subId) {
-              const newOptions = (sub.options || [""]).filter(
-                (_, i) => i !== index,
-              );
-              return { ...sub, options: newOptions.length ? newOptions : [""] };
-            }
-            return sub;
+            if (sub.clientId !== subId) return sub;
+            const newOptions = (sub.options || [""]).filter(
+              (_, i) => i !== index,
+            );
+            return {
+              ...sub,
+              options: newOptions.length ? newOptions : [""],
+            };
           }),
         };
       }
@@ -654,95 +675,69 @@ const GenerateTracerIndex = () => {
     formik.setFieldValue("questions", updatedQuestions);
   };
 
-  const addSubQuestion = (parentId) => {
+  const addSubQuestion = (parentClientId) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (q.id === parentId) {
-        return {
-          ...q,
-          subQuestions: [
-            ...q.subQuestions,
-            {
-              id: Date.now(),
-              questionText: "",
-              questionTypeId: "",
-              required: false,
-              showCondition: "always",
-              dependsOnQuestionId: null,
-              showWhenOption: "",
-              options: [""],
-              multipleTextFields: [""],
-              ratingScale: 5,
-              maxSelections: 0,
-            },
-          ],
-        };
-      }
-      return q;
+      if (q.clientId !== parentClientId) return q;
+      return {
+        ...q,
+        subQuestions: [...q.subQuestions, makeNewQuestion()],
+      };
     });
     formik.setFieldValue("questions", updatedQuestions);
   };
 
-  const updateSubQuestion = (parentId, subId, field, value) => {
+  const updateSubQuestion = (parentClientId, subClientId, field, value) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (q.id === parentId) {
-        return {
-          ...q,
-          subQuestions: q.subQuestions.map((sub) => {
-            if (sub.id === subId) {
-              if (field === "dependsOnQuestionId") {
-                return {
-                  ...sub,
-                  [field]: value,
-                  showWhenOption: "",
-                };
-              }
-              return { ...sub, [field]: value };
-            }
-            return sub;
-          }),
-        };
-      }
-      return q;
+      if (q.clientId !== parentClientId) return q;
+      return {
+        ...q,
+        subQuestions: q.subQuestions.map((sub) => {
+          if (sub.clientId !== subClientId) return sub;
+          if (field === "dependsOnClientId") {
+            return { ...sub, [field]: value, showWhenOption: "" };
+          }
+          return { ...sub, [field]: value };
+        }),
+      };
     });
     formik.setFieldValue("questions", updatedQuestions);
     setForceUpdate((prev) => !prev);
   };
 
-  const deleteSubQuestion = (parentId, subId) => {
+  const deleteSubQuestion = (parentClientId, subClientId) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (q.id === parentId) {
-        return {
-          ...q,
-          subQuestions: q.subQuestions.filter((sub) => sub.id !== subId),
-        };
-      }
-      return q;
+      if (q.clientId !== parentClientId) return q;
+      return {
+        ...q,
+        subQuestions: q.subQuestions.filter(
+          (sub) => sub.clientId !== subClientId,
+        ),
+      };
     });
     formik.setFieldValue("questions", updatedQuestions);
   };
 
   const addMultipleTextField = (
-    questionId,
+    clientId,
     isSubQuestion = false,
     subId = null,
   ) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (!isSubQuestion && q.id === questionId) {
+      if (!isSubQuestion && q.clientId === clientId) {
         return {
           ...q,
           multipleTextFields: [...(q.multipleTextFields || [""]), ""],
         };
-      } else if (isSubQuestion && q.id === questionId) {
+      }
+      if (isSubQuestion && q.clientId === clientId) {
         return {
           ...q,
           subQuestions: q.subQuestions.map((sub) => {
-            if (sub.id === subId) {
-              return {
-                ...sub,
-                multipleTextFields: [...(sub.multipleTextFields || [""]), ""],
-              };
-            }
-            return sub;
+            if (sub.clientId !== subId) return sub;
+            return {
+              ...sub,
+              multipleTextFields: [...(sub.multipleTextFields || [""]), ""],
+            };
           }),
         };
       }
@@ -752,27 +747,26 @@ const GenerateTracerIndex = () => {
   };
 
   const updateMultipleTextField = (
-    questionId,
+    clientId,
     index,
     value,
     isSubQuestion = false,
     subId = null,
   ) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (!isSubQuestion && q.id === questionId) {
+      if (!isSubQuestion && q.clientId === clientId) {
         const newFields = [...(q.multipleTextFields || [""])];
         newFields[index] = value;
         return { ...q, multipleTextFields: newFields };
-      } else if (isSubQuestion && q.id === questionId) {
+      }
+      if (isSubQuestion && q.clientId === clientId) {
         return {
           ...q,
           subQuestions: q.subQuestions.map((sub) => {
-            if (sub.id === subId) {
-              const newFields = [...(sub.multipleTextFields || [""])];
-              newFields[index] = value;
-              return { ...sub, multipleTextFields: newFields };
-            }
-            return sub;
+            if (sub.clientId !== subId) return sub;
+            const newFields = [...(sub.multipleTextFields || [""])];
+            newFields[index] = value;
+            return { ...sub, multipleTextFields: newFields };
           }),
         };
       }
@@ -782,13 +776,13 @@ const GenerateTracerIndex = () => {
   };
 
   const deleteMultipleTextField = (
-    questionId,
+    clientId,
     index,
     isSubQuestion = false,
     subId = null,
   ) => {
     const updatedQuestions = formik.values.questions.map((q) => {
-      if (!isSubQuestion && q.id === questionId) {
+      if (!isSubQuestion && q.clientId === clientId) {
         const newFields = (q.multipleTextFields || [""]).filter(
           (_, i) => i !== index,
         );
@@ -796,20 +790,19 @@ const GenerateTracerIndex = () => {
           ...q,
           multipleTextFields: newFields.length ? newFields : [""],
         };
-      } else if (isSubQuestion && q.id === questionId) {
+      }
+      if (isSubQuestion && q.clientId === clientId) {
         return {
           ...q,
           subQuestions: q.subQuestions.map((sub) => {
-            if (sub.id === subId) {
-              const newFields = (sub.multipleTextFields || [""]).filter(
-                (_, i) => i !== index,
-              );
-              return {
-                ...sub,
-                multipleTextFields: newFields.length ? newFields : [""],
-              };
-            }
-            return sub;
+            if (sub.clientId !== subId) return sub;
+            const newFields = (sub.multipleTextFields || [""]).filter(
+              (_, i) => i !== index,
+            );
+            return {
+              ...sub,
+              multipleTextFields: newFields.length ? newFields : [""],
+            };
           }),
         };
       }
@@ -818,12 +811,14 @@ const GenerateTracerIndex = () => {
     formik.setFieldValue("questions", updatedQuestions);
   };
 
+  // ==================== DRAG/DROP ====================
+
   const handleDragStart = (e, index) => {
     setDraggedItem(index);
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragOver = (e, index) => {
+  const handleDragOver = (e) => {
     e.preventDefault();
   };
 
@@ -838,6 +833,7 @@ const GenerateTracerIndex = () => {
 
     formik.setFieldValue("questions", newQuestions);
     setDraggedItem(null);
+
     if (activeTab === draggedItem) {
       setActiveTab(dropIndex);
     } else if (activeTab > draggedItem && activeTab <= dropIndex) {
@@ -859,8 +855,11 @@ const GenerateTracerIndex = () => {
     setSubTracerTypes([]);
     setVisibleQuestions({});
     setForceUpdate(false);
+    clientIdRef.current = 1;
     toast.info("Form has been reset");
   };
+
+  // ==================== ERROR COUNTING ====================
 
   const getQuestionErrorCount = (question, index) => {
     let count = 0;
@@ -872,72 +871,74 @@ const GenerateTracerIndex = () => {
       touched?.questionTypeId &&
       errors?.questionTypeId &&
       !(question.subQuestions?.length > 0)
-    )
+    ) {
       count++;
+    }
     if (errors?.options && question.options?.some((opt) => !opt)) count++;
     if (
       errors?.multipleTextFields &&
       question.multipleTextFields?.some((field) => !field)
-    )
+    ) {
       count++;
-    if (question.showCondition !== "always") {
-      if (!question.dependsOnQuestionId) count++;
-      if (question.showCondition === "option" && !question.showWhenOption)
-        count++;
     }
-
+    if (question.showCondition !== "always") {
+      if (!question.dependsOnClientId) count++;
+      if (question.showCondition === "option" && !question.showWhenOption) {
+        count++;
+      }
+    }
     return count;
   };
 
-  const renderRatingStars = (scale, value, onChange, disabled = false) => {
-    return (
-      <Box
-        sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
-      >
-        <Rating
-          name="rating"
-          value={value || 0}
-          precision={1}
-          max={scale}
-          onChange={(event, newValue) => {
-            if (onChange) onChange(newValue);
-          }}
-          icon={<StarIcon fontSize="inherit" />}
-          emptyIcon={<StarIcon fontSize="inherit" />}
-          disabled={disabled}
-          sx={{
-            "& .MuiRating-iconFilled": { color: "#1976d2" },
-            "& .MuiRating-iconHover": { color: "#1976d2" },
-          }}
-        />
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          {[...Array(scale)].map((_, i) => (
-            <Button
-              key={i}
-              variant={value === i + 1 ? "contained" : "outlined"}
-              size="small"
-              onClick={() => onChange && onChange(i + 1)}
-              disabled={disabled}
-              sx={{
-                minWidth: 32,
-                height: 32,
-                p: 0,
-                backgroundColor: value === i + 1 ? "#1976d2" : "transparent",
+  // ==================== RENDERERS ====================
+
+  const renderRatingStars = (scale, value, onChange, disabled = false) => (
+    <Box
+      sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
+    >
+      <Rating
+        name="rating"
+        value={value || 0}
+        precision={1}
+        max={scale}
+        onChange={(event, newValue) => {
+          if (onChange) onChange(newValue);
+        }}
+        icon={<StarIcon fontSize="inherit" />}
+        emptyIcon={<StarIcon fontSize="inherit" />}
+        disabled={disabled}
+        sx={{
+          "& .MuiRating-iconFilled": { color: "#1976d2" },
+          "& .MuiRating-iconHover": { color: "#1976d2" },
+        }}
+      />
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        {[...Array(scale)].map((_, i) => (
+          <Button
+            key={i}
+            variant={value === i + 1 ? "contained" : "outlined"}
+            size="small"
+            onClick={() => onChange && onChange(i + 1)}
+            disabled={disabled}
+            sx={{
+              minWidth: 32,
+              height: 32,
+              p: 0,
+              backgroundColor: value === i + 1 ? "#1976d2" : "transparent",
+              borderColor: "#1976d2",
+              color: value === i + 1 ? "white" : "#1976d2",
+              "&:hover": {
+                backgroundColor: value === i + 1 ? "#1976d2" : "#e3f2fd",
                 borderColor: "#1976d2",
-                color: value === i + 1 ? "white" : "#1976d2",
-                "&:hover": {
-                  backgroundColor: value === i + 1 ? "#1976d2" : "#e3f2fd",
-                  borderColor: "#1976d2",
-                },
-              }}
-            >
-              {i + 1}
-            </Button>
-          ))}
-        </Box>
+              },
+            }}
+          >
+            {i + 1}
+          </Button>
+        ))}
       </Box>
-    );
-  };
+    </Box>
+  );
 
   const renderUnderlinedDropdown = (options, questionId, disabled = false) => {
     const value = dropdownValues[questionId] || "";
@@ -970,7 +971,10 @@ const GenerateTracerIndex = () => {
           {options
             .filter((opt) => opt.trim() !== "")
             .map((option, idx) => (
-              <MenuItem key={idx} value={option}>
+              <MenuItem
+                key={buildKey(`dd-${questionId}`, idx, option)}
+                value={option}
+              >
                 {option}
               </MenuItem>
             ))}
@@ -995,10 +999,7 @@ const GenerateTracerIndex = () => {
       if (maxSelections > 0 && value.length > maxSelections) {
         value = value.slice(0, maxSelections);
       }
-      setMultiSelectValues((prev) => ({
-        ...prev,
-        [questionId]: value,
-      }));
+      setMultiSelectValues((prev) => ({ ...prev, [questionId]: value }));
     };
 
     return (
@@ -1009,13 +1010,7 @@ const GenerateTracerIndex = () => {
           value={selectedValues}
           onChange={handleChange}
           input={<OutlinedInput label="Select Options" />}
-          renderValue={(selected) => (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-              {selected.map((value) => (
-                <Chip key={value} label={value} size="small" />
-              ))}
-            </Box>
-          )}
+          renderValue={renderChips}
         >
           {options
             .filter((opt) => opt.trim() !== "")
@@ -1023,7 +1018,11 @@ const GenerateTracerIndex = () => {
               const isSelected = selectedValues.indexOf(option) > -1;
               const optionDisabled = limitReached && !isSelected;
               return (
-                <MenuItem key={idx} value={option} disabled={optionDisabled}>
+                <MenuItem
+                  key={buildKey(`ms-${questionId}`, idx, option)}
+                  value={option}
+                  disabled={optionDisabled}
+                >
                   <Checkbox checked={isSelected} />
                   <ListItemText primary={option} />
                 </MenuItem>
@@ -1053,6 +1052,7 @@ const GenerateTracerIndex = () => {
     const value = isTextArea
       ? textAreaValues[questionId] || ""
       : textInputValues[questionId] || "";
+
     const handleChange = (e) => {
       if (isTextArea) {
         setTextAreaValues((prev) => ({
@@ -1108,14 +1108,10 @@ const GenerateTracerIndex = () => {
   };
 
   const renderMultipleTextInputs = (fields, questionId, disabled = false) => {
-    if (!multipleTextValues[questionId]) {
-      multipleTextValues[questionId] = {};
-    }
-
     const handleFieldChange = (fieldIndex, value) => {
       setMultipleTextValues((prev) => ({
         ...prev,
-        [questionId]: { ...prev[questionId], [fieldIndex]: value },
+        [questionId]: { ...(prev[questionId] || {}), [fieldIndex]: value },
       }));
     };
 
@@ -1124,7 +1120,7 @@ const GenerateTracerIndex = () => {
         {fields
           .filter((field) => field.trim() !== "")
           .map((field, idx) => (
-            <Box key={idx}>
+            <Box key={buildKey(`mt-${questionId}`, idx, field)}>
               <Typography variant="caption" color="text.secondary" gutterBottom>
                 {field}
               </Typography>
@@ -1147,281 +1143,325 @@ const GenerateTracerIndex = () => {
     );
   };
 
+  // Extracted helper — removes nested ternary in renderValue
+  const renderChips = (selected) => (
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+      {selected.map((value) => (
+        <Chip key={value} label={value} size="small" />
+      ))}
+    </Box>
+  );
+
+  // Extracted helper to compute visibility safely
+  const isVisible = (clientId) =>
+    visibleQuestions[clientId] !== undefined
+      ? visibleQuestions[clientId]
+      : true;
+
+  // ==================== SHOW CONDITION HANDLERS ====================
+
+  // Central dispatcher: routes updates to the right question (top vs sub)
+  const updateQuestionFieldByScope = (
+    isSubQuestion,
+    { question, parentClientId, subClientId },
+    field,
+    value,
+  ) => {
+    if (isSubQuestion) {
+      updateSubQuestion(parentClientId, subClientId, field, value);
+    } else {
+      updateQuestion(question.clientId, field, value);
+    }
+  };
+
+  const applyShowConditionChange = (isSubQuestion, ctx, value) => {
+    updateQuestionFieldByScope(isSubQuestion, ctx, "showCondition", value);
+    if (value === "always") {
+      updateQuestionFieldByScope(isSubQuestion, ctx, "dependsOnClientId", null);
+      updateQuestionFieldByScope(isSubQuestion, ctx, "showWhenOption", "");
+    }
+    setForceUpdate((prev) => !prev);
+  };
+
+  const applyDependsOnChange = (isSubQuestion, ctx, value) => {
+    updateQuestionFieldByScope(isSubQuestion, ctx, "dependsOnClientId", value);
+    updateQuestionFieldByScope(isSubQuestion, ctx, "showWhenOption", "");
+    setForceUpdate((prev) => !prev);
+  };
+
+  const applyShowWhenOptionChange = (isSubQuestion, ctx, rawValue) => {
+    const value = Array.isArray(rawValue) ? rawValue.join(",") : rawValue;
+    updateQuestionFieldByScope(isSubQuestion, ctx, "showWhenOption", value);
+  };
+
+  // ==================== RENDER: OPTIONS EDITOR ====================
+
   const renderOptions = (
     question,
     isSubQuestion = false,
-    parentId = null,
-    subId = null,
+    parentClientId = null,
+    subClientId = null,
   ) => {
     const questionTypeValue = getQuestionTypeValue(question.questionTypeId);
-    const showMaxSelections =
-      questionTypeValue === "checkbox" || questionTypeValue === "multiSelect";
+    const showMaxSelections = MULTI_CHOICE_TYPES.includes(questionTypeValue);
+    const scopeClientId = isSubQuestion ? parentClientId : question.clientId;
 
-    switch (questionTypeValue) {
-      case "radio":
-      case "checkbox":
-      case "dropdown":
-      case "multiSelect":
-        return (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Options:
-            </Typography>
-            {(question.options || [""]).map((option, index) => (
-              <Box
-                key={index}
-                sx={{ display: "flex", alignItems: "center", mb: 1, gap: 1 }}
-              >
-                <TextField
-                  size="small"
-                  placeholder={`Option ${index + 1}`}
-                  value={option}
-                  onChange={(e) =>
-                    updateOption(
-                      isSubQuestion ? parentId : question.id,
-                      index,
-                      e.target.value,
-                      isSubQuestion,
-                      subId,
-                    )
-                  }
-                  fullWidth
-                  error={!option && formik.submitCount > 0}
-                  helperText={
-                    !option && formik.submitCount > 0
-                      ? "Option is required"
-                      : ""
-                  }
-                />
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() =>
-                    deleteOption(
-                      isSubQuestion ? parentId : question.id,
-                      index,
-                      isSubQuestion,
-                      subId,
-                    )
-                  }
-                  disabled={(question.options || [""]).length === 1}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            ))}
-            <Button
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={() =>
-                addOption(
-                  isSubQuestion ? parentId : question.id,
-                  isSubQuestion,
-                  subId,
-                )
-              }
-              sx={{ mt: 1 }}
+    if (OPTION_BASED_TYPES.includes(questionTypeValue)) {
+      return (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Options:
+          </Typography>
+          {(question.options || [""]).map((option, index) => (
+            <Box
+              key={buildKey(
+                `opt-${scopeClientId}-${subClientId || "root"}`,
+                index,
+                option,
+              )}
+              sx={{ display: "flex", alignItems: "center", mb: 1, gap: 1 }}
             >
-              Add Option
-            </Button>
-
-            {showMaxSelections && (
-              <Box
-                sx={{
-                  mt: 2,
-                  p: 2,
-                  borderRadius: 1,
-                  border: "1px dashed",
-                  borderColor: "divider",
-                }}
-              >
-                <Typography variant="subtitle2" gutterBottom>
-                  Selection Limit
-                </Typography>
-                <FormControl size="small" sx={{ minWidth: 240 }}>
-                  <InputLabel>Max selections allowed</InputLabel>
-                  <Select
-                    value={question.maxSelections || 0}
-                    label="Max selections allowed"
-                    onChange={(e) =>
-                      isSubQuestion
-                        ? updateSubQuestion(
-                            parentId,
-                            subId,
-                            "maxSelections",
-                            e.target.value,
-                          )
-                        : updateQuestion(
-                            question.id,
-                            "maxSelections",
-                            e.target.value,
-                          )
-                    }
-                  >
-                    <MenuItem value={0}>No limit</MenuItem>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                      <MenuItem key={n} value={n}>
-                        {n}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 1, display: "block" }}
-                >
-                  {question.maxSelections > 0
-                    ? `Users can select up to ${question.maxSelections} option(s).`
-                    : "Users can select any number of options."}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        );
-
-      case "multipleText":
-        return (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Text Fields:
-            </Typography>
-            {(question.multipleTextFields || [""]).map((field, index) => (
-              <Box key={index} sx={{ display: "flex", gap: 1, mb: 1 }}>
-                <TextField
-                  size="small"
-                  placeholder={`Field ${index + 1} label`}
-                  value={field}
-                  onChange={(e) =>
-                    updateMultipleTextField(
-                      isSubQuestion ? parentId : question.id,
-                      index,
-                      e.target.value,
-                      isSubQuestion,
-                      subId,
-                    )
-                  }
-                  fullWidth
-                  error={!field && formik.submitCount > 0}
-                  helperText={
-                    !field && formik.submitCount > 0
-                      ? "Field label is required"
-                      : ""
-                  }
-                />
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() =>
-                    deleteMultipleTextField(
-                      isSubQuestion ? parentId : question.id,
-                      index,
-                      isSubQuestion,
-                      subId,
-                    )
-                  }
-                  disabled={(question.multipleTextFields || [""]).length === 1}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            ))}
-            <Button
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={() =>
-                addMultipleTextField(
-                  isSubQuestion ? parentId : question.id,
-                  isSubQuestion,
-                  subId,
-                )
-              }
-              sx={{ mt: 1 }}
-            >
-              Add Field
-            </Button>
-          </Box>
-        );
-
-      case "rating":
-        return (
-          <Box sx={{ mt: 2 }}>
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>Number of Stars</InputLabel>
-              <Select
-                value={question.ratingScale || 5}
-                label="Number of Stars"
+              <TextField
+                size="small"
+                placeholder={`Option ${index + 1}`}
+                value={option}
                 onChange={(e) =>
-                  isSubQuestion
-                    ? updateSubQuestion(
-                        parentId,
-                        subId,
-                        "ratingScale",
-                        e.target.value,
-                      )
-                    : updateQuestion(question.id, "ratingScale", e.target.value)
+                  updateOption(
+                    scopeClientId,
+                    index,
+                    e.target.value,
+                    isSubQuestion,
+                    subClientId,
+                  )
                 }
+                fullWidth
+                error={!option && formik.submitCount > 0}
+                helperText={
+                  !option && formik.submitCount > 0 ? "Option is required" : ""
+                }
+              />
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() =>
+                  deleteOption(scopeClientId, index, isSubQuestion, subClientId)
+                }
+                disabled={(question.options || [""]).length === 1}
               >
-                <MenuItem value={3}>3 Stars</MenuItem>
-                <MenuItem value={5}>5 Stars</MenuItem>
-                <MenuItem value={7}>7 Stars</MenuItem>
-                <MenuItem value={10}>10 Stars</MenuItem>
-              </Select>
-            </FormControl>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="caption" color="text.secondary">
-                Preview:
+                <DeleteIcon />
+              </IconButton>
+            </Box>
+          ))}
+          <Button
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => addOption(scopeClientId, isSubQuestion, subClientId)}
+            sx={{ mt: 1 }}
+          >
+            Add Option
+          </Button>
+
+          {showMaxSelections && (
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                borderRadius: 1,
+                border: "1px dashed",
+                borderColor: "divider",
+              }}
+            >
+              <Typography variant="subtitle2" gutterBottom>
+                Selection Limit
               </Typography>
-              <Box sx={{ mt: 1 }}>
-                {renderRatingStars(question.ratingScale || 5, null, null, true)}
-              </Box>
+              <FormControl size="small" sx={{ minWidth: 240 }}>
+                <InputLabel>Max selections allowed</InputLabel>
+                <Select
+                  value={question.maxSelections || 0}
+                  label="Max selections allowed"
+                  onChange={(e) =>
+                    isSubQuestion
+                      ? updateSubQuestion(
+                          parentClientId,
+                          subClientId,
+                          "maxSelections",
+                          e.target.value,
+                        )
+                      : updateQuestion(
+                          question.clientId,
+                          "maxSelections",
+                          e.target.value,
+                        )
+                  }
+                >
+                  <MenuItem value={0}>No limit</MenuItem>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                    <MenuItem key={n} value={n}>
+                      {n}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 1, display: "block" }}
+              >
+                {question.maxSelections > 0
+                  ? `Users can select up to ${question.maxSelections} option(s).`
+                  : "Users can select any number of options."}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      );
+    }
+
+    if (questionTypeValue === "multipleText") {
+      return (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Text Fields:
+          </Typography>
+          {(question.multipleTextFields || [""]).map((field, index) => (
+            <Box
+              key={buildKey(
+                `mtf-${scopeClientId}-${subClientId || "root"}`,
+                index,
+                field,
+              )}
+              sx={{ display: "flex", gap: 1, mb: 1 }}
+            >
+              <TextField
+                size="small"
+                placeholder={`Field ${index + 1} label`}
+                value={field}
+                onChange={(e) =>
+                  updateMultipleTextField(
+                    scopeClientId,
+                    index,
+                    e.target.value,
+                    isSubQuestion,
+                    subClientId,
+                  )
+                }
+                fullWidth
+                error={!field && formik.submitCount > 0}
+                helperText={
+                  !field && formik.submitCount > 0
+                    ? "Field label is required"
+                    : ""
+                }
+              />
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() =>
+                  deleteMultipleTextField(
+                    scopeClientId,
+                    index,
+                    isSubQuestion,
+                    subClientId,
+                  )
+                }
+                disabled={(question.multipleTextFields || [""]).length === 1}
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Box>
+          ))}
+          <Button
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() =>
+              addMultipleTextField(scopeClientId, isSubQuestion, subClientId)
+            }
+            sx={{ mt: 1 }}
+          >
+            Add Field
+          </Button>
+        </Box>
+      );
+    }
+
+    if (questionTypeValue === "rating") {
+      return (
+        <Box sx={{ mt: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Number of Stars</InputLabel>
+            <Select
+              value={question.ratingScale || 5}
+              label="Number of Stars"
+              onChange={(e) =>
+                isSubQuestion
+                  ? updateSubQuestion(
+                      parentClientId,
+                      subClientId,
+                      "ratingScale",
+                      e.target.value,
+                    )
+                  : updateQuestion(
+                      question.clientId,
+                      "ratingScale",
+                      e.target.value,
+                    )
+              }
+            >
+              <MenuItem value={3}>3 Stars</MenuItem>
+              <MenuItem value={5}>5 Stars</MenuItem>
+              <MenuItem value={7}>7 Stars</MenuItem>
+              <MenuItem value={10}>10 Stars</MenuItem>
+            </Select>
+          </FormControl>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              Preview:
+            </Typography>
+            <Box sx={{ mt: 1 }}>
+              {renderRatingStars(question.ratingScale || 5, null, null, true)}
             </Box>
           </Box>
-        );
-
-      default:
-        return null;
+        </Box>
+      );
     }
+
+    return null;
   };
+
+  // ==================== RENDER: SHOW/HIDE CONDITION ====================
 
   const renderShowCondition = (
     question,
     isSubQuestion = false,
-    parentId = null,
-    subId = null,
+    parentClientId = null,
+    subClientId = null,
   ) => {
     const showCondition = question.showCondition || "always";
-    const dependsOnQuestionId = question.dependsOnQuestionId || null;
+    const dependsOnClientId = question.dependsOnClientId || null;
     const showWhenOption = question.showWhenOption || "";
 
-    const previousEligibleQuestions = getPreviousEligibleQuestions(question.id);
+    const ctx = { question, parentClientId, subClientId };
+    const previousEligibleQuestions = getPreviousEligibleQuestions(
+      question.clientId,
+    );
 
-    let dependentOptions = [];
-    let dependentQuestionType = null;
+    // Find dependent question's options + type
+    const flat = flattenQuestions(formik.values.questions);
+    const dependentQuestion = dependsOnClientId
+      ? flat.find((q) => q.clientId === dependsOnClientId)
+      : null;
 
-    if (dependsOnQuestionId) {
-      const id =
-        typeof dependsOnQuestionId === "string"
-          ? parseInt(dependsOnQuestionId)
-          : dependsOnQuestionId;
-      const questionObj = formik.values.questions.find((q) => {
-        const qId = typeof q.id === "string" ? parseInt(q.id) : q.id;
-        return qId === id;
-      });
-      if (questionObj) {
-        dependentOptions =
-          questionObj.options?.filter((opt) => opt && opt.trim() !== "") || [];
-        dependentQuestionType = getQuestionTypeValue(
-          questionObj.questionTypeId,
-        );
-      }
-    }
+    const dependentOptions =
+      dependentQuestion?.options?.filter((opt) => opt && opt.trim() !== "") ||
+      [];
+    const dependentQuestionType = dependentQuestion
+      ? getQuestionTypeValue(dependentQuestion.questionTypeId)
+      : null;
 
-    // Current trigger options (array form) for the multi-select
     const selectedTriggerOptions = parseShowWhenOptions(showWhenOption);
-    const isMultipleOptionParent =
-      dependentQuestionType === "checkbox" ||
-      dependentQuestionType === "multiSelect";
+    const isMultipleOptionParent = MULTI_CHOICE_TYPES.includes(
+      dependentQuestionType,
+    );
 
     return (
       <Box sx={{ mt: 2, p: 2, borderRadius: 1 }}>
@@ -1441,54 +1481,9 @@ const GenerateTracerIndex = () => {
               <Select
                 value={showCondition}
                 label="Show Condition"
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (isSubQuestion) {
-                    const updatedQuestions = formik.values.questions.map(
-                      (q) => {
-                        if (q.id === parentId) {
-                          return {
-                            ...q,
-                            subQuestions: q.subQuestions.map((sub) => {
-                              if (sub.id === subId) {
-                                return {
-                                  ...sub,
-                                  showCondition: value,
-                                  ...(value === "always" && {
-                                    dependsOnQuestionId: null,
-                                    showWhenOption: "",
-                                  }),
-                                };
-                              }
-                              return sub;
-                            }),
-                          };
-                        }
-                        return q;
-                      },
-                    );
-                    formik.setFieldValue("questions", updatedQuestions);
-                    setForceUpdate((prev) => !prev);
-                  } else {
-                    const updatedQuestions = formik.values.questions.map(
-                      (q) => {
-                        if (q.id === question.id) {
-                          return {
-                            ...q,
-                            showCondition: value,
-                            ...(value === "always" && {
-                              dependsOnQuestionId: null,
-                              showWhenOption: "",
-                            }),
-                          };
-                        }
-                        return q;
-                      },
-                    );
-                    formik.setFieldValue("questions", updatedQuestions);
-                    setForceUpdate((prev) => !prev);
-                  }
-                }}
+                onChange={(e) =>
+                  applyShowConditionChange(isSubQuestion, ctx, e.target.value)
+                }
               >
                 <MenuItem value="always">Always Show</MenuItem>
                 <MenuItem value="option">When Option Selected</MenuItem>
@@ -1502,58 +1497,18 @@ const GenerateTracerIndex = () => {
                 <FormControl fullWidth size="small">
                   <InputLabel>Previous Question</InputLabel>
                   <Select
-                    value={dependsOnQuestionId || ""}
+                    value={dependsOnClientId || ""}
                     label="Previous Question"
-                    onChange={(e) => {
-                      const value = e.target.value;
-
-                      if (isSubQuestion) {
-                        const updatedQuestions = formik.values.questions.map(
-                          (q) => {
-                            if (q.id === parentId) {
-                              return {
-                                ...q,
-                                subQuestions: q.subQuestions.map((sub) => {
-                                  if (sub.id === subId) {
-                                    return {
-                                      ...sub,
-                                      dependsOnQuestionId: value,
-                                      showWhenOption: "",
-                                    };
-                                  }
-                                  return sub;
-                                }),
-                              };
-                            }
-                            return q;
-                          },
-                        );
-                        formik.setFieldValue("questions", updatedQuestions);
-                      } else {
-                        const updatedQuestions = formik.values.questions.map(
-                          (q) => {
-                            if (q.id === question.id) {
-                              return {
-                                ...q,
-                                dependsOnQuestionId: value,
-                                showWhenOption: "",
-                              };
-                            }
-                            return q;
-                          },
-                        );
-                        formik.setFieldValue("questions", updatedQuestions);
-                      }
-
-                      setForceUpdate((prev) => !prev);
-                    }}
+                    onChange={(e) =>
+                      applyDependsOnChange(isSubQuestion, ctx, e.target.value)
+                    }
                   >
                     <MenuItem value="">
                       <em>Select a previous question</em>
                     </MenuItem>
                     {previousEligibleQuestions.length > 0 ? (
                       previousEligibleQuestions.map((q) => {
-                        const qIndex = formik.values.questions.indexOf(q);
+                        const displayLabel = getLabelForClientId(q.clientId);
                         const optionsCount =
                           q.options?.filter((o) => o && o.trim() !== "")
                             .length || 0;
@@ -1561,7 +1516,7 @@ const GenerateTracerIndex = () => {
                           q.questionTypeId,
                         );
                         return (
-                          <MenuItem key={q.id} value={q.id}>
+                          <MenuItem key={q.clientId} value={q.clientId}>
                             <Tooltip
                               title={
                                 typeLabel
@@ -1581,7 +1536,7 @@ const GenerateTracerIndex = () => {
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                Q{qIndex + 1}: {q.questionText || "Untitled"} (
+                                {displayLabel}: {q.questionText || "Untitled"} (
                                 {optionsCount} options)
                               </Box>
                             </Tooltip>
@@ -1605,22 +1560,13 @@ const GenerateTracerIndex = () => {
                       Dropdown question with options first.
                     </Typography>
                   )}
-                  {dependsOnQuestionId && (
+                  {dependsOnClientId && (
                     <Typography
                       variant="caption"
                       color="info"
                       sx={{ mt: 1, display: "block" }}
                     >
-                      Selected:{" "}
-                      {formik.values.questions.find((q) => {
-                        const qId =
-                          typeof q.id === "string" ? parseInt(q.id) : q.id;
-                        const dId =
-                          typeof dependsOnQuestionId === "string"
-                            ? parseInt(dependsOnQuestionId)
-                            : dependsOnQuestionId;
-                        return qId === dId;
-                      })?.questionText || "Unknown"}
+                      Selected: {getQuestionTextForClientId(dependsOnClientId)}
                     </Typography>
                   )}
                 </FormControl>
@@ -1645,44 +1591,23 @@ const GenerateTracerIndex = () => {
                         ? "Select Options to Show"
                         : "Select Option to Show"
                     }
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const value = Array.isArray(raw) ? raw.join(",") : raw;
-                      if (isSubQuestion) {
-                        updateSubQuestion(
-                          parentId,
-                          subId,
-                          "showWhenOption",
-                          value,
-                        );
-                      } else {
-                        updateQuestion(question.id, "showWhenOption", value);
-                      }
-                    }}
+                    onChange={(e) =>
+                      applyShowWhenOptionChange(
+                        isSubQuestion,
+                        ctx,
+                        e.target.value,
+                      )
+                    }
                     input={
                       isMultipleOptionParent ? (
                         <OutlinedInput label="Select Options to Show" />
                       ) : undefined
                     }
                     renderValue={
-                      isMultipleOptionParent
-                        ? (selected) => (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexWrap: "wrap",
-                                gap: 0.5,
-                              }}
-                            >
-                              {selected.map((value) => (
-                                <Chip key={value} label={value} size="small" />
-                              ))}
-                            </Box>
-                          )
-                        : undefined
+                      isMultipleOptionParent ? renderChips : undefined
                     }
                     disabled={
-                      !dependsOnQuestionId || dependentOptions.length === 0
+                      !dependsOnClientId || dependentOptions.length === 0
                     }
                   >
                     {!isMultipleOptionParent && (
@@ -1707,7 +1632,7 @@ const GenerateTracerIndex = () => {
                       </MenuItem>
                     ))}
                   </Select>
-                  {!dependsOnQuestionId && (
+                  {!dependsOnClientId && (
                     <Typography
                       variant="caption"
                       color="info"
@@ -1716,7 +1641,7 @@ const GenerateTracerIndex = () => {
                       Please select a previous question first.
                     </Typography>
                   )}
-                  {dependsOnQuestionId && dependentOptions.length === 0 && (
+                  {dependsOnClientId && dependentOptions.length === 0 && (
                     <Typography
                       variant="caption"
                       color="warning"
@@ -1726,7 +1651,7 @@ const GenerateTracerIndex = () => {
                       to that question.
                     </Typography>
                   )}
-                  {dependsOnQuestionId && dependentOptions.length > 0 && (
+                  {dependsOnClientId && dependentOptions.length > 0 && (
                     <Typography
                       variant="caption"
                       color="success"
@@ -1747,25 +1672,29 @@ const GenerateTracerIndex = () => {
     );
   };
 
+  // ==================== RENDER: PREVIEW ====================
+
   const renderPreviewOptions = (question, questionId = null) => {
     const questionTypeValue = getQuestionTypeValue(question.questionTypeId);
     if (!questionTypeValue) return null;
+
+    const qid = questionId || question.clientId;
 
     switch (questionTypeValue) {
       case "radio":
         return (
           <RadioGroup
-            value={dropdownValues[questionId] || ""}
-            onChange={(e) => {
+            value={dropdownValues[qid] || ""}
+            onChange={(e) =>
               setDropdownValues((prev) => ({
                 ...prev,
-                [questionId]: e.target.value,
-              }));
-            }}
+                [qid]: e.target.value,
+              }))
+            }
           >
             {(question.options || [""]).map((opt, idx) => (
               <FormControlLabel
-                key={idx}
+                key={buildKey(`pv-radio-${qid}`, idx, opt)}
                 value={opt}
                 control={<Radio />}
                 label={opt || `Option ${idx + 1}`}
@@ -1775,7 +1704,7 @@ const GenerateTracerIndex = () => {
         );
 
       case "checkbox": {
-        const currentSelected = multiSelectValues[questionId] || [];
+        const currentSelected = multiSelectValues[qid] || [];
         const maxSel = question.maxSelections || 0;
         const limitReached = maxSel > 0 && currentSelected.length >= maxSel;
         return (
@@ -1785,14 +1714,14 @@ const GenerateTracerIndex = () => {
               const optionDisabled = limitReached && !checked;
               return (
                 <FormControlLabel
-                  key={idx}
+                  key={buildKey(`pv-cb-${qid}`, idx, opt)}
                   disabled={optionDisabled}
                   control={
                     <Checkbox
                       checked={checked}
                       onChange={(e) => {
                         setMultiSelectValues((prev) => {
-                          const existing = prev[questionId] || [];
+                          const existing = prev[qid] || [];
                           let next;
                           if (e.target.checked) {
                             next =
@@ -1802,7 +1731,7 @@ const GenerateTracerIndex = () => {
                           } else {
                             next = existing.filter((v) => v !== opt);
                           }
-                          return { ...prev, [questionId]: next };
+                          return { ...prev, [qid]: next };
                         });
                       }}
                     />
@@ -1826,16 +1755,12 @@ const GenerateTracerIndex = () => {
       }
 
       case "dropdown":
-        return renderUnderlinedDropdown(
-          question.options || [],
-          questionId || question.id,
-          false,
-        );
+        return renderUnderlinedDropdown(question.options || [], qid, false);
 
       case "multiSelect":
         return renderOriginalMultiSelect(
           question.options || [],
-          questionId || question.id,
+          qid,
           false,
           question.maxSelections || 0,
         );
@@ -1843,35 +1768,23 @@ const GenerateTracerIndex = () => {
       case "multipleText":
         return renderMultipleTextInputs(
           question.multipleTextFields || [],
-          questionId || question.id,
+          qid,
           false,
         );
 
       case "rating":
-        const ratingKey = questionId || question.id;
         return renderRatingStars(
           question.ratingScale || 5,
-          ratingValues[ratingKey] || 0,
-          (value) =>
-            setRatingValues((prev) => ({ ...prev, [ratingKey]: value })),
+          ratingValues[qid] || 0,
+          (value) => setRatingValues((prev) => ({ ...prev, [qid]: value })),
           false,
         );
 
       case "text":
-        return renderUnderlinedTextInput(
-          questionId || question.id,
-          false,
-          false,
-          null,
-        );
+        return renderUnderlinedTextInput(qid, false, false, null);
 
       case "textarea":
-        return renderUnderlinedTextInput(
-          questionId || question.id,
-          false,
-          true,
-          null,
-        );
+        return renderUnderlinedTextInput(qid, false, true, null);
 
       case "date":
         return (
@@ -1893,14 +1806,156 @@ const GenerateTracerIndex = () => {
     }
   };
 
+  // ==================== RENDER: SUB-QUESTION EDITOR ====================
+
+  const renderSubQuestionEditor = (parentQuestion, sub, subIndex) => (
+    <Paper key={sub.clientId} variant="outlined" sx={{ p: 2, mb: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ flex: 1 }}>
+          Sub-question {subIndex + 1}
+        </Typography>
+        <IconButton
+          size="small"
+          color="error"
+          onClick={() =>
+            deleteSubQuestion(parentQuestion.clientId, sub.clientId)
+          }
+        >
+          <DeleteIcon />
+        </IconButton>
+      </Box>
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Sub-question Text"
+            value={sub.questionText}
+            onChange={(e) =>
+              updateSubQuestion(
+                parentQuestion.clientId,
+                sub.clientId,
+                "questionText",
+                e.target.value,
+              )
+            }
+          />
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Question Type</InputLabel>
+            <Select
+              value={sub.questionTypeId}
+              label="Question Type"
+              onChange={(e) => {
+                const newTypeId = e.target.value;
+                updateSubQuestion(
+                  parentQuestion.clientId,
+                  sub.clientId,
+                  "questionTypeId",
+                  newTypeId,
+                );
+                const newTypeValue = getQuestionTypeValue(newTypeId);
+                if (newTypeValue && OPTION_BASED_TYPES.includes(newTypeValue)) {
+                  if (!sub.options || sub.options.length === 0) {
+                    updateSubQuestion(
+                      parentQuestion.clientId,
+                      sub.clientId,
+                      "options",
+                      [""],
+                    );
+                  }
+                  if (
+                    MULTI_CHOICE_TYPES.includes(newTypeValue) &&
+                    sub.maxSelections === undefined
+                  ) {
+                    updateSubQuestion(
+                      parentQuestion.clientId,
+                      sub.clientId,
+                      "maxSelections",
+                      0,
+                    );
+                  }
+                }
+              }}
+            >
+              <MenuItem value="">
+                <em>-- Select Question Type --</em>
+              </MenuItem>
+              {tracerQuestionDropdownType.map((type) => (
+                <MenuItem key={type.id} value={type.id}>
+                  {type.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid size={{ xs: 12, md: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={sub.required}
+                onChange={(e) =>
+                  updateSubQuestion(
+                    parentQuestion.clientId,
+                    sub.clientId,
+                    "required",
+                    e.target.checked,
+                  )
+                }
+              />
+            }
+            label="Required"
+          />
+        </Grid>
+        {sub.questionTypeId && (
+          <Grid size={{ xs: 12, md: 6 }}>
+            {renderOptions(sub, true, parentQuestion.clientId, sub.clientId)}
+          </Grid>
+        )}
+        <Grid size={{ xs: 12 }}>
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <PlaylistAddIcon
+                  color={
+                    sub.showCondition !== "always" ? "primary" : "disabled"
+                  }
+                />
+                <Typography variant="caption">
+                  Show/Hide{" "}
+                  {sub.showCondition !== "always"
+                    ? "(Custom)"
+                    : "(Always Show)"}
+                </Typography>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails>
+              {renderShowCondition(
+                sub,
+                true,
+                parentQuestion.clientId,
+                sub.clientId,
+              )}
+            </AccordionDetails>
+          </Accordion>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
+
+  // ==================== RENDER: QUESTION FORM ====================
+
   const renderQuestionForm = (question, index) => {
     const currentQuestionTypeValue = getQuestionTypeValue(
       question.questionTypeId,
     );
+    const hasSubQuestions = question.subQuestions?.length > 0;
 
     return (
       <Paper
-        key={question.id}
+        key={question.clientId}
         sx={{
           p: 3,
           mb: 2,
@@ -1913,7 +1968,7 @@ const GenerateTracerIndex = () => {
         variant="outlined"
         draggable
         onDragStart={(e) => handleDragStart(e, index)}
-        onDragOver={(e) => handleDragOver(e, index)}
+        onDragOver={handleDragOver}
         onDrop={(e) => handleDrop(e, index)}
       >
         <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
@@ -1923,7 +1978,7 @@ const GenerateTracerIndex = () => {
           </Typography>
           <IconButton
             color="error"
-            onClick={() => deleteQuestion(question.id)}
+            onClick={() => deleteQuestion(question.clientId)}
             disabled={formik.values.questions.length === 1}
             size="small"
           >
@@ -1940,7 +1995,11 @@ const GenerateTracerIndex = () => {
               label="Question Text"
               value={question.questionText}
               onChange={(e) =>
-                updateQuestion(question.id, "questionText", e.target.value)
+                updateQuestion(
+                  question.clientId,
+                  "questionText",
+                  e.target.value,
+                )
               }
               onBlur={formik.handleBlur}
               variant="outlined"
@@ -1962,7 +2021,7 @@ const GenerateTracerIndex = () => {
               error={
                 formik.touched.questions?.[index]?.questionTypeId &&
                 Boolean(formik.errors.questions?.[index]?.questionTypeId) &&
-                !(question.subQuestions && question.subQuestions.length > 0)
+                !hasSubQuestions
               }
             >
               <InputLabel>Question Type</InputLabel>
@@ -1971,29 +2030,33 @@ const GenerateTracerIndex = () => {
                 label="Question Type"
                 onChange={(e) => {
                   const newTypeId = e.target.value;
-                  updateQuestion(question.id, "questionTypeId", newTypeId);
+                  updateQuestion(
+                    question.clientId,
+                    "questionTypeId",
+                    newTypeId,
+                  );
                   const newTypeValue = getQuestionTypeValue(newTypeId);
                   if (
                     newTypeValue &&
-                    ["radio", "checkbox", "dropdown", "multiSelect"].includes(
-                      newTypeValue,
-                    )
+                    OPTION_BASED_TYPES.includes(newTypeValue)
                   ) {
                     if (!question.options || question.options.length === 0) {
-                      updateQuestion(question.id, "options", [""]);
+                      updateQuestion(question.clientId, "options", [""]);
                     }
                     if (
-                      ["checkbox", "multiSelect"].includes(newTypeValue) &&
+                      MULTI_CHOICE_TYPES.includes(newTypeValue) &&
                       question.maxSelections === undefined
                     ) {
-                      updateQuestion(question.id, "maxSelections", 0);
+                      updateQuestion(question.clientId, "maxSelections", 0);
                     }
                   } else if (newTypeValue === "multipleText") {
                     if (
                       !question.multipleTextFields ||
                       question.multipleTextFields.length === 0
                     ) {
-                      updateQuestion(question.id, "multipleTextFields", [""]);
+                      updateQuestion(question.clientId, "multipleTextFields", [
+                        "",
+                      ]);
                     }
                   }
                 }}
@@ -2015,7 +2078,11 @@ const GenerateTracerIndex = () => {
                 <Switch
                   checked={question.required}
                   onChange={(e) =>
-                    updateQuestion(question.id, "required", e.target.checked)
+                    updateQuestion(
+                      question.clientId,
+                      "required",
+                      e.target.checked,
+                    )
                   }
                 />
               }
@@ -2052,19 +2119,11 @@ const GenerateTracerIndex = () => {
                       : "(Always Show)"}
                   </Typography>
                   {question.showCondition !== "always" &&
-                    question.dependsOnQuestionId && (
+                    question.dependsOnClientId && (
                       <Chip
-                        label={`Depends on Q${
-                          formik.values.questions.findIndex((q) => {
-                            const qId =
-                              typeof q.id === "string" ? parseInt(q.id) : q.id;
-                            const dId =
-                              typeof question.dependsOnQuestionId === "string"
-                                ? parseInt(question.dependsOnQuestionId)
-                                : question.dependsOnQuestionId;
-                            return qId === dId;
-                          }) + 1
-                        }`}
+                        label={`Depends on ${getLabelForClientId(
+                          question.dependsOnClientId,
+                        )}`}
                         size="small"
                         color="secondary"
                       />
@@ -2089,167 +2148,12 @@ const GenerateTracerIndex = () => {
 
           {!currentQuestionTypeValue && (
             <>
-              {question.subQuestions?.length > 0 && (
+              {hasSubQuestions && (
                 <Grid size={{ xs: 12 }}>
                   <Divider sx={{ my: 2 }} />
-                  {question.subQuestions.map((sub, subIndex) => (
-                    <Paper key={sub.id} variant="outlined" sx={{ p: 2, mb: 2 }}>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", mb: 1 }}
-                      >
-                        <Typography variant="subtitle2" sx={{ flex: 1 }}>
-                          Sub-question {subIndex + 1}
-                        </Typography>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => deleteSubQuestion(question.id, sub.id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                      <Grid container spacing={2}>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            label="Sub-question Text"
-                            value={sub.questionText}
-                            onChange={(e) =>
-                              updateSubQuestion(
-                                question.id,
-                                sub.id,
-                                "questionText",
-                                e.target.value,
-                              )
-                            }
-                          />
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 4 }}>
-                          <FormControl fullWidth size="small">
-                            <InputLabel>Question Type</InputLabel>
-                            <Select
-                              value={sub.questionTypeId}
-                              label="Question Type"
-                              onChange={(e) => {
-                                const newTypeId = e.target.value;
-                                updateSubQuestion(
-                                  question.id,
-                                  sub.id,
-                                  "questionTypeId",
-                                  newTypeId,
-                                );
-                                const newTypeValue =
-                                  getQuestionTypeValue(newTypeId);
-                                if (
-                                  newTypeValue &&
-                                  [
-                                    "radio",
-                                    "checkbox",
-                                    "dropdown",
-                                    "multiSelect",
-                                  ].includes(newTypeValue)
-                                ) {
-                                  if (
-                                    !sub.options ||
-                                    sub.options.length === 0
-                                  ) {
-                                    updateSubQuestion(
-                                      question.id,
-                                      sub.id,
-                                      "options",
-                                      [""],
-                                    );
-                                  }
-                                  if (
-                                    ["checkbox", "multiSelect"].includes(
-                                      newTypeValue,
-                                    ) &&
-                                    sub.maxSelections === undefined
-                                  ) {
-                                    updateSubQuestion(
-                                      question.id,
-                                      sub.id,
-                                      "maxSelections",
-                                      0,
-                                    );
-                                  }
-                                }
-                              }}
-                            >
-                              <MenuItem value="">
-                                <em>-- Select Question Type --</em>
-                              </MenuItem>
-                              {tracerQuestionDropdownType.map((type) => (
-                                <MenuItem key={type.id} value={type.id}>
-                                  {type.label}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 2 }}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                size="small"
-                                checked={sub.required}
-                                onChange={(e) =>
-                                  updateSubQuestion(
-                                    question.id,
-                                    sub.id,
-                                    "required",
-                                    e.target.checked,
-                                  )
-                                }
-                              />
-                            }
-                            label="Required"
-                          />
-                        </Grid>
-                        {sub.questionTypeId && (
-                          <Grid size={{ xs: 12, md: 6 }}>
-                            {renderOptions(sub, true, question.id, sub.id)}
-                          </Grid>
-                        )}
-                        <Grid size={{ xs: 12 }}>
-                          <Accordion defaultExpanded>
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <PlaylistAddIcon
-                                  color={
-                                    sub.showCondition !== "always"
-                                      ? "primary"
-                                      : "disabled"
-                                  }
-                                />
-                                <Typography variant="caption">
-                                  Show/Hide{" "}
-                                  {sub.showCondition !== "always"
-                                    ? "(Custom)"
-                                    : "(Always Show)"}
-                                </Typography>
-                              </Box>
-                            </AccordionSummary>
-                            <AccordionDetails>
-                              {renderShowCondition(
-                                sub,
-                                true,
-                                question.id,
-                                sub.id,
-                              )}
-                            </AccordionDetails>
-                          </Accordion>
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                  ))}
+                  {question.subQuestions.map((sub, subIndex) =>
+                    renderSubQuestionEditor(question, sub, subIndex),
+                  )}
                 </Grid>
               )}
               <Grid size={{ xs: 12 }}>
@@ -2258,7 +2162,7 @@ const GenerateTracerIndex = () => {
                   variant="contained"
                   color="secondary"
                   startIcon={<AddIcon />}
-                  onClick={() => addSubQuestion(question.id)}
+                  onClick={() => addSubQuestion(question.clientId)}
                 >
                   Add Sub-question
                 </Button>
@@ -2269,6 +2173,118 @@ const GenerateTracerIndex = () => {
       </Paper>
     );
   };
+
+  // ==================== RENDER: PREVIEW ====================
+
+  const renderPreviewQuestion = (question, index) => {
+    const questionTypeValue = getQuestionTypeValue(question.questionTypeId);
+    const questionIsVisible = isVisible(question.clientId);
+    if (!questionIsVisible) return null;
+
+    const hasSubQuestions = (question.subQuestions || []).length > 0;
+    if (!questionTypeValue && !hasSubQuestions) return null;
+
+    return (
+      <Box key={question.clientId} sx={{ mb: 3 }}>
+        <Typography variant="body1" gutterBottom>
+          {index + 1}. {question.questionText || "Untitled Question"}
+          {question.required && <span style={{ color: "red" }}> *</span>}
+        </Typography>
+
+        {question.showCondition !== "always" && (
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
+            <Chip
+              icon={<PlaylistAddIcon />}
+              label={`Depends on ${getLabelForClientId(
+                question.dependsOnClientId,
+              )}`}
+              size="small"
+              color="secondary"
+            />
+            {question.showCondition === "option" && question.showWhenOption && (
+              <Chip
+                label={`Show when: ${parseShowWhenOptions(
+                  question.showWhenOption,
+                ).join(", ")}`}
+                size="small"
+                color="primary"
+              />
+            )}
+          </Box>
+        )}
+
+        {questionTypeValue && (
+          <Box sx={{ ml: 2, mt: 1 }}>
+            {renderPreviewOptions(question, question.clientId)}
+          </Box>
+        )}
+
+        {hasSubQuestions && (
+          <Box
+            sx={{
+              ml: 2,
+              mt: 1,
+              pl: 2,
+              borderLeft: 2,
+              borderColor: "divider",
+            }}
+          >
+            {question.subQuestions.map((sub, subIndex) => {
+              const subQuestionTypeValue = getQuestionTypeValue(
+                sub.questionTypeId,
+              );
+              const subIsVisible = isVisible(sub.clientId);
+              if (!subIsVisible) return null;
+              if (!subQuestionTypeValue) return null;
+
+              return (
+                <Box key={sub.clientId} sx={{ mb: 2 }}>
+                  <Typography variant="body2" gutterBottom>
+                    {index + 1}.{subIndex + 1}{" "}
+                    {sub.questionText || "Untitled Sub-question"}
+                    {sub.required && <span style={{ color: "red" }}> *</span>}
+                  </Typography>
+                  {sub.showCondition !== "always" && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        flexWrap: "wrap",
+                        mb: 1,
+                      }}
+                    >
+                      <Chip
+                        icon={<PlaylistAddIcon />}
+                        label={`Depends on ${getLabelForClientId(
+                          sub.dependsOnClientId,
+                        )}`}
+                        size="small"
+                        color="secondary"
+                      />
+                      {sub.showCondition === "option" && sub.showWhenOption && (
+                        <Chip
+                          label={`Show when: ${parseShowWhenOptions(
+                            sub.showWhenOption,
+                          ).join(", ")}`}
+                          size="small"
+                          color="primary"
+                        />
+                      )}
+                    </Box>
+                  )}
+                  <Box sx={{ ml: 2 }}>
+                    {renderPreviewOptions(sub, sub.clientId)}
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
+  // ==================== RENDER: PARENT RETURN ====================
 
   return (
     <Paper sx={{ p: { xs: 2, md: 2 }, mt: 1 }} elevation={2}>
@@ -2409,7 +2425,7 @@ const GenerateTracerIndex = () => {
                 const errorCount = getQuestionErrorCount(question, index);
                 return (
                   <Tab
-                    key={question.id}
+                    key={question.clientId}
                     label={
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
@@ -2522,147 +2538,14 @@ const GenerateTracerIndex = () => {
             <Divider sx={{ my: 2 }} />
           )}
 
-          {formik.values.questions.map((question, index) => {
-            const questionTypeValue = getQuestionTypeValue(
-              question.questionTypeId,
-            );
-            const isVisible =
-              visibleQuestions[question.id] !== undefined
-                ? visibleQuestions[question.id]
-                : true;
-
-            if (!isVisible) {
-              return null;
-            }
-
-            return (
-              <Box key={question.id} sx={{ mb: 3 }}>
-                <Typography variant="body1" gutterBottom>
-                  {index + 1}. {question.questionText || "Untitled Question"}
-                  {question.required && (
-                    <span style={{ color: "red" }}> *</span>
-                  )}
-                </Typography>
-
-                {question.showCondition !== "always" && (
-                  <Box
-                    sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}
-                  >
-                    <Chip
-                      icon={<PlaylistAddIcon />}
-                      label={`Depends on Q${
-                        formik.values.questions.findIndex((q) => {
-                          const qId =
-                            typeof q.id === "string" ? parseInt(q.id) : q.id;
-                          const dId =
-                            typeof question.dependsOnQuestionId === "string"
-                              ? parseInt(question.dependsOnQuestionId)
-                              : question.dependsOnQuestionId;
-                          return qId === dId;
-                        }) + 1
-                      }`}
-                      size="small"
-                      color="secondary"
-                    />
-                    {question.showCondition === "option" &&
-                      question.showWhenOption && (
-                        <Chip
-                          label={`Show when: ${parseShowWhenOptions(
-                            question.showWhenOption,
-                          ).join(", ")}`}
-                          size="small"
-                          color="primary"
-                        />
-                      )}
-                  </Box>
-                )}
-
-                {questionTypeValue && (
-                  <Box sx={{ ml: 2, mt: 1 }}>
-                    {renderPreviewOptions(question, question.id)}
-                  </Box>
-                )}
-                {!questionTypeValue && question.subQuestions?.length > 0 && (
-                  <Box
-                    sx={{
-                      ml: 2,
-                      mt: 1,
-                      pl: 2,
-                      borderLeft: 2,
-                      borderColor: "divider",
-                    }}
-                  >
-                    {question.subQuestions.map((sub, subIndex) => {
-                      const subQuestionTypeValue = getQuestionTypeValue(
-                        sub.questionTypeId,
-                      );
-                      const isSubVisible =
-                        visibleQuestions[sub.id] !== undefined
-                          ? visibleQuestions[sub.id]
-                          : true;
-
-                      if (!isSubVisible) return null;
-
-                      return (
-                        <Box key={sub.id} sx={{ mb: 2 }}>
-                          <Typography variant="body2" gutterBottom>
-                            {index + 1}.{subIndex + 1}{" "}
-                            {sub.questionText || "Untitled Sub-question"}
-                            {sub.required && (
-                              <span style={{ color: "red" }}> *</span>
-                            )}
-                          </Typography>
-                          {sub.showCondition !== "always" && (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                gap: 1,
-                                flexWrap: "wrap",
-                                mb: 1,
-                              }}
-                            >
-                              <Chip
-                                icon={<PlaylistAddIcon />}
-                                label={`Depends on Q${
-                                  formik.values.questions.findIndex((q) => {
-                                    const qId =
-                                      typeof q.id === "string"
-                                        ? parseInt(q.id)
-                                        : q.id;
-                                    const dId =
-                                      typeof sub.dependsOnQuestionId ===
-                                      "string"
-                                        ? parseInt(sub.dependsOnQuestionId)
-                                        : sub.dependsOnQuestionId;
-                                    return qId === dId;
-                                  }) + 1
-                                }`}
-                                size="small"
-                                color="secondary"
-                              />
-                            </Box>
-                          )}
-                          {subQuestionTypeValue && (
-                            <Box sx={{ ml: 2 }}>
-                              {renderPreviewOptions(
-                                sub,
-                                `${question.id}-${sub.id}`,
-                              )}
-                            </Box>
-                          )}
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                )}
-              </Box>
-            );
-          })}
+          {formik.values.questions.map((question, index) =>
+            renderPreviewQuestion(question, index),
+          )}
 
           {formik.values.questions.length > 0 &&
             Object.values(visibleQuestions).every((v) => v === false) &&
             formik.values.questions.some(
-              (q) => q.showCondition === "option" && q.dependsOnQuestionId,
+              (q) => q.showCondition === "option" && q.dependsOnClientId,
             ) && (
               <Typography
                 variant="body2"

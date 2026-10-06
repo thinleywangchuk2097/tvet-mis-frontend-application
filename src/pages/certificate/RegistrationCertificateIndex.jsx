@@ -305,6 +305,11 @@ const paginationFooterPropTypes = {
   onRowsPerPageChange: PropTypes.func.isRequired,
 };
 
+const downloadAllHeaderPropTypes = {
+  count: PropTypes.number.isRequired,
+  onDownloadAll: PropTypes.func.isRequired,
+};
+
 // ==================== REUSABLE COMPONENTS ====================
 const SectionHeader = ({ title }) => (
   <Typography variant="h6" mb={3}>
@@ -408,6 +413,31 @@ const SearchField = ({
   />
 );
 SearchField.propTypes = searchFieldPropTypes;
+
+const DownloadAllHeader = ({ count, onDownloadAll }) => (
+  <Tooltip
+    title={
+      count === 0
+        ? "No records available to download"
+        : `Download all ${count} registration certificate(s)`
+    }
+    arrow
+  >
+    <span>
+      <Button
+        variant="text"
+        size="small"
+        startIcon={<DownloadIcon />}
+        onClick={onDownloadAll}
+        disabled={count === 0}
+        sx={{ textTransform: "none", fontWeight: "bold" }}
+      >
+        Download All
+      </Button>
+    </span>
+  </Tooltip>
+);
+DownloadAllHeader.propTypes = downloadAllHeaderPropTypes;
 
 const DataTable = ({
   columns,
@@ -527,13 +557,10 @@ const RegistrationCertificateIndex = () => {
       // Multi-field search: applicationNo, cid, referenceNo, registrationNo
       const matchesApplicationNo =
         searchTerm === "" ||
-        (reg.applicationNo &&
-          reg.applicationNo.toLowerCase().includes(searchTerm)) ||
-        (reg.cid && reg.cid.toLowerCase().includes(searchTerm)) ||
-        (reg.referenceNo &&
-          reg.referenceNo.toLowerCase().includes(searchTerm)) ||
-        (reg.registrationNo &&
-          reg.registrationNo.toLowerCase().includes(searchTerm));
+        reg.applicationNo?.toLowerCase().includes(searchTerm) ||
+        reg.cid?.toLowerCase().includes(searchTerm) ||
+        reg.referenceNo?.toLowerCase().includes(searchTerm) ||
+        reg.registrationNo?.toLowerCase().includes(searchTerm);
 
       const matchesSearch =
         appliedFilters.search === "" ||
@@ -549,6 +576,7 @@ const RegistrationCertificateIndex = () => {
   // Reset page when applied filters change
   useEffect(() => {
     pagination.handleChangePage(null, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appliedFilters]);
 
   // Search button enabled only when both Registration Type & Application No are filled
@@ -611,27 +639,10 @@ const RegistrationCertificateIndex = () => {
         label: "Action",
         align: "center",
         headerRender: () => (
-          <Tooltip
-            title={
-              filteredRegistrations.length === 0
-                ? "No records available to download"
-                : `Download all ${filteredRegistrations.length} registration certificate(s)`
-            }
-            arrow
-          >
-            <span>
-              <Button
-                variant="text"
-                size="small"
-                startIcon={<DownloadIcon />}
-                onClick={handleDownloadAll}
-                disabled={filteredRegistrations.length === 0}
-                sx={{ textTransform: "none", fontWeight: "bold" }}
-              >
-                Download All
-              </Button>
-            </span>
-          </Tooltip>
+          <DownloadAllHeader
+            count={filteredRegistrations.length}
+            onDownloadAll={handleDownloadAll}
+          />
         ),
         render: (item) => (
           <Tooltip title={`Download certificate for ${item.name}`} arrow>
