@@ -585,7 +585,7 @@ const NonAccreditedCourseTraineeSelection = () => {
                     <TableCell>Status</TableCell>
                     {selectedTrainees.some(
                       (trainee) => trainee.result_status_id,
-                    ) && <TableCell>Result Status</TableCell>}
+                    ) && <TableCell>Overall Result</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>

@@ -232,7 +232,6 @@ const useCourseData = (applicationNo, access_token) => {
           applicationNo,
           access_token,
         );
-      console.log("Non-BQF Programme details response:", response.data);
       let data = response.data;
       if (Array.isArray(data) && data.length > 0) data = data[0];
 
@@ -925,13 +924,11 @@ const ViewNonAccreditedCourseRegistration = () => {
         documents: newDocuments,
         qualityStandards: qualityStandardsData,
       };
-
       const response =
         await ApplyNonAccreditedCourseService.verifyNonAccreditedCourse(
           payload,
           access_token,
         );
-
       if (response.status === 200 || response.status === 201) {
         const statusMessages = {
           [STATUS.VERIFY_QAS1]: "Course verified successfully",

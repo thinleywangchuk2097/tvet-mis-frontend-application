@@ -230,7 +230,6 @@ const PublicIndex = () => {
   const fetchCourseAnnounceNotifications = async () => {
     try {
       const response = await PublicPageService.getCourseAnnounceNotifications();
-      console.log("Course Announcement Notifications:", response.data);
       setCourseAnnounceNotifications(response.data);
     } catch (error) {
       console.error("Error fetching course announcement notifications:", error);
@@ -585,7 +584,7 @@ const PublicIndex = () => {
       <Box
         sx={{
           bgcolor: P,
-          py: 0.6,
+          py: 1.1,
           overflow: "hidden",
           display: "flex",
           alignItems: "center",
@@ -594,26 +593,15 @@ const PublicIndex = () => {
         <Box
           sx={{
             bgcolor: PD,
-            px: 2,
-            py: 0.4,
+            px: 2.5,
+            py: 0.7,
             flexShrink: 0,
             display: "flex",
             alignItems: "center",
-            gap: 0.7,
+            gap: 0.9,
           }}
         >
-          <CampaignIcon sx={{ color: "#90caf9", fontSize: 14 }} />
-          <Typography
-            sx={{
-              color: "#90caf9",
-              fontSize: "0.65rem",
-              fontWeight: 800,
-              letterSpacing: 1,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Announcement
-          </Typography>
+          <CampaignIcon sx={{ color: "#90caf9", fontSize: 20 }} />
         </Box>
         <Box sx={{ overflow: "hidden", flex: 1, ml: 2 }}>
           <Box component="style">{`@keyframes tk{from{transform:translateX(100%)}to{transform:translateX(-200%)}}`}</Box>
@@ -622,8 +610,8 @@ const PublicIndex = () => {
               display: "inline-block",
               animation: "tk 45s linear infinite",
               color: "#e3f2fd",
-              fontSize: "0.75rem",
-              fontWeight: 500,
+              fontSize: "0.95rem",
+              fontWeight: 600,
               whiteSpace: "nowrap",
             }}
           >

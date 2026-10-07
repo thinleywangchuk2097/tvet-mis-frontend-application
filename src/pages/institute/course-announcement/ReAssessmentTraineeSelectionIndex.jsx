@@ -175,9 +175,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
     return `Move ${selectedPendingRows.length} trainee(s) to the Selected list.`;
   };
 
-  // Tooltip for hidden Result Status / other assessment columns in Selected table
+  // Tooltip for hidden Overall Result / other assessment columns in Selected table
   const hiddenColumnsTooltip =
-    "Result Status and assessment marks (Theory/Viva/Practical) will become visible once the application reaches the 'Assessment Completed' stage (status 59).";
+    "Overall Result and assessment marks (Theory/Viva/Practical) will become visible once the application reaches the 'Assessment Completed' stage (status 59).";
 
   const isNumericCertificationLevel = () => {
     const levelId = programmeDetails?.certification_level_id;
@@ -877,7 +877,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
                     <TableCell sx={headerCellStyle}>Qualification</TableCell>
                     <TableCell sx={headerCellStyle}>Status</TableCell>
                     {showOtherAssessmentsAndResultStatus && (
-                      <TableCell sx={headerCellStyle}>Result Status</TableCell>
+                      <TableCell sx={headerCellStyle}>Overall Result</TableCell>
                     )}
                     <TableCell sx={headerCellStyle}>
                       Internal Assessment
@@ -1131,7 +1131,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
                     <TableCell sx={headerCellStyle}>Contact</TableCell>
                     <TableCell sx={headerCellStyle}>Email</TableCell>
                     <TableCell sx={headerCellStyle}>Qualification</TableCell>
-                    <TableCell sx={headerCellStyle}>Result Status</TableCell>
+                    <TableCell sx={headerCellStyle}>Overall Result</TableCell>
                     <TableCell sx={headerCellStyle}>
                       Internal Assessment
                     </TableCell>

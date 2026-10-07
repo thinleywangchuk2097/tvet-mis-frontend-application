@@ -1,5 +1,5 @@
 // NonAccreditedCourse.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
 import {
   Table,
@@ -21,6 +21,7 @@ import {
   Typography,
   Chip,
   IconButton,
+  Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { Formik, Form } from "formik";
@@ -56,6 +57,15 @@ const RequiredStar = () => (
 );
 
 RequiredStar.propTypes = {};
+
+// Helper: Get today's date in YYYY-MM-DD (local time)
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 // ==================== CONSTANTS ====================
 const TABLE_STYLE = {
@@ -103,6 +113,8 @@ const formDateFieldPropTypes = {
   formik: PropTypes.object.isRequired,
   name: PropTypes.string.isRequired,
   label: PropTypes.node.isRequired,
+  min: PropTypes.string,
+  tooltip: PropTypes.string,
 };
 
 const dataTablePropTypes = {
@@ -401,21 +413,35 @@ const FormTextField = ({
 
 FormTextField.propTypes = formTextFieldPropTypes;
 
-const FormDateField = ({ formik, name, label }) => (
-  <TextField
-    type="date"
-    fullWidth
-    label={label}
-    name={name}
-    size="small"
-    value={formik.values[name] || ""}
-    onChange={formik.handleChange}
-    onBlur={formik.handleBlur}
-    InputLabelProps={{ shrink: true }}
-    error={formik.touched[name] && Boolean(formik.errors[name])}
-    helperText={formik.touched[name] && formik.errors[name]}
-  />
-);
+// 👇 Updated FormDateField with min + tooltip support
+const FormDateField = ({ formik, name, label, min, tooltip }) => {
+  const field = (
+    <TextField
+      type="date"
+      fullWidth
+      label={label}
+      name={name}
+      size="small"
+      value={formik.values[name] || ""}
+      onChange={formik.handleChange}
+      onBlur={formik.handleBlur}
+      InputLabelProps={{ shrink: true }}
+      inputProps={min ? { min } : {}}
+      error={formik.touched[name] && Boolean(formik.errors[name])}
+      helperText={formik.touched[name] && formik.errors[name]}
+    />
+  );
+
+  if (tooltip) {
+    return (
+      <Tooltip title={tooltip} arrow placement="top">
+        {field}
+      </Tooltip>
+    );
+  }
+
+  return field;
+};
 
 FormDateField.propTypes = formDateFieldPropTypes;
 
@@ -675,7 +701,7 @@ const NonAccreditedCourse = () => {
     feesPerTrainee: "",
     certificationLevelId: "",
     enrollmentCapacity: "",
-    applicationStartDate: "",
+    applicationStartDate: "", // 👈 No default date
     applicationEndDate: "",
     courseStartDate: "",
     courseEndDate: "",
@@ -687,7 +713,7 @@ const NonAccreditedCourse = () => {
     approvedCourses: courseData.approvedCourses,
   };
 
-  // FIXED: Removed `this` usage - using arrow function with context parameter
+  // Validation schema with no back-date restriction on application start date
   const validationSchema = Yup.object().shape({
     programmeId: Yup.string().required("Programme Name is required"),
     feesPerTrainee: Yup.number()
@@ -701,7 +727,11 @@ const NonAccreditedCourse = () => {
       .required("Enrollment capacity per batch is required"),
     applicationStartDate: Yup.date()
       .typeError("Invalid date")
-      .required("Application Start Date required"),
+      .required("Application Start Date required")
+      .min(
+        getTodayDate(), // 👈 No back date allowed
+        "Application start date cannot be a past date",
+      ),
     applicationEndDate: Yup.date()
       .typeError("Invalid date")
       .required("Application End Date required")
@@ -894,6 +924,7 @@ const NonAccreditedCourse = () => {
                     />
                   </Grid>
 
+                  {/* Application Start Date - no back date */}
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormDateField
                       formik={formik}
@@ -903,9 +934,12 @@ const NonAccreditedCourse = () => {
                           <RequiredStar /> Application Start Date
                         </>
                       }
+                      min={getTodayDate()}
+                      tooltip="Application start date cannot be a past date. Please select today or a future date."
                     />
                   </Grid>
 
+                  {/* Application End Date - must be >= start date */}
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormDateField
                       formik={formik}
@@ -915,9 +949,12 @@ const NonAccreditedCourse = () => {
                           <RequiredStar /> Application End Date
                         </>
                       }
+                      min={formik.values.applicationStartDate || getTodayDate()}
+                      tooltip="Application end date must be on or after the application start date."
                     />
                   </Grid>
 
+                  {/* Course Start Date - must be after app end */}
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormDateField
                       formik={formik}
@@ -927,9 +964,12 @@ const NonAccreditedCourse = () => {
                           <RequiredStar /> Course Start Date
                         </>
                       }
+                      min={formik.values.applicationEndDate || getTodayDate()}
+                      tooltip="Course start date must be after the application end date."
                     />
                   </Grid>
 
+                  {/* Course End Date - must be >= course start */}
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <FormDateField
                       formik={formik}
@@ -939,6 +979,8 @@ const NonAccreditedCourse = () => {
                           <RequiredStar /> Course End Date
                         </>
                       }
+                      min={formik.values.courseStartDate || getTodayDate()}
+                      tooltip="Course end date must be on or after the course start date."
                     />
                   </Grid>
 
