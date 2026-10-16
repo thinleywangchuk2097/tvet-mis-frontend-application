@@ -124,6 +124,7 @@ const NonAccreditedCourseRegistration = () => {
     fetchInstituteDetails();
     fetchQualityStandards();
     fetchProgrammeTypes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch courses after curriculumTypes is loaded
@@ -131,6 +132,7 @@ const NonAccreditedCourseRegistration = () => {
     if (curriculumTypes.length > 0) {
       fetchNonAccreditedCourseDetails();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curriculumTypes]);
 
   // Effect to populate quality selections when qualityData is loaded and a course is being viewed
@@ -142,6 +144,7 @@ const NonAccreditedCourseRegistration = () => {
     ) {
       populateQualitySelections(selectedCourse.qualityStandards);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qualityData, openView, selectedCourse]);
 
   const fetchQualityStandards = async () => {
@@ -1047,6 +1050,7 @@ const NonAccreditedCourseRegistration = () => {
     if (selectedCurriculumId) {
       autoFillCurriculumFields(selectedCurriculumId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCurriculumId, curriculumTypes]);
 
   return (
@@ -1547,7 +1551,7 @@ const NonAccreditedCourseRegistration = () => {
                           size="small"
                           value={formik.values.programmeTypeId || ""}
                           onChange={(e) => {
-                            const selectedId = e.target.value;
+                            // ✅ FIX: removed unused `const selectedId = e.target.value;`
                             formik.handleChange(e);
 
                             // Clear curriculum-related fields when switching programme type

@@ -126,27 +126,29 @@ const waveAnimation = keyframes`
 const P = "#1565c0";
 const TEAL = "#0097a7";
 
-// ── Dynamic color generator for sectors
+// ── High-contrast, clearly distinguishable sector colors
+const SECTOR_COLORS = [
+  "#1565c0", // strong blue
+  "#e53935", // strong red
+  "#2e7d32", // strong green
+  "#f9a825", // strong amber
+  "#6a1b9a", // strong purple
+  "#00838f", // strong cyan
+  "#ef6c00", // strong orange
+  "#4e342e", // strong brown
+  "#ad1457", // strong pink
+  "#283593", // strong indigo
+  "#9e9d24", // strong lime
+  "#c62828", // strong dark red
+  "#00695c", // strong teal
+  "#4527a0", // strong deep purple
+  "#37474f", // strong blue grey
+  "#d84315", // strong deep orange
+];
+
+// ── Dynamic color generator for sectors (high contrast)
 const getSectorColor = (index) => {
-  const colors = [
-    P,
-    "#0288d1",
-    TEAL,
-    "#2e7d32",
-    "#558b2f",
-    "#e65100",
-    "#6a1b9a",
-    "#7b1fa2",
-    "#8e24aa",
-    "#4527a0",
-    "#283593",
-    "#d84315",
-    "#bf360c",
-    "#f9a825",
-    "#ef6c00",
-    "#9e9d24",
-  ];
-  return colors[index % colors.length];
+  return SECTOR_COLORS[index % SECTOR_COLORS.length];
 };
 
 // ── Function to generate a distinct color for each bar in the Dzongkhag chart
@@ -453,8 +455,9 @@ const PieBarGraphDistributionIndex = () => {
                 <Typography
                   variant="caption"
                   sx={{
-                    color: "text.secondary",
+                    color: "#222",
                     fontSize: "0.65rem",
+                    fontWeight: 600,
                   }}
                 >
                   Distribution by sector
@@ -490,7 +493,7 @@ const PieBarGraphDistributionIndex = () => {
                         label={({ percent }) =>
                           `${(percent * 100).toFixed(0)}%`
                         }
-                        labelLine={{ stroke: "#ccc", strokeWidth: 0.5 }}
+                        labelLine={{ stroke: "#999", strokeWidth: 1 }}
                         animationBegin={300}
                         animationDuration={800}
                         animationEasing="ease-out"
@@ -499,15 +502,20 @@ const PieBarGraphDistributionIndex = () => {
                           <Cell
                             key={`cell-${index}`}
                             fill={getSectorColor(index)}
+                            stroke="#fff"
+                            strokeWidth={1.5}
                             style={{
                               cursor: "pointer",
                               transition: "transform 0.3s ease",
+                              filter: "brightness(1)",
                             }}
                             onMouseEnter={(e) => {
-                              e.target.style.transform = "scale(1.03)";
+                              e.target.style.transform = "scale(1.05)";
+                              e.target.style.filter = "brightness(1.15)";
                             }}
                             onMouseLeave={(e) => {
                               e.target.style.transform = "scale(1)";
+                              e.target.style.filter = "brightness(1)";
                             }}
                           />
                         ))}
@@ -518,6 +526,8 @@ const PieBarGraphDistributionIndex = () => {
                           border: "1px solid #d4e2f4",
                           fontSize: "0.7rem",
                           padding: "4px 8px",
+                          backgroundColor: "#fff",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                         }}
                         formatter={(value, name) => [
                           `${value} Program(s)`,
@@ -546,20 +556,21 @@ const PieBarGraphDistributionIndex = () => {
                       >
                         <Box
                           sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
+                            width: 10,
+                            height: 10,
+                            borderRadius: "3px",
                             bgcolor: getSectorColor(index),
                             flexShrink: 0,
+                            border: "1px solid rgba(0,0,0,0.1)",
                           }}
                         />
                         <Typography
                           variant="caption"
                           sx={{
-                            color: "#444",
+                            color: "#222",
                             flex: 1,
                             fontSize: "0.65rem",
-                            fontWeight: 500,
+                            fontWeight: 600,
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -584,7 +595,8 @@ const PieBarGraphDistributionIndex = () => {
                           <Typography
                             sx={{
                               fontSize: "0.55rem",
-                              color: "#888",
+                              color: "#666",
+                              fontWeight: 500,
                             }}
                           >
                             ({percentage}%)
@@ -652,7 +664,7 @@ const PieBarGraphDistributionIndex = () => {
               </Box>
               <Box>
                 <Typography
-                  fontWeight={700}
+                  fontWeight={800}
                   sx={{
                     fontSize: "0.85rem",
                     background: `linear-gradient(135deg, ${TEAL}, ${P})`,
@@ -667,8 +679,9 @@ const PieBarGraphDistributionIndex = () => {
                 <Typography
                   variant="caption"
                   sx={{
-                    color: "text.secondary",
+                    color: "#111",
                     fontSize: "0.65rem",
+                    fontWeight: 700,
                   }}
                 >
                   Across 20 Dzongkhags
@@ -703,34 +716,54 @@ const PieBarGraphDistributionIndex = () => {
                       dataKey="name"
                       tick={{
                         fontSize: 9,
-                        fill: "#555",
+                        fill: "#000",
+                        fontWeight: 700,
                       }}
                       angle={-40}
                       textAnchor="end"
                       interval={0}
                       height={55}
+                      axisLine={{ stroke: "#000", strokeWidth: 1 }}
+                      tickLine={{ stroke: "#000" }}
                     />
                     <YAxis
                       tick={{
                         fontSize: 9,
-                        fill: "#666",
+                        fill: "#000",
+                        fontWeight: 700,
                       }}
                       label={{
                         value: "Institutes",
                         angle: -90,
                         position: "insideLeft",
                         style: {
-                          fontSize: "9px",
-                          fill: "#666",
+                          fontSize: "10px",
+                          fill: "#000",
+                          fontWeight: 700,
                         },
                       }}
+                      axisLine={{ stroke: "#000", strokeWidth: 1 }}
+                      tickLine={{ stroke: "#000" }}
                     />
                     <RTooltip
                       contentStyle={{
                         borderRadius: 6,
-                        border: "1px solid #d4e2f4",
-                        fontSize: "0.7rem",
-                        padding: "4px 8px",
+                        border: "1px solid #333",
+                        fontSize: "0.75rem",
+                        padding: "6px 10px",
+                        backgroundColor: "#fff",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+                        color: "#000",
+                        fontWeight: 700,
+                      }}
+                      labelStyle={{
+                        color: "#000",
+                        fontWeight: 800,
+                        fontSize: "0.78rem",
+                      }}
+                      itemStyle={{
+                        color: "#000",
+                        fontWeight: 700,
                       }}
                       formatter={(value) => [`${value} Institute(s)`, "Count"]}
                     />
@@ -774,16 +807,18 @@ const PieBarGraphDistributionIndex = () => {
                   <Typography
                     variant="caption"
                     sx={{
-                      color: "#666",
-                      fontSize: "0.7rem",
+                      color: "#000",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
                     }}
                   >
                     Total Institutes:{" "}
                     <Box
                       component="span"
                       sx={{
-                        fontWeight: "bold",
-                        color: TEAL,
+                        fontWeight: 900,
+                        color: "#000",
+                        fontSize: "0.8rem",
                       }}
                     >
                       {dzongkhagInstituteData.reduce(

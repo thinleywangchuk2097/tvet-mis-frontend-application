@@ -73,7 +73,6 @@ const ReAssessmentIndex = () => {
   const [approvedProgrammes, setApprovedProgrammes] = useState([]);
   const [statusList, setStatusList] = useState([]);
   const [reassessmentTypes, setReassessmentTypes] = useState([]);
-  const [currentReassessmentType, setCurrentReassessmentType] = useState("");
   const [filterReassessmentType, setFilterReassessmentType] = useState("");
   const [filterCertificationLevel, setFilterCertificationLevel] = useState("");
   const [ncsProgrammes, setNcsProgrammes] = useState([]);
@@ -144,7 +143,6 @@ const ReAssessmentIndex = () => {
 
   const fetchAllNcsProgrammeData = async () => {
     try {
-      //const rplResponse = await CommonService.getAllOccupations();
       const ncsResponse = await NcsService.getAllNcsProgrammes(access_token);
       console.log("NCS Programmes response:", ncsResponse.data);
       const mappedNcsProgramme = ncsResponse.data.map((ncs) => ({
@@ -219,11 +217,8 @@ const ReAssessmentIndex = () => {
     try {
       if (!reassessmentTypeId) {
         setApprovedProgrammes([]);
-        setCurrentReassessmentType("");
         return;
       }
-
-      setCurrentReassessmentType(reassessmentTypeId);
 
       if (reassessmentTypeId === "42" || reassessmentTypeId === 42) {
         setApprovedProgrammes(accreditedProgramme);
@@ -283,7 +278,7 @@ const ReAssessmentIndex = () => {
     return programme ? programme.name : programmeId;
   };
 
-  // UPDATED: Added certification level filter to the filtering logic
+  // Filtering logic with certification level filter
   const filteredProgrammes = programmes.filter((programme) => {
     const programmeName = getProgrammeName(
       programme.programme_id,
@@ -448,6 +443,97 @@ const ReAssessmentIndex = () => {
     },
   };
 
+  // Extracted table body rendering logic (fixes nested ternary issue)
+  const renderTableBody = () => {
+    if (!filterReassessmentType) {
+      return (
+        <TableRow>
+          <TableCell colSpan={12} align="center">
+            Please select a Reassessment Type to view the data
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (filteredProgrammes.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={12} align="center">
+            No data available for selected reassessment type
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return filteredProgrammes
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      .map((programme, index) => (
+        <TableRow key={programme.id || index}>
+          <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
+          <TableCell>{programme.application_no || "N/A"}</TableCell>
+          <TableCell>{getReassessmentTypeName(programme.service_id)}</TableCell>
+          <TableCell>
+            {getProgrammeName(programme.programme_id, programme.service_id)}
+          </TableCell>
+          <TableCell>
+            Nu.{" "}
+            {programme.fees_per_trainee || programme.feesPerTrainee || "N/A"}
+          </TableCell>
+          <TableCell>
+            {programme.enrollment_capacity ||
+              programme.enrollmentCapacity ||
+              "N/A"}
+          </TableCell>
+          <TableCell>
+            {getCertificationLevelName(programme.certification_level_id)}
+          </TableCell>
+          <TableCell>
+            {getFundingSourceName(programme.funding_source_id)}
+          </TableCell>
+          <TableCell>
+            {programme.course_start_date && programme.course_end_date
+              ? `${new Date(programme.course_start_date).toLocaleDateString()} - ${new Date(programme.course_end_date).toLocaleDateString()}`
+              : "N/A"}
+          </TableCell>
+          <TableCell>
+            {getDzongkhagName(programme.training_location_id)}
+          </TableCell>
+          <TableCell>
+            <Chip
+              label={getStatusName(programme.status_id)}
+              size="small"
+              sx={{
+                backgroundColor: getStatusColor(programme.status_id),
+                color: "white",
+                fontWeight: "medium",
+                minWidth: "80px",
+                "& .MuiChip-label": {
+                  px: 1.5,
+                  py: 0.5,
+                },
+              }}
+            />
+          </TableCell>
+
+          <TableCell align="center">
+            <IconButton
+              color="primary"
+              size="small"
+              onClick={() =>
+                handleViewDetails(
+                  programme.application_no,
+                  programme.programme_id,
+                )
+              }
+              title="View Details"
+            >
+              <RemoveRedEyeIcon fontSize="small" />
+            </IconButton>
+          </TableCell>
+        </TableRow>
+      ));
+  };
+
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
@@ -562,98 +648,7 @@ const ReAssessmentIndex = () => {
               <TableCell align="center">Action</TableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
-            {!filterReassessmentType ? (
-              <TableRow>
-                <TableCell colSpan={12} align="center">
-                  Please select a Reassessment Type to view the data
-                </TableCell>
-              </TableRow>
-            ) : filteredProgrammes.length > 0 ? (
-              filteredProgrammes
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((programme, index) => (
-                  <TableRow key={programme.id || index}>
-                    <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
-                    <TableCell>{programme.application_no || "N/A"}</TableCell>
-                    <TableCell>
-                      {getReassessmentTypeName(programme.service_id)}
-                    </TableCell>
-                    <TableCell>
-                      {getProgrammeName(
-                        programme.programme_id,
-                        programme.service_id,
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      Nu.{" "}
-                      {programme.fees_per_trainee ||
-                        programme.feesPerTrainee ||
-                        "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      {programme.enrollment_capacity ||
-                        programme.enrollmentCapacity ||
-                        "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      {getCertificationLevelName(
-                        programme.certification_level_id,
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {getFundingSourceName(programme.funding_source_id)}
-                    </TableCell>
-                    <TableCell>
-                      {programme.course_start_date && programme.course_end_date
-                        ? `${new Date(programme.course_start_date).toLocaleDateString()} - ${new Date(programme.course_end_date).toLocaleDateString()}`
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      {getDzongkhagName(programme.training_location_id)}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getStatusName(programme.status_id)}
-                        size="small"
-                        sx={{
-                          backgroundColor: getStatusColor(programme.status_id),
-                          color: "white",
-                          fontWeight: "medium",
-                          minWidth: "80px",
-                          "& .MuiChip-label": {
-                            px: 1.5,
-                            py: 0.5,
-                          },
-                        }}
-                      />
-                    </TableCell>
-
-                    <TableCell align="center">
-                      <IconButton
-                        color="primary"
-                        size="small"
-                        onClick={() =>
-                          handleViewDetails(
-                            programme.application_no,
-                            programme.programme_id,
-                          )
-                        }
-                        title="View Details"
-                      >
-                        <RemoveRedEyeIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={12} align="center">
-                  No data available for selected reassessment type
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
+          <TableBody>{renderTableBody()}</TableBody>
         </Table>
         {filterReassessmentType && filteredProgrammes.length > 0 && (
           <TablePagination

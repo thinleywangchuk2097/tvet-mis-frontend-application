@@ -53,20 +53,13 @@ const Assessment = () => {
   const [instituteId, setInstituteId] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [certificationLevelId, setCertificationLevelId] = useState("");
-
   const [instituteList, setInstituteList] = useState([]);
   const [serviceList, setServiceList] = useState([]);
   const [programmeList, setProgrammeList] = useState([]);
   const [certificationLevelList, setCertificationLevelList] = useState([]);
-
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
-
   const access_token = useSelector((state) => state.auth.accessToken);
-
-  // ============================================================
-  // FETCHERS — all guarded and safe
-  // ============================================================
 
   const fetchAssessmentInstitutes = useCallback(async () => {
     if (!access_token) return;
@@ -85,7 +78,7 @@ const Assessment = () => {
     try {
       const res =
         await CertificationService.getServicesAssessementResult(access_token);
-        console.log("Fetched Services:", res.data);
+      console.log("Fetched Services:", res.data);
       setServiceList(toArray(res));
     } catch (error) {
       console.error("Error fetching Services:", error);
@@ -122,6 +115,38 @@ const Assessment = () => {
     }
   }, [instituteId, serviceId, certificationLevelId, access_token]);
 
+  const fetchByApplicationNo = useCallback(
+    (applicationNo) =>
+      CertificationService.getListPassTraineeForCertificatePrinting(
+        applicationNo,
+        null,
+        null,
+        null,
+        null,
+        access_token,
+      ),
+    [access_token],
+  );
+
+  const fetchByFilters = useCallback(
+    () =>
+      CertificationService.getListPassTraineeForCertificatePrinting(
+        null,
+        instituteId,
+        serviceId,
+        certificationLevelId,
+        filters.programmeList,
+        access_token,
+      ),
+    [
+      instituteId,
+      serviceId,
+      certificationLevelId,
+      filters.programmeList,
+      access_token,
+    ],
+  );
+
   const fetchPassedTrainees = useCallback(async () => {
     const hasApplicationNo = !!filters.ApplicationNo;
     const hasAllFour =
@@ -149,23 +174,13 @@ const Assessment = () => {
 
     setLoadingReports(true);
     try {
-      const res = hasApplicationNo
-        ? await CertificationService.getListPassTraineeForCertificatePrinting(
-            filters.ApplicationNo,
-            null,
-            null,
-            null,
-            null,
-            access_token,
-          )
-        : await CertificationService.getListPassTraineeForCertificatePrinting(
-            null,
-            instituteId,
-            serviceId,
-            certificationLevelId,
-            filters.programmeList,
-            access_token,
-          );
+      let res;
+      if (hasApplicationNo) {
+        res = await fetchByApplicationNo(filters.ApplicationNo);
+      } else {
+        res = await fetchByFilters();
+      }
+
       console.log("Fetched passed trainees:", res.data);
       setReports(toArray(res));
       setPage(0);
@@ -178,18 +193,20 @@ const Assessment = () => {
     }
   }, [
     filters.ApplicationNo,
-    filters.programmeList,
     instituteId,
     serviceId,
     certificationLevelId,
+    filters.programmeList,
     access_token,
+    fetchByApplicationNo,
+    fetchByFilters,
   ]);
 
   useEffect(() => {
     if (!access_token) return;
-    void fetchAssessmentInstitutes();
-    void fetchServices();
-    void fetchCertificationLevels();
+    fetchAssessmentInstitutes();
+    fetchServices();
+    fetchCertificationLevels();
   }, [
     access_token,
     fetchAssessmentInstitutes,
@@ -199,7 +216,7 @@ const Assessment = () => {
 
   useEffect(() => {
     if (instituteId && serviceId && certificationLevelId) {
-      void fetchProgrammes();
+      fetchProgrammes();
     } else {
       setProgrammeList([]);
     }
@@ -247,7 +264,7 @@ const Assessment = () => {
     try {
       await generateAllAssessmentCertificatesPdf(reports);
     } catch (err) {
-      console.error("❌ Bulk certificate generation failed");
+      console.error("Bulk certificate generation failed");
       console.error("   message:", err?.message);
       console.error("   stack:", err?.stack);
       console.error("   error:", err);
@@ -304,7 +321,7 @@ const Assessment = () => {
 
   const handleSearch = () => {
     setPage(0);
-    void fetchPassedTrainees();
+    fetchPassedTrainees();
   };
 
   const handleSearchKeyDown = (e) => {

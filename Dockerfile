@@ -3,8 +3,10 @@
 # ---------- Stage 1: build ----------
 FROM node:22-alpine3.22 AS builder
 
-# Patch the bundled npm CLI (source of the tar/glob/minimatch/brace-expansion CVEs)
-RUN npm install -g npm@latest && npm cache clean --force
+# Pin npm to a specific version (reproducible) and install without scripts.
+ARG NPM_VERSION=10.9.2
+RUN npm install -g npm@${NPM_VERSION} --ignore-scripts \
+ && npm cache clean --force
 
 WORKDIR /app
 
@@ -38,8 +40,10 @@ for (const [name, want] of Object.entries(fix)) {
 fs.writeFileSync('package.json', JSON.stringify(p, null, 2));
 EOF
 
-# Install dependencies
-RUN npm install --legacy-peer-deps && npm cache clean --force
+# Install dependencies WITHOUT running lifecycle scripts.
+# This blocks arbitrary code execution from transitive deps (postinstall, etc.).
+RUN npm install --ignore-scripts --legacy-peer-deps --no-audit --no-fund \
+ && npm cache clean --force
 
 # Copy source code and configuration files (ONLY what's needed for build)
 COPY index.html ./
@@ -47,6 +51,12 @@ COPY vite.config.js ./
 COPY eslint.config.js ./
 COPY public/ ./public/
 COPY src/ ./src/
+
+# Re-enable scripts ONLY for packages you trust and that truly need them.
+# esbuild ships prebuilt binaries in its tarball for Alpine, but its
+# postinstall is normally a no-op install check. Keep this list minimal.
+# Adjust/remove based on your actual dependency tree (e.g. sharp, node-gyp).
+RUN npm rebuild esbuild --foreground-scripts
 
 # Run build
 RUN npm run build

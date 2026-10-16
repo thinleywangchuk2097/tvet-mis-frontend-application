@@ -66,7 +66,6 @@ const REQUIRED_FIELDS = [
   "instituteName",
   "dzongkhag",
   "location",
-  "telephone",
   "mobile",
   "email",
   "ownershipType",
@@ -190,7 +189,8 @@ const InstituteSesCentreAssessmentCentre = () => {
         ),
         telephone: Yup.string()
           .matches(/^[0-9]{8,15}$/, "Invalid telephone number")
-          .required("Telephone No is required"),
+          .nullable()
+          .notRequired(),
         mobile: Yup.string()
           .matches(/^[0-9]{8}$/, "Invalid mobile number")
           .required("Mobile No is required"),
@@ -1350,11 +1350,7 @@ const InstituteSesCentreAssessmentCentre = () => {
                 fullWidth
                 size="small"
                 name="telephone"
-                label={
-                  <span>
-                    Telephone No <span style={{ color: "red" }}>*</span>
-                  </span>
-                }
+                label="Telephone No"
                 value={formik.values.telephone}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}

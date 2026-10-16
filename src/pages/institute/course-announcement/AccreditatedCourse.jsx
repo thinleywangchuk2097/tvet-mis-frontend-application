@@ -19,6 +19,7 @@ import {
   Typography,
   Chip,
   IconButton,
+  Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { Formik, Form } from "formik";
@@ -53,6 +54,15 @@ const fileToBase64 = (file) =>
       });
     reader.onerror = reject;
   });
+
+// Helper: Get today's date in YYYY-MM-DD (local time)
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 // ==================== MAIN COMPONENT ====================
 
@@ -90,7 +100,6 @@ const AccreditatedCourse = () => {
       const response =
         await InstituteRegistrationService.getInstituteDetails(registration_no);
       setInstituteDetails(response.data);
-      console.log("Institute Details:", response.data);
     } catch (error) {
       console.error("Error fetching institute data:", error);
     }
@@ -101,7 +110,6 @@ const AccreditatedCourse = () => {
       // Fetch certification levels (assuming parentId for certification levels)
       const levelsResponse = await CommonService.getByParentId(27);
       setCertificationLevels(levelsResponse.data);
-      console.log("CertificationLevels", levelsResponse.data);
       // Fetch funding sources (assuming parentId for funding sources)
       const fundingResponse = await CommonService.getByParentId(16);
       setFundingSources(fundingResponse.data);
@@ -114,7 +122,6 @@ const AccreditatedCourse = () => {
     try {
       const dzongkhagLists = await CommonService.getAllDzongkhags();
       setDzongkhags(dzongkhagLists.data);
-      console.log("Dzongkhags:", dzongkhagLists.data);
     } catch (error) {
       console.error("Error fetching dzongkhags:", error);
     }
@@ -128,7 +135,6 @@ const AccreditatedCourse = () => {
           access_token,
         );
       setApprovedCourses(approvedCourses.data);
-      console.log("Approved Courses:", approvedCourses.data);
     } catch (error) {
       console.error("Error fetching approved courses:", error);
     }
@@ -154,7 +160,6 @@ const AccreditatedCourse = () => {
     try {
       const statusResponse = await CommonService.getByParentId(4);
       setStatusList(statusResponse.data);
-      console.log("Status List:", statusResponse.data);
     } catch (error) {
       console.error("Error fetching status list:", error);
     }
@@ -184,7 +189,7 @@ const AccreditatedCourse = () => {
     programmeId: "",
     feesPerTrainee: "",
     enrollmentCapacity: "",
-    applicationStartDate: "",
+    applicationStartDate: "", // 👈 No default date
     applicationEndDate: "",
     courseStartDate: "",
     courseEndDate: "",
@@ -205,7 +210,11 @@ const AccreditatedCourse = () => {
       .required("Enrollment capacity per batch is required"),
     applicationStartDate: Yup.date()
       .typeError("Invalid date")
-      .required("Application Start Date required"),
+      .required("Application Start Date required")
+      .min(
+        getTodayDate(), // 👈 No back date allowed
+        "Application start date cannot be a past date",
+      ),
     applicationEndDate: Yup.date()
       .typeError("Invalid date")
       .required("Application End Date required")
@@ -688,108 +697,151 @@ const AccreditatedCourse = () => {
                       />
                     </Grid>
 
+                    {/* Application Start Date with Tooltip */}
                     <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        type="date"
-                        fullWidth
-                        label={
-                          <>
-                            Application Start Date <RequiredStar />
-                          </>
-                        }
-                        name="applicationStartDate"
-                        size="small"
-                        value={formik.values.applicationStartDate}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        InputLabelProps={{ shrink: true }}
-                        error={
-                          formik.touched.applicationStartDate &&
-                          Boolean(formik.errors.applicationStartDate)
-                        }
-                        helperText={
-                          formik.touched.applicationStartDate &&
-                          formik.errors.applicationStartDate
-                        }
-                      />
+                      <Tooltip
+                        title="Application start date cannot be a past date. Please select today or a future date."
+                        arrow
+                        placement="top"
+                      >
+                        <TextField
+                          type="date"
+                          fullWidth
+                          label={
+                            <>
+                              Application Start Date <RequiredStar />
+                            </>
+                          }
+                          name="applicationStartDate"
+                          size="small"
+                          value={formik.values.applicationStartDate}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          InputLabelProps={{ shrink: true }}
+                          inputProps={{ min: getTodayDate() }}
+                          error={
+                            formik.touched.applicationStartDate &&
+                            Boolean(formik.errors.applicationStartDate)
+                          }
+                          helperText={
+                            formik.touched.applicationStartDate &&
+                            formik.errors.applicationStartDate
+                          }
+                        />
+                      </Tooltip>
                     </Grid>
 
+                    {/* Application End Date with Tooltip */}
                     <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        type="date"
-                        fullWidth
-                        label={
-                          <>
-                            Application End Date <RequiredStar />
-                          </>
-                        }
-                        name="applicationEndDate"
-                        size="small"
-                        value={formik.values.applicationEndDate}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        InputLabelProps={{ shrink: true }}
-                        error={
-                          formik.touched.applicationEndDate &&
-                          Boolean(formik.errors.applicationEndDate)
-                        }
-                        helperText={
-                          formik.touched.applicationEndDate &&
-                          formik.errors.applicationEndDate
-                        }
-                      />
+                      <Tooltip
+                        title="Application end date must be on or after the application start date."
+                        arrow
+                        placement="top"
+                      >
+                        <TextField
+                          type="date"
+                          fullWidth
+                          label={
+                            <>
+                              Application End Date <RequiredStar />
+                            </>
+                          }
+                          name="applicationEndDate"
+                          size="small"
+                          value={formik.values.applicationEndDate}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          InputLabelProps={{ shrink: true }}
+                          inputProps={{
+                            min:
+                              formik.values.applicationStartDate ||
+                              getTodayDate(),
+                          }}
+                          error={
+                            formik.touched.applicationEndDate &&
+                            Boolean(formik.errors.applicationEndDate)
+                          }
+                          helperText={
+                            formik.touched.applicationEndDate &&
+                            formik.errors.applicationEndDate
+                          }
+                        />
+                      </Tooltip>
                     </Grid>
 
+                    {/* Course Start Date with Tooltip */}
                     <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        type="date"
-                        fullWidth
-                        label={
-                          <>
-                            Course Start Date <RequiredStar />
-                          </>
-                        }
-                        name="courseStartDate"
-                        size="small"
-                        value={formik.values.courseStartDate}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        InputLabelProps={{ shrink: true }}
-                        error={
-                          formik.touched.courseStartDate &&
-                          Boolean(formik.errors.courseStartDate)
-                        }
-                        helperText={
-                          formik.touched.courseStartDate &&
-                          formik.errors.courseStartDate
-                        }
-                      />
+                      <Tooltip
+                        title="Course start date must be after the application end date."
+                        arrow
+                        placement="top"
+                      >
+                        <TextField
+                          type="date"
+                          fullWidth
+                          label={
+                            <>
+                              Course Start Date <RequiredStar />
+                            </>
+                          }
+                          name="courseStartDate"
+                          size="small"
+                          value={formik.values.courseStartDate}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          InputLabelProps={{ shrink: true }}
+                          inputProps={{
+                            min:
+                              formik.values.applicationEndDate ||
+                              getTodayDate(),
+                          }}
+                          error={
+                            formik.touched.courseStartDate &&
+                            Boolean(formik.errors.courseStartDate)
+                          }
+                          helperText={
+                            formik.touched.courseStartDate &&
+                            formik.errors.courseStartDate
+                          }
+                        />
+                      </Tooltip>
                     </Grid>
 
+                    {/* Course End Date with Tooltip */}
                     <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        type="date"
-                        fullWidth
-                        label={
-                          <>
-                            Course End Date <RequiredStar />
-                          </>
-                        }
-                        name="courseEndDate"
-                        size="small"
-                        value={formik.values.courseEndDate}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        InputLabelProps={{ shrink: true }}
-                        error={
-                          formik.touched.courseEndDate &&
-                          Boolean(formik.errors.courseEndDate)
-                        }
-                        helperText={
-                          formik.touched.courseEndDate &&
-                          formik.errors.courseEndDate
-                        }
-                      />
+                      <Tooltip
+                        title="Course end date must be on or after the course start date."
+                        arrow
+                        placement="top"
+                      >
+                        <TextField
+                          type="date"
+                          fullWidth
+                          label={
+                            <>
+                              Course End Date <RequiredStar />
+                            </>
+                          }
+                          name="courseEndDate"
+                          size="small"
+                          value={formik.values.courseEndDate}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          InputLabelProps={{ shrink: true }}
+                          inputProps={{
+                            min:
+                              formik.values.courseStartDate || getTodayDate(),
+                          }}
+                          error={
+                            formik.touched.courseEndDate &&
+                            Boolean(formik.errors.courseEndDate)
+                          }
+                          helperText={
+                            formik.touched.courseEndDate &&
+                            formik.errors.courseEndDate
+                          }
+                        />
+                      </Tooltip>
                     </Grid>
 
                     <Grid item size={{ xs: 12, md: 6 }}>
