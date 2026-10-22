@@ -891,9 +891,6 @@ const AccreditedCourseRegistration = () => {
           documents: documents,
           qualityStandards: qualityStandardsList,
         };
-
-        console.log("Submitting data:", submissionData);
-
         const response =
           await ApplyAccreditedCourseService.submitAccreditedCourse(
             submissionData,

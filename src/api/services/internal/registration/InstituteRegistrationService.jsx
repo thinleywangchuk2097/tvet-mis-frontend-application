@@ -18,11 +18,15 @@ class InstituteRegistrationService {
       .catch((error) => error);
   }
 
-  getInstituteRegistrationDetails(application_no) {
+  getInstituteRegistrationDetails(application_no, token) {
     return apiClient
       .get(
         `/api/v1/public/institute-registration/get-institute-application-details/${application_no}`,
-        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       )
       .then((response) => response)
       .catch((error) => error);
@@ -63,14 +67,18 @@ class InstituteRegistrationService {
       .catch((error) => error);
   }
 
-   submitInstituteChange(values) {
+  submitInstituteChange(values) {
     return apiClient
-      .post(`/api/v1/public/institute-registration/change-institute`, values, {})
+      .post(
+        `/api/v1/public/institute-registration/change-institute`,
+        values,
+        {},
+      )
       .then((response) => response)
       .catch((error) => error);
   }
 
-   getInstituteChangeByApplicationNo(application_no) {
+  getInstituteChangeByApplicationNo(application_no) {
     return apiClient
       .get(
         `/api/v1/public/institute-registration/get-change-institute/${application_no}`,

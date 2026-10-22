@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import {
   Card,
@@ -20,7 +20,6 @@ import { useNavigate } from "react-router-dom";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import BhutanNDIService from "../../../api/services/external/ndi/BhutanNDIService";
 import { jwtDecode } from "jwt-decode";
-import { connect, StringCodec, nkeyAuthenticator } from "nats.ws";
 import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { loginSuccess } from "../../../features/auth/authSlice";
@@ -29,15 +28,7 @@ import { setUserProfile } from "../../../features/auth/userProfileSlice";
 import PrivilegeService from "../../../api/services/internal/privilege/PrivilegeService";
 import UserProfileService from "../../../api/services/internal/userprofile/UserProfileService";
 
-// stagging NDI NATS server endpoints
-const NATS_URL = "wss://natsdemoclient.bhutanndi.com";
-const SEED = new TextEncoder().encode(
-  "SUAPXY7TJFUFE3IX3OEMSLE3JFZJ3FZZRSRSOGSG2ANDIFN77O2MIBHWUM",
-);
-
-// production NDI NATS server endpoints
-//const NATS_URL = 'wss://natsg2c-client.bhutanndi.com';
-//const SEED = new TextEncoder().encode('SUAOCNCDWVZGDKIT63PAJVGCK5O6GMBMEJG3S52LZZILDNP4LTVPNN5FPE');
+const POLL_INTERVAL_MS = 2000;
 
 const Loader = () => (
   <Box
@@ -52,20 +43,16 @@ const Loader = () => (
   </Box>
 );
 
-// ==================== PROPTYPES FOR LOADER ====================
 Loader.propTypes = {};
 
-// ==================== ERROR MESSAGE COMPONENT ====================
 const ErrorMessage = ({ message }) => (
   <Typography color="error">{message}</Typography>
 );
 
-// ==================== PROPTYPES FOR ERROR MESSAGE ====================
 ErrorMessage.propTypes = {
   message: PropTypes.string.isRequired,
 };
 
-// ==================== QR CODE DISPLAY COMPONENT ====================
 const QRCodeDisplay = ({ value }) => (
   <Box
     sx={{
@@ -114,7 +101,6 @@ const QRCodeDisplay = ({ value }) => (
   </Box>
 );
 
-// ==================== PROPTYPES FOR QR CODE DISPLAY ====================
 QRCodeDisplay.propTypes = {
   value: PropTypes.string,
 };
@@ -128,6 +114,10 @@ const GenerateQRCode = () => {
   const dispatch = useDispatch();
   const isMobile = useMediaQuery("(max-width:768px)");
 
+  const pollRef = useRef(null);
+  const threadIdRef = useRef(null);
+  const stoppedRef = useRef(false);
+
   const getTokenData = (token) => {
     try {
       const decoded = jwtDecode(token);
@@ -140,20 +130,27 @@ const GenerateQRCode = () => {
   useEffect(() => {
     const fetchQRCode = async () => {
       try {
-        // No token needed for initial QR code request
+        // Backend auto-subscribes to NATS for the returned threadId
         const response = await BhutanNDIService.createProofRequest();
         console.log("Proof request response:", response);
-        if (response.data?.data?.proofRequestURL) {
-          setQrCodeUrl(response.data.data.proofRequestURL);
+
+        const data = response.data?.data;
+
+        if (data?.proofRequestURL) {
+          setQrCodeUrl(data.proofRequestURL);
         } else {
           throw new Error("Invalid response structure");
         }
-        if (response.data?.data?.proofRequestThreadId) {
-          const threadId = response.data.data.proofRequestThreadId;
-          connectToNats(threadId);
+
+        if (data?.deepLinkURL) {
+          setDeepLinkUrl(data.deepLinkURL);
         }
-        if (response.data?.data?.deepLinkURL) {
-          setDeepLinkUrl(response.data.data.deepLinkURL);
+
+        if (data?.proofRequestThreadId) {
+          threadIdRef.current = data.proofRequestThreadId;
+          startPolling(data.proofRequestThreadId);
+        } else {
+          setError("Invalid thread ID");
         }
       } catch (err) {
         console.error("Error fetching QR Code:", err);
@@ -164,49 +161,54 @@ const GenerateQRCode = () => {
     };
 
     fetchQRCode();
+
+    return () => {
+      stoppedRef.current = true;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, []);
+
+  const startPolling = (threadId) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+
+    pollRef.current = setInterval(async () => {
+      if (stoppedRef.current) return;
+
+      try {
+        const res = await BhutanNDIService.getNatsAuthResult(threadId);
+        console.log("Polling response:", res);
+        // Still pending — keep polling
+        if (res.status === 202 || res.data?.status === "PENDING") {
+          return;
+        }
+
+        // Stop polling once we have a terminal result
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+
+        if (res.status === 200 && res.data) {
+          await handleSuccessfulLogin(res.data);
+        } else {
+          const msg =
+            res.data?.message || res.data?.error || "Authentication failed";
+          toast.error(msg);
+          setError(msg);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+        // Keep polling on transient network errors
+      }
+    }, POLL_INTERVAL_MS);
+  };
 
   const handleOpenDeepLink = async () => {
     if (deepLinkUrl) {
       window.location.href = deepLinkUrl;
     } else {
       alert("No URL provided!");
-    }
-  };
-
-  const connectToNats = async (threadId) => {
-    try {
-      const sc = StringCodec();
-      const nc = await connect({
-        servers: NATS_URL,
-        authenticator: nkeyAuthenticator(SEED),
-      });
-      console.log("Connected to NATS!");
-      console.log("ThreadId", threadId);
-      if (threadId) {
-        const subscription = nc.subscribe(threadId);
-        for await (const msg of subscription) {
-          const data = JSON.parse(sc.decode(msg.data));
-          if (data) {
-            console.log("Received NATS message:", data);
-            const authResponse =
-              await BhutanNDIService.bhutanNDIAuthNatsResponse(data);
-            console.log("Authentication response:", authResponse);
-            if (authResponse.status === 200) {
-              await handleSuccessfulLogin(authResponse);
-            } else {
-              toast.error(
-                authResponse.response?.data || "Authentication failed",
-              );
-            }
-          }
-        }
-      } else {
-        setError("Invalid thread ID");
-      }
-    } catch (err) {
-      console.error("Error connecting to NATS:", err);
-      setError(err.message);
     }
   };
 
@@ -218,7 +220,8 @@ const GenerateQRCode = () => {
       userId,
       locationId,
       id,
-    } = authResponse.data;
+    } = authResponse;
+
     const { roles } = getTokenData(access_token);
     const currentRoleStr = String(current_role);
     const rolesStr = roles.map(String);
@@ -230,7 +233,6 @@ const GenerateQRCode = () => {
       return;
     }
 
-    // Dispatch login success to Redux
     dispatch(
       loginSuccess({
         access_token,
@@ -241,7 +243,6 @@ const GenerateQRCode = () => {
       }),
     );
 
-    // Fetch and set privileges
     try {
       const privilegesData = await PrivilegeService.getPrivileges(
         current_role,
@@ -262,7 +263,6 @@ const GenerateQRCode = () => {
       console.error("Privilege fetch error", err);
     }
 
-    // Fetch and set user profile
     try {
       const profileRes = await UserProfileService.getUserNameCurrentRoleName(
         userId,
@@ -282,7 +282,14 @@ const GenerateQRCode = () => {
     navigate("/");
   };
 
-  const handleClose = () => navigate("/auth/login");
+  const handleClose = () => {
+    stoppedRef.current = true;
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    navigate("/auth/login");
+  };
 
   return (
     <Box
@@ -646,7 +653,6 @@ const GenerateQRCode = () => {
   );
 };
 
-// ==================== PROPTYPES FOR MAIN COMPONENT ====================
 GenerateQRCode.propTypes = {};
 
 export default GenerateQRCode;

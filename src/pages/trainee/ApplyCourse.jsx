@@ -420,19 +420,32 @@ const ApplyCourse = () => {
     try {
       const response =
         await DatahubService.getDetailsByCitizenshipNo(citizenId);
-      const citizenData =
-        response.data?.citizenDetailsResponse?.citizenDetail?.[0];
+      console.log("cid Datahub response:", response.data);
 
-      if (citizenData) {
+      // Handle the flat response structure
+      const citizenData = response.data;
+
+      // Check if we have valid citizen data (has firstName or lastName)
+      if (citizenData && (citizenData.firstName || citizenData.lastName)) {
         const fullName =
           `${citizenData.firstName || ""} ${citizenData.lastName || ""}`.trim();
 
         formik.setFieldValue("name", fullName);
 
+        // Set DOB if available (format: "01/01/1978" -> "1978-01-01")
+        if (citizenData.dob) {
+          const dobParts = citizenData.dob.split("/");
+          if (dobParts.length === 3) {
+            // Convert DD/MM/YYYY to YYYY-MM-DD
+            const formattedDob = `${dobParts[2]}-${dobParts[1]}-${dobParts[0]}`;
+            formik.setFieldValue("dob", formattedDob);
+          }
+        }
+
         if (citizenData.gender) {
           const genderMap = {
-            Male: "1",
-            Female: "2",
+            Male: "30",
+            Female: "31",
           };
           const genderId = genderMap[citizenData.gender];
           if (genderId) {
@@ -447,6 +460,7 @@ const ApplyCourse = () => {
       } else {
         toast.warning("No citizen found with this ID");
         formik.setFieldValue("name", "");
+        formik.setFieldValue("dob", "");
         formik.setFieldValue("genderId", "");
         setAcademicResults(null);
         setIsDataFromApi(false);
@@ -458,6 +472,7 @@ const ApplyCourse = () => {
       console.error("Error fetching citizen details:", error);
       toast.error("Failed to fetch citizen details");
       formik.setFieldValue("name", "");
+      formik.setFieldValue("dob", "");
       formik.setFieldValue("genderId", "");
       setAcademicResults(null);
       setIsDataFromApi(false);
@@ -993,6 +1008,7 @@ const ApplyCourse = () => {
                               debouncedFetchCitizen(value);
                             } else if (value.length < 11) {
                               formik.setFieldValue("name", "");
+                              formik.setFieldValue("dob", "");
                               formik.setFieldValue("genderId", "");
                               setAcademicResults(null);
                               setIsDataFromApi(false);

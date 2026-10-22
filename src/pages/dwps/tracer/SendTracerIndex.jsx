@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useFormik } from "formik";
 import * as yup from "yup";
 import {
@@ -50,6 +50,163 @@ import TraineeTracerSurvey from "./TraineeTracerSurvey";
 import EmployerTracerSurvey from "./EmployerTracerSurvey";
 import { toast } from "react-toastify";
 
+/* ============================================================
+   Show/Hide condition helpers (inline)
+   ============================================================ */
+
+const parseShowWhenOptions = (showWhenOption) => {
+  if (!showWhenOption) return [];
+  return String(showWhenOption)
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+};
+
+const flattenSurveyQuestions = (questions) => {
+  const flat = [];
+  (questions || []).forEach((q, qi) => {
+    flat.push({
+      ...q,
+      __key: q.id,
+      __parentId: null,
+      __depth: 0,
+      __rootIndex: qi,
+    });
+    (q.subQuestions || []).forEach((sub, si) => {
+      flat.push({
+        ...sub,
+        __key: `sub_${sub.id}`,
+        __parentId: q.id,
+        __depth: 1,
+        __rootIndex: qi,
+        __subIndex: si,
+      });
+    });
+  });
+  return flat;
+};
+
+const buildOptionTextLookup = (questions) => {
+  const lookup = {};
+  (questions || []).forEach((q) => {
+    lookup[q.id] = {};
+    (q.options || []).forEach((opt) => {
+      const id = opt?.id ?? opt?.optionId;
+      const text =
+        opt?.text ?? opt?.optionText ?? (typeof opt === "string" ? opt : null);
+      if (id != null && text != null) lookup[q.id][String(id)] = text;
+    });
+    (q.subQuestions || []).forEach((sub) => {
+      lookup[`sub_${sub.id}`] = {};
+      (sub.options || []).forEach((opt) => {
+        const id = opt?.id ?? opt?.optionId;
+        const text =
+          opt?.text ??
+          opt?.optionText ??
+          (typeof opt === "string" ? opt : null);
+        if (id != null && text != null) {
+          lookup[`sub_${sub.id}`][String(id)] = text;
+        }
+      });
+      lookup[sub.id] = lookup[`sub_${sub.id}`];
+    });
+  });
+  return lookup;
+};
+
+const evaluateOwnCondition = (
+  question,
+  byId,
+  selectedValues,
+  optionTextLookup,
+) => {
+  if (question.showCondition !== "option") return true;
+  if (!question.dependsOnQuestionId) return true;
+
+  const depFlat = byId[question.dependsOnQuestionId];
+  if (!depFlat) return true;
+
+  const depKey = depFlat.__key;
+  const selectedValue = selectedValues[depKey];
+
+  const triggerOptions = parseShowWhenOptions(question.showWhenOption);
+  if (triggerOptions.length === 0) return true;
+
+  const depLookup = optionTextLookup[depKey] || {};
+
+  if (Array.isArray(selectedValue)) {
+    if (selectedValue.length === 0) return false;
+    const selectedTexts = selectedValue.map(
+      (v) => depLookup[String(v)] ?? String(v),
+    );
+    return triggerOptions.some((t) => selectedTexts.includes(t));
+  }
+
+  if (selectedValue == null || selectedValue === "") return false;
+  const selectedText =
+    depLookup[String(selectedValue)] ?? String(selectedValue);
+  return triggerOptions.includes(selectedText);
+};
+
+const computeVisibility = (questions, selectedValues) => {
+  const flat = flattenSurveyQuestions(questions);
+
+  const byId = {};
+  flat.forEach((q) => {
+    if (q.__depth === 0) byId[q.id] = q;
+    else byId[`sub_${q.id}`] = q;
+    if (q.__depth === 1) byId[q.id] = q;
+  });
+
+  const optionTextLookup = buildOptionTextLookup(questions);
+
+  const visibility = {};
+  const computing = new Set();
+
+  const compute = (q) => {
+    if (q.__key in visibility) return visibility[q.__key];
+    if (computing.has(q.__key)) return true;
+    computing.add(q.__key);
+
+    let result = true;
+
+    if (q.__depth === 1 && q.__parentId != null) {
+      const parent = byId[q.__parentId];
+      if (parent && !compute(parent)) {
+        computing.delete(q.__key);
+        visibility[q.__key] = false;
+        return false;
+      }
+    }
+
+    if (q.showCondition === "option" && q.dependsOnQuestionId != null) {
+      const depFlat = byId[q.dependsOnQuestionId];
+      if (!depFlat) {
+        result = true;
+      } else if (!compute(depFlat)) {
+        result = false;
+      } else {
+        result = evaluateOwnCondition(
+          q,
+          byId,
+          selectedValues,
+          optionTextLookup,
+        );
+      }
+    }
+
+    computing.delete(q.__key);
+    visibility[q.__key] = result;
+    return result;
+  };
+
+  flat.forEach((q) => compute(q));
+  return visibility;
+};
+
+/* ============================================================
+   Main component
+   ============================================================ */
 const SendTracerIndex = () => {
   const [surveys, setSurveys] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +217,9 @@ const SendTracerIndex = () => {
   const [selectedSubType, setSelectedSubType] = useState("");
   const [tracerDetails, setTracerDetails] = useState([]);
   const [tracerApplicationDetails, setTracerApplicationDetails] = useState([]);
-  const [tracerQuestionDropdownType, setTracerQuestionDropdownType] = useState([]);
+  const [tracerQuestionDropdownType, setTracerQuestionDropdownType] = useState(
+    [],
+  );
   const [viewLoading, setViewLoading] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
@@ -78,7 +237,7 @@ const SendTracerIndex = () => {
 
   const access_token = useSelector((state) => state.auth.accessToken);
 
-  // Formik validation schema for send action - Both parent and sub tracer types are required
+  /* ---------------- Formik (send validation) ---------------- */
   const sendValidationSchema = yup.object({
     parentTracerTypeId: yup
       .string()
@@ -86,21 +245,17 @@ const SendTracerIndex = () => {
     subTracerTypeId: yup.string().required("Please select a sub tracer type"),
   });
 
-  // Formik for send validation
   const formik = useFormik({
-    initialValues: {
-      parentTracerTypeId: "",
-      subTracerTypeId: "",
-    },
+    initialValues: { parentTracerTypeId: "", subTracerTypeId: "" },
     validationSchema: sendValidationSchema,
-    onSubmit: (values) => {},
+    onSubmit: () => {},
   });
 
-  // Pagination states
+  /* ---------------- Pagination ---------------- */
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
-  // Fetch parent tracer types on component mount
+  /* ---------------- Effects ---------------- */
   useEffect(() => {
     if (access_token) {
       fetchParentTracerTypes();
@@ -109,43 +264,30 @@ const SendTracerIndex = () => {
     }
   }, [access_token]);
 
+  /* ---------------- API calls ---------------- */
   const fetchParentTracerTypes = async () => {
-    if (!access_token) {
-      console.warn("No access token available");
-      return;
-    }
+    if (!access_token) return;
     try {
-      const response = await GenerateTracerService.getParentTracerTypes(access_token);
+      const response =
+        await GenerateTracerService.getParentTracerTypes(access_token);
       setParentTracerTypes(response.data || []);
-      console.log("Parent Tracer Types:", response.data);
     } catch (error) {
       console.error("Error fetching parent tracer types:", error);
-      if (error.response?.status === 401) {
-        toast.error("Your session has expired. Please login again.");
-      } else {
-        toast.error("Error fetching parent tracer types");
-      }
+      toast.error("Error fetching parent tracer types");
       setParentTracerTypes([]);
     }
   };
 
   const fetchTracerDetails = async () => {
-    if (!access_token) {
-      console.warn("No access token available");
-      return;
-    }
+    if (!access_token) return;
     setLoading(true);
     try {
-      const response = await GenerateTracerService.getTracerAllApplications(access_token);
+      const response =
+        await GenerateTracerService.getTracerAllApplications(access_token);
       setTracerDetails(response.data || []);
-      console.log("Tracer Details:", response.data);
     } catch (error) {
       console.error("Error fetching tracer details:", error);
-      if (error.response?.status === 401) {
-        toast.error("Your session has expired. Please login again.");
-      } else {
-        toast.error("Error fetching tracer details");
-      }
+      toast.error("Error fetching tracer details");
       setTracerDetails([]);
     } finally {
       setLoading(false);
@@ -153,29 +295,19 @@ const SendTracerIndex = () => {
   };
 
   const fetchTracerApplicationDetails = async (applicationNo) => {
-    if (!access_token) {
-      console.warn("No access token available");
-      return [];
-    }
+    if (!access_token) return [];
     setViewLoading(true);
     try {
-      const response = await GenerateTracerService.getTracerDetailsByApplicationNo(
-        applicationNo,
-        access_token,
-      );
+      const response =
+        await GenerateTracerService.getTracerDetailsByApplicationNo(
+          applicationNo,
+          access_token,
+        );
       setTracerApplicationDetails(response.data || []);
-      console.log(
-        `Tracer Application Details for ${applicationNo}:`,
-        response.data,
-      );
       return response.data || [];
     } catch (error) {
       console.error("Error fetching tracer application details:", error);
-      if (error.response?.status === 401) {
-        toast.error("Your session has expired. Please login again.");
-      } else {
-        toast.error("Error fetching tracer application details");
-      }
+      toast.error("Error fetching tracer application details");
       return [];
     } finally {
       setViewLoading(false);
@@ -183,32 +315,23 @@ const SendTracerIndex = () => {
   };
 
   const fetchTracerQuestionDropdownType = async () => {
-    if (!access_token) {
-      console.warn("No access token available");
-      return;
-    }
+    if (!access_token) return;
     try {
-      const response = await GenerateTracerService.getTracerQuestionDropdownType(access_token);
+      const response =
+        await GenerateTracerService.getTracerQuestionDropdownType(access_token);
       setTracerQuestionDropdownType(response.data || []);
-      console.log("Tracer Question Dropdown Types:", response.data);
     } catch (error) {
       console.error("Error fetching tracer question dropdown types:", error);
-      if (error.response?.status === 401) {
-        toast.error("Your session has expired. Please login again.");
-      } else {
-        toast.error("Error fetching question dropdown types");
-      }
+      toast.error("Error fetching question dropdown types");
       setTracerQuestionDropdownType([]);
     }
   };
 
-  // Fetch sub tracer types dynamically based on parent ID
   const fetchSubTracerTypes = async (parentId) => {
     if (!parentId) {
       setSubTracerTypes([]);
       return;
     }
-
     setIsLoadingSubTypes(true);
     try {
       const response = await CommonService.getByParentId(parentId);
@@ -218,7 +341,6 @@ const SendTracerIndex = () => {
         ...item,
       }));
       setSubTracerTypes(subTypes);
-      console.log(`Sub Tracer Types for parent ${parentId}:`, subTypes);
     } catch (error) {
       console.error("Error fetching sub tracer types:", error);
       toast.error("Error fetching sub tracer types");
@@ -228,27 +350,24 @@ const SendTracerIndex = () => {
     }
   };
 
-  // Handle parent tracer type change
+  /* ---------------- Filter change handlers ---------------- */
   const handleParentTracerTypeChange = async (selectedParentId) => {
     setSelectedParentType(selectedParentId);
     setSelectedSubType("");
     formik.setFieldValue("parentTracerTypeId", selectedParentId);
     formik.setFieldValue("subTracerTypeId", "");
-    // Clear validation errors when changing selections
     formik.setFieldTouched("parentTracerTypeId", false);
     formik.setFieldTouched("subTracerTypeId", false);
     await fetchSubTracerTypes(selectedParentId);
   };
 
-  // Handle sub tracer type change
   const handleSubTracerTypeChange = (selectedSubId) => {
     setSelectedSubType(selectedSubId);
     formik.setFieldValue("subTracerTypeId", selectedSubId);
-    // Clear validation error when sub type is selected
     formik.setFieldTouched("subTracerTypeId", false);
   };
 
-  // Helper function to get question type value by ID
+  /* ---------------- Question-type helpers ---------------- */
   const getQuestionTypeValue = (typeId) => {
     if (!typeId) return null;
     const questionType = (tracerQuestionDropdownType || []).find(
@@ -256,42 +375,56 @@ const SendTracerIndex = () => {
     );
     return questionType ? questionType.value : null;
   };
+  const getQuestionTypeForId = (typeId) => getQuestionTypeValue(typeId);
 
-  // Get question type for a question (handles both main and sub questions)
-  const getQuestionTypeForId = (typeId) => {
-    if (!typeId) return null;
-    const questionType = (tracerQuestionDropdownType || []).find(
-      (t) => t.id === typeId.toString(),
-    );
-    return questionType ? questionType.value : null;
-  };
-
-  // Parse options from JSON string
+  /* ---------------- Parsers (preserve conditions) ---------------- */
   const parseOptions = (optionsJson) => {
     if (!optionsJson || optionsJson === "[]") return [];
     try {
-      return JSON.parse(optionsJson);
+      const parsed =
+        typeof optionsJson === "string" ? JSON.parse(optionsJson) : optionsJson;
+      if (!Array.isArray(parsed)) return [];
+      if (parsed.length > 0 && parsed[0]?.optionText) {
+        return parsed.map((opt) => ({ id: opt.id, text: opt.optionText }));
+      }
+      return parsed;
     } catch (error) {
       console.error("Error parsing options:", error);
       return [];
     }
   };
 
-  // Parse sub-questions from JSON string with their options
   const parseSubQuestions = (subQuestionsJson) => {
     if (!subQuestionsJson || subQuestionsJson === "[]") return [];
     try {
-      const parsed = JSON.parse(subQuestionsJson);
+      const parsed =
+        typeof subQuestionsJson === "string"
+          ? JSON.parse(subQuestionsJson)
+          : subQuestionsJson;
+      if (!Array.isArray(parsed)) return [];
       return parsed.map((sub) => ({
         id: sub.id,
         questionText: sub.questionText,
         questionTypeId: sub.questionTypeId,
-        isRequired: sub.isRequired,
+        isRequired:
+          sub.isRequired === 1 ||
+          sub.isRequired === "1" ||
+          sub.isRequired === true ||
+          sub.isRequired === "true",
         ratingScale: sub.ratingScale || 5,
         subQuestionOrder: sub.subQuestionOrder,
+        showCondition: sub.showCondition || "always",
+        dependsOnQuestionId: sub.dependsOnQuestionId ?? null,
+        showWhenOption: sub.showWhenOption || "",
+        maxSelections:
+          sub.maxSelections != null ? Number(sub.maxSelections) : 0,
+        maxDigits: sub.maxDigits != null ? Number(sub.maxDigits) : 0,
         options:
           sub.options && sub.options.length > 0
-            ? sub.options.map((opt) => opt.optionText || opt)
+            ? sub.options.map((opt) => ({
+                id: opt.id,
+                text: opt.optionText || opt,
+              }))
             : [],
       }));
     } catch (error) {
@@ -300,7 +433,7 @@ const SendTracerIndex = () => {
     }
   };
 
-  // Transform API data to survey format
+  /* ---------------- Survey transform ---------------- */
   const transformToSurveyFormat = (
     applicationData,
     parentTypeName,
@@ -308,7 +441,7 @@ const SendTracerIndex = () => {
   ) => {
     if (!applicationData || applicationData.length === 0) return null;
 
-    const questions = applicationData.map((item, index) => {
+    const questions = applicationData.map((item) => {
       const questionTypeValue = getQuestionTypeValue(item.question_type_id);
       const options = parseOptions(item.question_options);
       const subQuestions = parseSubQuestions(item.sub_questions);
@@ -317,11 +450,20 @@ const SendTracerIndex = () => {
         id: item.id,
         questionText: item.question_text,
         questionType: questionTypeValue,
-        required: item.is_required === "1",
+        required:
+          item.is_required === "1" ||
+          item.is_required === 1 ||
+          item.is_required === true,
         ratingScale: item.rating_scale ? parseInt(item.rating_scale) : 5,
-        options: options.map((opt) => opt.optionText),
-        multipleTextFields: options.map((opt) => opt.optionText),
-        subQuestions: subQuestions,
+        showCondition: item.show_condition || "always",
+        dependsOnQuestionId: item.depends_on_question_id ?? null,
+        showWhenOption: item.show_when_option || "",
+        maxSelections:
+          item.max_selections != null ? Number(item.max_selections) : 0,
+        maxDigits: item.max_digits != null ? Number(item.max_digits) : 0,
+        options,
+        multipleTextFields: options.map((o) => o.text ?? o),
+        subQuestions,
       };
     });
 
@@ -332,11 +474,17 @@ const SendTracerIndex = () => {
       subTracerTypeName: subTypeName,
       tracerCreatedAt: applicationData[0]?.created_at?.split(" ")[0],
       status: "Pending",
-      questions: questions,
+      questions,
     };
   };
 
-  // Filter surveys based on selected parent and sub tracer types using IDs
+  /* ---------------- Preview visibility ---------------- */
+  const previewVisibility = useMemo(() => {
+    if (!selectedSurvey?.questions) return {};
+    return computeVisibility(selectedSurvey.questions, formResponses);
+  }, [selectedSurvey, formResponses]);
+
+  /* ---------------- Table filters ---------------- */
   const filteredTracerDetails = (tracerDetails || []).filter((tracer) => {
     const matchesParent = selectedParentType
       ? String(tracer.parent_tracer_type_id) === String(selectedParentType)
@@ -347,72 +495,53 @@ const SendTracerIndex = () => {
     return matchesParent && matchesSub;
   });
 
-  // Filter surveys based on search
   const filteredSurveys = (filteredTracerDetails || []).filter((survey) => {
-    const matchesSearch = search
+    return search
       ? survey.application_no?.toLowerCase().includes(search.toLowerCase())
       : true;
-    return matchesSearch;
   });
 
-  // Pagination functions
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
+  const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  // Get current page rows for display
   const paginatedSurveys = (filteredSurveys || []).slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage,
   );
 
-  // Validate before sending - Now requires both parent and sub tracer types
+  /* ---------------- Send validation ---------------- */
   const validateBeforeSend = async () => {
     setSendError("");
-
-    // Validate form values
     const errors = await formik.validateForm();
-
     if (Object.keys(errors).length > 0) {
-      // Set touched to show errors
       formik.setTouched({
         parentTracerTypeId: true,
         subTracerTypeId: true,
       });
-
-      // Create error message
       const errorMessages = [];
       if (errors.parentTracerTypeId)
         errorMessages.push(errors.parentTracerTypeId);
       if (errors.subTracerTypeId) errorMessages.push(errors.subTracerTypeId);
-
       setSendError(errorMessages.join(". "));
       return false;
     }
-
     return true;
   };
 
-  // Handle send to selected survey - Now validates both parent and sub types
+  /* ---------------- Send handlers ---------------- */
   const handleSend = async (survey) => {
-    // Check if parent type is selected
     if (!selectedParentType) {
       toast.warning("Please select a parent tracer type first");
       return;
     }
-
-    // Check if sub type is selected
     if (!selectedSubType) {
       toast.warning("Please select a sub tracer type");
       formik.setFieldTouched("subTracerTypeId", true);
       return;
     }
-
     const isValid = await validateBeforeSend();
     if (!isValid) return;
 
@@ -444,13 +573,10 @@ const SendTracerIndex = () => {
       applicationNo: selectedSurvey.applicationNo,
       parentTracerTypeId: selectedSurvey?.parentTracerTypeId,
       subTracerTypeId: selectedSurvey?.subTracerTypeId,
-      selectedTrainees: selectedTrainees,
+      selectedTrainees,
     };
-
-    console.log("Sending trainee tracer data:", sendData);
-
     try {
-      const response = await GenerateTracerService.sendTraineeTracerSurvey(
+      await GenerateTracerService.sendTraineeTracerSurvey(
         sendData,
         access_token,
       );
@@ -458,7 +584,7 @@ const SendTracerIndex = () => {
         `Trainee Tracer survey sent to ${selectedTrainees.length} trainee(s) successfully!`,
       );
       handleCloseSendDialog();
-      fetchTracerDetails(); // Refresh the list
+      fetchTracerDetails();
     } catch (error) {
       console.error("Error sending trainee survey:", error);
       toast.error(
@@ -472,13 +598,10 @@ const SendTracerIndex = () => {
       applicationNo: selectedSurvey.applicationNo,
       parentTracerTypeId: selectedSurvey?.parentTracerTypeId,
       subTracerTypeId: selectedSurvey?.subTracerTypeId,
-      selectedEmployers: selectedEmployers,
+      selectedEmployers,
     };
-
-    console.log("Sending employer tracer data:", sendData);
-
     try {
-      const response = await GenerateTracerService.sendEmployerTracerSurvey(
+      await GenerateTracerService.sendEmployerTracerSurvey(
         sendData,
         access_token,
       );
@@ -486,7 +609,7 @@ const SendTracerIndex = () => {
         `Employer Tracer survey sent to ${selectedEmployers.length} employer(s) successfully!`,
       );
       handleCloseSendDialog();
-      fetchTracerDetails(); // Refresh the list
+      fetchTracerDetails();
     } catch (error) {
       console.error("Error sending employer survey:", error);
       toast.error(
@@ -502,6 +625,7 @@ const SendTracerIndex = () => {
     setSendError("");
   };
 
+  /* ---------------- View / preview handlers ---------------- */
   const handleViewSurvey = async (survey) => {
     setViewLoading(true);
     try {
@@ -516,13 +640,17 @@ const SendTracerIndex = () => {
 
       if (transformedSurvey) {
         setSelectedSurvey(transformedSurvey);
+
         const initialResponses = {};
         transformedSurvey.questions.forEach((question) => {
-          if (question.questionType === "checkbox") {
+          if (
+            question.questionType === "checkbox" ||
+            question.questionType === "multiSelect"
+          ) {
             initialResponses[`q_${question.id}`] = [];
           } else if (question.questionType === "multipleText") {
             const multiResponses = {};
-            question.multipleTextFields.forEach((field, idx) => {
+            (question.multipleTextFields || []).forEach((_, idx) => {
               multiResponses[`field_${idx}`] = "";
             });
             initialResponses[`q_${question.id}`] = multiResponses;
@@ -530,15 +658,20 @@ const SendTracerIndex = () => {
             initialResponses[`q_${question.id}`] = "";
           }
 
-          if (question.subQuestions && question.subQuestions.length > 0) {
-            question.subQuestions.forEach((sub) => {
-              if (sub.questionType === "checkbox") {
-                initialResponses[`sub_${sub.id}`] = [];
-              } else {
-                initialResponses[`sub_${sub.id}`] = "";
-              }
-            });
-          }
+          (question.subQuestions || []).forEach((sub) => {
+            const subType = getQuestionTypeForId(sub.questionTypeId);
+            if (subType === "checkbox" || subType === "multiSelect") {
+              initialResponses[`sub_${sub.id}`] = [];
+            } else if (subType === "multipleText") {
+              const multi = {};
+              (sub.options || []).forEach((_, idx) => {
+                multi[`field_${idx}`] = "";
+              });
+              initialResponses[`sub_${sub.id}`] = multi;
+            } else {
+              initialResponses[`sub_${sub.id}`] = "";
+            }
+          });
         });
         setFormResponses(initialResponses);
         setViewOpen(true);
@@ -570,7 +703,6 @@ const SendTracerIndex = () => {
     fieldName = null,
   ) => {
     const key = isSubQuestion ? `sub_${questionId}` : `q_${questionId}`;
-
     if (fieldName) {
       setFormResponses((prev) => ({
         ...prev,
@@ -589,162 +721,176 @@ const SendTracerIndex = () => {
   ) => {
     const key = isSubQuestion ? `sub_${questionId}` : `q_${questionId}`;
     setFormResponses((prev) => {
-      const currentValues = prev[key] || [];
-      if (checked) {
-        return { ...prev, [key]: [...currentValues, option] };
-      } else {
-        return {
-          ...prev,
-          [key]: currentValues.filter((item) => item !== option),
-        };
-      }
+      const current = prev[key] || [];
+      return checked
+        ? { ...prev, [key]: [...current, option] }
+        : { ...prev, [key]: current.filter((v) => v !== option) };
     });
   };
 
-  // Render stars with numbers for rating
-  const renderRatingStars = (scale, value, onChange, disabled = false) => {
-    return (
-      <Box
-        sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
-      >
-        <Rating
-          name="rating"
-          value={value || 0}
-          precision={1}
-          max={scale}
-          onChange={(event, newValue) => {
-            if (onChange) onChange(newValue);
-          }}
-          icon={<StarIcon fontSize="inherit" />}
-          emptyIcon={<StarIcon fontSize="inherit" />}
-          disabled={disabled}
-          sx={{
-            "& .MuiRating-iconFilled": { color: "#1976d2" },
-            "& .MuiRating-iconHover": { color: "#1976d2" },
-          }}
-        />
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          {[...Array(scale)].map((_, i) => (
-            <Button
-              key={i}
-              variant={value === i + 1 ? "contained" : "outlined"}
-              size="small"
-              onClick={() => onChange && onChange(i + 1)}
-              disabled={disabled}
-              sx={{
-                minWidth: 32,
-                height: 32,
-                p: 0,
-                backgroundColor: value === i + 1 ? "#1976d2" : "transparent",
-                borderColor: "#1976d2",
-                color: value === i + 1 ? "white" : "#1976d2",
-              }}
-            >
-              {i + 1}
-            </Button>
-          ))}
-        </Box>
+  /* ---------------- Field renderers ---------------- */
+  const renderRatingStars = (scale, value, onChange, disabled = false) => (
+    <Box
+      sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}
+    >
+      <Rating
+        value={value || 0}
+        precision={1}
+        max={scale}
+        onChange={(_, v) => onChange?.(v)}
+        icon={<StarIcon fontSize="inherit" />}
+        emptyIcon={<StarIcon fontSize="inherit" />}
+        disabled={disabled}
+        sx={{
+          "& .MuiRating-iconFilled": { color: "#1976d2" },
+          "& .MuiRating-iconHover": { color: "#1976d2" },
+        }}
+      />
+      <Box sx={{ display: "flex", gap: 1 }}>
+        {[...Array(scale)].map((_, i) => (
+          <Button
+            key={i}
+            variant={value === i + 1 ? "contained" : "outlined"}
+            size="small"
+            onClick={() => onChange?.(i + 1)}
+            disabled={disabled}
+            sx={{
+              minWidth: 32,
+              height: 32,
+              p: 0,
+              backgroundColor: value === i + 1 ? "#1976d2" : "transparent",
+              borderColor: "#1976d2",
+              color: value === i + 1 ? "white" : "#1976d2",
+            }}
+          >
+            {i + 1}
+          </Button>
+        ))}
       </Box>
-    );
-  };
+    </Box>
+  );
 
-  // Render underlined dropdown preview
   const renderUnderlinedDropdown = (options, questionId, disabled = false) => {
     const value = dropdownValues[questionId] || "";
-    const handleChange = (event) => {
-      setDropdownValues((prev) => ({
-        ...prev,
-        [questionId]: event.target.value,
-      }));
-    };
     return (
       <FormControl fullWidth variant="standard" disabled={disabled}>
-        <InputLabel id={`dropdown-label-${questionId}`}>
-          Select an option
-        </InputLabel>
+        <InputLabel>Select an option</InputLabel>
         <Select
-          labelId={`dropdown-label-${questionId}`}
           value={value}
-          onChange={handleChange}
+          onChange={(e) =>
+            setDropdownValues((prev) => ({
+              ...prev,
+              [questionId]: e.target.value,
+            }))
+          }
           label="Select an option"
         >
           <MenuItem value="">
             <em>None</em>
           </MenuItem>
           {(options || [])
-            .filter((opt) => opt && opt.trim() !== "")
-            .map((option, idx) => (
-              <MenuItem key={idx} value={option}>
-                {option}
-              </MenuItem>
-            ))}
+            .filter((opt) => {
+              const text = typeof opt === "string" ? opt : opt.text;
+              return text && text.trim() !== "";
+            })
+            .map((opt, idx) => {
+              const text = typeof opt === "string" ? opt : opt.text;
+              return (
+                <MenuItem key={idx} value={text}>
+                  {text}
+                </MenuItem>
+              );
+            })}
         </Select>
       </FormControl>
     );
   };
 
-  // Render multi-select dropdown preview
-  const renderOriginalMultiSelect = (options, questionId, disabled = false) => {
+  const renderOriginalMultiSelect = (
+    options,
+    questionId,
+    disabled = false,
+    maxSelections = 0,
+  ) => {
     const selectedValues = multiSelectValues[questionId] || [];
-    const handleChange = (event) => {
-      const value = event.target.value;
-      setMultiSelectValues((prev) => ({
-        ...prev,
-        [questionId]: typeof value === "string" ? value.split(",") : value,
-      }));
-    };
+    const limitReached =
+      maxSelections > 0 && selectedValues.length >= maxSelections;
+
     return (
       <FormControl fullWidth size="small" disabled={disabled}>
         <InputLabel>Select Options</InputLabel>
         <Select
           multiple
           value={selectedValues}
-          onChange={handleChange}
+          onChange={(e) => {
+            let v = e.target.value;
+            v = typeof v === "string" ? v.split(",") : v;
+            if (maxSelections > 0 && v.length > maxSelections) {
+              v = v.slice(0, maxSelections);
+            }
+            setMultiSelectValues((prev) => ({ ...prev, [questionId]: v }));
+          }}
           input={<OutlinedInput label="Select Options" />}
           renderValue={(selected) => (
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-              {(selected || []).map((value) => (
-                <Chip key={value} label={value} size="small" />
+              {(selected || []).map((v) => (
+                <Chip key={v} label={v} size="small" />
               ))}
             </Box>
           )}
         >
           {(options || [])
-            .filter((opt) => opt && opt.trim() !== "")
-            .map((option, idx) => (
-              <MenuItem key={idx} value={option}>
-                <Checkbox checked={selectedValues.indexOf(option) > -1} />
-                <ListItemText primary={option} />
-              </MenuItem>
-            ))}
+            .filter((opt) => {
+              const text = typeof opt === "string" ? opt : opt.text;
+              return text && text.trim() !== "";
+            })
+            .map((opt, idx) => {
+              const text = typeof opt === "string" ? opt : opt.text;
+              const isSelected = selectedValues.indexOf(text) > -1;
+              const optionDisabled = limitReached && !isSelected;
+              return (
+                <MenuItem key={idx} value={text} disabled={optionDisabled}>
+                  <Checkbox checked={isSelected} />
+                  <ListItemText primary={text} />
+                </MenuItem>
+              );
+            })}
         </Select>
+        {maxSelections > 0 && (
+          <Typography
+            variant="caption"
+            color={limitReached ? "warning" : "text.secondary"}
+            sx={{ mt: 0.5, display: "block" }}
+          >
+            {selectedValues.length}/{maxSelections} selected
+            {limitReached ? " — limit reached" : ""}
+          </Typography>
+        )}
       </FormControl>
     );
   };
 
-  // Render underlined text input preview
   const renderUnderlinedTextInput = (
     questionId,
     disabled = false,
     isTextArea = false,
     fieldLabel = null,
+    maxDigits = 0,
   ) => {
+    const isLimited = !isTextArea && maxDigits > 0;
     const value = isTextArea
       ? textAreaValues[questionId] || ""
       : textInputValues[questionId] || "";
+
     const handleChange = (e) => {
-      if (isTextArea) {
-        setTextAreaValues((prev) => ({
-          ...prev,
-          [questionId]: e.target.value,
-        }));
-      } else {
-        setTextInputValues((prev) => ({
-          ...prev,
-          [questionId]: e.target.value,
-        }));
+      let raw = e.target.value;
+      if (isLimited) {
+        raw = raw.replace(/\D/g, "").slice(0, maxDigits);
       }
+      const setter = isTextArea ? setTextAreaValues : setTextInputValues;
+      setter((prev) => ({ ...prev, [questionId]: raw }));
     };
+
     if (isTextArea) {
       return (
         <TextField
@@ -759,75 +905,106 @@ const SendTracerIndex = () => {
         />
       );
     }
-    return (
-      <Input
-        fullWidth
-        placeholder={fieldLabel || "Type your answer here..."}
-        value={value}
-        onChange={handleChange}
-        disabled={disabled}
-        disableUnderline={false}
-      />
-    );
-  };
 
-  // Render multiple text inputs preview
-  const renderMultipleTextInputs = (fields, questionId, disabled = false) => {
-    if (!multipleTextValues[questionId]) {
-      multipleTextValues[questionId] = {};
-    }
-    const handleFieldChange = (fieldIndex, value) => {
-      setMultipleTextValues((prev) => ({
-        ...prev,
-        [questionId]: { ...(prev[questionId] || {}), [fieldIndex]: value },
-      }));
-    };
+    const atLimit = isLimited && value.length >= maxDigits;
+
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {(fields || [])
-          .filter((field) => field && field.trim() !== "")
-          .map((field, idx) => (
-            <Box key={idx}>
-              <Typography variant="caption" color="text.secondary" gutterBottom>
-                {field}
-              </Typography>
-              <Input
-                fullWidth
-                placeholder={`Enter ${field.toLowerCase()}`}
-                value={multipleTextValues[questionId]?.[idx] || ""}
-                onChange={(e) => handleFieldChange(idx, e.target.value)}
-                disabled={disabled}
-                disableUnderline={false}
-              />
-            </Box>
-          ))}
+      <Box>
+        <Input
+          fullWidth
+          placeholder={
+            isLimited
+              ? `Enter up to ${maxDigits} digits`
+              : fieldLabel || "Type your answer here..."
+          }
+          value={value}
+          onChange={handleChange}
+          disabled={disabled}
+          disableUnderline={false}
+          inputProps={
+            isLimited
+              ? { inputMode: "numeric", maxLength: maxDigits }
+              : undefined
+          }
+        />
+        {isLimited && (
+          <Typography
+            variant="caption"
+            color={atLimit ? "warning" : "text.secondary"}
+            sx={{ mt: 0.5, display: "block" }}
+          >
+            {value.length}/{maxDigits} digits
+            {atLimit ? " — limit reached" : ""}
+          </Typography>
+        )}
       </Box>
     );
   };
 
-  // Render preview options based on question type
+  const renderMultipleTextInputs = (fields, questionId, disabled = false) => {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {(fields || [])
+          .filter((field) => {
+            const text = typeof field === "string" ? field : field.text;
+            return text && text.trim() !== "";
+          })
+          .map((field, idx) => {
+            const text = typeof field === "string" ? field : field.text;
+            return (
+              <Box key={idx}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  gutterBottom
+                >
+                  {text}
+                </Typography>
+                <Input
+                  fullWidth
+                  placeholder={`Enter ${text.toLowerCase()}`}
+                  value={multipleTextValues[questionId]?.[idx] || ""}
+                  onChange={(e) =>
+                    setMultipleTextValues((prev) => ({
+                      ...prev,
+                      [questionId]: {
+                        ...(prev[questionId] || {}),
+                        [idx]: e.target.value,
+                      },
+                    }))
+                  }
+                  disabled={disabled}
+                  disableUnderline={false}
+                />
+              </Box>
+            );
+          })}
+      </Box>
+    );
+  };
+
   const renderPreviewOptions = (question, isSubQuestion = false) => {
     let questionType = question.questionType;
-
     if (!questionType && question.questionTypeId) {
       questionType = getQuestionTypeForId(question.questionTypeId);
     }
-
     if (!questionType) return null;
 
     const questionId = question.id;
     const responseKey = isSubQuestion ? `sub_${questionId}` : `q_${questionId}`;
     const responseValue =
-      formResponses[responseKey] || (questionType === "checkbox" ? [] : "");
+      formResponses[responseKey] ||
+      (questionType === "checkbox" || questionType === "multiSelect" ? [] : "");
 
     let options = [];
     if (question.options && question.options.length > 0) {
-      if (typeof question.options[0] === "string") {
-        options = question.options;
-      } else if (typeof question.options[0] === "object") {
-        options = question.options.map((opt) => opt.optionText || opt);
-      }
+      options = question.options.map((opt) =>
+        typeof opt === "string" ? opt : (opt.text ?? opt),
+      );
     }
+
+    const maxDigits = question.maxDigits || 0;
+    const maxSelections = question.maxSelections || 0;
 
     switch (questionType) {
       case "radio":
@@ -849,59 +1026,105 @@ const SendTracerIndex = () => {
           </RadioGroup>
         );
 
-      case "checkbox":
+      case "checkbox": {
+        const selectedArr = Array.isArray(responseValue) ? responseValue : [];
+        const limitReached =
+          maxSelections > 0 && selectedArr.length >= maxSelections;
+
         return (
-          <FormGroup>
-            {(options || []).map((opt, idx) => (
-              <FormControlLabel
-                key={idx}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={responseValue.includes(opt)}
-                    onChange={(e) =>
-                      handleCheckboxChange(
-                        questionId,
-                        opt,
-                        e.target.checked,
-                        isSubQuestion,
-                      )
+          <FormControl component="fieldset" fullWidth>
+            <FormGroup>
+              {(options || []).map((opt, idx) => {
+                const checked = selectedArr.includes(opt);
+                const optionDisabled = limitReached && !checked;
+                return (
+                  <FormControlLabel
+                    key={idx}
+                    disabled={optionDisabled}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            if (
+                              maxSelections > 0 &&
+                              selectedArr.length >= maxSelections
+                            ) {
+                              return;
+                            }
+                            handleCheckboxChange(
+                              questionId,
+                              opt,
+                              true,
+                              isSubQuestion,
+                            );
+                          } else {
+                            handleCheckboxChange(
+                              questionId,
+                              opt,
+                              false,
+                              isSubQuestion,
+                            );
+                          }
+                        }}
+                      />
                     }
+                    label={opt}
                   />
-                }
-                label={opt}
-              />
-            ))}
-          </FormGroup>
+                );
+              })}
+            </FormGroup>
+            {maxSelections > 0 && (
+              <Typography
+                variant="caption"
+                color={limitReached ? "warning" : "text.secondary"}
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                {selectedArr.length}/{maxSelections} selected
+                {limitReached ? " — limit reached" : ""}
+              </Typography>
+            )}
+          </FormControl>
         );
+      }
 
       case "dropdown":
-        return renderUnderlinedDropdown(options, questionId, false);
+        return renderUnderlinedDropdown(options, questionId);
 
       case "multiSelect":
-        return renderOriginalMultiSelect(options, questionId, false);
+        return renderOriginalMultiSelect(
+          options,
+          questionId,
+          false,
+          maxSelections,
+        );
 
       case "multipleText":
-        const textFields =
-          question.multipleTextFields || question.options || [];
-        return renderMultipleTextInputs(textFields, questionId, false);
+        return renderMultipleTextInputs(
+          question.multipleTextFields || question.options || [],
+          questionId,
+        );
 
       case "rating":
-        const ratingKey = `${questionId}`;
-        const ratingScale = question.ratingScale || 5;
         return renderRatingStars(
-          ratingScale,
-          ratingValues[ratingKey] || 0,
+          question.ratingScale || 5,
+          ratingValues[questionId] || 0,
           (value) =>
-            setRatingValues((prev) => ({ ...prev, [ratingKey]: value })),
-          false,
+            setRatingValues((prev) => ({ ...prev, [questionId]: value })),
         );
 
       case "text":
-        return renderUnderlinedTextInput(questionId, false, false, null);
+        return renderUnderlinedTextInput(
+          questionId,
+          false,
+          false,
+          null,
+          maxDigits,
+        );
 
       case "textarea":
-        return renderUnderlinedTextInput(questionId, false, true, null);
+        return renderUnderlinedTextInput(questionId, false, true);
 
       case "date":
         return (
@@ -918,13 +1141,14 @@ const SendTracerIndex = () => {
     }
   };
 
+  /* ---------------- Render ---------------- */
   return (
     <Paper sx={{ p: 3, mt: 1 }}>
       <Typography variant="h6" fontWeight={600} sx={{ mb: 3 }}>
         Send Tracer Surveys
       </Typography>
 
-      {/* Parent and Sub Tracer Type Filters */}
+      {/* Filters */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item size={{ xs: 12, md: 6 }}>
           <FormControl
@@ -939,10 +1163,9 @@ const SendTracerIndex = () => {
             <Select
               value={selectedParentType}
               label="Parent Tracer Type *"
-              onChange={async (e) => {
-                const selectedValue = e.target.value;
-                await handleParentTracerTypeChange(selectedValue);
-              }}
+              onChange={async (e) =>
+                await handleParentTracerTypeChange(e.target.value)
+              }
               onBlur={formik.handleBlur}
             >
               <MenuItem value="">
@@ -1009,7 +1232,6 @@ const SendTracerIndex = () => {
         </Grid>
       </Grid>
 
-      {/* Search Box */}
       {selectedParentType && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item size={{ xs: 12, md: 6 }}>
@@ -1025,14 +1247,12 @@ const SendTracerIndex = () => {
         </Grid>
       )}
 
-      {/* Loading State */}
       {loading && (
         <Box sx={{ display: "flex", justifyContent: "center", my: 3 }}>
           <CircularProgress />
         </Box>
       )}
 
-      {/* No Data Message */}
       {!loading && selectedParentType && filteredSurveys.length === 0 && (
         <Box sx={{ textAlign: "center", py: 3 }}>
           <Typography color="textSecondary">
@@ -1041,7 +1261,6 @@ const SendTracerIndex = () => {
         </Box>
       )}
 
-      {/* Table */}
       {selectedParentType && filteredSurveys.length > 0 && (
         <>
           <TableContainer>
@@ -1117,7 +1336,8 @@ const SendTracerIndex = () => {
                     </TableCell>
                     <TableCell>{survey.created_at?.split(" ")[0]}</TableCell>
                     <TableCell align="center">
-                      <Stack                        direction="row"
+                      <Stack
+                        direction="row"
                         spacing={0.5}
                         justifyContent="center"
                       >
@@ -1212,7 +1432,7 @@ const SendTracerIndex = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View Survey Details Dialog */}
+      {/* Preview dialog — respects show/hide + max limits */}
       <Dialog
         open={viewOpen}
         onClose={handleCloseView}
@@ -1250,70 +1470,82 @@ const SendTracerIndex = () => {
             selectedSurvey && (
               <Box>
                 {(selectedSurvey.questions || []).length > 0 ? (
-                  (selectedSurvey.questions || []).map((question, index) => (
-                    <Box key={question.id} sx={{ mb: 3 }}>
-                      <Typography variant="body1" gutterBottom fontWeight={500}>
-                        {index + 1}.{" "}
-                        {question.questionText || "Untitled Question"}
-                        {question.required && (
-                          <span style={{ color: "red", marginLeft: "4px" }}>
-                            *
-                          </span>
-                        )}
-                      </Typography>
-                      {question.questionType && (
-                        <Box sx={{ ml: 2, mt: 1, mb: 2 }}>
-                          {renderPreviewOptions(question)}
-                        </Box>
-                      )}
-                      {(question.subQuestions || []).length > 0 && (
-                        <Box
-                          sx={{
-                            ml: 2,
-                            borderRadius: 1,
-                          }}
+                  (selectedSurvey.questions || []).map((question, index) => {
+                    const parentVisible =
+                      previewVisibility[question.id] ?? true;
+                    if (!parentVisible) return null;
+
+                    return (
+                      <Box key={question.id} sx={{ mb: 3 }}>
+                        <Typography
+                          variant="body1"
+                          gutterBottom
+                          fontWeight={500}
                         >
-                          {(question.subQuestions || []).map((sub, subIndex) => {
-                            const subQuestionType =
-                              sub.questionType ||
-                              getQuestionTypeForId(sub.questionTypeId);
-                            const subQuestionWithType = {
-                              ...sub,
-                              questionType: subQuestionType,
-                            };
-                            return (
-                              <Box key={sub.id} sx={{ mb: 2 }}>
-                                <Typography variant="body2" gutterBottom>
-                                  {index + 1}.{subIndex + 1}{" "}
-                                  {sub.questionText ||
-                                    "Untitled Sub-question"}
-                                  {sub.isRequired === 1 && (
-                                    <span
-                                      style={{
-                                        color: "red",
-                                        marginLeft: "4px",
-                                      }}
-                                    >
-                                      *
-                                    </span>
-                                  )}
-                                </Typography>
-                                <Box sx={{ ml: 2, mt: 1 }}>
-                                  {renderPreviewOptions(
-                                    subQuestionWithType,
-                                    true,
-                                  )}
+                          {index + 1}.{" "}
+                          {question.questionText || "Untitled Question"}
+                          {question.required && (
+                            <span style={{ color: "red", marginLeft: "4px" }}>
+                              *
+                            </span>
+                          )}
+                        </Typography>
+
+                        {question.questionType && (
+                          <Box sx={{ ml: 2, mt: 1, mb: 2 }}>
+                            {renderPreviewOptions(question)}
+                          </Box>
+                        )}
+
+                        {(question.subQuestions || []).length > 0 && (
+                          <Box sx={{ ml: 2, borderRadius: 1 }}>
+                            {question.subQuestions.map((sub, subIndex) => {
+                              const key = `sub_${sub.id}`;
+                              const isVisible = previewVisibility[key] ?? true;
+                              if (!isVisible) return null;
+
+                              const subQuestionType =
+                                sub.questionType ||
+                                getQuestionTypeForId(sub.questionTypeId);
+                              const subWithType = {
+                                ...sub,
+                                questionType: subQuestionType,
+                              };
+
+                              return (
+                                <Box key={sub.id} sx={{ mb: 2 }}>
+                                  <Typography variant="body2" gutterBottom>
+                                    {index + 1}.{subIndex + 1}{" "}
+                                    {sub.questionText ||
+                                      "Untitled Sub-question"}
+                                    {(sub.isRequired === 1 ||
+                                      sub.isRequired === true) && (
+                                      <span
+                                        style={{
+                                          color: "red",
+                                          marginLeft: "4px",
+                                        }}
+                                      >
+                                        *
+                                      </span>
+                                    )}
+                                  </Typography>
+                                  <Box sx={{ ml: 2, mt: 1 }}>
+                                    {renderPreviewOptions(subWithType, true)}
+                                  </Box>
                                 </Box>
-                              </Box>
-                            );
-                          })}
-                        </Box>
-                      )}
-                      {index < (selectedSurvey.questions || []).length - 1 && (
-                        <Divider sx={{ my: 2 }} />
-                      )}
-                    </Box>
-                  ))
+                              );
+                            })}
+                          </Box>
+                        )}
+
+                        {index <
+                          (selectedSurvey.questions || []).length - 1 && (
+                          <Divider sx={{ my: 2 }} />
+                        )}
+                      </Box>
+                    );
+                  })
                 ) : (
                   <Typography
                     color="textSecondary"

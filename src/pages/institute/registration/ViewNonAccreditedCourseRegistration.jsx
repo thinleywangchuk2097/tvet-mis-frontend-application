@@ -235,6 +235,7 @@ const useCourseData = (applicationNo, access_token) => {
       let data = response.data;
       if (Array.isArray(data) && data.length > 0) data = data[0];
 
+      console.log("Fetched course details:", data);
       setCourseData(data);
       setDocuments(parseDocuments(data.documents));
       return data;
@@ -424,23 +425,33 @@ const useQualityStandards = (rawQualityData) => {
   };
 };
 
-const usePayment = (applicationNo) => {
+// usePayment now accepts `enabled` flag
+// When enabled is false (programme type 137), it skips fetching entirely.
+const usePayment = (applicationNo, access_token, enabled = true) => {
   const [paymentStatus, setPaymentStatus] = useState(null);
 
   const fetchPaymentStatus = useCallback(async () => {
+    if (!enabled) {
+      setPaymentStatus(null);
+      return;
+    }
     try {
-      const response =
-        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      const response = await BirmsPaymentService.getPaymentByApplicationNo(
+        applicationNo,
+        access_token,
+      );
       setPaymentStatus(response.data);
     } catch (error) {
       console.error("Error fetching payment status:", error);
       setPaymentStatus(null);
     }
-  }, [applicationNo]);
+  }, [applicationNo, access_token, enabled]);
 
   const isPaymentPaid = useMemo(() => {
+    // When payment is not required (enabled === false), treat as "not blocking"
+    if (!enabled) return true;
     return paymentStatus?.paymentStatus?.toLowerCase() === "paid";
-  }, [paymentStatus]);
+  }, [paymentStatus, enabled]);
 
   return { paymentStatus, fetchPaymentStatus, isPaymentPaid };
 };
@@ -490,8 +501,12 @@ const SectionHeader = ({ title }) => (
 
 SectionHeader.propTypes = sectionHeaderPropTypes;
 
-const ReadOnlyField = ({ label, value, gridProps = { xs: 12, md: 6 } }) => (
-  <Grid item {...gridProps}>
+const ReadOnlyField = ({
+  label,
+  value,
+  gridProps = { size: { xs: 12, md: 6 } },
+}) => (
+  <Grid {...gridProps}>
     <TextField
       fullWidth
       size="small"
@@ -643,7 +658,7 @@ const PaymentInfoCard = ({ paymentStatus, onGeneratePayment }) => {
                 value: paymentStatus.paymentMode || "Not yet paid",
               },
             ].map((field, idx) => (
-              <Grid item key={idx} size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid key={idx} size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box
                   sx={{
                     display: "flex",
@@ -853,7 +868,6 @@ const ViewNonAccreditedCourseRegistration = () => {
   // Custom hooks
   const courseDataHook = useCourseData(applicationNo, access_token);
   const qualityHook = useQualityStandards();
-  const paymentHook = usePayment(applicationNo);
   const dialogHook = useActionDialog();
 
   const [newDocuments, setNewDocuments] = useState([]);
@@ -863,6 +877,17 @@ const ViewNonAccreditedCourseRegistration = () => {
 
   const roleId = currentRoleId?.toString();
 
+  // Determine if this programme requires payment (only type 136 requires it)
+  const isLessThan140 = courseDataHook.courseData?.programme_type_id === "137";
+  const isPaymentRequired = !isLessThan140;
+
+  // Pass `enabled` to usePayment so it only fetches when payment is required
+  const paymentHook = usePayment(
+    applicationNo,
+    access_token,
+    isPaymentRequired,
+  );
+
   // Fetch all data on mount
   useEffect(() => {
     const loadData = async () => {
@@ -870,7 +895,6 @@ const ViewNonAccreditedCourseRegistration = () => {
       try {
         await courseDataHook.fetchAllData();
         await qualityHook.fetchQualityStandards();
-        await paymentHook.fetchPaymentStatus();
 
         // Load existing quality responses if available
         if (courseDataHook.courseData?.quality_standard_responses) {
@@ -886,6 +910,13 @@ const ViewNonAccreditedCourseRegistration = () => {
     };
     loadData();
   }, [applicationNo]);
+
+  // Fetch payment status only when payment is required and course data is loaded
+  useEffect(() => {
+    if (isPaymentRequired && courseDataHook.courseData) {
+      paymentHook.fetchPaymentStatus();
+    }
+  }, [isPaymentRequired, courseDataHook.courseData]);
 
   // Update quality responses when data changes
   useEffect(() => {
@@ -966,20 +997,21 @@ const ViewNonAccreditedCourseRegistration = () => {
     );
   }, [courseDataHook.courseData, navigate]);
 
+  // Tabs: only add "Generate PA Number" tab when payment is required (type 136)
   const tabs = useMemo(() => {
     const baseTabs = [
       { icon: <BusinessIcon />, label: "Programme Information" },
       { icon: <VerifiedIcon />, label: "Quality Standards" },
       { icon: <FileOpenIcon />, label: "Supporting Documents" },
     ];
-    if (currentRoleId == 7) {
+    if (currentRoleId == 7 && isPaymentRequired) {
       baseTabs.push({
         icon: <SettingsSuggestIcon />,
         label: "Generate PA Number",
       });
     }
     return baseTabs;
-  }, [currentRoleId]);
+  }, [currentRoleId, isPaymentRequired]);
 
   const getDialogContent = () => {
     const isRejectAction =
@@ -1050,7 +1082,7 @@ const ViewNonAccreditedCourseRegistration = () => {
         <>
           <Tooltip
             title={
-              !paymentHook.isPaymentPaid
+              isPaymentRequired && !paymentHook.isPaymentPaid
                 ? "Payment must be completed before verification"
                 : ""
             }
@@ -1063,7 +1095,7 @@ const ViewNonAccreditedCourseRegistration = () => {
                 size="small"
                 startIcon={<CheckCircleIcon />}
                 onClick={() => dialogHook.openDialog(STATUS.VERIFY_QAS1)}
-                disabled={!paymentHook.isPaymentPaid}
+                disabled={isPaymentRequired && !paymentHook.isPaymentPaid}
                 sx={{
                   px: 3,
                   py: 0.5,
@@ -1146,7 +1178,7 @@ const ViewNonAccreditedCourseRegistration = () => {
       {roleId === "22" && (
         <Tooltip
           title={
-            !paymentHook.isPaymentPaid
+            isPaymentRequired && !paymentHook.isPaymentPaid
               ? "Payment must be completed before approval"
               : ""
           }
@@ -1159,7 +1191,7 @@ const ViewNonAccreditedCourseRegistration = () => {
               size="small"
               startIcon={<CheckCircleIcon />}
               onClick={() => dialogHook.openDialog(STATUS.APPROVE_DG)}
-              disabled={!paymentHook.isPaymentPaid}
+              disabled={isPaymentRequired && !paymentHook.isPaymentPaid}
               sx={{
                 px: 3,
                 py: 0.5,
@@ -1204,9 +1236,6 @@ const ViewNonAccreditedCourseRegistration = () => {
 
   const data = courseDataHook.courseData;
 
-  // Determine if programme type is "less than 140 hours"
-  const isLessThan140 = data.programme_type_id === "137";
-
   return (
     <Box>
       <Paper sx={{ p: 2 }}>
@@ -1250,17 +1279,29 @@ const ViewNonAccreditedCourseRegistration = () => {
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
-                {/* Programme Type */}
+                {/* Programme Type - with tooltip on hover */}
                 <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Programme Type"
-                    value={courseDataHook.getProgrammeTypeName(
-                      data.programme_type_id,
-                    )}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
+                  <Tooltip
+                    title={
+                      isLessThan140
+                        ? "Non-BQF Programme less than 140 hours — no payment required."
+                        : "Non-BQF Programme more than 140 hours — payment is required before approval."
+                    }
+                    arrow
+                    placement="top"
+                  >
+                    <Box>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Programme Type"
+                        value={courseDataHook.getProgrammeTypeName(
+                          data.programme_type_id,
+                        )}
+                        slotProps={{ input: { readOnly: true } }}
+                      />
+                    </Box>
+                  </Tooltip>
                 </Grid>
                 {/* Curriculum Title - Only show if not less than 140 hours */}
                 {!isLessThan140 && (
@@ -1388,7 +1429,7 @@ const ViewNonAccreditedCourseRegistration = () => {
           {/* Tab 1: Quality Standards */}
           {tabValue === 1 && (
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item size={{ xs: 12 }}>
+              <Grid size={{ xs: 12 }}>
                 {qualityHook.qualityData.length > 0 ? (
                   qualityHook.qualityData.map((standard) => (
                     <ChecklistCategory
@@ -1414,7 +1455,7 @@ const ViewNonAccreditedCourseRegistration = () => {
           {/* Tab 2: Supporting Documents */}
           {tabValue === 2 && (
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item size={{ xs: 12 }}>
+              <Grid size={{ xs: 12 }}>
                 <Paper
                   sx={{ p: 2, border: "1px solid", borderColor: "divider" }}
                 >
@@ -1431,7 +1472,11 @@ const ViewNonAccreditedCourseRegistration = () => {
                     }}
                   >
                     <li>Trainer CV</li>
-                    <li>Curriculum Endorsement letter/ Certificate</li>
+                    <li>
+                      {isLessThan140
+                        ? "Course Profile"
+                        : "Curriculum Endorsement letter/ Certificate"}
+                    </li>
                   </Box>
                   <FileDownload
                     initialFiles={courseDataHook.documents}
@@ -1443,10 +1488,10 @@ const ViewNonAccreditedCourseRegistration = () => {
             </Grid>
           )}
 
-          {/* Generate PA Number Tab */}
-          {currentRoleId == 7 && tabValue === 3 && (
+          {/* Generate PA Number Tab - Only for type 136 */}
+          {currentRoleId == 7 && isPaymentRequired && tabValue === 3 && (
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item size={{ xs: 12 }}>
+              <Grid size={{ xs: 12 }}>
                 <Paper
                   sx={{ p: 2, border: "1px solid", borderColor: "divider" }}
                 >

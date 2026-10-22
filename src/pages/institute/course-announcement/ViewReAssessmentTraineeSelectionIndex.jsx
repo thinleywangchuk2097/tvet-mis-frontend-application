@@ -143,6 +143,32 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const getVivaPracticalMaxValue = () =>
     isDiplomaCertificationLevel() ? 60 : null;
 
+  // Per-field editability for diploma courses:
+  // - Theory/Viva editable only when value < 10
+  // - Practical/VivaPractical editable only when value < 36
+  const isFieldEditable = (fieldType, value) => {
+    // Base permission still required
+    if (!isEditable) return false;
+
+    if (isDiplomaCertificationLevel()) {
+      // Allow editing empty fields so a value can be entered
+      if (value === "" || value === null || value === undefined) return true;
+
+      const numValue = Number(value);
+      if (Number.isNaN(numValue)) return false;
+
+      if (fieldType === "theory" || fieldType === "viva") {
+        return numValue < 10;
+      }
+      if (fieldType === "practical" || fieldType === "vivaPractical") {
+        return numValue < 36;
+      }
+    }
+
+    // Non-diploma: fall back to global rule
+    return isEditable;
+  };
+
   // Business rules
   const allCAmarksExist = () => {
     if (selectedTrainees.length === 0) return false;
@@ -343,8 +369,10 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
   const fetchPaymentStatus = async () => {
     try {
-      const response =
-        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      const response = await BirmsPaymentService.getPaymentByApplicationNo(
+        applicationNo,
+        access_token,
+      );
       setPaymentStatus(response.data);
     } catch (error) {
       console.error("Error fetching payment status:", error);
@@ -908,18 +936,18 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       courseDetails?.certification_level_id === "112";
     const isVivaType = isServiceId41;
 
-    const readOnly = !isEditable;
-
     const getAssessmentConfig = () => {
       if (isVivaType) {
         return {
           firstField: {
+            type: "viva",
             value: traineeVivaAssessments[trainee.id] || "",
             onChange: (value) => handleVivaAssessmentChange(trainee.id, value),
             maxValue: getVivaMaxValue() || 100,
             tooltipMessage: getVivaTooltipMessage(),
           },
           secondField: {
+            type: "vivaPractical",
             value: traineeVivaPracticalAssessments[trainee.id] || "",
             onChange: (value) =>
               handleVivaPracticalAssessmentChange(trainee.id, value),
@@ -930,6 +958,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       } else {
         return {
           firstField: {
+            type: "theory",
             value: traineeTheoryAssessments[trainee.id] || "",
             onChange: (value) =>
               handleTheoryAssessmentChange(trainee.id, value),
@@ -937,6 +966,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
             tooltipMessage: getTheoryTooltipMessage(),
           },
           secondField: {
+            type: "practical",
             value: traineePracticalAssessments[trainee.id] || "",
             onChange: (value) =>
               handlePracticalAssessmentChange(trainee.id, value),
@@ -950,9 +980,31 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     const config = getAssessmentConfig();
 
     const renderAssessmentField = (fieldConfig, isNumericField) => {
-      const disabledTooltip = getAssessmentDisabledTooltip();
-      const maxValueTooltip = fieldConfig.tooltipMessage;
-      const tooltipMsg = disabledTooltip || maxValueTooltip || "";
+      const fieldReadOnly = !isFieldEditable(
+        fieldConfig.type,
+        fieldConfig.value,
+      );
+
+      // Tooltip: permission issues > lock-reason > max-value hint
+      let tooltipMsg = "";
+      if (!isRole9) {
+        tooltipMsg = "You do not have permission to edit assessments";
+      } else if (!isPaymentCompleted()) {
+        tooltipMsg = "Payment must be completed before editing assessments";
+      } else if (isDiplomaCertificationLevel() && fieldReadOnly) {
+        if (fieldConfig.type === "theory" || fieldConfig.type === "viva") {
+          tooltipMsg =
+            "Theory/Viva is editable only when the value is less than 10";
+        } else if (
+          fieldConfig.type === "practical" ||
+          fieldConfig.type === "vivaPractical"
+        ) {
+          tooltipMsg =
+            "Practical is editable only when the value is less than 36";
+        }
+      } else {
+        tooltipMsg = fieldConfig.tooltipMessage || "";
+      }
 
       const fieldContent = isNumericField ? (
         <TextField
@@ -963,7 +1015,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
           fullWidth
           slotProps={{
             input: {
-              readOnly: readOnly,
+              readOnly: fieldReadOnly,
               inputProps: {
                 min: 0,
                 max: fieldConfig.maxValue,
@@ -972,7 +1024,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
           }}
           sx={{
             minWidth: 120,
-            backgroundColor: readOnly ? "#f5f5f5" : "transparent",
+            backgroundColor: fieldReadOnly ? "#f5f5f5" : "transparent",
           }}
         />
       ) : (
@@ -981,10 +1033,10 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
             value={fieldConfig.value}
             onChange={(e) => fieldConfig.onChange(e.target.value)}
             displayEmpty
-            readOnly={readOnly}
+            readOnly={fieldReadOnly}
             sx={{
               "& .MuiSelect-select": { textAlign: "center" },
-              backgroundColor: readOnly ? "#f5f5f5" : "transparent",
+              backgroundColor: fieldReadOnly ? "#f5f5f5" : "transparent",
             }}
           >
             <MenuItem value="" disabled>

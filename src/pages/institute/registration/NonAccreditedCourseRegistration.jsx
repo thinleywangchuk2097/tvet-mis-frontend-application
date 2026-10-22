@@ -1931,7 +1931,11 @@ const NonAccreditedCourseRegistration = () => {
                       }}
                     >
                       <li>Trainer CV</li>
-                      <li>Curriculum Endorsement letter/ Certificate </li>
+                      {isLessThan140 ? (
+                        <li>Course Profile</li>
+                      ) : (
+                        <li>Curriculum Endorsement letter/ Certificate</li>
+                      )}
                     </Box>
                     <FileUpload
                       files={formik.values.files}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
   Table,
@@ -32,6 +32,10 @@ import {
   Tooltip,
   Tabs,
   Tab,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormLabel,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -60,7 +64,14 @@ const moduleManagementDialogPropTypes = {
     duration: PropTypes.string,
     prerequisites: PropTypes.string,
     learningOutcomes: PropTypes.string,
+    weightage: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     order: PropTypes.number,
+    courseContents: PropTypes.arrayOf(
+      PropTypes.shape({
+        courseContent: PropTypes.string,
+        fullMark: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      }),
+    ),
   }),
   formik: PropTypes.object.isRequired,
 };
@@ -73,31 +84,34 @@ const ModuleManagementDialog = ({
   initialData,
   formik,
 }) => {
-  const [moduleData, setModuleData] = useState(
-    initialData || {
-      moduleName: "",
-      moduleCode: "",
-      description: "",
-      duration: "",
-      prerequisites: "",
-      learningOutcomes: "",
-      order: (formik?.values?.modules?.length || 0) + 1,
-    },
-  );
+  const getEmptyModule = () => ({
+    moduleName: "",
+    moduleCode: "",
+    description: "",
+    duration: "",
+    prerequisites: "",
+    learningOutcomes: "",
+    weightage: "",
+    order: (formik?.values?.modules?.length || 0) + 1,
+    courseContents: [{ courseContent: "", fullMark: "" }],
+  });
+
+  const [moduleData, setModuleData] = useState(initialData || getEmptyModule());
 
   useEffect(() => {
     if (initialData) {
-      setModuleData(initialData);
-    } else {
       setModuleData({
-        moduleName: "",
-        moduleCode: "",
-        description: "",
-        duration: "",
-        prerequisites: "",
-        learningOutcomes: "",
-        order: (formik?.values?.modules?.length || 0) + 1,
+        weightage: "",
+        courseContents: [{ courseContent: "", fullMark: "" }],
+        ...initialData,
+        courseContents:
+          Array.isArray(initialData.courseContents) &&
+          initialData.courseContents.length > 0
+            ? initialData.courseContents
+            : [{ courseContent: "", fullMark: "" }],
       });
+    } else {
+      setModuleData(getEmptyModule());
     }
   }, [initialData, formik?.values?.modules?.length]);
 
@@ -105,12 +119,105 @@ const ModuleManagementDialog = ({
     setModuleData({ ...moduleData, [field]: value });
   };
 
+  // ===== Course Content handlers =====
+  const handleCourseContentChange = (index, field, value) => {
+    const updated = [...(moduleData.courseContents || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setModuleData({ ...moduleData, courseContents: updated });
+  };
+
+  const handleAddCourseContent = () => {
+    setModuleData({
+      ...moduleData,
+      courseContents: [
+        ...(moduleData.courseContents || []),
+        { courseContent: "", fullMark: "" },
+      ],
+    });
+  };
+
+  const handleRemoveCourseContent = (index) => {
+    const updated = (moduleData.courseContents || []).filter(
+      (_, i) => i !== index,
+    );
+    setModuleData({
+      ...moduleData,
+      courseContents:
+        updated.length > 0 ? updated : [{ courseContent: "", fullMark: "" }],
+    });
+  };
+
   const handleSave = () => {
     if (!moduleData.moduleName) {
       toast.error("Module name is required");
       return;
     }
-    onSave(moduleData);
+
+    // Weightage validation (percentage 0-100)
+    if (
+      moduleData.weightage !== "" &&
+      moduleData.weightage !== null &&
+      moduleData.weightage !== undefined
+    ) {
+      const weightageNum = Number(moduleData.weightage);
+      if (isNaN(weightageNum) || weightageNum < 0 || weightageNum > 100) {
+        toast.error("Weightage must be a number between 0 and 100");
+        return;
+      }
+    }
+
+    // Course Contents validation
+    const courseContents = moduleData.courseContents || [];
+    for (let i = 0; i < courseContents.length; i++) {
+      const row = courseContents[i];
+      const hasContent =
+        row.courseContent !== "" &&
+        row.courseContent !== null &&
+        row.courseContent !== undefined;
+      const hasMark =
+        row.fullMark !== "" &&
+        row.fullMark !== null &&
+        row.fullMark !== undefined;
+
+      if (!hasContent && !hasMark) continue;
+
+      if (!hasContent) {
+        toast.error(`Course Content #${i + 1}: Content is required`);
+        return;
+      }
+
+      if (hasMark) {
+        const markNum = Number(row.fullMark);
+        if (isNaN(markNum) || markNum < 0) {
+          toast.error(
+            `Course Content #${i + 1}: Full Mark must be a non-negative number`,
+          );
+          return;
+        }
+      }
+    }
+
+    const cleanedCourseContents = courseContents
+      .filter(
+        (row) =>
+          (row.courseContent !== "" &&
+            row.courseContent !== null &&
+            row.courseContent !== undefined) ||
+          (row.fullMark !== "" &&
+            row.fullMark !== null &&
+            row.fullMark !== undefined),
+      )
+      .map((row) => ({
+        courseContent: row.courseContent || "",
+        fullMark:
+          row.fullMark === "" ||
+          row.fullMark === null ||
+          row.fullMark === undefined
+            ? null
+            : Number(row.fullMark),
+      }));
+
+    onSave({ ...moduleData, courseContents: cleanedCourseContents });
     onClose();
   };
 
@@ -149,6 +256,22 @@ const ModuleManagementDialog = ({
               size="small"
             />
           </Grid>
+
+          {/* WEIGHTAGE FIELD */}
+          <Grid item size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Weightage (%)"
+              type="number"
+              value={moduleData.weightage ?? ""}
+              onChange={(e) => handleModuleChange("weightage", e.target.value)}
+              placeholder="e.g., 25"
+              size="small"
+              inputProps={{ min: 0, max: 100, step: "0.01" }}
+              helperText="Enter a value between 0 and 100"
+            />
+          </Grid>
+
           <Grid item size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
@@ -201,6 +324,94 @@ const ModuleManagementDialog = ({
               placeholder="List the learning outcomes for this module"
               size="small"
             />
+          </Grid>
+
+          {/* ===== COURSE CONTENT SECTION ===== */}
+          <Grid item size={{ xs: 12 }}>
+            <Divider sx={{ my: 1 }}>
+              <Typography variant="subtitle2" color="primary">
+                Course Content
+              </Typography>
+            </Divider>
+
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={1}
+            >
+              <Typography variant="caption" color="textSecondary">
+                Total Items: {(moduleData.courseContents || []).length}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={handleAddCourseContent}
+              >
+                Add More
+              </Button>
+            </Box>
+
+            {(moduleData.courseContents || []).map((row, index) => (
+              <Grid
+                container
+                spacing={1}
+                alignItems="center"
+                key={index}
+                sx={{ mb: 1 }}
+              >
+                <Grid item size={{ xs: 12, md: 7 }}>
+                  <TextField
+                    fullWidth
+                    label={`Course Content #${index + 1}`}
+                    value={row.courseContent ?? ""}
+                    onChange={(e) =>
+                      handleCourseContentChange(
+                        index,
+                        "courseContent",
+                        e.target.value,
+                      )
+                    }
+                    placeholder="e.g., Introduction to Topic"
+                    size="small"
+                  />
+                </Grid>
+                <Grid item size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    fullWidth
+                    label="Full Mark"
+                    type="number"
+                    value={row.fullMark ?? ""}
+                    onChange={(e) =>
+                      handleCourseContentChange(
+                        index,
+                        "fullMark",
+                        e.target.value,
+                      )
+                    }
+                    placeholder="e.g., 100"
+                    size="small"
+                    inputProps={{ min: 0, step: "0.01" }}
+                  />
+                </Grid>
+                <Grid item size={{ xs: 12, md: 1 }}>
+                  <Tooltip title="Remove">
+                    <span>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleRemoveCourseContent(index)}
+                        disabled={(moduleData.courseContents || []).length <= 1}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Grid>
+              </Grid>
+            ))}
           </Grid>
         </Grid>
       </DialogContent>
@@ -274,6 +485,7 @@ const CreateTotIndex = () => {
   const fetchProgramTypes = async () => {
     try {
       const response = await CommonService.getByParentId(28);
+      console.log("Program Types Response:", response.data);
       setProgramTypes(response.data);
     } catch (error) {
       console.error("Error fetching program types:", error);
@@ -327,8 +539,11 @@ const CreateTotIndex = () => {
           totalModules: modules.length,
           programName: program.programName || program.program_name,
           programCode: program.programCode || program.program_code,
-          programTypeId: program.program_type_id || program.programTypeId,
-          statusId: program.statusId || program.status_id,
+          // Normalize programTypeId / statusId to Number so === 120 checks work
+          programTypeId: Number(
+            program.program_type_id || program.programTypeId,
+          ),
+          statusId: Number(program.statusId || program.status_id),
           createdAt: program.createdAt || program.created_at,
         };
       });
@@ -369,6 +584,7 @@ const CreateTotIndex = () => {
           eligibilityCriteria: item.eligibility_criteria,
           remarks: item.remarks,
           programId: item.program_id,
+          showId: item.show_id ?? item.showId ?? 0,
         };
       });
 
@@ -430,7 +646,9 @@ const CreateTotIndex = () => {
 
   const handleConfirmModuleDelete = () => {
     if (moduleDeleteIndex !== null && moduleDeleteFormik) {
-      const currentProgramTypeId = moduleDeleteFormik.values.programTypeId;
+      const currentProgramTypeId = Number(
+        moduleDeleteFormik.values.programTypeId,
+      );
 
       if (
         currentProgramTypeId === 120 &&
@@ -476,6 +694,7 @@ const CreateTotIndex = () => {
         modules: program?.modules || [],
         moduleName: program?.modules?.[0]?.moduleName || "",
         moduleDescription: program?.modules?.[0]?.description || "",
+        showId: item.showId ?? 0,
       });
     } else {
       setEditingId(null);
@@ -524,12 +743,13 @@ const CreateTotIndex = () => {
   };
 
   const handleModuleSubmit = (moduleData, formik) => {
-    const currentProgramTypeId = formik.values.programTypeId;
+    const currentProgramTypeId = Number(formik.values.programTypeId);
 
+    // Block adding a NEW module (not editing an existing one) for Single Module
     if (
       currentProgramTypeId === 120 &&
       editingModuleIndex === null &&
-      formik.values.modules.length >= 1
+      (editingProgramId || formik.values.modules.length >= 1)
     ) {
       toast.error("Single Module programs can only have one module");
       return;
@@ -588,6 +808,7 @@ const CreateTotIndex = () => {
     formik.setFieldValue("programCode", "");
     formik.setFieldValue("programTypeId", programTypeId);
     formik.setFieldValue("modules", []);
+    formik.setFieldValue("showId", 0);
   };
 
   const handleProgramChangeForAnnouncement = (programId, formik) => {
@@ -637,7 +858,29 @@ const CreateTotIndex = () => {
           duration: Yup.string(),
           prerequisites: Yup.string(),
           learningOutcomes: Yup.string(),
+          weightage: Yup.number()
+            .transform((value, originalValue) =>
+              originalValue === "" || originalValue === null
+                ? undefined
+                : value,
+            )
+            .min(0, "Weightage cannot be less than 0")
+            .max(100, "Weightage cannot exceed 100")
+            .nullable(),
           order: Yup.number(),
+          courseContents: Yup.array().of(
+            Yup.object().shape({
+              courseContent: Yup.string().nullable(),
+              fullMark: Yup.number()
+                .transform((value, originalValue) =>
+                  originalValue === "" || originalValue === null
+                    ? undefined
+                    : value,
+                )
+                .min(0, "Full Mark cannot be negative")
+                .nullable(),
+            }),
+          ),
         }),
       )
       .min(1, "At least one module is required")
@@ -671,7 +914,32 @@ const CreateTotIndex = () => {
           duration: module.duration || "",
           prerequisites: module.prerequisites || "",
           learningOutcomes: module.learningOutcomes || "",
+          weightage:
+            module.weightage === "" ||
+            module.weightage === null ||
+            module.weightage === undefined
+              ? null
+              : Number(module.weightage),
           moduleOrder: module.order || index + 1,
+          courseContents: (module.courseContents || [])
+            .filter(
+              (cc) =>
+                (cc.courseContent !== "" &&
+                  cc.courseContent !== null &&
+                  cc.courseContent !== undefined) ||
+                (cc.fullMark !== "" &&
+                  cc.fullMark !== null &&
+                  cc.fullMark !== undefined),
+            )
+            .map((cc) => ({
+              courseContent: cc.courseContent || "",
+              fullMark:
+                cc.fullMark === "" ||
+                cc.fullMark === null ||
+                cc.fullMark === undefined
+                  ? null
+                  : Number(cc.fullMark),
+            })),
         })),
         total_modules: values.modules.length,
       };
@@ -724,6 +992,7 @@ const CreateTotIndex = () => {
     eligibilityCriteria: "",
     remarks: "",
     statusId: "",
+    showId: 0,
   };
 
   const announcementValidationSchema = Yup.object().shape({
@@ -771,6 +1040,9 @@ const CreateTotIndex = () => {
         remarks: values.remarks,
         serviceId: 24,
         statusId: values.statusId || 122,
+        // Only send showId when Single Module; default 0
+        showId:
+          Number(values.programTypeId) === 120 ? Number(values.showId) || 0 : 0,
       };
 
       if (editingId) {
@@ -852,7 +1124,7 @@ const CreateTotIndex = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        TOT Management
+        TOT Programmes Management
       </Typography>
 
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
@@ -861,7 +1133,7 @@ const CreateTotIndex = () => {
           onChange={handleTabChange}
           aria-label="TOT management tabs"
         >
-          <Tab label="TOT Programs" />
+          <Tab label="TOT Programmes" />
           <Tab label="TOT Announcements" />
         </Tabs>
       </Box>
@@ -911,9 +1183,9 @@ const CreateTotIndex = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>#</TableCell>
-                  <TableCell>Program Name</TableCell>
-                  <TableCell>Program Code</TableCell>
-                  <TableCell>Program Type</TableCell>
+                  <TableCell>Programme Name</TableCell>
+                  <TableCell>Programme Code</TableCell>
+                  <TableCell>Programme Type</TableCell>
                   <TableCell>Modules</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Created Date</TableCell>
@@ -1368,6 +1640,47 @@ const CreateTotIndex = () => {
                     </FormControl>
                   </Grid>
 
+                  {/* ===== Show To radio — only for Single Module ===== */}
+                  {Number(formik.values.programTypeId) === 120 && (
+                    <Grid item size={{ xs: 12 }}>
+                      <FormControl
+                        component="fieldset"
+                        error={
+                          formik.touched.showId && Boolean(formik.errors.showId)
+                        }
+                      >
+                        <FormLabel component="legend">Show To</FormLabel>
+                        <RadioGroup
+                          row
+                          name="showId"
+                          value={String(formik.values.showId ?? 0)}
+                          onChange={(e) => {
+                            formik.setFieldValue(
+                              "showId",
+                              Number(e.target.value),
+                            );
+                          }}
+                        >
+                          <FormControlLabel
+                            value="0"
+                            control={<Radio size="small" />}
+                            label="Default"
+                          />
+                          <FormControlLabel
+                            value="1"
+                            control={<Radio size="small" />}
+                            label="Both public and institute"
+                          />
+                        </RadioGroup>
+                        {formik.touched.showId && formik.errors.showId && (
+                          <FormHelperText error>
+                            {formik.errors.showId}
+                          </FormHelperText>
+                        )}
+                      </FormControl>
+                    </Grid>
+                  )}
+
                   <Grid item size={{ xs: 12, md: 6 }}>
                     <TextField
                       fullWidth
@@ -1563,12 +1876,20 @@ const CreateTotIndex = () => {
         fullWidth
       >
         <DialogTitle>
-          {editingProgramId ? "Edit TOT Program" : "Create TOT Program"}
+          {editingProgramId ? "Edit TOT Programme" : "Create TOT Programme"}
         </DialogTitle>
         <Formik
           initialValues={
             editingProgramId && selectedProgram
-              ? selectedProgram
+              ? {
+                  ...selectedProgram,
+                  programTypeId: selectedProgram.programTypeId
+                    ? Number(selectedProgram.programTypeId)
+                    : "",
+                  statusId: selectedProgram.statusId
+                    ? Number(selectedProgram.statusId)
+                    : "",
+                }
               : programInitialValues
           }
           validationSchema={programValidationSchema}
@@ -1624,7 +1945,11 @@ const CreateTotIndex = () => {
                         name="programTypeId"
                         value={formik.values.programTypeId}
                         onChange={(e) => {
-                          formik.handleChange(e);
+                          const value = e.target.value;
+                          formik.setFieldValue(
+                            "programTypeId",
+                            value === "" ? "" : Number(value),
+                          );
                           formik.setFieldValue("modules", []);
                         }}
                         onBlur={formik.handleBlur}
@@ -1699,7 +2024,7 @@ const CreateTotIndex = () => {
                     >
                       <Typography variant="subtitle2" color="textSecondary">
                         Total Modules: {formik.values.modules.length}
-                        {formik.values.programTypeId === 120 && (
+                        {Number(formik.values.programTypeId) === 120 && (
                           <Chip
                             label="Single Module (Max 1)"
                             size="small"
@@ -1715,8 +2040,9 @@ const CreateTotIndex = () => {
                         startIcon={<AddIcon />}
                         onClick={() => {
                           if (
-                            formik.values.programTypeId === 120 &&
-                            formik.values.modules.length >= 1
+                            Number(formik.values.programTypeId) === 120 &&
+                            (editingProgramId ||
+                              formik.values.modules.length >= 1)
                           ) {
                             toast.error(
                               "Single Module programs can only have one module",
@@ -1727,8 +2053,10 @@ const CreateTotIndex = () => {
                         }}
                         disabled={
                           !formik.values.programTypeId ||
-                          (formik.values.programTypeId === 120 &&
-                            formik.values.modules.length >= 1)
+                          (Number(formik.values.programTypeId) === 120 &&
+                            (editingProgramId
+                              ? true
+                              : formik.values.modules.length >= 1))
                         }
                       >
                         Add Module
@@ -1749,6 +2077,8 @@ const CreateTotIndex = () => {
                               <TableCell>Module Name *</TableCell>
                               <TableCell>Module Code</TableCell>
                               <TableCell>Duration</TableCell>
+                              <TableCell>Weightage (%)</TableCell>
+                              <TableCell>Course Contents</TableCell>
                               <TableCell>Prerequisites</TableCell>
                               <TableCell>Learning Outcomes</TableCell>
                               <TableCell align="center">Actions</TableCell>
@@ -1767,7 +2097,8 @@ const CreateTotIndex = () => {
                                   >
                                     {module.moduleName || "Untitled Module"}
                                   </Typography>
-                                  {formik.values.programTypeId === 120 && (
+                                  {Number(formik.values.programTypeId) ===
+                                    120 && (
                                     <Chip
                                       label="Single Module"
                                       size="small"
@@ -1780,6 +2111,35 @@ const CreateTotIndex = () => {
                                   {module.moduleCode || "-"}
                                 </TableCell>
                                 <TableCell>{module.duration || "-"}</TableCell>
+                                <TableCell>
+                                  {module.weightage !== "" &&
+                                  module.weightage !== null &&
+                                  module.weightage !== undefined
+                                    ? `${module.weightage}%`
+                                    : "-"}
+                                </TableCell>
+                                <TableCell>
+                                  {(module.courseContents || []).length > 0 ? (
+                                    <Box>
+                                      {module.courseContents.map((cc, i) => (
+                                        <Typography
+                                          key={i}
+                                          variant="caption"
+                                          display="block"
+                                        >
+                                          • {cc.courseContent || "-"}
+                                          {cc.fullMark !== "" &&
+                                          cc.fullMark !== null &&
+                                          cc.fullMark !== undefined
+                                            ? ` (Mark: ${cc.fullMark})`
+                                            : ""}
+                                        </Typography>
+                                      ))}
+                                    </Box>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </TableCell>
                                 <TableCell>
                                   {module.prerequisites || "-"}
                                 </TableCell>
@@ -1812,7 +2172,8 @@ const CreateTotIndex = () => {
                                         )
                                       }
                                       disabled={
-                                        formik.values.programTypeId === 120 &&
+                                        Number(formik.values.programTypeId) ===
+                                          120 &&
                                         formik.values.modules.length <= 1
                                       }
                                     >

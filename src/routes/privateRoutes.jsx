@@ -37,6 +37,7 @@ import NonAccreditedCourseRegistration from "../pages/institute/registration/Non
 import ViewAccreditedCourseRegistration from "../pages/institute/registration/ViewAccreditedCourseRegistration";
 import ViewNonAccreditedCourseRegistration from "../pages/institute/registration/ViewNonAccreditedCourseRegistration";
 import InstituteChange from "../pages/institute/registration/InstituteChange";
+import SelfAssessmentReport from "../pages/institute/registration/SelfAssessmentReport";
 
 //curriculum
 import CurriculumIndex from "../pages/curriculum/CurriculumIndex";
@@ -45,10 +46,11 @@ import ViewCurriculumIndex from "../pages/curriculum/ViewCurriculumIndex";
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
 import TrackTrainee from "../pages/institute/TrackTrainee";
-// tvet data manager
-import GenerateTracerIndex from "../pages/dwps/tracer/GenerateTracerIndex";
+// Tracer 
+import TracerQuestionGenerator from "../pages/dwps/tracer/TracerQuestionGenerator";
 import SendTracerIndex from "../pages/dwps/tracer/SendTracerIndex";
 import ResponseTracerIndex from "../pages/dwps/tracer/ResponseTracerIndex";
+import GenerateTracerIndex from "../pages/dwps/tracer/GenerateTracerIndex";
 //registration and proposal view
 import ViewInstituteSesCentreAssessmentCentreProposal from "../pages/public/proposal/ViewInstituteSesCentreAssessmentCentreProposal";
 import ViewInstituteSesCentreAssessmentCentre from "../pages/public/registration/ViewInstituteSesCentreAssessmentCentre";
@@ -62,9 +64,10 @@ import ApplyTrainerToTProgram from "../pages/dwps/tot/ApplyTrainerToTProgram";
 import ViewApplyTrainerToTProgram from "../pages/dwps/tot/ViewApplyTrainerToTProgram";
 
 //Certificate
-import Assessment from "../pages/certificate/Assessment";
-import CertificateIndex from "../pages/certificate/CertificateIndex";
+//import Assessment from "../pages/certificate/Assessment";
+import TraineeCertificateIndex from "../pages/certificate/TraineeCertificateIndex";
 import RegistrationCertificateIndex from "../pages/certificate/RegistrationCertificateIndex";
+import AccreditationBQFProgrammeIndex from "../pages/certificate/AccreditationBQFProgrammeIndex";
 
 //birms
 import BirmsAgencyPaymentIndex from "../pages/birms/private/BirmsAgencyPaymentIndex";
@@ -283,6 +286,7 @@ export const privateRoutes = [
       { path: "accredited-course", element: <AccreditedCourseRegistration /> },
       { path: "add-trainer", element: <AddTrainerIndex /> },
       { path: "institute-change", element: <InstituteChange /> },
+      { path: "self-assessment-report", element: <SelfAssessmentReport /> },
     ],
   },
   {
@@ -319,7 +323,8 @@ export const privateRoutes = [
   {
     path: "tracer",
     children: [
-      { path: "genarate-tracer-index", element: <GenerateTracerIndex /> },
+      { path: "generate-tracer-questions", element: <TracerQuestionGenerator /> },
+      { path: "generate-tracer-index", element: <GenerateTracerIndex /> },
       { path: "send-tracer", element: <SendTracerIndex /> },
       { path: "response-tracer", element: <ResponseTracerIndex /> },
     ],
@@ -383,9 +388,11 @@ export const privateRoutes = [
   {
     path: "certificate",
     children: [
-      { path: "assessment", element: <Assessment /> },
-      { path: "bqf-certificate", element: <CertificateIndex /> },
-      { path: "registration-certificate", element: <RegistrationCertificateIndex /> }
+   //   { path: "assessment", element: <Assessment /> },
+      { path: "bqf-certificate", element: <TraineeCertificateIndex /> },
+      { path: "registration-certificate", element: <RegistrationCertificateIndex /> },
+      { path: "programme-accreditation-certificate", element: <AccreditationBQFProgrammeIndex /> }
+
     ],
   },
   //without children

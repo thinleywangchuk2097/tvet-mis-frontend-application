@@ -11,7 +11,7 @@ class InstituteProposalService {
   getInstituteProposalByApplicationNo(application_no, token) {
     return apiClient
       .get(
-        `/api/v1/public/institute-proposal/get-institute-details/${application_no}`,
+        `/api/v1/public/institute-proposal/get-applicant-details/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

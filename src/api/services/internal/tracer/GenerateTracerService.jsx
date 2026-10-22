@@ -55,6 +55,7 @@ class GenerateTracerService {
       .then((response) => response)
       .catch((error) => error);
   }
+  
   sendTraineeTracerSurvey(data, token) {
     return apiClient
       .post(`/api/v1/user/management/tracer/send-trainee-survey`, data, {
