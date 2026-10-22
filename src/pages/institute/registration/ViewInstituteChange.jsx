@@ -37,11 +37,12 @@ import InstituteRegistrationService from "../../../api/services/internal/registr
 import CommonService from "../../../api/services/internal/common/CommonService";
 import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 import { format } from "date-fns";
+import { useSelector } from "react-redux";
 
 const ViewInstituteChange = () => {
   const { applicationNo } = useParams();
   const navigate = useNavigate();
-
+  const access_token = useSelector((state) => state.auth.accessToken);
   const [loading, setLoading] = useState(true);
   const [changeRequestData, setChangeRequestData] = useState(null);
   const [dzongkhags, setDzongkhags] = useState([]);
@@ -72,8 +73,10 @@ const ViewInstituteChange = () => {
 
   const fetchPaymentStatus = async () => {
     try {
-      const response =
-        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      const response = await BirmsPaymentService.getPaymentByApplicationNo(
+        applicationNo,
+        access_token,
+      );
       setPaymentStatus(response.data);
       console.log("Payment status fetched:", response.data);
     } catch (error) {

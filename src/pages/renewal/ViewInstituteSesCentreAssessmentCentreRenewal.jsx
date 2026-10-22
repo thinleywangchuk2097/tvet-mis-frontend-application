@@ -521,8 +521,10 @@ const usePayment = (applicationNo) => {
 
   const fetchPaymentStatus = useCallback(async () => {
     try {
-      const response =
-        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      const response = await BirmsPaymentService.getPaymentByApplicationNo(
+        applicationNo,
+        access_token,
+      );
       setPaymentStatus(response.data);
       return response.data;
     } catch (error) {

@@ -1,5 +1,5 @@
 // RegistrationCertificateIndex.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import PropTypes from "prop-types";
 import {
   Paper,
@@ -22,12 +22,21 @@ import {
   Divider,
   TablePagination,
   Tooltip,
+  CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import DownloadIcon from "@mui/icons-material/Download";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { toast } from "react-toastify";
+import { useSelector } from "react-redux";
+import {
+  generateRegistrationCertificatePdf,
+  generateAllRegistrationCertificatesPdf,
+} from "@/utils/pdf/registrationCertificatePdf";
+import ReportService from "../../api/services/internal/report/ReportService";
 
 // ==================== CONSTANTS ====================
+
 const TABLE_STYLE = {
   border: "1px solid #ccc",
   "& th, & td": {
@@ -36,7 +45,6 @@ const TABLE_STYLE = {
   },
 };
 
-// Registration Types (with IDs provided)
 const REGISTRATION_TYPES = [
   { id: 7, label: "Institute Registration" },
   { id: 36, label: "SES Centre Registration" },
@@ -48,181 +56,92 @@ const REGISTRATION_TYPES = [
 
 const ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
 
-// Tooltip text for the multi-search field
 const APPLICATION_NO_TOOLTIP =
   "Search by Application No, CID, Reference No, or Registration No";
 
-// ==================== SAMPLE DATA ====================
-const SAMPLE_REGISTRATIONS = [
-  // --- Institute Registration (id 7) ---
-  {
-    id: 1,
-    registrationTypeId: 7,
-    registrationType: "Institute Registration",
-    applicationNo: "APP-2026-0001",
-    referenceNo: "REF-INST-001",
-    registrationNo: "REG-INST-001",
-    name: "Thimphu Technical Institute",
-    cid: "INST-001",
-    registrationDate: "2026-01-05",
-    status: "Registered",
-  },
-  {
-    id: 2,
-    registrationTypeId: 7,
-    registrationType: "Institute Registration",
-    applicationNo: "APP-2026-0002",
-    referenceNo: "REF-INST-002",
-    registrationNo: "REG-INST-002",
-    name: "Paro Vocational Institute",
-    cid: "INST-002",
-    registrationDate: "2026-01-20",
-    status: "Registered",
-  },
+// ==================== HELPER FUNCTIONS ====================
 
-  // --- SES Centre Registration (id 36) ---
-  {
-    id: 3,
-    registrationTypeId: 36,
-    registrationType: "SES Centre Registration",
-    applicationNo: "APP-2026-0003",
-    referenceNo: "REF-SES-001",
-    registrationNo: "REG-SES-001",
-    name: "Bhutan Skills Centre",
-    cid: "SES-001",
-    registrationDate: "2026-01-10",
-    status: "Registered",
-  },
-  {
-    id: 4,
-    registrationTypeId: 36,
-    registrationType: "SES Centre Registration",
-    applicationNo: "APP-2026-0004",
-    referenceNo: "REF-SES-002",
-    registrationNo: "REG-SES-002",
-    name: "Gelephu Skills Centre",
-    cid: "SES-002",
-    registrationDate: "2026-02-01",
-    status: "Registered",
-  },
+const getField = (item, ...fields) => {
+  for (const field of fields) {
+    const value = item?.[field];
 
-  // --- Assessment Centre Accreditation (id 16) ---
-  {
-    id: 5,
-    registrationTypeId: 16,
-    registrationType: "Assessment Centre Accreditation",
-    applicationNo: "APP-2026-0005",
-    referenceNo: "REF-AC-001",
-    registrationNo: "REG-AC-001",
-    name: "National Assessment Centre",
-    cid: "AC-001",
-    registrationDate: "2026-01-02",
-    status: "Registered",
-  },
-  {
-    id: 6,
-    registrationTypeId: 16,
-    registrationType: "Assessment Centre Accreditation",
-    applicationNo: "APP-2026-0006",
-    referenceNo: "REF-AC-002",
-    registrationNo: "REG-AC-002",
-    name: "Regional Assessment Centre",
-    cid: "AC-002",
-    registrationDate: "2026-02-10",
-    status: "Registered",
-  },
+    if (value !== null && value !== undefined && value !== "") {
+      return value;
+    }
+  }
 
-  // --- Assessor (id 32) ---
-  {
-    id: 7,
-    registrationTypeId: 32,
-    registrationType: "Assessor",
-    applicationNo: "APP-2026-0007",
-    referenceNo: "REF-ASR-001",
-    registrationNo: "REG-ASR-001",
-    name: "Pema Dorji",
-    cid: "1160400783",
-    registrationDate: "2026-01-05",
-    status: "Registered",
-  },
-  {
-    id: 8,
-    registrationTypeId: 32,
-    registrationType: "Assessor",
-    applicationNo: "APP-2026-0008",
-    referenceNo: "REF-ASR-002",
-    registrationNo: "REG-ASR-002",
-    name: "Tashi",
-    cid: "1160400909",
-    registrationDate: "2026-01-06",
-    status: "Registered",
-  },
+  return "N/A";
+};
 
-  // --- Accreditor (id 5) ---
-  {
-    id: 9,
-    registrationTypeId: 5,
-    registrationType: "Accreditor",
-    applicationNo: "APP-2026-0009",
-    referenceNo: "REF-ACR-001",
-    registrationNo: "REG-ACR-001",
-    name: "Pema Lhamo",
-    cid: "1160400783",
-    registrationDate: "2026-01-10",
-    status: "Registered",
-  },
-  {
-    id: 10,
-    registrationTypeId: 5,
-    registrationType: "Accreditor",
-    applicationNo: "APP-2026-0010",
-    referenceNo: "REF-ACR-002",
-    registrationNo: "REG-ACR-002",
-    name: "Karma Wangmo",
-    cid: "1160400456",
-    registrationDate: "2026-02-01",
-    status: "Registered",
-  },
+const getResponseData = (response) => {
+  const responseData = response?.data;
 
-  // --- Quality Auditor (id 3) ---
-  {
-    id: 11,
-    registrationTypeId: 3,
-    registrationType: "Quality Auditor",
-    applicationNo: "APP-2026-0011",
-    referenceNo: "REF-QA-001",
-    registrationNo: "REG-QA-001",
-    name: "Wahgchuk Pemo",
-    cid: "189700202",
-    registrationDate: "2026-01-02",
-    status: "Registered",
-  },
-  {
-    id: 12,
-    registrationTypeId: 3,
-    registrationType: "Quality Auditor",
-    applicationNo: "APP-2026-0012",
-    referenceNo: "REF-QA-002",
-    registrationNo: "REG-QA-002",
-    name: "Ugyen Tshering",
-    cid: "1160400789",
-    registrationDate: "2026-02-10",
-    status: "Registered",
-  },
-];
+  if (Array.isArray(responseData)) {
+    return responseData;
+  }
+
+  if (Array.isArray(responseData?.data)) {
+    return responseData.data;
+  }
+
+  if (Array.isArray(responseData?.content)) {
+    return responseData.content;
+  }
+
+  if (Array.isArray(responseData?.result)) {
+    return responseData.result;
+  }
+
+  if (Array.isArray(responseData?.data?.content)) {
+    return responseData.data.content;
+  }
+
+  return [];
+};
+
+/**
+ * Resolve the label for a registration type from its id.
+ */
+const getRegistrationTypeLabel = (registrationTypeId) =>
+  REGISTRATION_TYPES.find(
+    (type) => String(type.id) === String(registrationTypeId),
+  )?.label || registrationTypeId;
+
+/**
+ * Normalize a registration record into the shape the PDF template expects.
+ */
+const buildPdfPayload = (registration) => ({
+  ...registration,
+  registration_type_label: getRegistrationTypeLabel(
+    registration?.registration_type,
+  ),
+  institute_name: getField(
+    registration,
+    "institute_name",
+    "full_name",
+    "applicant_name",
+    "name",
+  ),
+  registration_no: getField(registration, "registration_no", "registrationNo"),
+  application_no: getField(registration, "application_no", "applicationNo"),
+});
 
 // ==================== CUSTOM HOOKS ====================
-const useFilters = (initialFilters = {}) => {
+
+const useFilters = () => {
   const [filters, setFilters] = useState({
     registrationType: "",
     applicationNo: "",
     search: "",
-    ...initialFilters,
   });
 
-  const handleFilterChange = useCallback((e) => {
-    const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
+  const handleFilterChange = useCallback((event) => {
+    const { name, value } = event.target;
+
+    setFilters((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   }, []);
 
   const clearFilters = useCallback(() => {
@@ -233,90 +152,45 @@ const useFilters = (initialFilters = {}) => {
     });
   }, []);
 
-  return { filters, handleFilterChange, clearFilters };
+  return {
+    filters,
+    handleFilterChange,
+    clearFilters,
+  };
 };
 
 const usePagination = (initialRowsPerPage = 5) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(initialRowsPerPage);
 
-  const handleChangePage = (_, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (e) => {
-    setRowsPerPage(parseInt(e.target.value, 10));
+  const handleChangePage = useCallback((_, newPage) => {
+    setPage(newPage);
+  }, []);
+
+  const handleChangeRowsPerPage = useCallback((event) => {
+    setRowsPerPage(Number.parseInt(event.target.value, 10));
     setPage(0);
+  }, []);
+
+  return {
+    page,
+    rowsPerPage,
+    handleChangePage,
+    handleChangeRowsPerPage,
   };
-
-  return { page, rowsPerPage, handleChangePage, handleChangeRowsPerPage };
-};
-
-// ==================== PROPTYPES ====================
-const sectionHeaderPropTypes = { title: PropTypes.string.isRequired };
-
-const filterSelectPropTypes = {
-  name: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  label: PropTypes.string.isRequired,
-  options: PropTypes.array.isRequired,
-  onChange: PropTypes.func.isRequired,
-  disabled: PropTypes.bool,
-};
-
-const filterTextFieldPropTypes = {
-  name: PropTypes.string.isRequired,
-  value: PropTypes.string,
-  label: PropTypes.string.isRequired,
-  type: PropTypes.string,
-  onChange: PropTypes.func.isRequired,
-  tooltip: PropTypes.string,
-};
-
-const clearButtonPropTypes = {
-  onClear: PropTypes.func.isRequired,
-};
-
-const searchFieldPropTypes = {
-  value: PropTypes.string,
-  onChange: PropTypes.func.isRequired,
-  placeholder: PropTypes.string,
-};
-
-const dataTablePropTypes = {
-  columns: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      label: PropTypes.string,
-      field: PropTypes.string,
-      align: PropTypes.string,
-      render: PropTypes.func,
-      headerRender: PropTypes.func,
-    }),
-  ).isRequired,
-  data: PropTypes.array.isRequired,
-  page: PropTypes.number,
-  rowsPerPage: PropTypes.number,
-  emptyMessage: PropTypes.string,
-};
-
-const paginationFooterPropTypes = {
-  count: PropTypes.number.isRequired,
-  rowsPerPage: PropTypes.number.isRequired,
-  page: PropTypes.number.isRequired,
-  onPageChange: PropTypes.func.isRequired,
-  onRowsPerPageChange: PropTypes.func.isRequired,
-};
-
-const downloadAllHeaderPropTypes = {
-  count: PropTypes.number.isRequired,
-  onDownloadAll: PropTypes.func.isRequired,
 };
 
 // ==================== REUSABLE COMPONENTS ====================
+
 const SectionHeader = ({ title }) => (
   <Typography variant="h6" mb={3}>
     {title}
   </Typography>
 );
-SectionHeader.propTypes = sectionHeaderPropTypes;
+
+SectionHeader.propTypes = {
+  title: PropTypes.string.isRequired,
+};
 
 const FilterSelect = ({
   name,
@@ -328,8 +202,10 @@ const FilterSelect = ({
 }) => (
   <FormControl fullWidth size="small" disabled={disabled}>
     <InputLabel>{label}</InputLabel>
+
     <Select name={name} value={value} onChange={onChange} label={label}>
       <MenuItem value="">-Select-</MenuItem>
+
       {options.map((option) => (
         <MenuItem key={option.id} value={option.id}>
           {option.label}
@@ -338,25 +214,33 @@ const FilterSelect = ({
     </Select>
   </FormControl>
 );
-FilterSelect.propTypes = filterSelectPropTypes;
+
+FilterSelect.propTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  label: PropTypes.string.isRequired,
+  options: PropTypes.array.isRequired,
+  onChange: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+};
 
 const FilterTextField = ({
   name,
   value,
   label,
-  type = "text",
   onChange,
   tooltip,
+  disabled = false,
 }) => {
   const field = (
     <TextField
       fullWidth
       label={label}
-      type={type}
       name={name}
       value={value}
       onChange={onChange}
       size="small"
+      disabled={disabled}
       InputProps={{
         endAdornment: tooltip ? (
           <InputAdornment position="end">
@@ -375,7 +259,15 @@ const FilterTextField = ({
     field
   );
 };
-FilterTextField.propTypes = filterTextFieldPropTypes;
+
+FilterTextField.propTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+  tooltip: PropTypes.string,
+  disabled: PropTypes.bool,
+};
 
 const ClearButton = ({ onClear }) => (
   <Tooltip title="Clear all filters" arrow>
@@ -390,15 +282,14 @@ const ClearButton = ({ onClear }) => (
     </Button>
   </Tooltip>
 );
-ClearButton.propTypes = clearButtonPropTypes;
 
-const SearchField = ({
-  value,
-  onChange,
-  placeholder = "Search registrations...",
-}) => (
+ClearButton.propTypes = {
+  onClear: PropTypes.func.isRequired,
+};
+
+const SearchField = ({ value, onChange }) => (
   <TextField
-    placeholder={placeholder}
+    placeholder="Search registrations..."
     name="search"
     value={value}
     size="small"
@@ -412,9 +303,13 @@ const SearchField = ({
     }}
   />
 );
-SearchField.propTypes = searchFieldPropTypes;
 
-const DownloadAllHeader = ({ count, onDownloadAll }) => (
+SearchField.propTypes = {
+  value: PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
+const DownloadAllHeader = ({ count, onDownloadAll, disabled = false }) => (
   <Tooltip
     title={
       count === 0
@@ -429,7 +324,7 @@ const DownloadAllHeader = ({ count, onDownloadAll }) => (
         size="small"
         startIcon={<DownloadIcon />}
         onClick={onDownloadAll}
-        disabled={count === 0}
+        disabled={count === 0 || disabled}
         sx={{ textTransform: "none", fontWeight: "bold" }}
       >
         Download All
@@ -437,63 +332,77 @@ const DownloadAllHeader = ({ count, onDownloadAll }) => (
     </span>
   </Tooltip>
 );
-DownloadAllHeader.propTypes = downloadAllHeaderPropTypes;
 
-const DataTable = ({
-  columns,
-  data,
-  page,
-  rowsPerPage,
-  emptyMessage = "No data found",
-}) => {
-  const paginatedData = data.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage,
-  );
-
-  return (
-    <TableContainer>
-      <Table size="small" sx={TABLE_STYLE}>
-        <TableHead>
-          <TableRow
-            sx={{
-              background: "#f5f5f5",
-              "& .MuiTableCell-root": { fontWeight: "bold" },
-            }}
-          >
-            {columns.map((col) => (
-              <TableCell key={col.id} align={col.align || "left"}>
-                {col.headerRender ? col.headerRender(col) : col.label}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {paginatedData.length > 0 ? (
-            paginatedData.map((item, index) => (
-              <TableRow key={item.id} hover>
-                {columns.map((col) => (
-                  <TableCell key={col.id} align={col.align || "left"}>
-                    {col.render
-                      ? col.render(item, index + page * rowsPerPage)
-                      : item[col.field] || "N/A"}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} align="center" sx={{ py: 3 }}>
-                {emptyMessage}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
+DownloadAllHeader.propTypes = {
+  count: PropTypes.number.isRequired,
+  onDownloadAll: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
 };
-DataTable.propTypes = dataTablePropTypes;
+
+const DataTable = ({ columns, data, emptyMessage = "No data found" }) => (
+  <TableContainer>
+    <Table size="small" sx={TABLE_STYLE}>
+      <TableHead>
+        <TableRow
+          sx={{
+            background: "#f5f5f5",
+            "& .MuiTableCell-root": {
+              fontWeight: "bold",
+            },
+          }}
+        >
+          {columns.map((column) => (
+            <TableCell key={column.id} align={column.align || "left"}>
+              {column.headerRender ? column.headerRender(column) : column.label}
+            </TableCell>
+          ))}
+        </TableRow>
+      </TableHead>
+
+      <TableBody>
+        {data.length > 0 ? (
+          data.map((item, index) => (
+            <TableRow
+              key={
+                item.id ?? item.application_no ?? item.registration_no ?? index
+              }
+              hover
+            >
+              {columns.map((column) => (
+                <TableCell key={column.id} align={column.align || "left"}>
+                  {column.render
+                    ? column.render(item, index)
+                    : getField(item, column.field)}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))
+        ) : (
+          <TableRow>
+            <TableCell colSpan={columns.length} align="center" sx={{ py: 3 }}>
+              {emptyMessage}
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  </TableContainer>
+);
+
+DataTable.propTypes = {
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      label: PropTypes.string,
+      field: PropTypes.string,
+      align: PropTypes.string,
+      render: PropTypes.func,
+      headerRender: PropTypes.func,
+    }),
+  ).isRequired,
+  data: PropTypes.array.isRequired,
+  emptyMessage: PropTypes.string,
+};
 
 const PaginationFooter = ({
   count,
@@ -507,12 +416,16 @@ const PaginationFooter = ({
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
+      flexWrap: "wrap",
+      gap: 1,
     }}
   >
     <Typography variant="caption" color="text.secondary">
-      Showing {Math.min((page + 1) * rowsPerPage, count)} of {count}{" "}
-      registrations
+      Showing {count === 0 ? 0 : Math.min(page * rowsPerPage + 1, count)}
+      {" - "}
+      {Math.min((page + 1) * rowsPerPage, count)} of {count} registrations
     </Typography>
+
     <TablePagination
       rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
       component="div"
@@ -522,118 +435,232 @@ const PaginationFooter = ({
       onPageChange={onPageChange}
       onRowsPerPageChange={onRowsPerPageChange}
       sx={{
-        ".MuiTablePagination-select": { borderRadius: 1 },
-        ".MuiTablePagination-displayedRows": { margin: 0 },
+        ".MuiTablePagination-select": {
+          borderRadius: 1,
+        },
+        ".MuiTablePagination-displayedRows": {
+          margin: 0,
+        },
       }}
     />
   </Box>
 );
-PaginationFooter.propTypes = paginationFooterPropTypes;
+
+PaginationFooter.propTypes = {
+  count: PropTypes.number.isRequired,
+  rowsPerPage: PropTypes.number.isRequired,
+  page: PropTypes.number.isRequired,
+  onPageChange: PropTypes.func.isRequired,
+  onRowsPerPageChange: PropTypes.func.isRequired,
+};
 
 // ==================== MAIN COMPONENT ====================
+
 const RegistrationCertificateIndex = () => {
   const filters = useFilters();
   const pagination = usePagination(5);
 
-  // Dummy registrations
-  const [registrations] = useState(SAMPLE_REGISTRATIONS);
+  const access_token = useSelector((state) => state.auth.accessToken);
 
-  // Applied filters (only updated on Search click)
+  const [registrations, setRegistrations] = useState([]);
+
   const [appliedFilters, setAppliedFilters] = useState({
     registrationType: "",
     applicationNo: "",
     search: "",
   });
 
-  // Filter registrations based on APPLIED filters
-  const filteredRegistrations = useMemo(() => {
-    const searchTerm = appliedFilters.applicationNo.trim().toLowerCase();
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
 
-    return registrations.filter((reg) => {
-      const matchesRegistrationType =
-        appliedFilters.registrationType === "" ||
-        reg.registrationTypeId === Number(appliedFilters.registrationType);
+  // ==================== API SEARCH ====================
 
-      // Multi-field search: applicationNo, cid, referenceNo, registrationNo
-      const matchesApplicationNo =
-        searchTerm === "" ||
-        reg.applicationNo?.toLowerCase().includes(searchTerm) ||
-        reg.cid?.toLowerCase().includes(searchTerm) ||
-        reg.referenceNo?.toLowerCase().includes(searchTerm) ||
-        reg.registrationNo?.toLowerCase().includes(searchTerm);
+  const handleSearch = useCallback(async () => {
+    const registration_type = filters.filters.registrationType;
+    const application_no = filters.filters.applicationNo.trim();
 
-      const matchesSearch =
-        appliedFilters.search === "" ||
-        reg.name.toLowerCase().includes(appliedFilters.search.toLowerCase()) ||
-        reg.applicationNo
-          .toLowerCase()
-          .includes(appliedFilters.search.toLowerCase());
+    if (!registration_type || !application_no) {
+      return;
+    }
 
-      return matchesRegistrationType && matchesApplicationNo && matchesSearch;
-    });
-  }, [registrations, appliedFilters]);
+    try {
+      setLoading(true);
+      setError("");
+      setHasSearched(true);
 
-  // Reset page when applied filters change
-  useEffect(() => {
-    pagination.handleChangePage(null, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters]);
+      const response = await ReportService.getRegistrationDetailsForCertificate(
+        registration_type,
+        application_no,
+        access_token,
+      );
 
-  // Search button enabled only when both Registration Type & Application No are filled
-  const canSearch =
-    filters.filters.registrationType !== "" &&
-    filters.filters.applicationNo.trim() !== "";
+      const responseData = getResponseData(response);
 
-  // Handle Search button click — applies filters
-  const handleSearch = useCallback(() => {
-    setAppliedFilters({ ...filters.filters });
-  }, [filters.filters]);
+      console.log("Fetched registration details:", responseData);
 
-  // Handle Clear — resets both form filters and applied filters
+      setRegistrations(responseData);
+
+      setAppliedFilters({
+        ...filters.filters,
+        registrationType: String(registration_type),
+        applicationNo: application_no,
+      });
+
+      pagination.handleChangePage(null, 0);
+
+      if (responseData.length === 0) {
+        setError("No registration records found.");
+      }
+    } catch (err) {
+      console.error("Error fetching registration details:", err);
+
+      setRegistrations([]);
+
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Failed to fetch registration details. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [filters.filters, access_token, pagination.handleChangePage]);
+
+  // ==================== CLEAR FILTERS ====================
+
   const handleClear = useCallback(() => {
     filters.clearFilters();
+
     setAppliedFilters({
       registrationType: "",
       applicationNo: "",
       search: "",
     });
-  }, [filters]);
 
-  // Dummy PDF handler (no API calls)
-  const handlePdf = useCallback((registration) => {
-    console.log("Generate Registration Certificate PDF for:", registration);
-    alert(`Downloading registration certificate for ${registration.name}`);
+    setRegistrations([]);
+    setError("");
+    setHasSearched(false);
+
+    pagination.handleChangePage(null, 0);
+  }, [filters.clearFilters, pagination.handleChangePage]);
+
+  // ==================== QUICK SEARCH ====================
+
+  const filteredRegistrations = useMemo(() => {
+    const searchTerm = appliedFilters.search.trim().toLowerCase();
+
+    if (!searchTerm) {
+      return registrations;
+    }
+
+    return registrations.filter((item) => {
+      const searchableFields = [
+        item.application_no,
+        item.registration_no,
+        item.registration_type,
+        item.service_id,
+        item.institute_name,
+        item.location,
+        item.exact_location,
+      ];
+
+      return searchableFields.some((value) =>
+        String(value ?? "")
+          .toLowerCase()
+          .includes(searchTerm),
+      );
+    });
+  }, [registrations, appliedFilters.search]);
+
+  useEffect(() => {
+    pagination.handleChangePage(null, 0);
+  }, [appliedFilters.search, pagination.handleChangePage]);
+
+  // ==================== CERTIFICATE ACTIONS ====================
+
+  const handlePdf = useCallback(async (registration) => {
+    try {
+      setDownloading(true);
+      const payload = buildPdfPayload(registration);
+      await generateRegistrationCertificatePdf(payload);
+    } catch (err) {
+      console.error("❌ Registration certificate generation failed:", err);
+      toast.error(
+        `Could not generate certificate: ${err?.message || "unknown"}`,
+      );
+    } finally {
+      setDownloading(false);
+    }
   }, []);
 
-  // Dummy Download All handler (no API calls)
-  const handleDownloadAll = useCallback(() => {
-    console.log(
-      "Generate all Registration Certificate PDFs:",
-      filteredRegistrations,
-    );
-    alert(
-      `Downloading ${filteredRegistrations.length} registration certificates`,
-    );
+  const handleDownloadAll = useCallback(async () => {
+    if (filteredRegistrations.length === 0) {
+      return;
+    }
+
+    try {
+      setDownloading(true);
+      const payloads = filteredRegistrations.map(buildPdfPayload);
+      await generateAllRegistrationCertificatesPdf(payloads);
+    } catch (err) {
+      console.error("❌ Bulk registration certificate generation failed:", err);
+      toast.error(
+        `Could not generate certificates: ${err?.message || "unknown"}`,
+      );
+    } finally {
+      setDownloading(false);
+    }
   }, [filteredRegistrations]);
 
-  // Table columns configuration
+  // ==================== TABLE COLUMNS ====================
+
   const columns = useMemo(
     () => [
-      { id: "index", label: "#", render: (_, index) => index + 1 },
+      {
+        id: "index",
+        label: "#",
+        render: (_, index) =>
+          pagination.page * pagination.rowsPerPage + index + 1,
+      },
       {
         id: "registrationType",
         label: "Registration Type",
-        field: "registrationType",
+        render: (item) => getField(item, "registration_type"),
       },
-      { id: "applicationNo", label: "Application No", field: "applicationNo" },
-      { id: "name", label: "Name", field: "name" },
-      { id: "cid", label: "CID/Reference No", field: "cid" },
       {
-        id: "registrationDate",
-        label: "Registration Date",
-        field: "registrationDate",
+        id: "applicationNo",
+        label: "Application No",
+        render: (item) => getField(item, "application_no", "applicationNo"),
       },
-      { id: "status", label: "Status", field: "status" },
+      {
+        id: "name",
+        label: "Institute / Applicant Name",
+        render: (item) =>
+          getField(
+            item,
+            "institute_name",
+            "full_name",
+            "applicant_name",
+            "name",
+          ),
+      },
+      {
+        id: "registrationNo",
+        label: "Registration No",
+        render: (item) => getField(item, "registration_no", "registrationNo"),
+      },
+      {
+        id: "location",
+        label: "Location",
+        render: (item) => getField(item, "location"),
+      },
+      {
+        id: "exactLocation",
+        label: "Exact Location",
+        render: (item) => getField(item, "exact_location", "exactLocation"),
+      },
       {
         id: "actions",
         label: "Action",
@@ -642,37 +669,71 @@ const RegistrationCertificateIndex = () => {
           <DownloadAllHeader
             count={filteredRegistrations.length}
             onDownloadAll={handleDownloadAll}
+            disabled={loading || downloading}
           />
         ),
         render: (item) => (
-          <Tooltip title={`Download certificate for ${item.name}`} arrow>
-            <Button
-              variant="text"
-              size="small"
-              startIcon={<DownloadIcon />}
-              onClick={() => handlePdf(item)}
-              sx={{ textTransform: "none" }}
-            >
-              Certificate
-            </Button>
+          <Tooltip
+            title={`Download certificate for ${getField(
+              item,
+              "institute_name",
+              "registration_no",
+              "application_no",
+            )}`}
+            arrow
+          >
+            <span>
+              <Button
+                variant="text"
+                size="small"
+                startIcon={<DownloadIcon />}
+                onClick={() => handlePdf(item)}
+                disabled={loading || downloading}
+                sx={{ textTransform: "none" }}
+              >
+                Certificate
+              </Button>
+            </span>
           </Tooltip>
         ),
       },
     ],
-    [handlePdf, handleDownloadAll, filteredRegistrations.length],
+    [
+      pagination.page,
+      pagination.rowsPerPage,
+      filteredRegistrations.length,
+      handlePdf,
+      handleDownloadAll,
+      loading,
+      downloading,
+    ],
   );
 
-  // Paginated registrations for display
-  const paginatedRegistrations = filteredRegistrations.slice(
-    pagination.page * pagination.rowsPerPage,
-    pagination.page * pagination.rowsPerPage + pagination.rowsPerPage,
-  );
+  // ==================== PAGINATION ====================
+
+  const paginatedRegistrations = useMemo(() => {
+    const startIndex = pagination.page * pagination.rowsPerPage;
+
+    return filteredRegistrations.slice(
+      startIndex,
+      startIndex + pagination.rowsPerPage,
+    );
+  }, [filteredRegistrations, pagination.page, pagination.rowsPerPage]);
+
+  // ==================== SEARCH VALIDATION ====================
+
+  const canSearch =
+    filters.filters.registrationType !== "" &&
+    filters.filters.applicationNo.trim() !== "" &&
+    !loading;
+
+  // ==================== RENDER ====================
 
   return (
     <Paper sx={{ p: 2, mt: 1 }}>
-      <SectionHeader title="Registration Certificate" />
+      <SectionHeader title="List Of Registration Certificates" />
 
-      {/* Filter Section */}
+      {/* Registration Filters */}
       <Grid container spacing={2} sx={{ mb: 2 }} alignItems="flex-end">
         <Grid item size={{ xs: 12, md: 3 }}>
           <FilterSelect
@@ -681,6 +742,7 @@ const RegistrationCertificateIndex = () => {
             label="Registration Type"
             options={REGISTRATION_TYPES}
             onChange={filters.handleFilterChange}
+            disabled={loading}
           />
         </Grid>
 
@@ -691,6 +753,7 @@ const RegistrationCertificateIndex = () => {
             label="Application No"
             onChange={filters.handleFilterChange}
             tooltip={APPLICATION_NO_TOOLTIP}
+            disabled={loading}
           />
         </Grid>
 
@@ -700,27 +763,33 @@ const RegistrationCertificateIndex = () => {
             title={
               canSearch
                 ? "Search registrations"
-                : "Please select Registration Type and enter Application No"
+                : "Select Registration Type and enter Application No"
             }
             arrow
           >
-            <span style={{ width: "100%" }}>
+            <span style={{ display: "block", width: "100%" }}>
               <Button
                 variant="contained"
                 color="primary"
-                startIcon={<SearchIcon />}
+                startIcon={
+                  loading ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <SearchIcon />
+                  )
+                }
                 onClick={handleSearch}
                 disabled={!canSearch}
                 fullWidth
                 sx={{ textTransform: "none" }}
               >
-                Search
+                {loading ? "Searching..." : "Search"}
               </Button>
             </span>
           </Tooltip>
         </Grid>
 
-        {/* Clear */}
+        {/* Clear Button */}
         <Grid item size={{ xs: 12, md: 2 }}>
           <ClearButton onClear={handleClear} />
         </Grid>
@@ -728,23 +797,41 @@ const RegistrationCertificateIndex = () => {
 
       <Divider sx={{ my: 2 }} />
 
-      {/* Search (quick filter on results) */}
+      {/* Quick Search */}
       <Grid container justifyContent="flex-end" sx={{ mb: 2 }}>
         <Grid item>
           <SearchField
             value={filters.filters.search}
-            onChange={filters.handleFilterChange}
+            onChange={(event) => {
+              filters.handleFilterChange(event);
+
+              setAppliedFilters((previous) => ({
+                ...previous,
+                search: event.target.value,
+              }));
+            }}
           />
         </Grid>
       </Grid>
 
-      {/* Registrations Table */}
+      {/* Error Message */}
+      {error && (
+        <Typography color="error" variant="body2" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+      )}
+
+      {/* Registration Table */}
       <DataTable
         columns={columns}
         data={paginatedRegistrations}
-        page={0}
-        rowsPerPage={paginatedRegistrations.length}
-        emptyMessage="No registrations found matching your criteria"
+        emptyMessage={
+          loading
+            ? "Loading registration details..."
+            : hasSearched
+              ? "No registrations found matching your criteria"
+              : "Select a Registration Type, enter an Application No, and click Search"
+        }
       />
 
       <Divider sx={{ my: 2 }} />
@@ -760,7 +847,5 @@ const RegistrationCertificateIndex = () => {
     </Paper>
   );
 };
-
-RegistrationCertificateIndex.propTypes = {};
 
 export default RegistrationCertificateIndex;

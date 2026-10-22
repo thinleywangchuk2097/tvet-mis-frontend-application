@@ -424,29 +424,24 @@ const InstituteSesCentreAssessmentCentre = () => {
     setFetchingCitizen(true);
     try {
       const response = await DatahubService.getDetailsByCitizenshipNo(cid);
-      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
-        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
+      console.log("Citizen details response:", response.data);
 
+      // Handle the actual response structure (citizen object directly at response.data)
+      const citizen = response.data;
+
+      if (citizen && (citizen.firstName || citizen.lastName)) {
         let genderValue = "";
-        if (citizen.gender === "M") {
-          const genderOption = genderOptions.find(
-            (opt) => opt.label === "Male",
-          );
-          genderValue = genderOption?.value || "";
-        } else if (citizen.gender === "F") {
-          const genderOption = genderOptions.find(
-            (opt) => opt.label === "Female",
-          );
-          genderValue = genderOption?.value || "";
-        } else {
-          const genderOption = genderOptions.find(
-            (opt) => opt.label === "Others",
-          );
-          genderValue = genderOption?.value || "";
-        }
+
+        // Match gender directly (response has "Male", "Female", etc.)
+        const genderOption = genderOptions.find(
+          (opt) =>
+            opt.label.toLowerCase() === (citizen.gender || "").toLowerCase(),
+        );
+        genderValue = genderOption?.value || "";
 
         const fullName =
           `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
+
         formik.setFieldValue(`trainers[${index}].name`, fullName);
         formik.setFieldValue(`trainers[${index}].gender`, genderValue);
 
@@ -474,9 +469,11 @@ const InstituteSesCentreAssessmentCentre = () => {
     setFetchingCitizen(true);
     try {
       const response = await DatahubService.getDetailsByCitizenshipNo(cid);
-      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
-        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
 
+      // Handle the actual response structure (citizen object directly at response.data)
+      const citizen = response.data;
+
+      if (citizen && (citizen.firstName || citizen.lastName)) {
         const fullName =
           `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
 
@@ -1670,10 +1667,12 @@ const InstituteSesCentreAssessmentCentre = () => {
                             formik.touched.trainers?.[index]?.cid &&
                             formik.errors.trainers?.[index]?.cid
                           }
-                          InputProps={{
-                            endAdornment: fetchingCitizen && (
-                              <CircularProgress size={20} />
-                            ),
+                          slotProps={{
+                            input: {
+                              endAdornment: fetchingCitizen && (
+                                <CircularProgress size={20} />
+                              ),
+                            },
                           }}
                         />
                       </Grid>
@@ -1948,10 +1947,12 @@ const InstituteSesCentreAssessmentCentre = () => {
                             : formik.touched.courses?.[index]?.course &&
                               formik.errors.courses?.[index]?.course
                         }
-                        InputProps={{
-                          endAdornment: loadingCourses[course.sector] && (
-                            <CircularProgress size={20} />
-                          ),
+                        slotProps={{
+                          input: {
+                            endAdornment: loadingCourses[course.sector] && (
+                              <CircularProgress size={20} />
+                            ),
+                          },
                         }}
                       >
                         <MenuItem value="">
@@ -2316,10 +2317,12 @@ const InstituteSesCentreAssessmentCentre = () => {
                           formik.touched.tuitionDetails?.[index]?.tutorCid &&
                           formik.errors.tuitionDetails?.[index]?.tutorCid
                         }
-                        InputProps={{
-                          endAdornment: fetchingCitizen && (
-                            <CircularProgress size={20} />
-                          ),
+                        slotProps={{
+                          input: {
+                            endAdornment: fetchingCitizen && (
+                              <CircularProgress size={20} />
+                            ),
+                          },
                         }}
                       />
                     </Grid>

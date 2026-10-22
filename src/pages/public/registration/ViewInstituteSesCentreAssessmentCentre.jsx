@@ -227,8 +227,10 @@ const ViewInstituteSesCentreAssessmentCentre = () => {
 
   const fetchPaymentStatus = async () => {
     try {
-      const response =
-        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      const response = await BirmsPaymentService.getPaymentByApplicationNo(
+        applicationNo,
+        access_token,
+      );
       setPaymentStatus(response.data);
       console.log("Payment status fetched:", response.data);
     } catch (error) {

@@ -298,15 +298,22 @@ const AssessorAccreditorQMSAuditor = () => {
     setFetchingCitizen(true);
     try {
       const response = await DatahubService.getDetailsByCitizenshipNo(cid);
-      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
-        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
-        const genderMap = { M: "Male", F: "Female" };
-        const genderOption = dropdownData.genders.find(
-          (opt) => opt.name === (genderMap[citizen.gender] || "Others"),
-        );
+      // FIXED: Datahub returns citizen object directly (flat structure)
+      const citizen = response.data;
 
-        const fullName =
-          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
+      if (citizen && (citizen.cid || citizen.firstName)) {
+        // Build full name including middle name if present
+        const nameParts = [
+          citizen.firstName,
+          citizen.middleName,
+          citizen.lastName,
+        ].filter(Boolean);
+        const fullName = nameParts.join(" ").trim();
+
+        // FIXED: gender comes as "Male"/"Female" (not "M"/"F")
+        const genderOption = dropdownData.genders.find(
+          (opt) => opt.name === citizen.gender,
+        );
 
         formik.setFieldValue("fullName", fullName);
         formik.setFieldValue("genderId", genderOption?.id || "");
@@ -314,12 +321,16 @@ const AssessorAccreditorQMSAuditor = () => {
         toast.success(`Citizen details fetched successfully for ${fullName}`);
       } else {
         toast.warning("No citizen details found for this CID");
+        formik.setFieldValue("fullName", "");
+        formik.setFieldValue("genderId", "");
       }
     } catch (error) {
       console.error("Error fetching citizen details:", error);
       toast.error(
         "Failed to fetch citizen details. Please check the CID number.",
       );
+      formik.setFieldValue("fullName", "");
+      formik.setFieldValue("genderId", "");
     } finally {
       setFetchingCitizen(false);
     }

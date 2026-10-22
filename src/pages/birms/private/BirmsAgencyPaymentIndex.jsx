@@ -88,7 +88,7 @@ const BirmsAgencyPaymentIndex = () => {
   const [selectedInstitute, setSelectedInstitute] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
-
+  const token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
 
   // Helper function for required label (without red color)
@@ -150,9 +150,7 @@ const BirmsAgencyPaymentIndex = () => {
   const fetchPaymentDetails = async () => {
     try {
       setLoading(true);
-      const response = await BirmsPaymentService.getAllPaymentDetails();
-      console.log("Payment details from API:", response.data);
-
+      const response = await BirmsPaymentService.getAllPaymentDetails(token);
       const mappedPayments = response.data.map((item, index) => ({
         id: parseInt(item.id) || index + 1,
         payment_no: item.payment_advice_no || `PAY-${Date.now()}-${index}`,
@@ -246,7 +244,7 @@ const BirmsAgencyPaymentIndex = () => {
     try {
       setLoading(true);
       const response =
-        await BirmsPaymentService.getCourseByInstituteId(instituteId);
+        await BirmsPaymentService.getCourseByInstituteId(instituteId, token);
       console.log("Courses response:", response.data);
       const mappedCourses = response.data.map((item) => ({
         id: item.course_id || item.id,
@@ -417,7 +415,7 @@ const BirmsAgencyPaymentIndex = () => {
     try {
       setDownloadingReceipts((prev) => ({ ...prev, [paymentId]: true }));
 
-      const response = await BirmsPaymentService.getPaymentReceipt(receiptNo);
+      const response = await BirmsPaymentService.getPaymentReceipt(receiptNo, token);
       console.log("Receipt response:", response);
 
       const data = response.data;
@@ -569,7 +567,7 @@ const BirmsAgencyPaymentIndex = () => {
 
       console.log("Sending cancellation payload:", payload);
 
-      const response = await BirmsPaymentService.makePaymentCancel(payload);
+      const response = await BirmsPaymentService.makePaymentCancel(payload, token);
 
       console.log("Cancel response:", response);
       console.log("Cancel response data:", response.data);

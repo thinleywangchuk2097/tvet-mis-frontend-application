@@ -241,8 +241,6 @@ const StaffManagement = () => {
     try {
       const response =
         await InstituteRegistrationService.getInstituteDetails(registration_no);
-      console.log("Institute Details Response:", response.data);
-
       const instituteData = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
@@ -252,7 +250,6 @@ const StaffManagement = () => {
       if (instituteData && instituteData.institute_id) {
         const id = instituteData.institute_id;
         setInstituteId(id);
-        console.log("Institute ID set to:", id);
         await fetchStaff(id);
       }
     } catch (error) {
@@ -271,12 +268,18 @@ const StaffManagement = () => {
     try {
       const response =
         await DatahubService.getDetailsByCitizenshipNo(citizenId);
-      const citizenData =
-        response.data?.citizenDetailsResponse?.citizenDetail?.[0];
 
-      if (citizenData) {
-        const fullName =
-          `${citizenData.firstName || ""} ${citizenData.lastName || ""}`.trim();
+      const citizenData = response.data;
+
+      if (citizenData && (citizenData.cid || citizenData.firstName)) {
+        // Build full name including middle name if present
+        const nameParts = [
+          citizenData.firstName,
+          citizenData.middleName,
+          citizenData.lastName,
+        ].filter(Boolean);
+
+        const fullName = nameParts.join(" ").trim();
 
         setFieldValue("name", fullName);
 
@@ -291,8 +294,18 @@ const StaffManagement = () => {
           }
         }
 
+        // FIXED: dob comes as "DD/MM/YYYY" — convert to "YYYY-MM-DD" for <input type="date">
         if (citizenData.dob) {
-          setFieldValue("dob", citizenData.dob);
+          const parts = citizenData.dob.split("/");
+          if (parts.length === 3) {
+            const [day, month, year] = parts;
+            setFieldValue(
+              "dob",
+              `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`,
+            );
+          } else {
+            setFieldValue("dob", citizenData.dob);
+          }
         }
 
         toast.success("Citizen details fetched successfully");
@@ -358,7 +371,6 @@ const StaffManagement = () => {
     ],
   };
 
-  // FIXED: Removed `this` usage - using arrow functions with context parameter
   const validationSchema = Yup.object().shape({
     hasCitizenId: Yup.string().required("Required"),
 
@@ -451,7 +463,6 @@ const StaffManagement = () => {
     const instituteIdToUse = id || instituteId;
 
     if (!instituteIdToUse) {
-      console.log("Institute ID not available yet, skipping staff fetch");
       setStaff([]);
       return;
     }
@@ -462,8 +473,6 @@ const StaffManagement = () => {
         instituteIdToUse,
         access_token,
       );
-      console.log("Fetched Staff Response:", response);
-
       let rawData = [];
       if (response.data) {
         if (Array.isArray(response.data)) {
@@ -481,8 +490,6 @@ const StaffManagement = () => {
       }
 
       const mappedData = mapStaffData(rawData);
-      console.log("Mapped Staff Data:", mappedData);
-
       setStaff(mappedData);
     } catch (error) {
       console.error("Error fetching staff:", error);
@@ -520,8 +527,6 @@ const StaffManagement = () => {
             : null,
         })),
       };
-
-      console.log("Submitting payload:", payload);
 
       const response = await StaffManagementService.submitStaff(
         payload,
@@ -589,9 +594,6 @@ const StaffManagement = () => {
           trainingCost: train.trainingCost,
         })),
       };
-
-      console.log("Updating payload:", payload);
-
       const response = await StaffManagementService.editStaff(
         payload,
         access_token,
@@ -772,7 +774,7 @@ const StaffManagement = () => {
       <Dialog
         open={openDialog}
         onClose={() => setOpenDialog(false)}
-        maxWidth="lg"
+        maxWidth="xl"
         fullWidth
       >
         <DialogTitle>

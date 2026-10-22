@@ -95,6 +95,9 @@ const ViewAccreditedCourseRegistration = () => {
   const [documents, setDocuments] = useState([]);
   const [newDocuments, setNewDocuments] = useState([]);
 
+  // Editable enrolment capacity for Role 7
+  const [enrolmentCapacity, setEnrolmentCapacity] = useState("");
+
   // Master data
   const [sectors, setSectors] = useState([]);
   const [occupations, setOccupations] = useState([]);
@@ -300,8 +303,10 @@ const ViewAccreditedCourseRegistration = () => {
 
   const fetchPaymentStatus = async () => {
     try {
-      const response =
-        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      const response = await BirmsPaymentService.getPaymentByApplicationNo(
+        applicationNo,
+        access_token,
+      );
       setPaymentStatus(response.data);
     } catch (error) {
       console.error("Error fetching payment status:", error);
@@ -363,6 +368,7 @@ const ViewAccreditedCourseRegistration = () => {
 
       setCourseData(data);
       setCurrentStatusId(Number(data.status_id));
+      setEnrolmentCapacity(data.enrolment_capacity ?? "");
 
       // Parse documents
       if (data.documents) {
@@ -718,6 +724,18 @@ const ViewAccreditedCourseRegistration = () => {
 
     if (!validateAssignments(selectedStatusId)) return;
 
+    // Validate enrolment capacity for Role 7
+    if (isRole7) {
+      if (
+        enrolmentCapacity !== "" &&
+        (Number.isNaN(Number(enrolmentCapacity)) ||
+          Number(enrolmentCapacity) < 0)
+      ) {
+        toast.error("Please enter a valid enrolment capacity");
+        return;
+      }
+    }
+
     setActionLoading(true);
     try {
       const qualityStandardsData = prepareQualityStandardsForBackend();
@@ -744,7 +762,10 @@ const ViewAccreditedCourseRegistration = () => {
         qualityStandards: qualityStandardsData,
         assignedRecs: assignedRecsPayload,
         assignedAccreditors: assignedAccreditorsPayload,
+        enrolmentCapacity:
+          enrolmentCapacity === "" ? null : Number(enrolmentCapacity),
       };
+      console.log("Payload for action:", payload);
       const response =
         await ApplyAccreditedCourseService.verifyAccreditedCourse(
           payload,
@@ -1191,8 +1212,26 @@ const ViewAccreditedCourseRegistration = () => {
                     fullWidth
                     size="small"
                     label="Enrollment capacity per batch"
-                    value={courseData.enrolment_capacity || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
+                    type={isRole7 ? "number" : "text"}
+                    value={
+                      isRole7
+                        ? enrolmentCapacity
+                        : courseData.enrolment_capacity || "N/A"
+                    }
+                    onChange={(e) => {
+                      if (!isRole7) return;
+                      const val = e.target.value;
+                      if (val === "" || /^\d*$/.test(val)) {
+                        setEnrolmentCapacity(val);
+                      }
+                    }}
+                    slotProps={{
+                      input: {
+                        readOnly: !isRole7,
+                        inputProps: { min: 0 },
+                      },
+                    }}
+                    disabled={!isRole7}
                   />
                 </Grid>
                 <Grid size={{ xs: 12, md: 3 }}>

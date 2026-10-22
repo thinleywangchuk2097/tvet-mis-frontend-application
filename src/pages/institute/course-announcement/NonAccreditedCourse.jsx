@@ -413,7 +413,7 @@ const FormTextField = ({
 
 FormTextField.propTypes = formTextFieldPropTypes;
 
-// 👇 Updated FormDateField with min + tooltip support
+// Updated FormDateField with min + tooltip support
 const FormDateField = ({ formik, name, label, min, tooltip }) => {
   const field = (
     <TextField
@@ -711,17 +711,20 @@ const NonAccreditedCourse = () => {
     files: [],
     createdBy: actionId,
     approvedCourses: courseData.approvedCourses,
+    programmeTypeId: "",
   };
 
-  // Validation schema with no back-date restriction on application start date
+  // Validation schema with conditional certificationLevelId
   const validationSchema = Yup.object().shape({
     programmeId: Yup.string().required("Programme Name is required"),
     feesPerTrainee: Yup.number()
       .typeError("Must be a number")
       .required("Fees per trainee is required"),
-    certificationLevelId: Yup.string().required(
-      "Certification Level is required",
-    ),
+    certificationLevelId: Yup.string().when("programmeTypeId", {
+      is: (val) => val && val !== "137",
+      then: (schema) => schema.required("Certification Level is required"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
     enrollmentCapacity: Yup.number()
       .typeError("Must be a number")
       .required("Enrollment capacity per batch is required"),
@@ -802,12 +805,19 @@ const NonAccreditedCourse = () => {
               "",
             false,
           );
+          // Store the programme type id for conditional rendering & validation
+          formik.setFieldValue(
+            "programmeTypeId",
+            selectedCourse.programme_type_id || "",
+            false,
+          );
         }
       } else {
         formik.setFieldValue("programmeId", "", false);
         formik.setFieldValue("feesPerTrainee", "", false);
         formik.setFieldValue("certificationLevelId", "", false);
         formik.setFieldValue("enrollmentCapacity", "", false);
+        formik.setFieldValue("programmeTypeId", "", false);
       }
     },
     [courseData.approvedCourses],
@@ -861,215 +871,225 @@ const NonAccreditedCourse = () => {
           onSubmit={handleSubmit}
           enableReinitialize={true}
         >
-          {(formik) => (
-            <Form>
-              <DialogContent dividers>
-                <Grid container spacing={2}>
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormTextField
-                      formik={formik}
-                      name="programmeId"
-                      label={
-                        <>
-                          <RequiredStar /> Programme Name
-                        </>
-                      }
-                      select
-                      options={courseData.approvedCourses}
-                      optionLabelKey="course_name"
-                      onChange={(e) => handleCourseChange(e, formik)}
-                    />
-                  </Grid>
+          {(formik) => {
+            // Determine if the selected programme is less than 140 hours (137)
+            const isLessThan140 = formik.values.programmeTypeId === "137";
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormTextField
-                      formik={formik}
-                      name="feesPerTrainee"
-                      label={
-                        <>
-                          <RequiredStar /> Fees per Trainee (Nu.)
-                        </>
-                      }
-                      type="number"
-                      readOnly
-                    />
-                  </Grid>
+            return (
+              <Form>
+                <DialogContent dividers>
+                  <Grid container spacing={2}>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormTextField
+                        formik={formik}
+                        name="programmeId"
+                        label={
+                          <>
+                            <RequiredStar /> Programme Name
+                          </>
+                        }
+                        select
+                        options={courseData.approvedCourses}
+                        optionLabelKey="course_name"
+                        onChange={(e) => handleCourseChange(e, formik)}
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormTextField
-                      formik={formik}
-                      name="certificationLevelId"
-                      label={
-                        <>
-                          <RequiredStar /> Certification Level
-                        </>
-                      }
-                      select
-                      options={dropdownData.certificationLevels}
-                      readOnly
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormTextField
+                        formik={formik}
+                        name="feesPerTrainee"
+                        label={
+                          <>
+                            <RequiredStar /> Fees per Trainee (Nu.)
+                          </>
+                        }
+                        type="number"
+                        readOnly
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormTextField
-                      formik={formik}
-                      name="enrollmentCapacity"
-                      label={
-                        <>
-                          <RequiredStar /> Enrollment Capacity per Batch
-                        </>
-                      }
-                      type="number"
-                      readOnly
-                    />
-                  </Grid>
+                    {/* Certification Level - hidden when programme_type_id === "137" */}
+                    {!isLessThan140 && (
+                      <Grid item size={{ xs: 12, md: 6 }}>
+                        <FormTextField
+                          formik={formik}
+                          name="certificationLevelId"
+                          label={
+                            <>
+                              <RequiredStar /> Certification Level
+                            </>
+                          }
+                          select
+                          options={dropdownData.certificationLevels}
+                          readOnly
+                        />
+                      </Grid>
+                    )}
 
-                  {/* Application Start Date - no back date */}
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormDateField
-                      formik={formik}
-                      name="applicationStartDate"
-                      label={
-                        <>
-                          <RequiredStar /> Application Start Date
-                        </>
-                      }
-                      min={getTodayDate()}
-                      tooltip="Application start date cannot be a past date. Please select today or a future date."
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormTextField
+                        formik={formik}
+                        name="enrollmentCapacity"
+                        label={
+                          <>
+                            <RequiredStar /> Enrollment Capacity per Batch
+                          </>
+                        }
+                        type="number"
+                        readOnly
+                      />
+                    </Grid>
 
-                  {/* Application End Date - must be >= start date */}
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormDateField
-                      formik={formik}
-                      name="applicationEndDate"
-                      label={
-                        <>
-                          <RequiredStar /> Application End Date
-                        </>
-                      }
-                      min={formik.values.applicationStartDate || getTodayDate()}
-                      tooltip="Application end date must be on or after the application start date."
-                    />
-                  </Grid>
+                    {/* Application Start Date - no back date */}
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormDateField
+                        formik={formik}
+                        name="applicationStartDate"
+                        label={
+                          <>
+                            <RequiredStar /> Application Start Date
+                          </>
+                        }
+                        min={getTodayDate()}
+                        tooltip="Application start date cannot be a past date. Please select today or a future date."
+                      />
+                    </Grid>
 
-                  {/* Course Start Date - must be after app end */}
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormDateField
-                      formik={formik}
-                      name="courseStartDate"
-                      label={
-                        <>
-                          <RequiredStar /> Course Start Date
-                        </>
-                      }
-                      min={formik.values.applicationEndDate || getTodayDate()}
-                      tooltip="Course start date must be after the application end date."
-                    />
-                  </Grid>
+                    {/* Application End Date - must be >= start date */}
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormDateField
+                        formik={formik}
+                        name="applicationEndDate"
+                        label={
+                          <>
+                            <RequiredStar /> Application End Date
+                          </>
+                        }
+                        min={
+                          formik.values.applicationStartDate || getTodayDate()
+                        }
+                        tooltip="Application end date must be on or after the application start date."
+                      />
+                    </Grid>
 
-                  {/* Course End Date - must be >= course start */}
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormDateField
-                      formik={formik}
-                      name="courseEndDate"
-                      label={
-                        <>
-                          <RequiredStar /> Course End Date
-                        </>
-                      }
-                      min={formik.values.courseStartDate || getTodayDate()}
-                      tooltip="Course end date must be on or after the course start date."
-                    />
-                  </Grid>
+                    {/* Course Start Date - must be after app end */}
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormDateField
+                        formik={formik}
+                        name="courseStartDate"
+                        label={
+                          <>
+                            <RequiredStar /> Course Start Date
+                          </>
+                        }
+                        min={formik.values.applicationEndDate || getTodayDate()}
+                        tooltip="Course start date must be after the application end date."
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormTextField
-                      formik={formik}
-                      name="fundingSourceId"
-                      label={
-                        <>
-                          <RequiredStar /> Funding Source
-                        </>
-                      }
-                      select
-                      options={dropdownData.fundingSources}
-                    />
-                  </Grid>
+                    {/* Course End Date - must be >= course start */}
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormDateField
+                        formik={formik}
+                        name="courseEndDate"
+                        label={
+                          <>
+                            <RequiredStar /> Course End Date
+                          </>
+                        }
+                        min={formik.values.courseStartDate || getTodayDate()}
+                        tooltip="Course end date must be on or after the course start date."
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12, md: 6 }}>
-                    <FormTextField
-                      formik={formik}
-                      name="trainingLocationId"
-                      label={
-                        <>
-                          <RequiredStar /> Training Location (Dzongkhag)
-                        </>
-                      }
-                      select
-                      options={dropdownData.dzongkhags}
-                      optionLabelKey="dzonkhagName"
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormTextField
+                        formik={formik}
+                        name="fundingSourceId"
+                        label={
+                          <>
+                            <RequiredStar /> Funding Source
+                          </>
+                        }
+                        select
+                        options={dropdownData.fundingSources}
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12 }}>
-                    <FormTextField
-                      formik={formik}
-                      name="courseDescription"
-                      label={
-                        <>
-                          <RequiredStar /> Course Description
-                        </>
-                      }
-                      multiline
-                      rows={3}
-                    />
-                  </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <FormTextField
+                        formik={formik}
+                        name="trainingLocationId"
+                        label={
+                          <>
+                            <RequiredStar /> Training Location (Dzongkhag)
+                          </>
+                        }
+                        select
+                        options={dropdownData.dzongkhags}
+                        optionLabelKey="dzonkhagName"
+                      />
+                    </Grid>
 
-                  <Grid item size={{ xs: 12 }}>
-                    <FileUpload
-                      files={formik.values.files}
-                      onFilesChange={(files) => {
-                        formik.setFieldValue("files", files);
-                        setTimeout(() => formik.validateField("files"), 100);
-                      }}
-                      error={
-                        formik.touched.files && Boolean(formik.errors.files)
-                      }
-                      helperText={formik.touched.files && formik.errors.files}
-                    />
-                    {!formik.touched.files &&
-                      formik.values.files.length === 0 && (
-                        <Typography variant="caption" color="textSecondary">
-                          Please upload required documents (PDF, DOC, etc.)
-                        </Typography>
-                      )}
+                    <Grid item size={{ xs: 12 }}>
+                      <FormTextField
+                        formik={formik}
+                        name="courseDescription"
+                        label={
+                          <>
+                            <RequiredStar /> Course Description
+                          </>
+                        }
+                        multiline
+                        rows={3}
+                      />
+                    </Grid>
+
+                    <Grid item size={{ xs: 12 }}>
+                      <FileUpload
+                        files={formik.values.files}
+                        onFilesChange={(files) => {
+                          formik.setFieldValue("files", files);
+                          setTimeout(() => formik.validateField("files"), 100);
+                        }}
+                        error={
+                          formik.touched.files && Boolean(formik.errors.files)
+                        }
+                        helperText={formik.touched.files && formik.errors.files}
+                      />
+                      {!formik.touched.files &&
+                        formik.values.files.length === 0 && (
+                          <Typography variant="caption" color="textSecondary">
+                            Please upload required documents (PDF, DOC, etc.)
+                          </Typography>
+                        )}
+                    </Grid>
                   </Grid>
-                </Grid>
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="error"
-                  onClick={() => setOpenDialog(false)}
-                  disabled={courseData.loading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="small"
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  disabled={courseData.loading}
-                >
-                  {courseData.loading ? "Submitting..." : "Submit"}
-                </Button>
-              </DialogActions>
-            </Form>
-          )}
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    onClick={() => setOpenDialog(false)}
+                    disabled={courseData.loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="small"
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    disabled={courseData.loading}
+                  >
+                    {courseData.loading ? "Submitting..." : "Submit"}
+                  </Button>
+                </DialogActions>
+              </Form>
+            );
+          }}
         </Formik>
       </Dialog>
     </Paper>

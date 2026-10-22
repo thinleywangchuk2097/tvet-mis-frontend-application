@@ -428,8 +428,10 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const fetchPaymentStatus = async () => {
     try {
-      const response =
-        await BirmsPaymentService.getPaymentByApplicationNo(applicationNo);
+      const response = await BirmsPaymentService.getPaymentByApplicationNo(
+        applicationNo,
+        access_token,
+      );
       setPaymentStatus(response.data);
     } catch (error) {
       console.error("Error fetching payment status:", error);
@@ -1419,16 +1421,21 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
                       const readOnly = isAssessmentReadOnly();
 
+                      // ---- Total = Internal Assessment + Theory + Practical ----
+                      let internalValue = 0;
                       let theoryValue = 0;
                       let practicalValue = 0;
                       if (isNumericCertificationLevel() && !isServiceId39) {
+                        internalValue =
+                          parseInt(trainee.internal_assessment) || 0;
                         theoryValue =
                           parseInt(traineeTheoryAssessments[trainee.id]) || 0;
                         practicalValue =
                           parseInt(traineePracticalAssessments[trainee.id]) ||
                           0;
                       }
-                      const totalValue = theoryValue + practicalValue;
+                      const totalValue =
+                        internalValue + theoryValue + practicalValue;
 
                       const getReadOnlyTooltip = () => {
                         if (currentRoleId == 22) {

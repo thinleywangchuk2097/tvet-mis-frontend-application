@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -6,7 +6,6 @@ import {
   TextField,
   Button,
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   Divider,
@@ -32,10 +31,8 @@ import {
   Phone,
   CheckCircle,
   Close,
-  ArrowForward,
   Receipt,
   Payment as PaymentIcon,
-  AccountBalance,
   Verified,
   OpenInNew as OpenInNewIcon,
 } from "@mui/icons-material";
@@ -44,16 +41,16 @@ import FastRewindIcon from "@mui/icons-material/FastRewind";
 import CurrencyExchangeIcon from "@mui/icons-material/CurrencyExchange";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import CommonBirmsPaymentService from "../../../api/services/internal/birms/CommonBirmsPaymentService";
+import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
+import { useSelector } from "react-redux";
 
 const CommonBirmsPayment = () => {
   const params = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const theme = useTheme();
-
+  const access_token = useSelector((state) => state.auth.accessToken);
   // State for URL parameters
   const [paymentParams, setPaymentParams] = useState({
     applicationNo: "",
@@ -165,15 +162,13 @@ const CommonBirmsPayment = () => {
         paymentDueDate: values.paymentDueDate,
       };
 
-      const response =
-        await CommonBirmsPaymentService.generatePaymentAdvice(paymentRequest);
-      console.log("Payment advice response:", response);
-
+      const response = await BirmsPaymentService.generatePaymentAdvice(
+        paymentRequest,
+        access_token,
+      );
       if (response.status === 200 || response.status === 201) {
         // Get the data from response
         const data = response.data;
-        console.log("Response data:", data);
-
         // Check if data has content with redirectUrl
         let redirectUrl = null;
         if (data && data.content && data.content.redirectUrl) {
@@ -181,9 +176,6 @@ const CommonBirmsPayment = () => {
         } else if (data && data.redirectUrl) {
           redirectUrl = data.redirectUrl;
         }
-
-        console.log("Redirect URL:", redirectUrl);
-
         if (redirectUrl) {
           // Open redirect URL in new tab with full reload
           const newWindow = window.open(
@@ -271,9 +263,10 @@ const CommonBirmsPayment = () => {
         paymentDueDate: values.paymentDueDate,
       };
 
-      const response =
-        await CommonBirmsPaymentService.generatePaymentAdvice(paymentRequest);
-      console.log("birms response", response.data)
+      const response = await BirmsPaymentService.generatePaymentAdvice(
+        paymentRequest,
+        access_token,
+      );
       if (response.status === 200 || response.status === 201) {
         setPaymentAdviceData(response.data);
         setActiveStep(2);

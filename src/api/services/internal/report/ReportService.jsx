@@ -1,7 +1,6 @@
 import apiClient from "../../../axios";
 
 class ReportService {
-
   courseServiceType(token) {
     return apiClient
       .get(`/api/v1/user/management/report/get-course-service-type`, {
@@ -57,7 +56,7 @@ class ReportService {
       .catch((error) => error);
   }
 
-   getInstitutesProposalDetails(token) {
+  getInstitutesProposalDetails(token) {
     return apiClient
       .get(`/api/v1/user/management/report/get-institutes-proposal-details`, {
         headers: {
@@ -70,11 +69,14 @@ class ReportService {
 
   getInstitutesRegistrationDetails(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-institutes-registration-details`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      .get(
+        `/api/v1/user/management/report/get-institutes-registration-details`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      })
+      )
       .then((response) => response)
       .catch((error) => error);
   }
@@ -88,7 +90,52 @@ class ReportService {
       .then((response) => response)
       .catch((error) => error);
   }
-  
+
+  getRegistrationDetailsForCertificate(
+    registration_type,
+    application_no,
+    token,
+  ) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/report/get-registration-applicant-details/${registration_type}/${application_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  getTraineesDetailsForCertificate(registration_no, application_no, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/report/get-trainee-applicant-details/${registration_no}/${application_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  getAccreditedProgrammeDetailsForCertificate(registration_no, application_no, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/report/get-accredited-programme-details/${registration_no}/${application_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new ReportService();

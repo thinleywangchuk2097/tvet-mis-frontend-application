@@ -326,21 +326,44 @@ const AddTrainerIndex = () => {
     return employmentType?.name || "";
   };
 
+  // Helper to get a course's display label - handles accredited (programme_title),
+  // non-accredited (course_name / name), and fallback
+  const getCourseLabel = (course) => {
+    if (!course) return "";
+    return (
+      course.course_name ||
+      course.name ||
+      course.programme_title ||
+      `Course ID: ${course.id}`
+    );
+  };
+
   const getCourseName = (courseTypeId, courseId) => {
     const coursesList = getCoursesByType(courseTypeId);
     const course = coursesList.find((c) => String(c.id) === String(courseId));
-    return course?.course_name || course?.name || `Course ID: ${courseId}`;
+    return getCourseLabel(course) || `Course ID: ${courseId}`;
   };
 
+  // Maps the actual course type names from the API:
+  //   "BQF Programme"                          -> accredited courses
+  //   "Non-BQF Programme more than 140 hours"  -> non-accredited courses
   const getCoursesByType = (courseTypeValue) => {
+    if (!courseTypeValue) return [];
+
     const selectedCourseType = courseTypes.find(
       (type) => String(type.id) === String(courseTypeValue),
     );
 
-    if (selectedCourseType?.name === "Accredited") {
-      return accreditedCourses;
-    } else if (selectedCourseType?.name === "Non Accredited") {
+    if (!selectedCourseType) return [];
+
+    const name = (selectedCourseType.name || "").trim().toLowerCase();
+
+    // "Non-BQF" must be checked first so it is not swallowed by the "bqf" branch
+    if (name.includes("non-bqf") || name.includes("non bqf")) {
       return nonAccreditedCourses;
+    }
+    if (name.includes("bqf")) {
+      return accreditedCourses;
     }
     return [];
   };
@@ -1396,7 +1419,7 @@ const AddTrainerIndex = () => {
                                   {getCoursesByType(course.courseTypeId).map(
                                     (c) => (
                                       <MenuItem key={c.id} value={c.id}>
-                                        {c.course_name || c.name}
+                                        {getCourseLabel(c)}
                                       </MenuItem>
                                     ),
                                   )}

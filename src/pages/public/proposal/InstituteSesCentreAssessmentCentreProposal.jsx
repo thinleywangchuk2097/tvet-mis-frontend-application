@@ -125,9 +125,51 @@ const validationSchema = Yup.object({
   ),
 });
 
+// ===== Helper: extract name from minimal response =====
+const extractCitizenName = (payload) => {
+  if (!payload) return "";
+
+  // Case 1: new minimal endpoint returns { fullName: "..." }
+  if (payload.fullName) {
+    return payload.fullName.trim();
+  }
+
+  // Case 2: existing endpoint returns the DTO directly
+  const detail = payload.citizenDetailsResponse?.citizenDetail?.[0];
+  if (detail) {
+    const parts = [detail.firstName, detail.middleName, detail.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    return parts;
+  }
+
+  // Case 3: DTO returned at top level
+  if (payload.firstName || payload.lastName) {
+    return [payload.firstName, payload.middleName, payload.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+  }
+
+  return "";
+};
+
 const InstituteSesCentreAssessmentCentreProposal = () => {
   const [loading, setLoading] = useState(false);
-  const [fetchingCitizen, setFetchingCitizen] = useState(false);
+
+  // ✅ Per-field loading state instead of a single shared boolean
+  const [fetchingCitizen, setFetchingCitizen] = useState({
+    promoter: false,
+    partners: {}, // keyed by index
+  });
+
+  // ✅ Track last looked-up CID per field to avoid duplicate calls
+  const lastLookedUpCid = useRef({
+    promoter: "",
+    partners: {},
+  });
+
   const [sectors, setSectors] = useState([]);
   const [serviceName, setServiceName] = useState();
   const [dzongkhags, setDzongkhags] = useState([]);
@@ -157,85 +199,92 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
     fetchServiceName();
   }, [serviceId]);
 
+  // ===== Generic citizen lookup (shared by promoter + partners) =====
+  const fetchCitizenName = async (cid, { partnerIndex = null }) => {
+    if (!cid || cid.length !== 11) {
+      return null;
+    }
+
+    // ✅ Skip duplicate lookups for the same CID
+    const lastCid =
+      partnerIndex === null
+        ? lastLookedUpCid.current.promoter
+        : lastLookedUpCid.current.partners[partnerIndex];
+
+    if (lastCid === cid) {
+      return null;
+    }
+
+    // ✅ Set per-field loading
+    setFetchingCitizen((prev) => {
+      if (partnerIndex === null) {
+        return { ...prev, promoter: true };
+      }
+      return {
+        ...prev,
+        partners: { ...prev.partners, [partnerIndex]: true },
+      };
+    });
+
+    try {
+      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
+
+      const fullName = extractCitizenName(response.data);
+
+      if (fullName) {
+        lastLookedUpCid.current = {
+          promoter:
+            partnerIndex === null ? cid : lastLookedUpCid.current.promoter,
+          partners: {
+            ...lastLookedUpCid.current.partners,
+            ...(partnerIndex !== null ? { [partnerIndex]: cid } : {}),
+          },
+        };
+        toast.success(`Citizen details fetched successfully for ${fullName}`);
+        return fullName;
+      }
+
+      toast.warning("No citizen details found for this CID");
+      return "";
+    } catch (error) {
+      console.error("Citizen lookup failed for CID:", cid);
+      toast.error(
+        "Failed to fetch citizen details. Please check the CID number.",
+      );
+      return "";
+    } finally {
+      setFetchingCitizen((prev) => {
+        if (partnerIndex === null) {
+          return { ...prev, promoter: false };
+        }
+        return {
+          ...prev,
+          partners: { ...prev.partners, [partnerIndex]: false },
+        };
+      });
+    }
+  };
+
+  const fetchAndFillPromoterDetails = async (cid, formik) => {
+    const fullName = await fetchCitizenName(cid, { partnerIndex: null });
+    if (fullName !== null) {
+      formik.setFieldValue("promoterName", fullName);
+    }
+  };
+
+  const fetchAndFillPartnerDetails = async (cid, formik, index) => {
+    const fullName = await fetchCitizenName(cid, { partnerIndex: index });
+    if (fullName !== null) {
+      formik.setFieldValue(`partners[${index}].partnerName`, fullName);
+    }
+  };
+
   const fetchSectors = async () => {
     try {
       const response = await CommonService.getAllSectors();
       setSectors(response.data);
     } catch (error) {
       console.error("Error fetching sectors:", error);
-    }
-  };
-
-  const fetchDeclaration = async () => {
-    try {
-      const response = await CommonService.getByParentId(30);
-      setDeclaration(response.data);
-    } catch (error) {
-      console.error("Error fetching declaration:", error);
-    }
-  };
-
-  const fetchAndFillPromoterDetails = async (cid, formik) => {
-    if (!cid || cid.length !== 11) {
-      toast.warning("Please enter a valid 11-digit CID");
-      return;
-    }
-
-    setFetchingCitizen(true);
-    try {
-      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
-      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
-        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
-        const fullName =
-          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
-
-        formik.setFieldValue("promoterName", fullName);
-
-        toast.success(`Citizen details fetched successfully for ${fullName}`);
-      } else {
-        toast.warning("No citizen details found for this CID");
-        formik.setFieldValue("promoterName", "");
-      }
-    } catch (error) {
-      console.error("Error fetching citizen details:", error);
-      toast.error(
-        "Failed to fetch citizen details. Please check the CID number.",
-      );
-      formik.setFieldValue("promoterName", "");
-    } finally {
-      setFetchingCitizen(false);
-    }
-  };
-
-  const fetchAndFillPartnerDetails = async (cid, formik, index) => {
-    if (!cid || cid.length !== 11) {
-      toast.warning("Please enter a valid 11-digit CID");
-      return;
-    }
-
-    setFetchingCitizen(true);
-    try {
-      const response = await DatahubService.getDetailsByCitizenshipNo(cid);
-      if (response.data?.citizenDetailsResponse?.citizenDetail?.[0]) {
-        const citizen = response.data.citizenDetailsResponse.citizenDetail[0];
-        const fullName =
-          `${citizen.firstName || ""} ${citizen.lastName || ""}`.trim();
-
-        formik.setFieldValue(`partners[${index}].partnerName`, fullName);
-
-        toast.success(`Citizen details fetched successfully for ${fullName}`);
-      } else {
-        toast.warning("No citizen details found for this CID");
-        formik.setFieldValue(`partners[${index}].partnerName`, "");
-      }
-    } catch (error) {
-      console.error("Error fetching citizen details:", error);
-      toast.error(
-        "Failed to fetch citizen details. Please check the CID number.",
-      );
-      formik.setFieldValue(`partners[${index}].partnerName`, "");
-    } finally {
-      setFetchingCitizen(false);
     }
   };
 
@@ -309,6 +358,15 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       setTypeOfOwners(typeOfOwnerdata.data);
     } catch (error) {
       console.error("Error fetching activity levels:", error);
+    }
+  };
+
+  const fetchDeclaration = async () => {
+    try {
+      const response = await CommonService.getByParentId(30);
+      setDeclaration(response.data);
+    } catch (error) {
+      console.error("Error fetching declaration:", error);
     }
   };
 
@@ -407,9 +465,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
     },
   });
 
-  const isOthersType = () => {
-    return formik.values.ownershipTypeId === "2";
-  };
+  const isOthersType = () => formik.values.ownershipTypeId === "2";
 
   const isAgencyOrOrganization = () => {
     const id = formik.values.otherOwnershipTypeId;
@@ -472,6 +528,8 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                     formik.setFieldValue("otherName", "");
                     formik.setFieldValue("otherAddress", "");
                     formik.setFieldValue("partners", []);
+                    // ✅ Reset lookup caches when ownership type changes
+                    lastLookedUpCid.current = { promoter: "", partners: {} };
                   }}
                   onBlur={formik.handleBlur}
                   error={
@@ -594,7 +652,15 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                                 name={`partners[${index}].citizenId`}
                                 size="small"
                                 value={partner.citizenId}
-                                onChange={formik.handleChange}
+                                onChange={(e) => {
+                                  formik.handleChange(e);
+                                  // ✅ Clear name + cache when CID changes
+                                  formik.setFieldValue(
+                                    `partners[${index}].partnerName`,
+                                    "",
+                                  );
+                                  lastLookedUpCid.current.partners[index] = "";
+                                }}
                                 onBlur={(e) => {
                                   formik.handleBlur(e);
                                   if (
@@ -619,9 +685,9 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                                   formik.errors.partners?.[index]?.citizenId
                                 }
                                 InputProps={{
-                                  endAdornment: fetchingCitizen && (
-                                    <CircularProgress size={20} />
-                                  ),
+                                  endAdornment: fetchingCitizen.partners[
+                                    index
+                                  ] && <CircularProgress size={20} />,
                                 }}
                               />
                             </Grid>
@@ -719,6 +785,12 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                               const updated = [...formik.values.partners];
                               updated.splice(index, 1);
                               formik.setFieldValue("partners", updated);
+                              // ✅ Clean up per-index state
+                              const newPartners = {
+                                ...lastLookedUpCid.current.partners,
+                              };
+                              delete newPartners[index];
+                              lastLookedUpCid.current.partners = newPartners;
                             }}
                           >
                             <DeleteIcon />
@@ -894,7 +966,12 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                       name="promoterCitizenId"
                       size="small"
                       value={formik.values.promoterCitizenId}
-                      onChange={formik.handleChange}
+                      onChange={(e) => {
+                        formik.handleChange(e);
+                        // ✅ Clear name + cache when CID changes
+                        formik.setFieldValue("promoterName", "");
+                        lastLookedUpCid.current.promoter = "";
+                      }}
                       onBlur={(e) => {
                         formik.handleBlur(e);
                         if (e.target.value && e.target.value.length === 11) {
@@ -910,7 +987,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                         formik.errors.promoterCitizenId
                       }
                       InputProps={{
-                        endAdornment: fetchingCitizen && (
+                        endAdornment: fetchingCitizen.promoter && (
                           <CircularProgress size={20} />
                         ),
                       }}
@@ -1266,7 +1343,11 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                 fontWeight: 600,
                 textTransform: "none",
               }}
-              onClick={() => formik.resetForm()}
+              onClick={() => {
+                formik.resetForm();
+                lastLookedUpCid.current = { promoter: "", partners: {} };
+                setFetchingCitizen({ promoter: false, partners: {} });
+              }}
             >
               Reset
             </Button>
