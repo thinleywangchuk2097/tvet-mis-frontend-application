@@ -1,18 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
 import {
-  Alert,
   Box,
   Button,
-  Card,
-  Chip,
-  Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  IconButton,
+  alpha,
+  TextField,
   InputAdornment,
   Typography,
   Dialog,
@@ -277,26 +269,11 @@ const Surface = ({ children, sx }) => (
 );
 Surface.propTypes = { children: PropTypes.node, sx: PropTypes.object };
 
-Section.propTypes = {
-  id: PropTypes.string,
-  bg: PropTypes.string,
-  children: PropTypes.node,
-  py: PropTypes.oneOfType([PropTypes.object, PropTypes.number]),
-};
-
-const SURFACE_CARD = {
-  border: "1px solid #e3eaf4",
-  borderRadius: 3,
-  bgcolor: W,
-  boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
-};
-
 // ═══════════════════════════════════════════════════════════════════════════
 const PublicIndex = () => {
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [slide, setSlide] = useState(0);
   const timerRef = useRef(null);
-  const [insightTab, setInsightTab] = useState(0);
 
   // Track Application state
   const [trackQ, setTrackQ] = useState("");
@@ -967,105 +944,6 @@ const PublicIndex = () => {
         </Section>
       </Box>
 
-      {/* ── 3. TVET at a glance ────────────────────────────────────── */}
-      <Section bg={SURFACE} py={{ xs: 4, md: 4.5 }}>
-        <SectionTitle
-          align="center"
-          eyebrow="By the Numbers"
-          title="TVET at a Glance"
-          subtitle="A snapshot of the technical and vocational education and training landscape in Bhutan."
-        />
-        <SectionBoundary>
-          <TvetCardsIndex />
-        </SectionBoundary>
-      </Section>
-
-      {/* ── 4. Insights (indicators + distribution) ────────────────── */}
-      <Section bg={W}>
-        <SectionTitle
-          eyebrow="Insights"
-          title="Key TVET Indicators & Distribution"
-          subtitle="Cumulative figures across Public and Private providers, and where TVET is happening across Bhutan."
-        />
-        <Card elevation={0} sx={{ ...SURFACE_CARD, overflow: "hidden" }}>
-          <Tabs
-            value={insightTab}
-            onChange={(e, v) => setInsightTab(v)}
-            variant="scrollable"
-            scrollButtons="auto"
-            sx={{
-              px: 2,
-              borderBottom: "1px solid #e3eaf4",
-              "& .MuiTab-root": { textTransform: "none", fontWeight: 700, minHeight: 56 },
-            }}
-          >
-            <Tab icon={<InsightsIcon fontSize="small" />} iconPosition="start" label="Key Indicators" />
-            <Tab icon={<PieChartIcon fontSize="small" />} iconPosition="start" label="Distribution Overview" />
-          </Tabs>
-          <Box sx={{ p: { xs: 1, md: 2 } }}>
-            <SectionBoundary>
-              {insightTab === 0 ? (
-                <TvetIndicatorsInstituteProviderType />
-              ) : (
-                <PieBarGraphDistributionIndex />
-              )}
-            </SectionBoundary>
-          </Box>
-        </Card>
-      </Section>
-
-      {/* ── 5. Course announcements ────────────────────────────────── */}
-      <Section id="course-announcements" bg={W}>
-        <SectionTitle
-          eyebrow="Latest Opportunities"
-          title="Course Announcements"
-          subtitle="Programmes accepting applications now — find the right course and apply online."
-        />
-        <Card
-          elevation={0}
-          sx={{
-            ...SURFACE_CARD,
-            p: { xs: 1.5, md: 2.5 },
-            "& .MuiTableCell-root": {
-              fontSize: "0.8rem",
-              py: 0.85,
-              px: 1.2,
-              border: "1px solid #dbe5f0",
-            },
-            "& .MuiTableCell-head": {
-              bgcolor: PL,
-              fontWeight: 700,
-              fontSize: "0.77rem",
-              color: PD,
-              whiteSpace: "nowrap",
-            },
-            "& .MuiTableBody-root tr:hover .MuiTableCell-root": { bgcolor: "#f5f9ff" },
-            "& .MuiChip-root": { fontSize: "0.65rem", height: 20, fontWeight: 700 },
-            "& .MuiButton-root": { fontSize: "0.72rem", py: 0.4 },
-            "& .MuiInputBase-input": { fontSize: "0.82rem" },
-            "& .MuiTablePagination-root": { fontSize: "0.75rem" },
-          }}
-        >
-          <SectionBoundary fallback="Course announcements are temporarily unavailable. Please try again later.">
-            <CourseTraineeAnnouncementsIndex />
-          </SectionBoundary>
-        </Card>
-      </Section>
-
-      {/* ── 6. Ongoing programmes ──────────────────────────────────── */}
-      <Section bg={SURFACE}>
-        <SectionTitle
-          eyebrow="Active Programmes"
-          title="Ongoing Programmes"
-          subtitle="Latest programme activity across training providers."
-        />
-        <Card elevation={0} sx={{ ...SURFACE_CARD, p: { xs: 1.5, md: 2.5 } }}>
-          <SectionBoundary>
-            <OngoingProgramsIndex />
-          </SectionBoundary>
-        </Card>
-      </Section>
-
       {/* ── Track Application Modal ── */}
       <Dialog
         open={trackOpen}
@@ -1077,7 +955,7 @@ const PublicIndex = () => {
         <DialogTitle
           sx={{
             fontWeight: 700,
-            fontSize: "0.95rem",
+            fontSize: "0.92rem",
             bgcolor: PL,
             borderBottom: "1px solid #c5d5ea",
             py: 1.5,
@@ -1105,10 +983,20 @@ const PublicIndex = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {trackRes ? (
+                {trackLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                      <Typography sx={{ color: "#666" }}>
+                        Searching for application...
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : trackRes ? (
                   <TableRow hover>
                     <TableCell>
-                      <Typography fontWeight={600}>{trackRes.application_no || "N/A"}</Typography>
+                      <Typography fontWeight={600}>
+                        {trackRes.application_no || "N/A"}
+                      </Typography>
                     </TableCell>
                     <TableCell>{trackRes.application_name || "N/A"}</TableCell>
                     <TableCell>{trackRes.service_name || "N/A"}</TableCell>
@@ -1118,7 +1006,10 @@ const PublicIndex = () => {
                         label={getStatusLabel(trackRes.current_status)}
                         size="small"
                         sx={{
-                          bgcolor: alpha(getStatusColor(trackRes.current_status), 0.12),
+                          bgcolor: alpha(
+                            getStatusColor(trackRes.current_status),
+                            0.12,
+                          ),
                           color: getStatusColor(trackRes.current_status),
                           fontWeight: 700,
                           fontSize: "0.72rem",
@@ -1129,10 +1020,22 @@ const PublicIndex = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                      <Typography sx={{ color: "error.main", fontWeight: 600 }}>
+                      <Typography
+                        sx={{
+                          color: "error.main",
+                          fontWeight: 600,
+                        }}
+                      >
                         No application found for the entered number.
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "#666", mt: 1, display: "block" }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: "#666",
+                          mt: 1,
+                          display: "block",
+                        }}
+                      >
                         Please check your application number and try again.
                       </Typography>
                     </TableCell>
@@ -1149,7 +1052,12 @@ const PublicIndex = () => {
             color="error"
             size="small"
             startIcon={<CloseFullscreenIcon />}
-            sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+            sx={{
+              borderRadius: 1.5,
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: "0.8rem",
+            }}
           >
             Close
           </Button>
