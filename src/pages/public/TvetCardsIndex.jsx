@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Box, Grid, Typography, alpha, keyframes } from "@mui/material";
+import { useEffect, useRef, useState } from "react";
+import PropTypes from "prop-types";
+import { Box, Grid, Typography, alpha } from "@mui/material";
 import BusinessIcon from "@mui/icons-material/Business";
 import SchoolIcon from "@mui/icons-material/School";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -8,76 +9,18 @@ import CoPresentIcon from "@mui/icons-material/CoPresent";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
 
 // ── Brand palette
+const PD = "#0a2d6e";
 const P = "#1565c0";
-const TEAL = "#0097a7";
-
-// ── Animations
-const fadeInUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
-const scaleIn = keyframes`
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-`;
-
-const countUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
-const rotateIcon = keyframes`
-  0% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(10deg);
-  }
-  75% {
-    transform: rotate(-10deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-`;
-
-const ripple = keyframes`
-  0% {
-    transform: scale(0);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-`;
+const W = "#ffffff";
 
 // ── Headline stats (values come from /api/v1/public/data/home-stats)
 const stats = [
   {
     key: "trainingInstitutes",
     label: "Training Institutes",
-    icon: <BusinessIcon sx={{ fontSize: 18 }} />,
-    color: P,
+    caption: "Registered public and private training providers",
+    icon: <BusinessIcon />,
+    accent: "#64b5f6",
   },
   {
     key: "programsOffered",
@@ -94,14 +37,16 @@ const stats = [
   {
     key: "traineesEnrolled",
     label: "Trainees Enrolled",
-    icon: <GroupsIcon sx={{ fontSize: 18 }} />,
-    color: "#2e7d32",
+    caption: "Trainees enrolled across all programmes",
+    icon: <GroupsIcon />,
+    accent: "#81c784",
   },
   {
     key: "dzongkhagsReached",
     label: "Dzongkhags Reached",
-    icon: <PublicIcon sx={{ fontSize: 18 }} />,
-    color: "#e65100",
+    caption: "TVET delivery across every district of Bhutan",
+    icon: <MapIcon />,
+    accent: "#ffb74d",
   },
 ];
 
@@ -175,48 +120,12 @@ const TvetCardsIndex = () => {
     };
   }, [targets]);
 
-  // Check if stats data is available and not empty
-  const hasData = stats && stats.length > 0;
+  return value;
+};
 
-  if (!hasData) {
-    return (
-      <Box
-        sx={{
-          textAlign: "center",
-          py: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 200,
-          bgcolor: "#ffffff",
-          borderRadius: 2,
-          border: "1px solid #e3eaf4",
-        }}
-      >
-        <Typography
-          sx={{
-            color: "error.main",
-            fontWeight: 600,
-            fontSize: "0.8rem",
-          }}
-        >
-          No data available
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            color: "#666",
-            mt: 0.5,
-            display: "block",
-            fontSize: "0.7rem",
-          }}
-        >
-          No TVET statistics found
-        </Typography>
-      </Box>
-    );
-  }
+const StatItem = ({ stat, start, index }) => {
+  const value = useCountUp(stat.value, start);
+  const divider = `1px solid ${alpha(W, 0.14)}`;
 
   return (
     <Grid container spacing={1.5}>
@@ -277,25 +186,17 @@ const TvetCardsIndex = () => {
               }}
             />
 
-            <Box
-              className="icon-box"
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                bgcolor: alpha(s.color, 0.12),
-                color: s.color,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                mx: "auto",
-                mb: 1,
-                transition: "all 0.3s ease",
-                animation: `${scaleIn} 0.4s ease-out ${i * 0.1 + 0.2}s both`,
-              }}
-            >
-              {s.icon}
-            </Box>
+StatItem.propTypes = {
+  stat: PropTypes.shape({
+    value: PropTypes.number.isRequired,
+    label: PropTypes.string.isRequired,
+    caption: PropTypes.string,
+    icon: PropTypes.node,
+    accent: PropTypes.string,
+  }).isRequired,
+  start: PropTypes.bool.isRequired,
+  index: PropTypes.number.isRequired,
+};
 
             <Typography
               sx={{
@@ -309,60 +210,72 @@ const TvetCardsIndex = () => {
               {animatedValues[i] ?? "—"}
             </Typography>
 
-            <Typography
-              sx={{
-                color: s.color,
-                fontSize: "0.65rem",
-                fontWeight: 700,
-                letterSpacing: 0.5,
-                textTransform: "uppercase",
-                mt: 1,
-                position: "relative",
-                display: "inline-block",
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: -3,
-                  left: "50%",
-                  transform: "translateX(-50%) scaleX(0)",
-                  width: "30%",
-                  height: 1.5,
-                  backgroundColor: s.color,
-                  transition: "transform 0.3s ease",
-                },
-              }}
-              className="label-text"
-            >
-              {s.label}
-            </Typography>
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.25 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
-            {/* Decorative dots */}
-            <Box
-              sx={{
-                position: "absolute",
-                bottom: 6,
-                right: 6,
-                width: 3,
-                height: 3,
-                borderRadius: "50%",
-                backgroundColor: alpha(s.color, 0.3),
-              }}
-            />
-            <Box
-              sx={{
-                position: "absolute",
-                bottom: 11,
-                right: 11,
-                width: 2,
-                height: 2,
-                borderRadius: "50%",
-                backgroundColor: alpha(s.color, 0.2),
-              }}
-            />
-          </Box>
-        </Grid>
-      ))}
-    </Grid>
+  return (
+    <Box
+      ref={ref}
+      sx={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 3,
+        background: `linear-gradient(120deg, ${PD} 0%, #0d3b8a 55%, ${P} 100%)`,
+        boxShadow: "0 18px 40px rgba(10,45,110,0.22)",
+        py: { xs: 1, md: 2.25 },
+        px: { xs: 0.5, md: 1.5 },
+      }}
+    >
+      {/* Subtle decorative shapes */}
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          width: 240,
+          height: 240,
+          borderRadius: "50%",
+          top: -150,
+          right: -80,
+          bgcolor: alpha(W, 0.05),
+        }}
+      />
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          width: 220,
+          height: 220,
+          borderRadius: "50%",
+          bottom: -120,
+          left: "35%",
+          bgcolor: alpha(W, 0.04),
+        }}
+      />
+
+      <Grid container sx={{ position: "relative" }}>
+        {stats.map((stat, index) => (
+          <Grid key={stat.label} size={{ xs: 6, md: 3 }}>
+            <StatItem stat={stat} start={visible} index={index} />
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
   );
 };
 

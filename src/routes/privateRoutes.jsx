@@ -38,6 +38,7 @@ import ViewAccreditedCourseRegistration from "../pages/institute/registration/Vi
 import ViewNonAccreditedCourseRegistration from "../pages/institute/registration/ViewNonAccreditedCourseRegistration";
 import InstituteChange from "../pages/institute/registration/InstituteChange";
 import SelfAssessmentReport from "../pages/institute/registration/SelfAssessmentReport";
+import ViewSelfAssessmentReport from "../pages/institute/registration/ViewSelfAssessmentReport";
 
 //curriculum
 import CurriculumIndex from "../pages/curriculum/CurriculumIndex";
@@ -193,6 +194,8 @@ export const privateRoutes = [
       {
         path: "view-cmfg-monitoring-index/:applicationNo",
         element: <ViewCmfgMonitoringIndex />,
+        path: "view-self-assessment-report/:applicationNo",
+        element: <ViewSelfAssessmentReport />,
       },
       {
         path: "view-trainee-selection/:applicationNo",
