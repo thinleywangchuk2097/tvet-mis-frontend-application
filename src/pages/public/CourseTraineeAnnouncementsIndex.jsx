@@ -443,7 +443,7 @@ const CourseTraineeAnnouncementsIndex = () => {
     try {
       const response = await CommonService.getAllCourseAnnouncement();
       console.log("CourseAnnouncementDetails", response.data);
-      setCourseAnnouncementDetails(response.data);
+      setCourseAnnouncementDetails(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching course announcements:", error);
     }
@@ -452,10 +452,10 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchDropdownData = async () => {
     try {
       const levelsResponse = await CommonService.getAllCertificateLevels();
-      setCertificationLevels(levelsResponse.data);
+      setCertificationLevels(Array.isArray(levelsResponse?.data) ? levelsResponse.data : []);
 
       const fundingResponse = await CommonService.getByParentId(16);
-      setFundingSources(fundingResponse.data);
+      setFundingSources(Array.isArray(fundingResponse?.data) ? fundingResponse.data : []);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
     }
@@ -464,7 +464,7 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchDzongkhags = async () => {
     try {
       const dzongkhagLists = await CommonService.getAllDzongkhags();
-      setDzongkhags(dzongkhagLists.data);
+      setDzongkhags(Array.isArray(dzongkhagLists?.data) ? dzongkhagLists.data : []);
     } catch (error) {
       console.error("Error fetching dzongkhags:", error);
     }
