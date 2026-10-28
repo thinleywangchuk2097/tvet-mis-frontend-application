@@ -37,6 +37,34 @@ import TrackApplicationStatusService from "../../api/services/internal/track/Tra
 import CommonService from "../../api/services/internal/common/CommonService";
 import UserRoleManagementService from "../../api/services/internal/userrole/UserRoleManagementService";
 
+// "26 Oct 2026, 10:42"
+const formatDateTime = (value) => {
+  if (!value) return null;
+  const d = new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+// minutes -> "2d 4h 15m"
+const formatDuration = (minutes) => {
+  if (minutes === null || minutes === undefined || minutes === "") return "—";
+  const m = Number(minutes);
+  if (!Number.isFinite(m) || m < 0) return "—";
+  if (m < 1) return "< 1m";
+  const days = Math.floor(m / 1440);
+  const hours = Math.floor((m % 1440) / 60);
+  const mins = Math.floor(m % 60);
+  return [days ? `${days}d` : null, hours ? `${hours}h` : null, mins && !days ? `${mins}m` : null]
+    .filter(Boolean)
+    .join(" ") || "0m";
+};
+
 const TrackApplicationStatusIndex = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -220,6 +248,13 @@ const TrackApplicationStatusIndex = () => {
             roleId: item.role_id,
             roleName: roleName,
             recordType: item.record_type,
+            actionDate: item.action_date || null,
+            updatedDate: item.updated_date || null,
+            turnaroundMinutes:
+              item.turnaround_minutes !== undefined &&
+              item.turnaround_minutes !== null
+                ? Number(item.turnaround_minutes)
+                : null,
           };
         });
 
@@ -404,7 +439,7 @@ const TrackApplicationStatusIndex = () => {
         }}
       >
         <Grid container spacing={2} alignItems="flex-end">
-          <Grid item size={{ xs: 12, md: 8 }}>
+          <Grid item size={{ xs: 12, sm: "grow" }}>
             <Typography
               variant="caption"
               sx={{
@@ -470,17 +505,17 @@ const TrackApplicationStatusIndex = () => {
               />
             </Tooltip>
           </Grid>
-          <Grid item size={{ xs: 6, md: 2 }}>
+          <Grid item size="auto">
             <Button
               variant="contained"
               color="primary"
               startIcon={<SearchIcon />}
-              fullWidth
               onClick={handleSearch}
               disabled={loading}
               sx={{
                 fontSize: "0.85rem",
                 py: 1,
+                px: 3,
                 borderRadius: 2,
                 textTransform: "none",
                 boxShadow: isDark
@@ -500,17 +535,17 @@ const TrackApplicationStatusIndex = () => {
               )}
             </Button>
           </Grid>
-          <Grid item size={{ xs: 6, md: 2 }}>
+          <Grid item size="auto">
             <Button
               variant="outlined"
               color="error"
               startIcon={<ClearIcon />}
-              fullWidth
               onClick={handleClearSearch}
               disabled={loading}
               sx={{
                 fontSize: "0.85rem",
                 py: 1,
+                px: 3,
                 borderRadius: 2,
                 textTransform: "none",
                 borderColor: borderColor,
@@ -564,10 +599,10 @@ const TrackApplicationStatusIndex = () => {
             sx={{
               border: `1px solid ${borderColor}`,
               borderRadius: 2,
-              overflow: "hidden",
+              overflowX: "auto",
             }}
           >
-            <Table sx={{ borderCollapse: "collapse" }} size="small">
+            <Table sx={{ borderCollapse: "collapse", minWidth: 1150 }} size="small">
               <TableHead>
                 <TableRow sx={{ bgcolor: tableHeaderBg }}>
                   <TableCell
@@ -654,12 +689,51 @@ const TrackApplicationStatusIndex = () => {
                   >
                     Status
                   </TableCell>
+                  <TableCell
+                    sx={{
+                      border: `1px solid ${borderColor}`,
+                      fontWeight: 600,
+                      fontSize: "0.75rem",
+                      padding: "8px 12px",
+                      width: "150px",
+                      whiteSpace: "nowrap",
+                      color: isDark ? "rgba(255, 255, 255, 0.9)" : "inherit",
+                    }}
+                  >
+                    Action Date
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      border: `1px solid ${borderColor}`,
+                      fontWeight: 600,
+                      fontSize: "0.75rem",
+                      padding: "8px 12px",
+                      width: "150px",
+                      whiteSpace: "nowrap",
+                      color: isDark ? "rgba(255, 255, 255, 0.9)" : "inherit",
+                    }}
+                  >
+                    Updated Date
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      border: `1px solid ${borderColor}`,
+                      fontWeight: 600,
+                      fontSize: "0.75rem",
+                      padding: "8px 12px",
+                      width: "130px",
+                      whiteSpace: "nowrap",
+                      color: isDark ? "rgba(255, 255, 255, 0.9)" : "inherit",
+                    }}
+                  >
+                    Turn Around
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
                       <CircularProgress size={36} />
                       <Typography
                         sx={{
@@ -851,11 +925,81 @@ const TrackApplicationStatusIndex = () => {
                           }}
                         />
                       </TableCell>
+                      {/* Action date: when this step was acted on */}
+                      <TableCell
+                        sx={{
+                          border: `1px solid ${borderColor}`,
+                          padding: "6px 12px",
+                          fontSize: "0.8rem",
+                          whiteSpace: "nowrap",
+                          color: isDark ? "rgba(255, 255, 255, 0.85)" : "inherit",
+                        }}
+                      >
+                        {formatDateTime(application.actionDate) || "—"}
+                      </TableCell>
+                      {/* Updated date: when the next action replaced this step */}
+                      <TableCell
+                        sx={{
+                          border: `1px solid ${borderColor}`,
+                          padding: "6px 12px",
+                          fontSize: "0.8rem",
+                          whiteSpace: "nowrap",
+                          color: isDark ? "rgba(255, 255, 255, 0.85)" : "inherit",
+                        }}
+                      >
+                        {application.updatedDate ? (
+                          formatDateTime(application.updatedDate)
+                        ) : (
+                          <Chip
+                            label="Pending"
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                            sx={{ fontSize: "0.7rem", height: 22 }}
+                          />
+                        )}
+                      </TableCell>
+                      {/* Turnaround = updated date - action date (ongoing for the current step) */}
+                      <TableCell
+                        sx={{
+                          border: `1px solid ${borderColor}`,
+                          padding: "6px 12px",
+                          fontSize: "0.8rem",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: "0.8rem",
+                            fontWeight: 600,
+                            color: application.updatedDate
+                              ? isDark
+                                ? "#ffffff"
+                                : "inherit"
+                              : theme.palette.warning.main,
+                          }}
+                        >
+                          {formatDuration(application.turnaroundMinutes)}
+                        </Typography>
+                        {!application.updatedDate &&
+                          application.turnaroundMinutes !== null && (
+                            <Typography
+                              sx={{
+                                fontSize: "0.68rem",
+                                color: isDark
+                                  ? "rgba(255, 255, 255, 0.5)"
+                                  : "text.secondary",
+                              }}
+                            >
+                              ongoing
+                            </Typography>
+                          )}
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
                       <SearchIcon
                         sx={{
                           fontSize: 48,

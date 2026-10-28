@@ -30,7 +30,9 @@ import {
   CardContent,
   Alert,
   Tooltip,
+  Avatar,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import BusinessIcon from "@mui/icons-material/Business";
 import SchoolIcon from "@mui/icons-material/School";
@@ -52,21 +54,27 @@ import InstituteRegistrationRenewalService from "../../api/services/internal/reg
 import BirmsPaymentService from "../../api/services/internal/birms/BirmsPaymentService";
 
 // ==================== CONSTANTS ====================
+// Bordered, compact checklist table (same look as the CMFG monitoring checklist)
 const TABLE_STYLE = {
-  border: "1px solid",
-  borderColor: "divider",
+  borderCollapse: "collapse",
   "& th, & td": {
     border: "1px solid",
     borderColor: "divider",
-    height: 28,
-    padding: "0px 6px",
-    fontSize: "0.80rem",
-    lineHeight: 1.2,
+    py: 0.5,
+    px: 1,
+    fontSize: "0.8rem",
+    lineHeight: 1.3,
     verticalAlign: "middle",
   },
   "& th": {
+    py: 0.75,
     fontWeight: 600,
-    backgroundColor: "#fafafa",
+    color: "text.secondary",
+    textTransform: "uppercase",
+    fontSize: "0.72rem",
+    letterSpacing: 0.4,
+    bgcolor: "#fafafa",
+    whiteSpace: "nowrap",
   },
 };
 
@@ -157,6 +165,7 @@ const qualityChecklistTablePropTypes = {
   onResponseChange: PropTypes.func.isRequired,
   onRemarkChange: PropTypes.func.isRequired,
   isReadOnly: PropTypes.bool,
+  sectionNo: PropTypes.number,
 };
 
 const paymentInfoCardPropTypes = {
@@ -632,8 +641,9 @@ const parseDocuments = (docsStr) => {
 };
 
 // ==================== REUSABLE COMPONENTS ====================
+// MUI v7 Grid takes breakpoints via `size`, not xs/md props (those were ignored -> full width)
 const BasicInfoField = ({ label, value, gridProps = { xs: 12, md: 4 } }) => (
-  <Grid {...gridProps}>
+  <Grid size={gridProps}>
     <TextField
       fullWidth
       size="small"
@@ -822,90 +832,165 @@ const QualityChecklistTable = ({
   onResponseChange,
   onRemarkChange,
   isReadOnly = false,
+  sectionNo,
 }) => {
+  const rows = standard.rows || [];
+  const answers = qualityResponses[standard.id] || {};
+  const answered = rows.filter((r) => answers[r.id]).length;
+  const noCount = rows.filter((r) => answers[r.id] === "N").length;
+  const complete = rows.length > 0 && answered === rows.length;
+
   return (
-    <Grid size={{ xs: 12 }}>
-      <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-        <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
+    <Paper
+      variant="outlined"
+      sx={{ mb: 2, borderRadius: 1.5, overflow: "hidden" }}
+    >
+      {/* Section header */}
+      <Box
+        sx={{
+          px: 1.5,
+          py: 0.75,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          bgcolor: (t) => alpha(t.palette.primary.main, 0.05),
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        {sectionNo && (
+          <Avatar
+            sx={{
+              width: 22,
+              height: 22,
+              fontSize: "0.72rem",
+              bgcolor: "primary.main",
+            }}
+          >
+            {sectionNo}
+          </Avatar>
+        )}
+        <Typography fontWeight={600} fontSize="0.9rem" sx={{ flex: 1 }}>
           {standard.title}
         </Typography>
-        <TableContainer>
-          <Table size="small" sx={TABLE_STYLE}>
-            <TableHead>
-              <TableRow>
-                <TableCell width="40">Sl. No</TableCell>
-                <TableCell>Quality Indicator</TableCell>
-                <TableCell align="center" width="80">
-                  YES
-                </TableCell>
-                <TableCell align="center" width="80">
-                  NO
-                </TableCell>
-                <TableCell width="250">Remarks</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {standard.rows.map((row, index) => {
-                const selectedValue = qualityResponses[standard.id]?.[row.id];
-                const isYes = selectedValue === "Y";
-                const isNo = selectedValue === "N";
-                const remark = qualityRemarks[standard.id]?.[row.id] || "";
+        {noCount > 0 && (
+          <Chip
+            size="small"
+            color="error"
+            variant="outlined"
+            label={`${noCount} No`}
+            sx={{ height: 20, fontSize: "0.7rem" }}
+          />
+        )}
+        <Chip
+          size="small"
+          color={complete ? "success" : "default"}
+          variant={complete ? "filled" : "outlined"}
+          label={`${answered}/${rows.length}`}
+          sx={{ height: 20, fontSize: "0.7rem" }}
+        />
+      </Box>
 
-                return (
-                  <TableRow key={row.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{row.value}</TableCell>
-                    <TableCell align="center">
-                      <Radio
-                        size="small"
-                        sx={{ p: 0.25 }}
-                        checked={isYes}
-                        disabled={isReadOnly}
-                        onChange={() => {
-                          const newValue = isYes ? undefined : "Y";
-                          onResponseChange(standard.id, row.id, newValue);
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Radio
-                        size="small"
-                        sx={{ p: 0.25 }}
-                        checked={isNo}
-                        disabled={isReadOnly}
-                        onChange={() => {
-                          const newValue = isNo ? undefined : "N";
-                          onResponseChange(standard.id, row.id, newValue);
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
+      <TableContainer>
+        <Table size="small" sx={TABLE_STYLE}>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ width: 64 }}>No.</TableCell>
+              <TableCell>Quality indicator</TableCell>
+              <TableCell align="center" sx={{ width: 52 }}>
+                Yes
+              </TableCell>
+              <TableCell align="center" sx={{ width: 52 }}>
+                No
+              </TableCell>
+              <TableCell sx={{ width: "28%" }}>Remarks</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.map((row, index) => {
+              const selectedValue = answers[row.id];
+              const isYes = selectedValue === "Y";
+              const isNo = selectedValue === "N";
+              const remark = qualityRemarks[standard.id]?.[row.id] || "";
+
+              return (
+                <TableRow
+                  key={row.id}
+                  sx={{
+                    bgcolor: (t) =>
+                      isNo ? alpha(t.palette.error.main, 0.04) : "inherit",
+                  }}
+                >
+                  <TableCell
+                    sx={{ color: "text.secondary", whiteSpace: "nowrap" }}
+                  >
+                    {sectionNo ? `${sectionNo}.${index + 1}` : index + 1}
+                  </TableCell>
+                  <TableCell>
+                    <Typography fontSize="0.8rem">{row.value}</Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Radio
+                      size="small"
+                      color="success"
+                      sx={{ p: 0.25, "& svg": { fontSize: 18 } }}
+                      checked={isYes}
+                      disabled={isReadOnly}
+                      onChange={() =>
+                        onResponseChange(
+                          standard.id,
+                          row.id,
+                          isYes ? undefined : "Y",
+                        )
+                      }
+                    />
+                  </TableCell>
+                  <TableCell align="center">
+                    <Radio
+                      size="small"
+                      color="error"
+                      sx={{ p: 0.25, "& svg": { fontSize: 18 } }}
+                      checked={isNo}
+                      disabled={isReadOnly}
+                      onChange={() =>
+                        onResponseChange(
+                          standard.id,
+                          row.id,
+                          isNo ? undefined : "N",
+                        )
+                      }
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {isReadOnly ? (
+                      <Typography fontSize="0.8rem" color="text.secondary">
+                        {remark || "—"}
+                      </Typography>
+                    ) : (
                       <TextField
                         fullWidth
                         size="small"
-                        placeholder="Enter remarks"
+                        variant="standard"
+                        placeholder={
+                          isNo ? "Explain why (recommended)" : "Optional"
+                        }
                         value={remark}
                         onChange={(e) =>
                           onRemarkChange(standard.id, row.id, e.target.value)
                         }
-                        slotProps={{
-                          input: {
-                            readOnly: isReadOnly,
-                            sx: { fontSize: "0.75rem" },
-                          },
-                        }}
                         multiline
-                        rows={2}
+                        maxRows={3}
+                        slotProps={{ input: { sx: { fontSize: "0.8rem" } } }}
                       />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-    </Grid>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
   );
 };
 
@@ -1638,10 +1723,11 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
         <Grid size={{ xs: 12 }}>
           {qualityStandards.qualityData.length > 0 ? (
             <>
-              {qualityStandards.qualityData.slice(0, 3).map((standard) => (
+              {qualityStandards.qualityData.slice(0, 3).map((standard, sIdx) => (
                 <QualityChecklistTable
                   key={standard.id}
                   standard={standard}
+                  sectionNo={sIdx + 1}
                   qualityResponses={qualityStandards.qualityResponses}
                   qualityRemarks={qualityStandards.qualityRemarks}
                   onResponseChange={

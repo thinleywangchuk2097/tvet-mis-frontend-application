@@ -21,7 +21,11 @@ import {
   CircularProgress,
   Checkbox,
   FormControlLabel,
+  LinearProgress,
+  Chip,
+  Tooltip,
 } from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import SearchIcon from "@mui/icons-material/Search";
 import BusinessIcon from "@mui/icons-material/Business";
@@ -1158,13 +1162,140 @@ const InstituteSesCentreAssessmentCentre = () => {
     isTuitionService,
   ]);
 
+  // ---- Application progress (mirrors the rules that enable Submit) ----
+  const progress = useMemo(() => {
+    const v = formik.values;
+    const filled = REQUIRED_FIELDS.filter(
+      (f) => v[f] !== "" && v[f] !== null && v[f] !== undefined,
+    ).length;
+
+    // quality standards (the first three are the ones shown and required)
+    let qTotal = 0;
+    let qAnswered = 0;
+    let qYes = 0;
+    let qNo = 0;
+    qualityData.slice(0, 3).forEach((standard) =>
+      standard.rows.forEach((row) => {
+        qTotal++;
+        const sel = qualitySelections[standard.id]?.[row.id];
+        if (sel === "Y" || sel === "N") qAnswered++;
+        if (sel === "Y") qYes++;
+        if (sel === "N") qNo++;
+      }),
+    );
+
+    const listValid = (list, errs) =>
+      (list?.length || 0) > 0 && list.every((_, i) => !errs?.[i]);
+    const trainersDone = listValid(v.trainers, formik.errors.trainers);
+    const coursesDone = listValid(v.courses, formik.errors.courses);
+    const tuitionDone = listValid(v.tuitionDetails, formik.errors.tuitionDetails);
+    const docsDone = (v.files?.length || 0) > 0;
+    const declDone = v.declarationAccepted === true;
+
+    // same order as the tabs
+    const steps = [
+      {
+        label: "Basic information",
+        done: filled === REQUIRED_FIELDS.length,
+        detail: `${filled}/${REQUIRED_FIELDS.length} fields`,
+      },
+      ...(isTuitionService
+        ? [
+            {
+              label: "Tuition details",
+              done: tuitionDone,
+              detail: `${v.tuitionDetails?.length || 0} added`,
+            },
+          ]
+        : [
+            {
+              label: "Trainers",
+              done: trainersDone,
+              detail: `${v.trainers?.length || 0} added`,
+            },
+            {
+              label: "Courses",
+              done: coursesDone,
+              detail: `${v.courses?.length || 0} added`,
+            },
+          ]),
+      {
+        label: "Quality standards",
+        done: areAllQualityStandardsYes,
+        detail: `${qYes}/${qTotal} Yes`,
+      },
+      {
+        label: "Documents",
+        done: docsDone,
+        detail: `${v.files?.length || 0} file(s)`,
+      },
+      { label: "Declaration", done: declDone, detail: declDone ? "accepted" : "pending" },
+    ];
+
+    const units = REQUIRED_FIELDS.length + qTotal + (steps.length - 2);
+    const doneUnits =
+      filled +
+      qYes +
+      steps.filter((st, i) => i > 0 && st.label !== "Quality standards" && st.done).length;
+    let percent = units ? Math.round((doneUnits / units) * 100) : 0;
+    if (percent >= 100 && !isSubmitEnabled) percent = 99; // e.g. a field is still invalid
+
+    return {
+      steps,
+      percent,
+      quality: {
+        total: qTotal,
+        answered: qAnswered,
+        yes: qYes,
+        no: qNo,
+        percent: qTotal ? Math.round((qAnswered / qTotal) * 100) : 0,
+      },
+    };
+  }, [
+    formik.values,
+    formik.errors,
+    qualityData,
+    qualitySelections,
+    areAllQualityStandardsYes,
+    isTuitionService,
+    isSubmitEnabled,
+  ]);
+
   const renderChecklist = (standard) => {
     return (
       <Grid item xs={12} key={standard.id}>
         <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
-            {standard.title}
-          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1,
+              mb: 1,
+            }}
+          >
+            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }}>
+              {standard.title}
+            </Typography>
+            {(() => {
+              const answered = standard.rows.filter(
+                (r) => qualitySelections[standard.id]?.[r.id],
+              ).length;
+              const allYes = standard.rows.every(
+                (r) => qualitySelections[standard.id]?.[r.id] === "Y",
+              );
+              const full = answered === standard.rows.length;
+              return (
+                <Chip
+                  size="small"
+                  label={`${answered}/${standard.rows.length}`}
+                  color={allYes ? "success" : full ? "warning" : "default"}
+                  variant={full ? "filled" : "outlined"}
+                  sx={{ height: 20, fontSize: "0.7rem" }}
+                />
+              );
+            })()}
+          </Box>
           <TableContainer>
             <Table size="small" sx={TABLE_STYLE}>
               <TableHead>
@@ -2426,6 +2557,59 @@ const InstituteSesCentreAssessmentCentre = () => {
       return (
         <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item size={{ xs: 12 }}>
+            {progress.quality.total > 0 && (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  mb: 2,
+                  borderColor: areAllQualityStandardsYes
+                    ? "success.main"
+                    : progress.quality.no > 0
+                      ? "warning.main"
+                      : "divider",
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    mb: 0.75,
+                    gap: 1,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={600}>
+                    Checklist progress
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color={areAllQualityStandardsYes ? "success.main" : "text.secondary"}
+                  >
+                    {progress.quality.answered}/{progress.quality.total} answered ·{" "}
+                    {progress.quality.yes} Yes · {progress.quality.no} No
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={progress.quality.percent}
+                  color={
+                    areAllQualityStandardsYes
+                      ? "success"
+                      : progress.quality.no > 0
+                        ? "warning"
+                        : "primary"
+                  }
+                  sx={{ height: 8, borderRadius: 4 }}
+                />
+                {progress.quality.no > 0 && (
+                  <Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 0.75 }}>
+                    {progress.quality.no} indicator(s) answered No. All quality indicators must be
+                    Yes before you can submit.
+                  </Typography>
+                )}
+              </Paper>
+            )}
             {qualityData.slice(0, 3).map(renderChecklist)}
           </Grid>
         </Grid>
@@ -2567,6 +2751,65 @@ const InstituteSesCentreAssessmentCentre = () => {
         {applicationFound && (
           <>
             <Divider />
+            {/* Overall application progress */}
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                my: 2,
+                borderColor: progress.percent === 100 ? "success.main" : "divider",
+                bgcolor: progress.percent === 100 ? "#f1f8f4" : "#f8fafc",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 1,
+                }}
+              >
+                <Typography fontWeight={600}>Application progress</Typography>
+                <Typography
+                  fontWeight={700}
+                  color={progress.percent === 100 ? "success.main" : "primary.main"}
+                >
+                  {progress.percent}%
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={progress.percent}
+                color={progress.percent === 100 ? "success" : "primary"}
+                sx={{ height: 8, borderRadius: 4 }}
+              />
+              <Box sx={{ display: "flex", gap: 2, mt: 1.25, flexWrap: "wrap" }}>
+                {progress.steps.map((st, i) => (
+                  <Box
+                    key={st.label}
+                    onClick={() => setTabValue(i)}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      cursor: "pointer",
+                      "&:hover .lbl": { textDecoration: "underline" },
+                    }}
+                  >
+                    <CheckCircleIcon
+                      sx={{ fontSize: 17 }}
+                      color={st.done ? "success" : "disabled"}
+                    />
+                    <Typography className="lbl" variant="caption" fontWeight={600}>
+                      {st.label}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      ({st.detail})
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
             <Tabs
               value={tabValue}
               onChange={(e, v) => setTabValue(v)}
@@ -2576,7 +2819,17 @@ const InstituteSesCentreAssessmentCentre = () => {
               }}
             >
               {tabs.map((tab, index) => (
-                <Tab key={index} icon={tab.icon} label={tab.label} />
+                <Tab
+                  key={index}
+                  icon={
+                    progress.steps[index]?.done ? (
+                      <CheckCircleIcon color="success" />
+                    ) : (
+                      tab.icon
+                    )
+                  }
+                  label={tab.label}
+                />
               ))}
             </Tabs>
 
@@ -2616,6 +2869,18 @@ const InstituteSesCentreAssessmentCentre = () => {
               {/* Submit and Reset Buttons - Only on Last Tab, positioned on the right */}
               {isLastTab && (
                 <Grid item sx={{ ml: "auto" }}>
+                  <Tooltip
+                    arrow
+                    title={
+                      !isSubmitEnabled
+                        ? `Complete: ${progress.steps
+                            .filter((st) => !st.done)
+                            .map((st) => st.label)
+                            .join(", ") || "fix the highlighted fields"}`
+                        : ""
+                    }
+                  >
+                    <span>
                   <Button
                     variant="contained"
                     size="small"
@@ -2630,6 +2895,8 @@ const InstituteSesCentreAssessmentCentre = () => {
                   >
                     {loading ? "Submitting..." : "Submit"}
                   </Button>
+                    </span>
+                  </Tooltip>
                   <Button
                     color="error"
                     variant="contained"

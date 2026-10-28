@@ -34,6 +34,13 @@ class PublicPageService {
       .then((response) => response)
       .catch((error) => error);
   }
+  // Headline figures for "TVET by the numbers"
+  getHomeStats() {
+    return apiClient
+      .get(`/api/v1/public/data/home-stats`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new PublicPageService();

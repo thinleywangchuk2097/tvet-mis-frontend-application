@@ -47,7 +47,7 @@ import ViewCurriculumIndex from "../pages/curriculum/ViewCurriculumIndex";
 //apply for tot and qms certification
 import ApplyQmsCertification from "../pages/institute/ApplyQmsCertification";
 import TrackTrainee from "../pages/institute/TrackTrainee";
-// Tracer 
+// Tracer
 import TracerQuestionGenerator from "../pages/dwps/tracer/TracerQuestionGenerator";
 import SendTracerIndex from "../pages/dwps/tracer/SendTracerIndex";
 import ResponseTracerIndex from "../pages/dwps/tracer/ResponseTracerIndex";
@@ -63,6 +63,7 @@ import ViewInstituteChange from "../pages/institute/registration/ViewInstituteCh
 import CreateTotIndex from "../pages/dwps/tot/CreateTotIndex";
 import ApplyTrainerToTProgram from "../pages/dwps/tot/ApplyTrainerToTProgram";
 import ViewApplyTrainerToTProgram from "../pages/dwps/tot/ViewApplyTrainerToTProgram";
+import GenerateToTCertificate from "../pages/dwps/tot/GenerateToTCertificate";
 
 //Certificate
 //import Assessment from "../pages/certificate/Assessment";
@@ -77,6 +78,8 @@ import CommonBirmsPayment from "../pages/birms/private/CommonBirmsPayment";
 //master
 import SectorOccupationIndex from "../pages/master/SectorOccupationIndex";
 import ServiceMasterIndex from "../pages/master/ServiceMasterIndex";
+import QualityStandardCheckListIndex from "../pages/master/QualityStandardCheckListIndex";
+
 //reports
 import InstituteReportIndex from "../pages/report/InstituteReportIndex";
 import CourseReportIndex from "../pages/report/CourseReportIndex";
@@ -100,7 +103,6 @@ import TutorsDetailsReport from "../pages/ses-centre/report/TutorsDetailsReport"
 //assessment-centre
 import ChangeAssessmentCentre from "../pages/assessment-centre/registration/ChangeAssessmentCentre";
 import ProgramRegistration from "../pages/assessment-centre/registration/ProgramRegistration";
-import AssessmentCentreOffence from "../pages/assessment-centre/offence/AssessmentCentreOffence";
 import AssessmentCentreResult from "../pages/assessment-centre/assessment-result/AssessmentCentreResult";
 //registration
 import AddTrainerIndex from "../pages/trainer/AddTrainerIndex";
@@ -113,6 +115,9 @@ import OnCampusJobPlacement from "../pages/dwps/ojt/OnCampusJobPlacement";
 import TrainingJobPlacementReportIndex from "../pages/dwps/ojt/TrainingJobPlacementReportIndex";
 //assessment
 import RegularIndex from "../pages/assessment/RegularIndex";
+//cmfg
+import CmfgMonitoringIndex from "../pages/dwps/cmfg/CmfgMonitoringIndex";
+import ViewCmfgMonitoringIndex from "../pages/dwps/cmfg/ViewCmfgMonitoringIndex";
 
 export const privateRoutes = [
   {
@@ -136,6 +141,10 @@ export const privateRoutes = [
     children: [
       { path: "sector-occupation-index", element: <SectorOccupationIndex /> },
       { path: "service-master-index", element: <ServiceMasterIndex /> },
+      {
+        path: "quality-standard-checklist-index",
+        element: <QualityStandardCheckListIndex />,
+      },
     ],
   },
 
@@ -183,6 +192,8 @@ export const privateRoutes = [
         element: <ViewAccreditedCourseRegistration />,
       },
       {
+        path: "view-cmfg-monitoring-index/:applicationNo",
+        element: <ViewCmfgMonitoringIndex />,
         path: "view-self-assessment-report/:applicationNo",
         element: <ViewSelfAssessmentReport />,
       },
@@ -242,7 +253,6 @@ export const privateRoutes = [
     children: [
       { path: "change-assessment-centre", element: <ChangeAssessmentCentre /> },
       { path: "program-registration", element: <ProgramRegistration /> },
-      { path: "offence", element: <AssessmentCentreOffence /> },
       { path: "result", element: <AssessmentCentreResult /> },
     ],
   },
@@ -328,10 +338,19 @@ export const privateRoutes = [
   {
     path: "tracer",
     children: [
-      { path: "generate-tracer-questions", element: <TracerQuestionGenerator /> },
+      {
+        path: "generate-tracer-questions",
+        element: <TracerQuestionGenerator />,
+      },
       { path: "generate-tracer-index", element: <GenerateTracerIndex /> },
       { path: "send-tracer", element: <SendTracerIndex /> },
       { path: "response-tracer", element: <ResponseTracerIndex /> },
+    ],
+  },
+  {
+    path: "cmfg",
+    children: [
+      { path: "cmfg-monitoring-index", element: <CmfgMonitoringIndex /> },
     ],
   },
   {
@@ -360,6 +379,7 @@ export const privateRoutes = [
     children: [
       { path: "create-index", element: <CreateTotIndex /> },
       { path: "apply-trainer-tot-index", element: <ApplyTrainerToTProgram /> },
+      { path: "generate-tot-certificate", element: <GenerateToTCertificate /> },
     ],
   },
   {
@@ -393,11 +413,16 @@ export const privateRoutes = [
   {
     path: "certificate",
     children: [
-   //   { path: "assessment", element: <Assessment /> },
+      //   { path: "assessment", element: <Assessment /> },
       { path: "bqf-certificate", element: <TraineeCertificateIndex /> },
-      { path: "registration-certificate", element: <RegistrationCertificateIndex /> },
-      { path: "programme-accreditation-certificate", element: <AccreditationBQFProgrammeIndex /> }
-
+      {
+        path: "registration-certificate",
+        element: <RegistrationCertificateIndex />,
+      },
+      {
+        path: "programme-accreditation-certificate",
+        element: <AccreditationBQFProgrammeIndex />,
+      },
     ],
   },
   //without children

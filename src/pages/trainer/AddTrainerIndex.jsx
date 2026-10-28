@@ -14,7 +14,6 @@ import {
   TableRow,
   TablePagination,
   Dialog,
-  Divider,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -30,7 +29,19 @@ import {
   FormControlLabel,
   FormControl,
   FormLabel,
+  InputAdornment,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import SearchIcon from "@mui/icons-material/Search";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import SaveIcon from "@mui/icons-material/Save";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
@@ -52,24 +63,6 @@ import ApplyNonAccreditedCourseService from "../../api/services/internal/course/
 import AddTrainerService from "../../api/services/internal/trainer/AddTrainerService";
 import InstituteRegistrationService from "../../api/services/internal/registration/InstituteRegistrationService";
 
-// Table style constant
-const TABLE_STYLE = {
-  border: "1px solid",
-  borderColor: "divider",
-  "& th, & td": {
-    border: "1px solid",
-    borderColor: "divider",
-    height: 28,
-    padding: "0px 6px",
-    fontSize: "0.80rem",
-    lineHeight: 1.2,
-    verticalAlign: "middle",
-  },
-  "& th": {
-    fontWeight: 600,
-  },
-};
-
 // Custom styled component for required field label
 const RequiredLabel = ({ children }) => (
   <span>
@@ -80,6 +73,75 @@ const RequiredLabel = ({ children }) => (
 
 RequiredLabel.propTypes = {
   children: PropTypes.node.isRequired,
+};
+
+// Form section heading with icon
+const SectionHeader = ({ icon, title, first }) => (
+  <Box
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      gap: 1,
+      mt: first ? 0 : 3.5,
+      mb: 2,
+      pb: 1,
+      borderBottom: "1px solid",
+      borderColor: "divider",
+    }}
+  >
+    <Avatar
+      sx={{
+        width: 28,
+        height: 28,
+        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+        color: "primary.main",
+        "& svg": { fontSize: 17 },
+      }}
+    >
+      {icon}
+    </Avatar>
+    <Typography variant="subtitle1" fontWeight={600}>
+      {title}
+    </Typography>
+  </Box>
+);
+
+SectionHeader.propTypes = {
+  icon: PropTypes.node,
+  title: PropTypes.string.isRequired,
+  first: PropTypes.bool,
+};
+
+// Small summary tile for the page header
+const StatTile = ({ label, value, color }) => (
+  <Box
+    sx={{
+      px: 2,
+      py: 1,
+      borderRadius: 2,
+      border: "1px solid",
+      borderColor: "divider",
+      bgcolor: "background.paper",
+      minWidth: 96,
+    }}
+  >
+    <Typography
+      variant="h6"
+      fontWeight={700}
+      sx={{ lineHeight: 1.2, color: color || "text.primary" }}
+    >
+      {value}
+    </Typography>
+    <Typography variant="caption" color="text.secondary" noWrap>
+      {label}
+    </Typography>
+  </Box>
+);
+
+StatTile.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+  color: PropTypes.string,
 };
 
 const AddTrainerIndex = () => {
@@ -424,7 +486,11 @@ const AddTrainerIndex = () => {
         toast.success("Trainer deleted successfully!");
         await fetchTrainers(instituteId);
       } else {
-        toast.error(response?.data?.message || "Failed to delete trainer");
+        toast.error(
+          response?.response?.data?.message ||
+            response?.data?.message ||
+            "Failed to delete trainer",
+        );
       }
       setDeleteConfirmOpen(false);
       setTrainerToDelete(null);
@@ -587,7 +653,7 @@ const AddTrainerIndex = () => {
       let response;
       if (dialogMode === "add") {
         response = await AddTrainerService.submitTrainer(payload, access_token);
-        if ((response && response.status === 201) || response.status === 200) {
+        if (response?.status === 201 || response?.status === 200) {
           toast.success(
             response.data?.message || "Trainer added successfully!",
           );
@@ -595,7 +661,12 @@ const AddTrainerIndex = () => {
           resetForm();
           setOpenDialog(false);
         } else {
-          toast.error(response?.data?.message || "Failed to add trainer");
+          // The service returns the axios error instead of throwing it
+          toast.error(
+            response?.response?.data?.message ||
+              response?.data?.message ||
+              "Failed to add trainer",
+          );
         }
       } else if (dialogMode === "edit") {
         response = await AddTrainerService.updateTrainer(payload, access_token);
@@ -606,7 +677,11 @@ const AddTrainerIndex = () => {
           await fetchTrainers(instituteId);
           setOpenDialog(false);
         } else {
-          toast.error(response?.data?.message || "Failed to update trainer");
+          toast.error(
+            response?.response?.data?.message ||
+              response?.data?.message ||
+              "Failed to update trainer",
+          );
         }
       }
     } catch (error) {
@@ -650,8 +725,15 @@ const AddTrainerIndex = () => {
   if (!isDataLoaded) {
     return (
       <Paper
-        elevation={3}
-        style={{ padding: 20, margin: 10, textAlign: "center" }}
+        elevation={0}
+        sx={{
+          p: 6,
+          m: 1.25,
+          textAlign: "center",
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
       >
         <CircularProgress />
         <Typography variant="body1" sx={{ mt: 2 }}>
@@ -664,8 +746,15 @@ const AddTrainerIndex = () => {
   if (!instituteId && trainers.length === 0 && !loading) {
     return (
       <Paper
-        elevation={3}
-        style={{ padding: 20, margin: 10, textAlign: "center" }}
+        elevation={0}
+        sx={{
+          p: 6,
+          m: 1.25,
+          textAlign: "center",
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
       >
         <CircularProgress />
         <Typography variant="body1" sx={{ mt: 2 }}>
@@ -675,66 +764,170 @@ const AddTrainerIndex = () => {
     );
   }
 
+  // Header summary
+  const employmentCounts = employmentTypes
+    .map((et) => ({
+      name: et.name,
+      count: trainers.filter(
+        (t) => String(t.employmentTypeId) === String(et.id),
+      ).length,
+    }))
+    .filter((e) => e.count > 0);
+  const withCourses = trainers.filter((t) => t.courses?.length > 0).length;
+
+  const employmentChipColor = (name = "") => {
+    const n = name.toLowerCase();
+    if (n.includes("full")) return "primary";
+    if (n.includes("part")) return "warning";
+    if (n.includes("contract")) return "info";
+    return "default";
+  };
+
+  const headCellSx = {
+    fontWeight: 600,
+    color: "text.secondary",
+    textTransform: "uppercase",
+    fontSize: "0.72rem",
+    letterSpacing: 0.4,
+    bgcolor: "#fafafa",
+    py: 0.75,
+    whiteSpace: "nowrap",
+  };
+
+  // bordered, compact table (every cell outlined)
+  const borderedTableSx = {
+    borderCollapse: "collapse",
+    "& th, & td": {
+      border: "1px solid",
+      borderColor: "divider",
+      px: 1,
+      fontSize: "0.8rem",
+      lineHeight: 1.3,
+      verticalAlign: "middle",
+    },
+    "& td": { py: 0.5 },
+    // keep cell content compact too
+    "& td .MuiTypography-body2": { fontSize: "0.8rem" },
+    "& td .MuiTypography-caption": { fontSize: "0.7rem" },
+    "& td .MuiChip-root": { height: 22, fontSize: "0.7rem" },
+    "& td .MuiChip-icon": { fontSize: 14 },
+    "& td .MuiIconButton-root": { p: 0.4 },
+  };
+
   return (
-    <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
-      <Typography variant="h5" gutterBottom>
-        Trainer Management
-      </Typography>
-
-      <Grid
-        container
-        spacing={1}
-        alignItems="center"
-        sx={{ justifyContent: "flex-end", mb: 2 }}
+    <Paper
+      elevation={0}
+      sx={{
+        p: { xs: 2, md: 3 },
+        m: 1.25,
+        borderRadius: 3,
+        border: "1px solid",
+        borderColor: "divider",
+      }}
+    >
+      {/* Page header */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: { xs: "flex-start", md: "center" },
+          gap: 2,
+          flexWrap: "wrap",
+          mb: 3,
+        }}
       >
-        <Grid item size={{ xs: 12, md: 4 }}>
-          <TextField
-            label="Search"
-            variant="outlined"
-            size="small"
-            fullWidth
-            placeholder="Search by Name, ID, Qualification or Specialization"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                height: "36px",
-                "& input": { padding: "8px 12px" },
-                "& fieldset": { borderRadius: "4px" },
-              },
-            }}
+        <Avatar
+          sx={{
+            width: 48,
+            height: 48,
+            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+            color: "primary.main",
+          }}
+        >
+          <GroupsOutlinedIcon />
+        </Avatar>
+        <Box sx={{ flex: 1, minWidth: 220 }}>
+          <Typography variant="h5" fontWeight={600}>
+            Trainer Management
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Register your institute&apos;s trainers and the courses they teach.
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+          <StatTile label="Total trainers" value={trainers.length} />
+          {employmentCounts.map((e) => (
+            <StatTile key={e.name} label={e.name} value={e.count} />
+          ))}
+          <StatTile
+            label="With courses"
+            value={withCourses}
+            color="success.main"
           />
-        </Grid>
-        <Grid item size={{ xs: 12, md: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            size="small"
-            startIcon={<PersonAddIcon />}
-            onClick={handleAdd}
-            sx={{ height: "36px" }}
-          >
-            Add Trainer
-          </Button>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
-      <TableContainer component={Paper} elevation={1}>
-        <Table size="small" sx={TABLE_STYLE}>
+      {/* Toolbar */}
+      <Box
+        sx={{
+          display: "flex",
+          gap: 1.5,
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 2,
+        }}
+      >
+        <TextField
+          size="small"
+          placeholder="Search by name, CID / work permit, email, qualification or specialization"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
+          sx={{ flex: 1, minWidth: 260, maxWidth: 520 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+        <Box sx={{ flex: 1 }} />
+        <Button
+          variant="contained"
+          startIcon={<PersonAddIcon />}
+          onClick={handleAdd}
+          sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+        >
+          Add Trainer
+        </Button>
+      </Box>
+
+      {/* Trainer table */}
+      <TableContainer
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 2,
+        }}
+      >
+        <Table size="small" stickyHeader sx={borderedTableSx}>
           <TableHead>
             <TableRow>
-              <TableCell width={50}>#</TableCell>
-              <TableCell>ID/Reference No</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell>Qualification</TableCell>
-              <TableCell>Specialization</TableCell>
-              <TableCell align="center">Experience (Yrs)</TableCell>
-              <TableCell>Employment Type</TableCell>
-              <TableCell>Courses</TableCell>
-              <TableCell align="center" width={120}>
-                Action
+              <TableCell sx={{ ...headCellSx, width: 48 }}>#</TableCell>
+              <TableCell sx={headCellSx}>Trainer</TableCell>
+              <TableCell sx={headCellSx}>Contact</TableCell>
+              <TableCell sx={headCellSx}>Qualification</TableCell>
+              <TableCell sx={headCellSx} align="center">
+                Experience
+              </TableCell>
+              <TableCell sx={headCellSx}>Employment</TableCell>
+              <TableCell sx={headCellSx}>Courses</TableCell>
+              <TableCell sx={{ ...headCellSx, width: 130 }} align="center">
+                Actions
               </TableCell>
             </TableRow>
           </TableHead>
@@ -743,116 +936,156 @@ const AddTrainerIndex = () => {
               filteredTrainers
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((trainer, index) => (
-                  <TableRow key={trainer.id}>
-                    <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
+                  <TableRow
+                    key={trainer.id}
+                    hover
+                    sx={{ "& td": { py: 0.5 } }}
+                  >
                     <TableCell>
-                      <Chip
-                        label={getTrainerDisplayId(trainer)}
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
-                      />
+                      <Typography variant="body2" color="text.secondary">
+                        {index + 1 + page * rowsPerPage}
+                      </Typography>
                     </TableCell>
                     <TableCell>
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 1 }}
                       >
                         <Avatar
-                          sx={{ width: 24, height: 24, fontSize: "0.75rem" }}
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            fontSize: "0.72rem",
+                            bgcolor: "primary.main",
+                          }}
                         >
                           {getInitials(trainer.name)}
                         </Avatar>
-                        <Typography variant="body2">{trainer.name}</Typography>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            {trainer.name}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ fontFamily: "monospace" }}
+                          >
+                            {getTrainerDisplayId(trainer) || "-"}
+                            {trainer.genderName
+                              ? ` • ${trainer.genderName}`
+                              : ""}
+                          </Typography>
+                        </Box>
                       </Box>
                     </TableCell>
                     <TableCell>
                       <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                        sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
                       >
                         <EmailIcon
-                          sx={{ fontSize: 12, color: "text.secondary" }}
-                        />
-                        <Typography variant="body2">{trainer.email}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                      >
-                        <PhoneIcon
-                          sx={{ fontSize: 12, color: "text.secondary" }}
+                          sx={{ fontSize: 14, color: "text.secondary" }}
                         />
                         <Typography variant="body2">
-                          {trainer.mobileNo}
+                          {trainer.email || "—"}
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
+                      >
+                        <PhoneIcon
+                          sx={{ fontSize: 14, color: "text.secondary" }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          {trainer.mobileNo || "—"}
                         </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell>{trainer.qualificationName || "—"}</TableCell>
-                    <TableCell>{trainer.specialization || "—"}</TableCell>
-                    <TableCell align="center">
-                      {trainer.workExperience} yrs
-                    </TableCell>
                     <TableCell>
+                      <Typography variant="body2">
+                        {trainer.qualificationName || "—"}
+                      </Typography>
+                      {trainer.specialization && (
+                        <Typography variant="caption" color="text.secondary">
+                          {trainer.specialization}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell align="center">
                       <Chip
-                        label={trainer.employmentTypeName || "—"}
                         size="small"
                         variant="outlined"
-                        sx={{
-                          backgroundColor:
-                            trainer.employmentTypeName === "full time" ||
-                            trainer.employmentTypeName === "Full time"
-                              ? "#e3f2fd"
-                              : trainer.employmentTypeName === "part time" ||
-                                  trainer.employmentTypeName === "Part time"
-                                ? "#fff3e0"
-                                : "#f5f5f5",
-                          fontSize: "0.7rem",
-                        }}
+                        label={`${trainer.workExperience || 0} yrs`}
                       />
                     </TableCell>
                     <TableCell>
-                      {trainer.courses && trainer.courses.length > 0 ? (
-                        <Box
-                          sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}
-                        >
-                          {trainer.courses.map((course, idx) => (
-                            <Chip
-                              key={idx}
-                              label={`${getCourseTypeName(course.courseTypeId)}: ${course.courseName}`}
-                              size="small"
-                              variant="outlined"
-                              sx={{ fontSize: "0.65rem" }}
-                            />
-                          ))}
-                        </Box>
+                      {trainer.employmentTypeName ? (
+                        <Chip
+                          label={trainer.employmentTypeName}
+                          size="small"
+                          color={employmentChipColor(
+                            trainer.employmentTypeName,
+                          )}
+                          variant="outlined"
+                          sx={{ textTransform: "capitalize" }}
+                        />
                       ) : (
                         "—"
                       )}
                     </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="View Details">
+                    <TableCell>
+                      {trainer.courses && trainer.courses.length > 0 ? (
+                        <Tooltip
+                          arrow
+                          title={
+                            <Box>
+                              {trainer.courses.map((course, idx) => (
+                                <div key={idx}>
+                                  {getCourseTypeName(course.courseTypeId)}:{" "}
+                                  {course.courseName}
+                                </div>
+                              ))}
+                            </Box>
+                          }
+                        >
+                          <Chip
+                            size="small"
+                            color="success"
+                            variant="outlined"
+                            icon={<MenuBookOutlinedIcon />}
+                            label={`${trainer.courses.length} course${
+                              trainer.courses.length === 1 ? "" : "s"
+                            }`}
+                          />
+                        </Tooltip>
+                      ) : (
+                        <Typography variant="caption" color="text.disabled">
+                          None assigned
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                      <Tooltip title="View details">
                         <IconButton
-                          color="primary"
                           size="small"
                           onClick={() => handleView(trainer)}
+                          sx={{ color: "info.main" }}
                         >
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Edit Trainer">
+                      <Tooltip title="Edit trainer">
                         <IconButton
-                          color="secondary"
                           size="small"
                           onClick={() => handleEdit(trainer)}
+                          sx={{ color: "primary.main" }}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Delete Trainer">
+                      <Tooltip title="Delete trainer">
                         <IconButton
-                          color="error"
                           size="small"
                           onClick={() => handleDeleteClick(trainer)}
+                          sx={{ color: "error.main" }}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -862,11 +1095,34 @@ const AddTrainerIndex = () => {
                 ))
             ) : (
               <TableRow>
-                <TableCell colSpan={11} align="center">
+                <TableCell colSpan={8} align="center" sx={{ py: 7 }}>
                   {loading ? (
-                    <CircularProgress size={24} />
+                    <CircularProgress size={28} />
                   ) : (
-                    "No data available in table"
+                    <Box>
+                      <PersonSearchOutlinedIcon
+                        sx={{ fontSize: 48, color: "text.disabled" }}
+                      />
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 1 }}
+                      >
+                        {search
+                          ? "No trainers match your search"
+                          : "No trainers registered yet"}
+                      </Typography>
+                      {!search && (
+                        <Button
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={handleAdd}
+                          sx={{ mt: 1.5, textTransform: "none" }}
+                        >
+                          Add your first trainer
+                        </Button>
+                      )}
+                    </Box>
                   )}
                 </TableCell>
               </TableRow>
@@ -881,6 +1137,7 @@ const AddTrainerIndex = () => {
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
+          sx={{ borderTop: "1px solid", borderColor: "divider" }}
         />
       </TableContainer>
 
@@ -892,7 +1149,13 @@ const AddTrainerIndex = () => {
         fullWidth
         scroll="paper"
       >
-        <DialogTitle>
+        <DialogTitle
+          sx={{
+            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.05),
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
           <Box
             sx={{
               display: "flex",
@@ -901,9 +1164,17 @@ const AddTrainerIndex = () => {
               justifyContent: "space-between",
             }}
           >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <SchoolIcon />
-              <Typography variant="h6">
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Avatar
+                sx={{
+                  bgcolor: "primary.main",
+                  width: 36,
+                  height: 36,
+                }}
+              >
+                <SchoolIcon fontSize="small" />
+              </Avatar>
+              <Typography variant="h6" fontWeight={600}>
                 {dialogMode === "add"
                   ? "Add New Trainer"
                   : dialogMode === "edit"
@@ -926,18 +1197,9 @@ const AddTrainerIndex = () => {
           {(formik) => (
             <Form>
               <DialogContent dividers>
-                <Paper
-                  sx={{
-                    p: 3,
-                    border: "1px solid",
-                    borderColor: "divider",
-                  }}
-                >
+                <Paper elevation={0} sx={{ p: { xs: 1, md: 2 } }}>
                   {/* Identification Section */}
-                  <Typography fontWeight={600} gutterBottom>
-                    Identification Information
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
+                  <SectionHeader icon={<BadgeOutlinedIcon />} title="Identification Information" first />
                   <Grid container spacing={2}>
                     <Grid item size={{ xs: 12 }}>
                       <FormControl component="fieldset">
@@ -1033,10 +1295,7 @@ const AddTrainerIndex = () => {
                   </Grid>
 
                   {/* Personal Information */}
-                  <Typography fontWeight={600} gutterBottom sx={{ mt: 3 }}>
-                    Personal Information
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
+                  <SectionHeader icon={<PersonOutlineIcon />} title="Personal Information" />
                   <Grid container spacing={2}>
                     <Grid item size={{ xs: 12, md: 6 }}>
                       <TextField
@@ -1140,10 +1399,7 @@ const AddTrainerIndex = () => {
                   </Grid>
 
                   {/* Professional Information */}
-                  <Typography fontWeight={600} gutterBottom sx={{ mt: 3 }}>
-                    Professional Information
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
+                  <SectionHeader icon={<WorkOutlineIcon />} title="Professional Information" />
                   <Grid container spacing={2}>
                     <Grid item size={{ xs: 12, md: 6 }}>
                       <TextField
@@ -1312,10 +1568,7 @@ const AddTrainerIndex = () => {
                   </Grid>
 
                   {/* Course Assignment Section */}
-                  <Typography fontWeight={600} gutterBottom sx={{ mt: 3 }}>
-                    Course Assignment
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
+                  <SectionHeader icon={<MenuBookOutlinedIcon />} title="Course Assignment" />
 
                   <FieldArray name="courses">
                     {({ push, remove }) => (
@@ -1483,10 +1736,7 @@ const AddTrainerIndex = () => {
                   {/* Supporting Documents Section */}
                   {dialogMode !== "view" && (
                     <>
-                      <Typography fontWeight={600} gutterBottom sx={{ mt: 3 }}>
-                        Supporting Documents
-                      </Typography>
-                      <Divider sx={{ mb: 2 }} />
+                      <SectionHeader icon={<AttachFileIcon />} title="Supporting Documents" />
                       <Grid container spacing={2}>
                         <Grid item size={{ xs: 12 }}>
                           <FileUpload
@@ -1502,10 +1752,7 @@ const AddTrainerIndex = () => {
 
                   {dialogMode === "view" && formik.values.files?.length > 0 && (
                     <>
-                      <Typography fontWeight={600} gutterBottom sx={{ mt: 3 }}>
-                        Uploaded Documents
-                      </Typography>
-                      <Divider sx={{ mb: 2 }} />
+                      <SectionHeader icon={<AttachFileIcon />} title="Uploaded Documents" />
                       <Box>
                         {formik.values.files.map((file, index) => (
                           <Chip
@@ -1521,40 +1768,48 @@ const AddTrainerIndex = () => {
                   )}
                 </Paper>
               </DialogContent>
-              <DialogActions>
+              <DialogActions sx={{ px: 3, py: 1.5, gap: 1 }}>
+                {dialogMode !== "view" && (
+                  <Button
+                    onClick={() => handleReset(formik.resetForm)}
+                    startIcon={<RotateLeftIcon />}
+                    disabled={loading}
+                    sx={{ textTransform: "none", mr: "auto" }}
+                    color="inherit"
+                  >
+                    Reset form
+                  </Button>
+                )}
                 <Button
-                  size="small"
-                  variant="contained"
-                  color="error"
+                  variant="outlined"
+                  color="inherit"
                   onClick={() => setOpenDialog(false)}
                   disabled={loading}
+                  sx={{ textTransform: "none" }}
                 >
                   {dialogMode === "view" ? "Close" : "Cancel"}
                 </Button>
                 {dialogMode !== "view" && (
                   <>
                     <Button
-                      size="small"
-                      variant="contained"
-                      color="secondary"
-                      onClick={() => handleReset(formik.resetForm)}
-                      startIcon={<RotateLeftIcon />}
-                      disabled={loading}
-                    >
-                      Reset
-                    </Button>
-                    <Button
-                      size="small"
                       type="submit"
                       variant="contained"
                       color="primary"
                       disabled={loading}
+                      sx={{ textTransform: "none", fontWeight: 600, px: 3 }}
+                      startIcon={
+                        loading ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <SaveIcon />
+                        )
+                      }
                     >
                       {loading
                         ? "Saving..."
                         : dialogMode === "add"
-                          ? "Create"
-                          : "Update"}
+                          ? "Save Trainer"
+                          : "Update Trainer"}
                     </Button>
                   </>
                 )}
@@ -1571,30 +1826,44 @@ const AddTrainerIndex = () => {
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to delete &quot;{trainerToDelete?.name}&quot;?
+        <DialogContent sx={{ textAlign: "center", pt: 4 }}>
+          <Avatar
+            sx={{
+              mx: "auto",
+              mb: 2,
+              width: 52,
+              height: 52,
+              bgcolor: (theme) => alpha(theme.palette.error.main, 0.1),
+              color: "error.main",
+            }}
+          >
+            <WarningAmberIcon />
+          </Avatar>
+          <Typography variant="h6" fontWeight={600} gutterBottom>
+            Delete trainer?
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            This action cannot be undone.
+          <Typography variant="body2" color="text.secondary">
+            <strong>{trainerToDelete?.name}</strong> will be removed from your
+            trainer list. You can add them again later with the same CID or
+            work permit number.
           </Typography>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1, justifyContent: "center" }}>
           <Button
-            variant="contained"
-            size="small"
-            color="secondary"
+            variant="outlined"
+            color="inherit"
             onClick={handleCancelDelete}
+            sx={{ textTransform: "none", minWidth: 110 }}
           >
             Cancel
           </Button>
           <Button
             onClick={handleConfirmDelete}
             color="error"
-            size="small"
             variant="contained"
             disabled={loading}
+            sx={{ textTransform: "none", minWidth: 110 }}
+            startIcon={<DeleteIcon />}
           >
             Delete
           </Button>

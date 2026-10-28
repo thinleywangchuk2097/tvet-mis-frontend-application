@@ -212,6 +212,8 @@ const HoverMenu = ({ item, onItemClick, navBtnSx, activeBtnSx }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const timerRef = useRef(null);
   const isOpen = Boolean(anchorEl);
+  // the card's arrow points at the middle of the parent menu button
+  const arrowLeft = anchorEl ? Math.round(anchorEl.offsetWidth / 2) : 24;
 
   const handleEnter = (e) => {
     clearTimeout(timerRef.current);
@@ -256,15 +258,27 @@ const HoverMenu = ({ item, onItemClick, navBtnSx, activeBtnSx }) => {
             onMouseLeave: scheduleClose,
             sx: {
               pointerEvents: "auto",
-              mt: 0,
+              mt: "11px", // room for the arrow
               minWidth: 270,
               borderRadius: "0 0 10px 10px",
               borderTop: `3px solid ${TEAL}`,
               boxShadow: "0 10px 36px rgba(0,0,0,0.22)",
-              overflow: "hidden",
+              overflow: "visible", // let the arrow show above the card
+              // arrow pointing up to the parent menu
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                top: -13,
+                left: arrowLeft,
+                transform: "translateX(-50%)",
+                borderLeft: "10px solid transparent",
+                borderRight: "10px solid transparent",
+                borderBottom: `10px solid ${TEAL}`,
+              },
             },
           },
-          list: { sx: { p: 0 } },
+          // keep the rounded bottom corners now that the card itself doesn't clip
+          list: { sx: { p: 0, borderRadius: "0 0 10px 10px", overflow: "hidden" } },
         }}
         disableAutoFocus
         disableAutoFocusItem

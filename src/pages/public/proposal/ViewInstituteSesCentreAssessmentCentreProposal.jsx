@@ -47,6 +47,18 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
   const [typeOfOwners, setTypeOfOwners] = useState([]);
   const [serviceName, setServiceName] = useState();
   const [serviceId, setServiceId] = useState();
+  const isSES = Number(serviceId) === 34;
+  const isAssessmentCentre = Number(serviceId) === 35;
+  const profileTitle = isSES
+    ? "Supplementary Education Service Centre Profile"
+    : isAssessmentCentre
+      ? "Assessment Center Profile"
+      : "Training Provider Profile";
+  const proposedNameLabel = isSES
+    ? "Proposed SES Name"
+    : isAssessmentCentre
+      ? "Proposed Assessment Center Name"
+      : "Proposed Institute Name";
 
   // Editable fields state
   const [editableData, setEditableData] = useState({
@@ -314,8 +326,8 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
           mobileNo: editableData.mobile_no,
           emailId: editableData.email_id,
           sectorId: editableData.sector_id,
-          courseId: editableData.course_id,
-          activityLevelId: editableData.activity_level_id,
+          courseId: isSES ? null : editableData.course_id,
+          activityLevelId: isSES ? null : editableData.activity_level_id,
         }),
       };
 
@@ -839,7 +851,7 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
           }}
         >
           <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            Training Provider Profile
+            {profileTitle}
           </Typography>
           <Divider sx={{ mb: 3 }} />
           <Grid container spacing={3}>
@@ -848,8 +860,7 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
                 fullWidth
                 label={
                   <span>
-                    Proposed Institute Name{" "}
-                    <span style={{ color: "red" }}>*</span>
+                    {proposedNameLabel} <span style={{ color: "red" }}>*</span>
                   </span>
                 }
                 size="small"
@@ -869,8 +880,7 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
                 fullWidth
                 label={
                   <span>
-                    Institute Location (Dzongkhag){" "}
-                    <span style={{ color: "red" }}>*</span>
+                    Location (Dzongkhag) <span style={{ color: "red" }}>*</span>
                   </span>
                 }
                 size="small"
@@ -972,66 +982,72 @@ const ViewInstituteSesCentreAssessmentCentreProposal = () => {
               </TextField>
             </Grid>
 
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                select
-                fullWidth
-                label={
-                  <span>
-                    Course <span style={{ color: "red" }}>*</span>
-                  </span>
-                }
-                size="small"
-                value={editableData.course_id}
-                onChange={(e) =>
-                  handleEditableChange("course_id", e.target.value)
-                }
-                disabled={!editableData.sector_id}
-              >
-                <MenuItem value="">
-                  {!editableData.sector_id
-                    ? "Select sector first"
-                    : courses.length === 0
-                      ? "No courses available"
-                      : "Select Course"}
-                </MenuItem>
-                {courses.map((course) => (
-                  <MenuItem key={course.id} value={course.id}>
-                    {course.occupationName || course.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
+            {/* Course & Activity Level not shown for SES (34) */}
+            {!isSES && (
+              <>
+                <Grid item size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    label={
+                      <span>
+                        Course <span style={{ color: "red" }}>*</span>
+                      </span>
+                    }
+                    size="small"
+                    value={editableData.course_id}
+                    onChange={(e) =>
+                      handleEditableChange("course_id", e.target.value)
+                    }
+                    disabled={!editableData.sector_id}
+                  >
+                    <MenuItem value="">
+                      {!editableData.sector_id
+                        ? "Select sector first"
+                        : courses.length === 0
+                          ? "No courses available"
+                          : "Select Course"}
+                    </MenuItem>
+                    {courses.map((course) => (
+                      <MenuItem key={course.id} value={course.id}>
+                        {course.occupationName || course.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
 
-            <Grid item size={{ xs: 12, md: 4 }}>
-              <TextField
-                select
-                fullWidth
-                label={
-                  <span>
-                    Activity Level <span style={{ color: "red" }}>*</span>
-                  </span>
-                }
-                size="small"
-                value={editableData.activity_level_id}
-                onChange={(e) =>
-                  handleEditableChange("activity_level_id", e.target.value)
-                }
-              >
-                {activityLevels.map((level) => (
-                  <MenuItem key={level.id} value={level.id}>
-                    {level.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
+                <Grid item size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    label={
+                      <span>
+                        Activity Level <span style={{ color: "red" }}>*</span>
+                      </span>
+                    }
+                    size="small"
+                    value={editableData.activity_level_id}
+                    onChange={(e) =>
+                      handleEditableChange("activity_level_id", e.target.value)
+                    }
+                  >
+                    {activityLevels.map((level) => (
+                      <MenuItem key={level.id} value={level.id}>
+                        {level.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+              </>
+            )}
           </Grid>
         </Paper>
 
         {/* Supporting Documents */}
         <Paper sx={{ p: 3, mb: 4 }}>
           <Typography fontWeight={600} sx={{ mb: 2 }}>
-            Supporting Documents ({documents.length + newDocuments.length})
+            Supporting Documents{isSES ? " (optional)" : ""} (
+            {documents.length + newDocuments.length})
           </Typography>
           <Divider sx={{ mb: 3 }} />
 

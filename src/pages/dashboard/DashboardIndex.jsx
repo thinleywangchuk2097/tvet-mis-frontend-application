@@ -8,7 +8,9 @@ import ACSLevel1Dashboard from "./ACSLevel1Dashboard";
 import ApproverBQPCADashboard from "./ApproverBQPCADashboard";
 import TvetDataManagerFocalDashboard from "./TvetDataManagerFocalDashboard";
 import DWPS1Dashboard from "./DWPS1Dashboard";
-import Level2Dashboard from "./Level2Dashboard";
+import TVETQCDashboard from "./TVETQCDashboard";
+import SESCentreDashboard from "./SESCentreDashboard";
+
 const DashboardIndex = () => {
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
 
@@ -29,8 +31,10 @@ const DashboardIndex = () => {
       return <TvetDataManagerFocalDashboard />;
     case "21": //dwps1 role ID
       return <DWPS1Dashboard />;
-    case "22": //Level 2 role ID
-      return <Level2Dashboard />;
+    case "22": //TVET QC role ID
+      return <TVETQCDashboard />;
+    case "28": //SESCentre role ID
+      return <SESCentreDashboard />;
     default:
       return <DefaultDashboard />; // for default or common roles
   }

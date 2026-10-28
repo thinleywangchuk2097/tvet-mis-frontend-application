@@ -29,7 +29,9 @@ import {
   Stack,
   Autocomplete,
   Tooltip,
+  Avatar,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import BusinessIcon from "@mui/icons-material/Business";
 import SchoolIcon from "@mui/icons-material/School";
@@ -62,23 +64,30 @@ const SERVICE_CODE_MAP = {
   4: 100582,
 };
 
-const TABLE_STYLE = {
-  border: "1px solid",
-  borderColor: "divider",
+// Bordered, compact checklist table (same look as the CMFG monitoring checklist)
+const CHECKLIST_TABLE = {
+  borderCollapse: "collapse",
   "& th, & td": {
     border: "1px solid",
     borderColor: "divider",
-    height: 28,
-    padding: "0px 6px",
-    fontSize: "0.80rem",
-    lineHeight: 1.2,
+    py: 0.5,
+    px: 1,
+    fontSize: "0.8rem",
+    lineHeight: 1.3,
     verticalAlign: "middle",
   },
   "& th": {
+    py: 0.75,
     fontWeight: 600,
-    backgroundColor: "#fafafa",
+    color: "text.secondary",
+    textTransform: "uppercase",
+    fontSize: "0.72rem",
+    letterSpacing: 0.4,
+    bgcolor: "#fafafa",
+    whiteSpace: "nowrap",
   },
 };
+
 
 const ViewInstituteSesCentreAssessmentCentre = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
@@ -1044,29 +1053,87 @@ const ViewInstituteSesCentreAssessmentCentre = () => {
   };
 
   const renderChecklist = useCallback(
-    (standard) => {
-      // Check if user is REC (role 23) - make readonly
+    (standard, sectionIndex = 0) => {
+      // REC (role 23) sees the checklist read-only
       const isReadOnly = currentRoleId == 23;
+      const answered = standard.rows.filter(
+        (r) => qualityResponses[standard.id]?.[r.id],
+      ).length;
+      const noCount = standard.rows.filter(
+        (r) => qualityResponses[standard.id]?.[r.id] === "N",
+      ).length;
+      const complete = answered === standard.rows.length;
+      const sectionNo = sectionIndex + 1;
+
+      const readOnlyTip = (child) => (
+        <Tooltip title="This field is read-only for REC members" arrow>
+          <span>{child}</span>
+        </Tooltip>
+      );
 
       return (
         <Grid size={{ xs: 12 }} key={standard.id}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
-              {standard.title}
-            </Typography>
+          <Paper
+            variant="outlined"
+            sx={{ borderRadius: 1.5, mb: 1.5, overflow: "hidden" }}
+          >
+            {/* Section header */}
+            <Box
+              sx={{
+                px: 1.5,
+                py: 0.75,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                bgcolor: (t) => alpha(t.palette.primary.main, 0.05),
+                borderBottom: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <Avatar
+                sx={{
+                  width: 22,
+                  height: 22,
+                  fontSize: "0.72rem",
+                  bgcolor: "primary.main",
+                }}
+              >
+                {sectionNo}
+              </Avatar>
+              <Typography fontWeight={600} fontSize="0.9rem" sx={{ flex: 1 }}>
+                {standard.title}
+              </Typography>
+              {noCount > 0 && (
+                <Chip
+                  size="small"
+                  color="error"
+                  variant="outlined"
+                  label={`${noCount} No`}
+                  sx={{ height: 20, fontSize: "0.7rem" }}
+                />
+              )}
+              <Chip
+                size="small"
+                color={complete ? "success" : "default"}
+                variant={complete ? "filled" : "outlined"}
+                label={`${answered}/${standard.rows.length}`}
+                sx={{ height: 20, fontSize: "0.7rem" }}
+              />
+            </Box>
+
             <TableContainer>
-              <Table size="small" sx={TABLE_STYLE}>
+              <Table size="small" sx={CHECKLIST_TABLE}>
                 <TableHead>
                   <TableRow>
-                    <TableCell width="40">Sl. No</TableCell>
-                    <TableCell>Quality Indicator</TableCell>
-                    <TableCell align="center" width="80">
-                      YES
+                    <TableCell sx={{ width: 64 }}>No.</TableCell>
+                    <TableCell>Quality indicator</TableCell>
+                    <TableCell align="center" sx={{ width: 52 }}>
+                      Yes
                     </TableCell>
-                    <TableCell align="center" width="80">
-                      NO
+                    <TableCell align="center" sx={{ width: 52 }}>
+                      No
                     </TableCell>
-                    <TableCell width="250">Remarks</TableCell>
+                    <TableCell sx={{ width: "28%" }}>Remarks</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1076,98 +1143,75 @@ const ViewInstituteSesCentreAssessmentCentre = () => {
                     const isYes = selectedValue === "Y";
                     const isNo = selectedValue === "N";
                     const remark = qualityRemarks[standard.id]?.[row.id] || "";
+
+                    const yesRadio = (
+                      <Radio
+                        size="small"
+                        color="success"
+                        sx={{ p: 0.25, "& svg": { fontSize: 18 } }}
+                        checked={isYes}
+                        disabled={isReadOnly}
+                        onChange={() =>
+                          handleQualityResponseChange(
+                            standard.id,
+                            row.id,
+                            isYes ? undefined : "Y",
+                          )
+                        }
+                      />
+                    );
+                    const noRadio = (
+                      <Radio
+                        size="small"
+                        color="error"
+                        sx={{ p: 0.25, "& svg": { fontSize: 18 } }}
+                        checked={isNo}
+                        disabled={isReadOnly}
+                        onChange={() =>
+                          handleQualityResponseChange(
+                            standard.id,
+                            row.id,
+                            isNo ? undefined : "N",
+                          )
+                        }
+                      />
+                    );
+
                     return (
-                      <TableRow key={row.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell>{row.value}</TableCell>
-                        <TableCell align="center">
-                          {isReadOnly ? (
-                            <Tooltip
-                              title="This field is read-only for REC members"
-                              arrow
-                            >
-                              <span>
-                                <Radio
-                                  size="small"
-                                  sx={{ p: 0.25 }}
-                                  checked={isYes}
-                                  disabled={true}
-                                />
-                              </span>
-                            </Tooltip>
-                          ) : (
-                            <Radio
-                              size="small"
-                              sx={{ p: 0.25 }}
-                              checked={isYes}
-                              onChange={() => {
-                                const newValue = isYes ? undefined : "Y";
-                                handleQualityResponseChange(
-                                  standard.id,
-                                  row.id,
-                                  newValue,
-                                );
-                              }}
-                            />
-                          )}
+                      <TableRow
+                        key={row.id}
+                        sx={{
+                          bgcolor: (t) =>
+                            isNo ? alpha(t.palette.error.main, 0.04) : "inherit",
+                        }}
+                      >
+                        <TableCell
+                          sx={{ color: "text.secondary", whiteSpace: "nowrap" }}
+                        >
+                          {sectionNo}.{index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <Typography fontSize="0.8rem">{row.value}</Typography>
                         </TableCell>
                         <TableCell align="center">
-                          {isReadOnly ? (
-                            <Tooltip
-                              title="This field is read-only for REC members"
-                              arrow
-                            >
-                              <span>
-                                <Radio
-                                  size="small"
-                                  sx={{ p: 0.25 }}
-                                  checked={isNo}
-                                  disabled={true}
-                                />
-                              </span>
-                            </Tooltip>
-                          ) : (
-                            <Radio
-                              size="small"
-                              sx={{ p: 0.25 }}
-                              checked={isNo}
-                              onChange={() => {
-                                const newValue = isNo ? undefined : "N";
-                                handleQualityResponseChange(
-                                  standard.id,
-                                  row.id,
-                                  newValue,
-                                );
-                              }}
-                            />
-                          )}
+                          {isReadOnly ? readOnlyTip(yesRadio) : yesRadio}
+                        </TableCell>
+                        <TableCell align="center">
+                          {isReadOnly ? readOnlyTip(noRadio) : noRadio}
                         </TableCell>
                         <TableCell>
                           {isReadOnly ? (
-                            <Tooltip
-                              title="This field is read-only for REC members"
-                              arrow
-                            >
-                              <TextField
-                                fullWidth
-                                size="small"
-                                placeholder="Enter remarks"
-                                value={remark}
-                                slotProps={{
-                                  input: {
-                                    readOnly: true,
-                                    sx: { fontSize: "0.75rem" },
-                                  },
-                                }}
-                                multiline
-                                rows={2}
-                              />
-                            </Tooltip>
+                            <Typography fontSize="0.8rem" color="text.secondary">
+                              {remark || "—"}
+                            </Typography>
                           ) : (
                             <TextField
                               fullWidth
                               size="small"
-                              placeholder="Enter remarks"
+                              variant="standard"
+                              placeholder={
+                                isNo ? "Explain why (recommended)" : "Optional"
+                              }
                               value={remark}
                               onChange={(e) =>
                                 handleQualityRemarkChange(
@@ -1176,13 +1220,11 @@ const ViewInstituteSesCentreAssessmentCentre = () => {
                                   e.target.value,
                                 )
                               }
-                              slotProps={{
-                                input: {
-                                  sx: { fontSize: "0.75rem" },
-                                },
-                              }}
                               multiline
-                              rows={2}
+                              maxRows={3}
+                              slotProps={{
+                                input: { sx: { fontSize: "0.8rem" } },
+                              }}
                             />
                           )}
                         </TableCell>

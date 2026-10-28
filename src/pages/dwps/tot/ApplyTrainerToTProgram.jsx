@@ -24,6 +24,7 @@ import {
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import SchoolIcon from "@mui/icons-material/School";
 import SendIcon from "@mui/icons-material/Send";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import TotService from "../../../api/services/internal/tot/TotService";
@@ -54,6 +55,12 @@ const trainerTablePropTypes = {
   onSelectAllTrainers: PropTypes.func.isRequired,
   onApplyTrainers: PropTypes.func.isRequired,
   loading: PropTypes.bool,
+  submitting: PropTypes.bool,
+  appliedInfo: PropTypes.shape({
+    applicationNo: PropTypes.string,
+    appliedAt: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    trainerIds: PropTypes.array,
+  }),
 };
 
 // ==================== TRAINER TABLE COMPONENT ====================
@@ -65,7 +72,11 @@ const TrainerTable = ({
   onSelectAllTrainers,
   onApplyTrainers,
   loading,
+  submitting,
+  appliedInfo,
 }) => {
+  const alreadyApplied = !!appliedInfo;
+  const appliedIds = (appliedInfo?.trainerIds ?? []).map(String);
   const [trainerPage, setTrainerPage] = useState(0);
   const [trainerRowsPerPage, setTrainerRowsPerPage] = useState(5);
 
@@ -75,7 +86,11 @@ const TrainerTable = ({
     setTrainerPage(0);
   };
 
-  const currentSelected = selectedTrainers[announcementId] || [];
+  const currentSelected = alreadyApplied
+    ? trainersList
+        .filter((t) => appliedIds.includes(String(t.id)))
+        .map((t) => t.id)
+    : selectedTrainers[announcementId] || [];
 
   const isAllSelected = () => {
     return (
@@ -95,6 +110,20 @@ const TrainerTable = ({
 
   return (
     <Box>
+      {alreadyApplied && (
+        <Alert
+          severity="success"
+          icon={<CheckCircleIcon fontSize="inherit" />}
+          sx={{ mt: 1 }}
+        >
+          Your institute has already applied {appliedIds.length} trainer(s) for
+          this program
+          {appliedInfo?.appliedAt
+            ? ` on ${new Date(appliedInfo.appliedAt).toLocaleDateString("en-GB")}`
+            : ""}
+          . Applied trainers are shown ticked below.
+        </Alert>
+      )}
       <TableContainer component={Paper} variant="outlined" sx={{ mt: 1 }}>
         <Table size="small">
           <TableHead>
@@ -102,6 +131,7 @@ const TrainerTable = ({
               <TableCell padding="checkbox">
                 <Checkbox
                   checked={isAllSelected()}
+                  disabled={alreadyApplied}
                   onChange={(e) => onSelectAllTrainers(announcementId, e)}
                 />
               </TableCell>
@@ -129,12 +159,16 @@ const TrainerTable = ({
                     key={trainer.id}
                     hover
                     selected={isSelected}
-                    sx={{ cursor: "pointer" }}
-                    onClick={() => onSelectTrainer(announcementId, trainer.id)}
+                    sx={{ cursor: alreadyApplied ? "default" : "pointer" }}
+                    onClick={() =>
+                      !alreadyApplied &&
+                      onSelectTrainer(announcementId, trainer.id)
+                    }
                   >
                     <TableCell padding="checkbox">
                       <Checkbox
                         checked={isSelected}
+                        disabled={alreadyApplied}
                         onClick={(e) => e.stopPropagation()}
                         onChange={() =>
                           onSelectTrainer(announcementId, trainer.id)
@@ -203,17 +237,32 @@ const TrainerTable = ({
         }}
       >
         <Typography variant="body2" color="text.secondary">
-          Selected: <strong>{selectedCount}</strong> trainer(s)
+          {alreadyApplied ? "Applied" : "Selected"}:{" "}
+          <strong>{selectedCount}</strong> trainer(s)
         </Typography>
         <Button
           variant="contained"
           color="success"
-          startIcon={<SendIcon />}
+          startIcon={
+            submitting ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : alreadyApplied ? (
+              <CheckCircleIcon />
+            ) : (
+              <SendIcon />
+            )
+          }
           onClick={() => onApplyTrainers(announcementId)}
-          disabled={selectedCount === 0 || loading}
+          disabled={
+            alreadyApplied || submitting || selectedCount === 0 || loading
+          }
           size="small"
         >
-          Apply Selected ({selectedCount})
+          {alreadyApplied
+            ? "Already Applied"
+            : submitting
+              ? "Applying..."
+              : `Apply Selected (${selectedCount})`}
         </Button>
       </Box>
     </Box>
@@ -243,6 +292,8 @@ const ApplyTrainerToTProgram = () => {
   const [statusOptions, setStatusOptions] = useState([]);
   const [instituteId, setInstituteId] = useState(null);
   const [allTrainers, setAllTrainers] = useState([]);
+  // { [applicationNo]: { applicationNo, appliedAt, trainerIds } } for this institute
+  const [appliedMap, setAppliedMap] = useState({});
 
   // Reference data for mapping IDs to names
   const [genders, setGenders] = useState([]);
@@ -272,6 +323,7 @@ const ApplyTrainerToTProgram = () => {
   useEffect(() => {
     if (instituteId) {
       fetchInstituteTrainerDetails();
+      fetchInstituteApplied();
     }
   }, [instituteId]);
 
@@ -342,6 +394,24 @@ const ApplyTrainerToTProgram = () => {
       console.error("Error fetching institute data:", error);
       toast.error("Failed to fetch institute details");
     }
+  };
+
+  // Applications this institute has already submitted (keyed by application no)
+  const fetchInstituteApplied = async () => {
+    if (!instituteId) return;
+    const response = await TotService.getInstituteApplied(
+      instituteId,
+      access_token,
+    );
+    if (response instanceof Error || response?.isAxiosError) {
+      console.error("Error fetching applied programs:", response);
+      return;
+    }
+    const map = {};
+    (response?.data || []).forEach((row) => {
+      if (row?.applicationNo) map[row.applicationNo] = row;
+    });
+    setAppliedMap(map);
   };
 
   const getGenderName = (genderId) => {
@@ -595,7 +665,25 @@ const ApplyTrainerToTProgram = () => {
     );
     const applicationNo = announcement?.applicationNo || null;
 
-    setLoading(true);
+    if (submitting) return; // guard against double click
+    if (appliedMap[applicationNo]) {
+      setSnackbar({
+        open: true,
+        message: "Your institute has already applied for this program",
+        severity: "info",
+      });
+      return;
+    }
+    if (!instituteId) {
+      setSnackbar({
+        open: true,
+        message: "Institute details not loaded yet. Please try again.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setSubmitting(true);
     try {
       // Prepare the payload for ALL selected trainers as a list
       const payload = selected.map((trainerId) => ({
@@ -618,7 +706,17 @@ const ApplyTrainerToTProgram = () => {
         access_token,
       );
 
-      if (response.status === 200 || response.status === 201) {
+      if (response?.response?.status === 409) {
+        // Already applied (e.g. from another tab) - refresh and lock
+        await fetchInstituteApplied();
+        setSnackbar({
+          open: true,
+          message:
+            response.response.data?.message ||
+            "Your institute has already applied for this program",
+          severity: "info",
+        });
+      } else if (response.status === 200 || response.status === 201) {
         const data = response.data;
         setSnackbar({
           open: true,
@@ -628,7 +726,16 @@ const ApplyTrainerToTProgram = () => {
           severity: "success",
         });
 
-        // Clear selection after successful application
+        // Lock this announcement for the institute
+        setAppliedMap((prev) => ({
+          ...prev,
+          [applicationNo]: {
+            applicationNo,
+            programAnnouncementId: announcementId,
+            appliedAt: new Date().toISOString(),
+            trainerIds: selected,
+          },
+        }));
         setSelectedTrainers((prev) => ({
           ...prev,
           [announcementId]: [],
@@ -636,7 +743,10 @@ const ApplyTrainerToTProgram = () => {
       } else {
         setSnackbar({
           open: true,
-          message: response.data?.message || "Failed to apply trainers",
+          message:
+            response?.response?.data?.message ||
+            response?.data?.message ||
+            "Failed to apply trainers",
           severity: "error",
         });
       }
@@ -648,7 +758,7 @@ const ApplyTrainerToTProgram = () => {
         severity: "error",
       });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -814,6 +924,14 @@ const ApplyTrainerToTProgram = () => {
                         </TableCell>
                         <TableCell>{formatDate(item.programEndDate)}</TableCell>
                         <TableCell>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              flexWrap: "wrap",
+                            }}
+                          >
                           <Tooltip
                             title={
                               isExpanded ? "Hide Trainers" : "Load Trainers"
@@ -848,6 +966,18 @@ const ApplyTrainerToTProgram = () => {
                               )}
                             </Button>
                           </Tooltip>
+                          {appliedMap[item.applicationNo] && (
+                            <Chip
+                              size="small"
+                              color="success"
+                              icon={<CheckCircleIcon />}
+                              label={`Applied (${
+                                appliedMap[item.applicationNo].trainerIds
+                                  ?.length ?? 0
+                              })`}
+                            />
+                          )}
+                          </Box>
                         </TableCell>
                       </TableRow>
                       {isExpanded && (
@@ -888,6 +1018,8 @@ const ApplyTrainerToTProgram = () => {
                                   onSelectAllTrainers={handleSelectAllTrainers}
                                   onApplyTrainers={handleApplyTrainers}
                                   loading={loading}
+                                  submitting={submitting}
+                                  appliedInfo={appliedMap[item.applicationNo]}
                                 />
                               )}
                             </Box>

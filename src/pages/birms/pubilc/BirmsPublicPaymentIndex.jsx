@@ -35,6 +35,7 @@ const BirmsPublicPaymentIndex = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState([]);
+  const [searchError, setSearchError] = useState("");
 
   const fetchPaymentDetails = async (paymentAdviceNo) => {
     try {
@@ -42,9 +43,20 @@ const BirmsPublicPaymentIndex = () => {
       setLoading(true);
       const response =
         await BirmsPaymentService.getPaymentByPaymentAdviceNo(paymentAdviceNo);
-      const data = Array.isArray(response.data)
-        ? response.data
-        : [response.data];
+      // The service returns the error object instead of throwing
+      if (response instanceof Error || response?.isAxiosError) {
+        const status = response?.response?.status;
+        if (status === 404) return []; // not found -> "No results" message
+        throw new Error(
+          response?.response?.data?.message ||
+            "Could not check this payment advice right now. Please try again.",
+        );
+      }
+      const raw = response?.data;
+      // A missing advice can come back as an empty body (null); drop empty rows
+      const data = (Array.isArray(raw) ? raw : [raw]).filter(
+        (row) => row && typeof row === "object",
+      );
       setPaymentDetails(data);
       console.log("payment Details:", data);
       return data;
@@ -57,6 +69,7 @@ const BirmsPublicPaymentIndex = () => {
   };
 
   const handleSearch = async () => {
+    setSearchError("");
     if (!searchAdviceNo.trim()) {
       setSearchPerformed(false);
       setPaymentDetails([]);
@@ -70,10 +83,15 @@ const BirmsPublicPaymentIndex = () => {
       setPage(0);
     } catch (error) {
       setPaymentDetails([]);
+      setSearchError(
+        error?.message ||
+          "Could not check this payment advice right now. Please try again.",
+      );
     }
   };
 
   const handleClearSearch = () => {
+    setSearchError("");
     setSearchAdviceNo("");
     setSearchPerformed(false);
     setPaymentDetails([]);
@@ -237,7 +255,15 @@ const BirmsPublicPaymentIndex = () => {
           </Box>
         </Box>
 
-        {searchPerformed && !loading && (
+        {searchPerformed && !loading && searchError && (
+          <Box sx={{ mb: 1.5 }}>
+            <Alert severity="error" sx={{ borderRadius: 1.5, py: 0.5 }}>
+              {searchError}
+            </Alert>
+          </Box>
+        )}
+
+        {searchPerformed && !loading && !searchError && (
           <Box sx={{ mb: 1.5 }}>
             <Alert
               severity={displayData.length > 0 ? "info" : "warning"}
@@ -485,7 +511,7 @@ const BirmsPublicPaymentIndex = () => {
           </TableContainer>
         )}
 
-        {!loading && searchPerformed && displayData.length === 0 && (
+        {!loading && searchPerformed && !searchError && displayData.length === 0 && (
           <Box
             sx={{
               textAlign: "center",

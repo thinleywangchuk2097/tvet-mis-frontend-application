@@ -12,6 +12,21 @@ class BirmsPaymentService {
       .catch((error) => error);
   }
 
+  // Only one institute's payments (institute payment page)
+  getPaymentDetailsByInstituteId(instituteId, token) {
+    return apiClient
+      .get(
+        `/api/v1/private/birms/payment/get-payment-details-by-institute/${instituteId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getAllPaymentDetails(token) {
     return apiClient
       .get(`/api/v1/private/birms/payment/get-all-payment-details`, {

@@ -24,7 +24,10 @@ import {
   Radio,
   FormControl,
   FormLabel,
+  LinearProgress,
+  Tooltip,
 } from "@mui/material";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from "react-toastify";
@@ -534,7 +537,7 @@ const PartnerCard = ({
 PartnerCard.propTypes = partnerCardPropTypes;
 
 // ==================== VALIDATION SCHEMA ====================
-const getValidationSchema = () => {
+const getValidationSchema = (entityLabel = "Institute") => {
   return Yup.object({
     changeType: Yup.string().required("Please select the type of change"),
 
@@ -551,7 +554,8 @@ const getValidationSchema = () => {
 
     proposed_institute_name: Yup.string().when("changeType", {
       is: CHANGE_TYPES.NAME,
-      then: (schema) => schema.required("New institute name is required"),
+      then: (schema) =>
+        schema.required(`New ${entityLabel.toLowerCase()} name is required`),
       otherwise: (schema) => schema.nullable(),
     }),
 
@@ -675,8 +679,11 @@ const getValidationSchema = () => {
 };
 
 // ==================== MAIN COMPONENT ====================
-const InstituteChange = () => {
+// entityLabel: "Institute" (default) or e.g. "SES Centre" -- only changes the wording.
+// designOnly: true = show the full flow but don't send anything to the backend yet.
+const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
   const navigate = useNavigate();
+  const entityLower = entityLabel.toLowerCase();
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
 
@@ -706,7 +713,7 @@ const InstituteChange = () => {
 
   const formik = useFormik({
     initialValues: formValues,
-    validationSchema: getValidationSchema(),
+    validationSchema: getValidationSchema(entityLabel),
     onSubmit: async (values) => {
       setSubmitting(true);
       try {
@@ -750,6 +757,13 @@ const InstituteChange = () => {
           statusId: 115,
           createdBy: actionId,
         };
+
+        if (designOnly) {
+          // Not connected to the backend yet (e.g. SES centre change)
+          console.log(`${entityLabel} change payload (not submitted):`, payload);
+          toast.info(`${entityLabel} change submission is not connected yet.`);
+          return;
+        }
 
         const response =
           await InstituteRegistrationService.submitInstituteChange(payload);
@@ -944,8 +958,8 @@ const InstituteChange = () => {
               <FormTextField
                 formik={formik}
                 name="proposed_institute_name"
-                label="New Institute Name"
-                placeholder="Enter new institute name"
+                label={`New ${entityLabel} Name`}
+                placeholder={`Enter new ${entityLower} name`}
                 required
               />
             </Grid>
@@ -1208,7 +1222,7 @@ const InstituteChange = () => {
             values.proposed_institute_name && (
               <Grid item size={{ xs: 12, md: 4 }}>
                 <Typography variant="body2" color="textSecondary">
-                  New Institute Name:
+                  New {entityLabel} Name:
                 </Typography>
                 <Typography variant="body1">
                   {values.proposed_institute_name}
@@ -1333,6 +1347,42 @@ const InstituteChange = () => {
   const { activeStep } = stepper;
   const isLastStep = activeStep === STEPS.length - 1;
 
+  // ---- Request progress (same rules as the Next / Submit buttons) ----
+  const v = formik.values;
+  const otherErrors = Object.keys(formik.errors).filter(
+    (k) => !["changeType", "reasonForChange", "files"].includes(k),
+  );
+  const reason = (v.reasonForChange || "").trim();
+  const progressSteps = [
+    {
+      label: "Type of change",
+      done: !!v.changeType,
+      detail: v.changeType ? getChangeSummary()[0] || "selected" : "not selected",
+    },
+    {
+      label: "Change details",
+      done: !!v.changeType && hasChanges() && otherErrors.length === 0,
+      detail:
+        !v.changeType
+          ? "select a type first"
+          : otherErrors.length > 0
+            ? `${otherErrors.length} field(s) to fix`
+            : hasChanges()
+              ? "filled"
+              : "not filled",
+    },
+    {
+      label: "Reason",
+      done: reason.length >= 5,
+      detail: reason.length >= 5 ? "provided" : "min. 5 characters",
+    },
+  ];
+  const docCount = v.files?.length || 0;
+  const progressPercent = Math.round(
+    (progressSteps.filter((st) => st.done).length / progressSteps.length) * 100,
+  );
+  const canSubmit = hasChanges() && !!v.reasonForChange;
+
   return (
     <Box sx={{ m: 1 }}>
       <Paper sx={{ p: 2 }}>
@@ -1343,11 +1393,11 @@ const InstituteChange = () => {
             fontWeight="bold"
             sx={{ textDecoration: "underline", fontSize: "1.3rem" }}
           >
-            Request for Institute Change
+            Request for {entityLabel} Change
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            Submit a request to change your institute&apos;s location, name, or
-            ownership details
+            Submit a request to change your {entityLower}&apos;s location, name,
+            or ownership details
           </Typography>
           {registration_no && (
             <Typography
@@ -1361,7 +1411,7 @@ const InstituteChange = () => {
         </Box>
 
         {/* Stepper */}
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+        <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
           {STEPS.map((label) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>
@@ -1369,12 +1419,79 @@ const InstituteChange = () => {
           ))}
         </Stepper>
 
+        {/* Request progress */}
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            mb: 4,
+            borderColor: progressPercent === 100 ? "success.main" : "divider",
+            bgcolor: progressPercent === 100 ? "#f1f8f4" : "#f8fafc",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 1,
+            }}
+          >
+            <Typography fontWeight={600}>Request progress</Typography>
+            <Typography
+              fontWeight={700}
+              color={progressPercent === 100 ? "success.main" : "primary.main"}
+            >
+              {progressPercent}%
+            </Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={progressPercent}
+            color={progressPercent === 100 ? "success" : "primary"}
+            sx={{ height: 8, borderRadius: 4 }}
+          />
+          <Box sx={{ display: "flex", gap: 2.5, mt: 1.25, flexWrap: "wrap" }}>
+            {progressSteps.map((st) => (
+              <Box
+                key={st.label}
+                sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+              >
+                {st.done ? (
+                  <CheckCircleIcon color="success" sx={{ fontSize: 17 }} />
+                ) : (
+                  <RadioButtonUncheckedIcon color="disabled" sx={{ fontSize: 17 }} />
+                )}
+                <Typography variant="caption" fontWeight={600}>
+                  {st.label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  ({st.detail})
+                </Typography>
+              </Box>
+            ))}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              {docCount > 0 ? (
+                <CheckCircleIcon color="success" sx={{ fontSize: 17 }} />
+              ) : (
+                <RadioButtonUncheckedIcon color="disabled" sx={{ fontSize: 17 }} />
+              )}
+              <Typography variant="caption" fontWeight={600}>
+                Documents
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                ({docCount} file(s), optional)
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
+
         {/* Current Institute Information */}
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <SectionHeader
               icon={BusinessIcon}
-              title="Current Institute Information"
+              title={`Current ${entityLabel} Information`}
             />
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={2}>
@@ -1384,7 +1501,7 @@ const InstituteChange = () => {
                   value: instituteData.instituteDetails?.application_no,
                 },
                 {
-                  label: "Institute Name:",
+                  label: `${entityLabel} Name:`,
                   value: instituteData.currentInstituteData?.instituteName,
                 },
                 {
@@ -1521,6 +1638,18 @@ const InstituteChange = () => {
               Cancel
             </Button>
             {isLastStep ? (
+              <Tooltip
+                arrow
+                title={
+                  !canSubmit
+                    ? `Complete: ${progressSteps
+                        .filter((st) => !st.done)
+                        .map((st) => st.label)
+                        .join(", ")}`
+                    : ""
+                }
+              >
+                <span>
               <Button
                 type="button"
                 variant="contained"
@@ -1547,6 +1676,8 @@ const InstituteChange = () => {
               >
                 {submitting ? "Submitting..." : "Submit"}
               </Button>
+                </span>
+              </Tooltip>
             ) : (
               <Button
                 type="button"
@@ -1570,6 +1701,9 @@ const InstituteChange = () => {
 };
 
 // ==================== PROPTYPES FOR MAIN COMPONENT ====================
-InstituteChange.propTypes = {};
+InstituteChange.propTypes = {
+  entityLabel: PropTypes.string,
+  designOnly: PropTypes.bool,
+};
 
 export default InstituteChange;
