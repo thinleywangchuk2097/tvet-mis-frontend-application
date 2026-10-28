@@ -27,6 +27,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import DatahubService from "../../../api/services/external/datahub/DatahubService";
 
 // ===== Validation Schema =====
+// Label of the "proposed name" field per service (UI only; the field stays proposedInstituteName)
+const PROPOSED_NAME_LABELS = {
+  34: "Proposed SES Name",
+  35: "Proposed Assessment Center Name",
+};
+const DEFAULT_PROPOSED_NAME_LABEL = "Proposed Institute Name"; // service 6 and others
+
 const validationSchema = Yup.object({
   ownershipTypeId: Yup.string().required("Ownership Type is required"),
 
@@ -125,6 +132,19 @@ const validationSchema = Yup.object({
   ),
 });
 
+// Supplementary Education Service (SES) Centre proposal
+const SES_SERVICE_ID = 34;
+
+// SES (34): course, activity level and supporting documents are optional
+const getValidationSchema = (serviceId) =>
+  Number(serviceId) === SES_SERVICE_ID
+    ? validationSchema.shape({
+        courseId: Yup.string().nullable(),
+        activityLevelId: Yup.string().nullable(),
+        files: Yup.array(),
+      })
+    : validationSchema;
+
 // ===== Helper: extract name from minimal response =====
 const extractCitizenName = (payload) => {
   if (!payload) return "";
@@ -183,6 +203,11 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
 
   const navigate = useNavigate();
   const { serviceId } = useParams();
+  const proposedNameLabel =
+    PROPOSED_NAME_LABELS[Number(serviceId)] || DEFAULT_PROPOSED_NAME_LABEL;
+  const isSES = Number(serviceId) === SES_SERVICE_ID;
+  console.log("serviceId:", serviceId);
+
   const formikRef = useRef();
 
   useEffect(() => {
@@ -408,7 +433,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       declarationAccepted: false,
     },
 
-    validationSchema,
+    validationSchema: getValidationSchema(serviceId),
     validateOnChange: true,
     validateOnBlur: true,
     onSubmit: async (values, { resetForm }) => {
@@ -684,10 +709,12 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                                   formik.touched.partners &&
                                   formik.errors.partners?.[index]?.citizenId
                                 }
-                                InputProps={{
-                                  endAdornment: fetchingCitizen.partners[
-                                    index
-                                  ] && <CircularProgress size={20} />,
+                                slotProps={{
+                                  input: {
+                                    endAdornment: fetchingCitizen.partners[
+                                      index
+                                    ] && <CircularProgress size={20} />,
+                                  },
                                 }}
                               />
                             </Grid>
@@ -711,12 +738,14 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                                   formik.touched.partners &&
                                   formik.errors.partners?.[index]?.partnerName
                                 }
-                                InputProps={{
-                                  readOnly: true,
-                                  sx: {
-                                    backgroundColor: partner.partnerName
-                                      ? (theme) => theme.palette.action.hover
-                                      : "transparent",
+                                slotProps={{
+                                  input: {
+                                    readOnly: true,
+                                    sx: {
+                                      backgroundColor: partner.partnerName
+                                        ? (theme) => theme.palette.action.hover
+                                        : "transparent",
+                                    },
                                   },
                                 }}
                               />
@@ -785,7 +814,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                               const updated = [...formik.values.partners];
                               updated.splice(index, 1);
                               formik.setFieldValue("partners", updated);
-                              // ✅ Clean up per-index state
+                              //Clean up per-index state
                               const newPartners = {
                                 ...lastLookedUpCid.current.partners,
                               };
@@ -968,7 +997,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                       value={formik.values.promoterCitizenId}
                       onChange={(e) => {
                         formik.handleChange(e);
-                        // ✅ Clear name + cache when CID changes
                         formik.setFieldValue("promoterName", "");
                         lastLookedUpCid.current.promoter = "";
                       }}
@@ -986,10 +1014,12 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                         formik.touched.promoterCitizenId &&
                         formik.errors.promoterCitizenId
                       }
-                      InputProps={{
-                        endAdornment: fetchingCitizen.promoter && (
-                          <CircularProgress size={20} />
-                        ),
+                      slotProps={{
+                        input: {
+                          endAdornment: fetchingCitizen.promoter && (
+                            <CircularProgress size={20} />
+                          ),
+                        },
                       }}
                     />
                   </Grid>
@@ -1011,12 +1041,14 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                         formik.touched.promoterName &&
                         formik.errors.promoterName
                       }
-                      InputProps={{
-                        readOnly: true,
-                        sx: {
-                          backgroundColor: formik.values.promoterName
-                            ? (theme) => theme.palette.action.hover
-                            : "transparent",
+                      slotProps={{
+                        input: {
+                          readOnly: true,
+                          sx: {
+                            backgroundColor: formik.values.promoterName
+                              ? (theme) => theme.palette.action.hover
+                              : "transparent",
+                          },
                         },
                       }}
                     />
@@ -1036,14 +1068,18 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
             }}
           >
             <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-              Training Provider Profile
+              {isSES
+                ? "Supplementary Education Service Centre Profile"
+                : Number(serviceId) === 35
+                  ? "Assessment Center Profile"
+                  : "Training Provider Profile"}
             </Typography>
             <Divider sx={{ mb: 3 }} />
             <Grid container spacing={3}>
               <Grid item size={{ xs: 12, md: 4 }}>
                 <TextField
                   fullWidth
-                  label={requiredLabel("Proposed Institute Name")}
+                  label={requiredLabel(proposedNameLabel)}
                   name="proposedInstituteName"
                   size="small"
                   value={formik.values.proposedInstituteName}
@@ -1055,7 +1091,11 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                   }
                   helperText={
                     formik.touched.proposedInstituteName &&
-                    formik.errors.proposedInstituteName
+                    formik.errors.proposedInstituteName &&
+                    String(formik.errors.proposedInstituteName).replace(
+                      DEFAULT_PROPOSED_NAME_LABEL,
+                      proposedNameLabel,
+                    )
                   }
                 />
               </Grid>
@@ -1064,7 +1104,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                 <TextField
                   select
                   fullWidth
-                  label={requiredLabel("Institute Location (Dzongkhag)")}
+                  label={requiredLabel("Location (Dzongkhag)")}
                   name="dzongkhagId"
                   size="small"
                   value={formik.values.dzongkhagId}
@@ -1179,73 +1219,85 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                 </TextField>
               </Grid>
 
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  select
-                  fullWidth
-                  label={requiredLabel("Course")}
-                  name="courseId"
-                  size="small"
-                  value={formik.values.courseId}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={
-                    formik.touched.courseId && Boolean(formik.errors.courseId)
-                  }
-                  helperText={formik.touched.courseId && formik.errors.courseId}
-                  disabled={!formik.values.sectorId || loadingCourses}
-                  InputProps={{
-                    endAdornment: loadingCourses && (
-                      <CircularProgress size={20} />
-                    ),
-                  }}
-                >
-                  <MenuItem value="">
-                    {loadingCourses ? "Loading courses..." : "Select Course"}
-                  </MenuItem>
-                  {Array.isArray(courses) &&
-                    courses.map((course) => (
-                      <MenuItem key={course.id} value={course.id.toString()}>
-                        {course.occupationName || course.name}
+              {/* not shown for SES (34) */}
+              {!isSES && (
+                <Grid item size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    label={requiredLabel("Course")}
+                    name="courseId"
+                    size="small"
+                    value={formik.values.courseId}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={
+                      formik.touched.courseId && Boolean(formik.errors.courseId)
+                    }
+                    helperText={
+                      formik.touched.courseId && formik.errors.courseId
+                    }
+                    disabled={!formik.values.sectorId || loadingCourses}
+                    slotProps={{
+                      input: {
+                        endAdornment: loadingCourses && (
+                          <CircularProgress size={20} />
+                        ),
+                      },
+                    }}
+                  >
+                    <MenuItem value="">
+                      {loadingCourses ? "Loading courses..." : "Select Course"}
+                    </MenuItem>
+                    {Array.isArray(courses) &&
+                      courses.map((course) => (
+                        <MenuItem key={course.id} value={course.id.toString()}>
+                          {course.occupationName || course.name}
+                        </MenuItem>
+                      ))}
+                  </TextField>
+                </Grid>
+              )}
+
+              {/* not shown for SES (34) */}
+              {!isSES && (
+                <Grid item size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    label={requiredLabel("Activity Level")}
+                    name="activityLevelId"
+                    size="small"
+                    value={formik.values.activityLevelId}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={
+                      formik.touched.activityLevelId &&
+                      Boolean(formik.errors.activityLevelId)
+                    }
+                    helperText={
+                      formik.touched.activityLevelId &&
+                      formik.errors.activityLevelId
+                    }
+                  >
+                    <MenuItem value="">Select</MenuItem>
+                    {activityLevels.map((level) => (
+                      <MenuItem key={level.id} value={level.id.toString()}>
+                        {level.name}
                       </MenuItem>
                     ))}
-                </TextField>
-              </Grid>
-
-              <Grid item size={{ xs: 12, md: 4 }}>
-                <TextField
-                  select
-                  fullWidth
-                  label={requiredLabel("Activity Level")}
-                  name="activityLevelId"
-                  size="small"
-                  value={formik.values.activityLevelId}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={
-                    formik.touched.activityLevelId &&
-                    Boolean(formik.errors.activityLevelId)
-                  }
-                  helperText={
-                    formik.touched.activityLevelId &&
-                    formik.errors.activityLevelId
-                  }
-                >
-                  <MenuItem value="">Select</MenuItem>
-                  {activityLevels.map((level) => (
-                    <MenuItem key={level.id} value={level.id.toString()}>
-                      {level.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
+                  </TextField>
+                </Grid>
+              )}
             </Grid>
           </Paper>
 
           {/* Supporting Documents */}
           <Paper sx={{ p: 3, mb: 4 }}>
             <Typography fontWeight={600} sx={{ mb: 2 }}>
-              {requiredLabel("Supporting Documents")}
+              {isSES
+                ? "Supporting Documents (optional)"
+                : requiredLabel("Supporting Documents")}
             </Typography>
             <Divider sx={{ mb: 3 }} />
             <FileUpload

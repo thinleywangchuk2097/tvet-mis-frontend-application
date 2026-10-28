@@ -219,7 +219,7 @@ const PieBarGraphDistributionIndex = () => {
   const fetchDzongkhags = async () => {
     try {
       const dzongkhagLists = await CommonService.getAllDzongkhags();
-      setDzongkhags(dzongkhagLists.data);
+      setDzongkhags(Array.isArray(dzongkhagLists?.data) ? dzongkhagLists.data : []);
     } catch (error) {
       console.error("Error fetching dzongkhags:", error);
     }
@@ -228,7 +228,7 @@ const PieBarGraphDistributionIndex = () => {
   const fetchInstituteDetails = async () => {
     try {
       const response = await PublicPageService.getAllInstitutes();
-      setInstituteDetails(response.data);
+      setInstituteDetails(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching institute details:", error);
     }
@@ -237,7 +237,7 @@ const PieBarGraphDistributionIndex = () => {
   const fetchCourseBySectorData = async () => {
     try {
       const response = await PublicPageService.getCourseBySector();
-      const transformedData = response.data.map((item) => ({
+      const transformedData = (Array.isArray(response?.data) ? response.data : []).map((item) => ({
         name: item.sector_name,
         value: item.sector_value,
       }));

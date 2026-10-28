@@ -4,6 +4,8 @@ import BusinessIcon from "@mui/icons-material/Business";
 import SchoolIcon from "@mui/icons-material/School";
 import GroupsIcon from "@mui/icons-material/Groups";
 import PublicIcon from "@mui/icons-material/Public";
+import CoPresentIcon from "@mui/icons-material/CoPresent";
+import PublicPageService from "../../api/services/internal/public/PublicPageService";
 
 // ── Brand palette
 const P = "#1565c0";
@@ -69,28 +71,34 @@ const ripple = keyframes`
   }
 `;
 
-// ── Headline stats
+// ── Headline stats (values come from /api/v1/public/data/home-stats)
 const stats = [
   {
-    value: "144",
+    key: "trainingInstitutes",
     label: "Training Institutes",
     icon: <BusinessIcon sx={{ fontSize: 18 }} />,
     color: P,
   },
   {
-    value: "720",
+    key: "programsOffered",
     label: "Programs Offered",
     icon: <SchoolIcon sx={{ fontSize: 18 }} />,
     color: TEAL,
   },
   {
-    value: "6,767",
+    key: "registeredTrainers",
+    label: "Registered Trainers",
+    icon: <CoPresentIcon sx={{ fontSize: 18 }} />,
+    color: "#6a1b9a",
+  },
+  {
+    key: "traineesEnrolled",
     label: "Trainees Enrolled",
     icon: <GroupsIcon sx={{ fontSize: 18 }} />,
     color: "#2e7d32",
   },
   {
-    value: "20",
+    key: "dzongkhagsReached",
     label: "Dzongkhags Reached",
     icon: <PublicIcon sx={{ fontSize: 18 }} />,
     color: "#e65100",
@@ -98,43 +106,74 @@ const stats = [
 ];
 
 const TvetCardsIndex = () => {
-  const [animatedValues, setAnimatedValues] = useState(stats.map(() => 0));
+  // null = not loaded / not available (shown as "—")
+  const [targets, setTargets] = useState(stats.map(() => null));
+  const [animatedValues, setAnimatedValues] = useState(stats.map(() => "—"));
 
-  // Count up animation
+  // Load the figures
   useEffect(() => {
-    const timeouts = stats.map((stat, index) => {
-      const targetValue = parseInt(stat.value.replace(/,/g, ""));
+    let alive = true;
+    PublicPageService.getHomeStats().then((res) => {
+      if (!alive) return;
+      const data =
+        res && !(res instanceof Error) && !res.isAxiosError ? res.data || {} : {};
+      setTargets(
+        stats.map((s) => {
+          const v = data[s.key];
+          return v === null || v === undefined || Number.isNaN(Number(v))
+            ? null
+            : Number(v);
+        }),
+      );
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Count up animation once the figures arrive
+  useEffect(() => {
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    const timers = targets.map((target, index) => {
+      const setAt = (val) =>
+        setAnimatedValues((prev) => {
+          const next = [...prev];
+          next[index] = val;
+          return next;
+        });
+
+      if (target === null) {
+        setAt("—");
+        return null;
+      }
+      if (reduceMotion || target === 0) {
+        setAt(target.toLocaleString());
+        return null;
+      }
+
       const duration = 1500;
       const stepTime = 20;
-      const steps = duration / stepTime;
-      const increment = targetValue / steps;
+      const increment = target / (duration / stepTime);
       let current = 0;
-
       const timer = setInterval(() => {
         current += increment;
-        if (current >= targetValue) {
-          setAnimatedValues((prev) => {
-            const newValues = [...prev];
-            newValues[index] = stat.value;
-            return newValues;
-          });
+        if (current >= target) {
+          setAt(target.toLocaleString());
           clearInterval(timer);
         } else {
-          setAnimatedValues((prev) => {
-            const newValues = [...prev];
-            newValues[index] = Math.floor(current).toLocaleString();
-            return newValues;
-          });
+          setAt(Math.floor(current).toLocaleString());
         }
       }, stepTime);
-
       return timer;
     });
 
     return () => {
-      timeouts.forEach((timer) => timer && clearInterval(timer));
+      timers.forEach((timer) => timer && clearInterval(timer));
     };
-  }, []);
+  }, [targets]);
 
   // Check if stats data is available and not empty
   const hasData = stats && stats.length > 0;
@@ -182,7 +221,7 @@ const TvetCardsIndex = () => {
   return (
     <Grid container spacing={1.5}>
       {stats.map((s, i) => (
-        <Grid key={i} size={{ xs: 6, md: 3 }}>
+        <Grid key={i} size={{ xs: 6, sm: 4, md: 2.4 }}>
           <Box
             sx={{
               bgcolor: "#ffffff",
@@ -267,7 +306,7 @@ const TvetCardsIndex = () => {
                 animation: `${countUp} 0.6s ease-out ${i * 0.1 + 0.3}s both`,
               }}
             >
-              {animatedValues[i] || "0"}
+              {animatedValues[i] ?? "—"}
             </Typography>
 
             <Typography

@@ -1,6 +1,7 @@
 import apiClient from "../../../axios";
 
 class InstituteRegistrationRenewalService {
+  
   resubmitInstitute(values) {
     return apiClient
       .post(`/api/v1/public/institute-registration/submit`, values, {})

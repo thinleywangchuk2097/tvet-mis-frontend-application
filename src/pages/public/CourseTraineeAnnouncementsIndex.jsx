@@ -104,6 +104,8 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
   const positionRef = useRef(0);
   const isPausedRef = useRef(false);
   const startTimeRef = useRef(null);
+  // how many copies of the list are rendered; enough to always fill the banner
+  const [copies, setCopies] = useState(3);
 
   // 2. All useCallback hooks
   const getCourseIcon = useCallback((courseName) => {
@@ -135,8 +137,8 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
   // 3. All useMemo hooks
   const displayItems = useMemo(() => {
     if (announcements.length === 0) return [];
-    return [...announcements, ...announcements, ...announcements];
-  }, [announcements]);
+    return Array.from({ length: copies }, () => announcements).flat();
+  }, [announcements, copies]);
 
   // 4. All useEffect hooks
   useEffect(() => {
@@ -145,11 +147,21 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
 
     if (!container || !content || announcements.length === 0) return;
 
-    // Check if content needs to scroll
-    const contentWidth = content.scrollWidth / 3; // Because we triple the content
+    // Width of one copy of the list
+    const contentWidth = content.scrollWidth / copies;
     const containerWidth = container.clientWidth;
+    if (!contentWidth) return;
 
-    if (contentWidth <= containerWidth) {
+    // Always scroll, also on wide screens where the list is shorter than the
+    // banner: render enough copies to cover the banner plus one copy to loop.
+    const needed = Math.max(3, Math.ceil(containerWidth / contentWidth) + 2);
+    if (needed !== copies) {
+      setCopies(needed);
+      return; // re-runs with the new number of copies
+    }
+
+    // Respect "reduce motion": keep the list still
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
       content.style.transform = "translateX(0)";
       return;
     }
@@ -202,7 +214,7 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
       container.removeEventListener("mouseenter", handleMouseEnter);
       container.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, [announcements]);
+  }, [announcements, copies]);
 
   // 5.  CONDITIONAL RETURN AFTER ALL HOOKS
   if (announcements.length === 0) return null;
@@ -442,8 +454,8 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchCourseAnnouncementDetails = async () => {
     try {
       const response = await CommonService.getAllCourseAnnouncement();
-      console.log("CourseAnnouncementDetails", response.data);
-      setCourseAnnouncementDetails(response.data);
+      console.log("CourseAnnouncementDetails", response?.data);
+      setCourseAnnouncementDetails(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching course announcements:", error);
     }
@@ -452,10 +464,10 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchDropdownData = async () => {
     try {
       const levelsResponse = await CommonService.getAllCertificateLevels();
-      setCertificationLevels(levelsResponse.data);
+      setCertificationLevels(Array.isArray(levelsResponse?.data) ? levelsResponse.data : []);
 
       const fundingResponse = await CommonService.getByParentId(16);
-      setFundingSources(fundingResponse.data);
+      setFundingSources(Array.isArray(fundingResponse?.data) ? fundingResponse.data : []);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
     }
@@ -464,7 +476,7 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchDzongkhags = async () => {
     try {
       const dzongkhagLists = await CommonService.getAllDzongkhags();
-      setDzongkhags(dzongkhagLists.data);
+      setDzongkhags(Array.isArray(dzongkhagLists?.data) ? dzongkhagLists.data : []);
     } catch (error) {
       console.error("Error fetching dzongkhags:", error);
     }

@@ -42,6 +42,8 @@ import { useNavigate } from "react-router-dom";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import PublicPageService from "../../../api/services/internal/public/PublicPageService";
 import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
+import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
+import PropTypes from "prop-types";
 import { exportToExcel } from "@/utils/exportExcel";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import { useFormik } from "formik";
@@ -62,8 +64,11 @@ const generatePAValidationSchema = Yup.object({
   taxPayerName: Yup.string().required("Tax Payer Name is required"),
 });
 
-const BirmsAgencyPaymentIndex = () => {
+// instituteView = true: the logged-in institute's own payments only
+// (no institute filter/column, no Generate PA, no cancel; Pay + receipt download stay).
+const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
   const navigate = useNavigate();
+  const registrationNo = useSelector((state) => state.auth.userId);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -139,7 +144,7 @@ const BirmsAgencyPaymentIndex = () => {
   useEffect(() => {
     fetchPaymentDetails();
     fetchDropdownData();
-    fetchInstitutes();
+    if (!instituteView) fetchInstitutes();
   }, []);
 
   // Apply filters whenever filter criteria or payments change
@@ -150,8 +155,29 @@ const BirmsAgencyPaymentIndex = () => {
   const fetchPaymentDetails = async () => {
     try {
       setLoading(true);
-      const response = await BirmsPaymentService.getAllPaymentDetails(token);
-      const mappedPayments = response.data.map((item, index) => ({
+      let response;
+      if (instituteView) {
+        // Resolve the logged-in institute, then load only its payments
+        const details =
+          await InstituteRegistrationService.getInstituteDetails(registrationNo);
+        const instId = details?.data?.[0]?.institute_id;
+        if (!instId) {
+          toast.error("Institute details not found");
+          setPayments([]);
+          return;
+        }
+        fetchCoursesByInstitute(instId);
+        response = await BirmsPaymentService.getPaymentDetailsByInstituteId(
+          instId,
+          token,
+        );
+      } else {
+        response = await BirmsPaymentService.getAllPaymentDetails(token);
+      }
+      if (response instanceof Error || response?.isAxiosError) {
+        throw response;
+      }
+      const mappedPayments = (response.data || []).map((item, index) => ({
         id: parseInt(item.id) || index + 1,
         payment_no: item.payment_advice_no || `PAY-${Date.now()}-${index}`,
         paymentAdviceNo: item.payment_advice_no,
@@ -314,7 +340,8 @@ const BirmsAgencyPaymentIndex = () => {
     setSelectedCourse("");
     setSelectedStatus("");
     setSearch("");
-    setCourses([]);
+    // the institute view keeps its own course list
+    if (!instituteView) setCourses([]);
   };
 
   const handleChangePage = (event, newPage) => setPage(newPage);
@@ -722,11 +749,12 @@ const BirmsAgencyPaymentIndex = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        Payment Management
+        {instituteView ? "My Payments" : "Payment Management"}
       </Typography>
 
       {/* Filter Section */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
+        {!instituteView && (
         <Grid item size={{ xs: 12, md: 3 }}>
           <FormControl fullWidth size="small">
             <InputLabel>Institute</InputLabel>
@@ -744,15 +772,16 @@ const BirmsAgencyPaymentIndex = () => {
             </Select>
           </FormControl>
         </Grid>
+        )}
 
-        <Grid item size={{ xs: 12, md: 3 }}>
+        <Grid item size={{ xs: 12, md: instituteView ? 4 : 3 }}>
           <FormControl fullWidth size="small">
             <InputLabel>Course</InputLabel>
             <Select
               value={selectedCourse}
               onChange={(e) => setSelectedCourse(e.target.value)}
               label="Course"
-              disabled={!selectedInstitute}
+              disabled={!instituteView && !selectedInstitute}
             >
               <MenuItem value="">All Courses</MenuItem>
               {courses.map((course) => (
@@ -764,7 +793,7 @@ const BirmsAgencyPaymentIndex = () => {
           </FormControl>
         </Grid>
 
-        <Grid item size={{ xs: 12, md: 3 }}>
+        <Grid item size={{ xs: 12, md: instituteView ? 4 : 3 }}>
           <FormControl fullWidth size="small">
             <InputLabel>Status</InputLabel>
             <Select
@@ -782,7 +811,7 @@ const BirmsAgencyPaymentIndex = () => {
           </FormControl>
         </Grid>
 
-        <Grid item size={{ xs: 12, md: 3 }}>
+        <Grid item size={{ xs: 12, md: instituteView ? 4 : 3 }}>
           <TextField
             label="Search"
             variant="outlined"
@@ -805,16 +834,18 @@ const BirmsAgencyPaymentIndex = () => {
             >
               Clear Filters
             </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              onClick={handleOpenGeneratePADialog}
-              startIcon={<SettingsSuggestIcon />}
-              sx={{ textTransform: "none" }}
-            >
-              Generate PA
-            </Button>
+            {!instituteView && (
+              <Button
+                variant="contained"
+                color="primary"
+                size="small"
+                onClick={handleOpenGeneratePADialog}
+                startIcon={<SettingsSuggestIcon />}
+                sx={{ textTransform: "none" }}
+              >
+                Generate PA
+              </Button>
+            )}
             <Button
               variant="contained"
               color="primary"
@@ -840,7 +871,9 @@ const BirmsAgencyPaymentIndex = () => {
                 Payment Advice No.
               </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Reference No</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Institute</TableCell>
+              {!instituteView && (
+                <TableCell sx={{ fontWeight: "bold" }}>Institute</TableCell>
+              )}
               <TableCell sx={{ fontWeight: "bold" }}>Course</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Tax Payer</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
@@ -883,14 +916,16 @@ const BirmsAgencyPaymentIndex = () => {
                           {payment.invoice_no || "N/A"}
                         </Typography>
                       </TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontSize: "0.75rem" }}
-                        >
-                          {payment.institute_name || "N/A"}
-                        </Typography>
-                      </TableCell>
+                      {!instituteView && (
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontSize: "0.75rem" }}
+                          >
+                            {payment.institute_name || "N/A"}
+                          </Typography>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Typography
                           variant="body2"
@@ -1010,7 +1045,7 @@ const BirmsAgencyPaymentIndex = () => {
                             </Tooltip>
                           )}
 
-                          {isPending && (
+                          {isPending && !instituteView && (
                             <Tooltip title="Cancel payment" arrow>
                               <Button
                                 variant="outlined"
@@ -1051,7 +1086,7 @@ const BirmsAgencyPaymentIndex = () => {
                 })
             ) : (
               <TableRow>
-                <TableCell colSpan={11} align="center">
+                <TableCell colSpan={instituteView ? 10 : 11} align="center">
                   <Typography variant="body1" sx={{ py: 3 }}>
                     No payment records found
                   </Typography>
@@ -1637,6 +1672,10 @@ const BirmsAgencyPaymentIndex = () => {
       </Dialog>
     </Paper>
   );
+};
+
+BirmsAgencyPaymentIndex.propTypes = {
+  instituteView: PropTypes.bool,
 };
 
 export default BirmsAgencyPaymentIndex;

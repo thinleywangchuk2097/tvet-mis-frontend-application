@@ -21,6 +21,9 @@ import {
   Radio,
   CircularProgress,
   FormHelperText,
+  LinearProgress,
+  Chip,
+  Tooltip,
 } from "@mui/material";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -100,6 +103,30 @@ const MonitoringAssessmentIndex = () => {
     });
 
     return totalQuestions > 0 && answeredQuestions === totalQuestions;
+  }, [qualityData, qualityResponses]);
+
+  // Checklist progress (answered / yes / no)
+  const qualityStats = useMemo(() => {
+    let total = 0;
+    let answered = 0;
+    let yes = 0;
+    let no = 0;
+    qualityData.forEach((category) =>
+      category.rows.forEach((row) => {
+        total++;
+        const v = qualityResponses[category.id]?.[row.id];
+        if (v) answered++;
+        if (v === "Y") yes++;
+        if (v === "N") no++;
+      }),
+    );
+    return {
+      total,
+      answered,
+      yes,
+      no,
+      percent: total ? Math.round((answered / total) * 100) : 0,
+    };
   }, [qualityData, qualityResponses]);
 
   // Generate validation schema dynamically based on quality data
@@ -559,9 +586,34 @@ const MonitoringAssessmentIndex = () => {
       return (
         <Grid item xs={12} key={standard.id}>
           <Paper sx={{ p: 1.5, border: "1px solid", borderColor: "divider" }}>
-            <Typography sx={{ fontSize: "0.75rem", fontWeight: 600 }} mb={0.5}>
-              {standard.title}
-            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 1,
+                mb: 0.5,
+              }}
+            >
+              <Typography sx={{ fontSize: "0.75rem", fontWeight: 600 }}>
+                {standard.title}
+              </Typography>
+              {(() => {
+                const answered = standard.rows.filter(
+                  (r) => qualityResponses[standard.id]?.[r.id],
+                ).length;
+                const done = answered === standard.rows.length;
+                return (
+                  <Chip
+                    size="small"
+                    label={`${answered}/${standard.rows.length}`}
+                    color={done ? "success" : "default"}
+                    variant={done ? "filled" : "outlined"}
+                    sx={{ height: 20, fontSize: "0.7rem" }}
+                  />
+                );
+              })()}
+            </Box>
             <TableContainer>
               <Table size="small" sx={TABLE_STYLE}>
                 <TableHead>
@@ -919,20 +971,64 @@ const MonitoringAssessmentIndex = () => {
                     (a) => a.institute_id === selectedAssessmentCentre,
                   )?.proposed_institute_name}
               </Typography>
-              <Typography
-                variant="caption"
-                color={isAllRadiosChecked ? "success.main" : "error.main"}
-              >
-                {getProgressText()} {isAllRadiosChecked && "✓"}
-              </Typography>
             </Box>
-            <Typography
-              component="span"
-              color="error"
-              sx={{ mb: 2, display: "block", fontSize: "0.75rem" }}
+
+            {/* Checklist progress */}
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 1.5,
+                mb: 2,
+                borderColor: isAllRadiosChecked ? "success.main" : "divider",
+                bgcolor: isAllRadiosChecked ? "#f1f8f4" : "#f8fafc",
+              }}
             >
-              (All questions must be answered)
-            </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 0.75,
+                  gap: 1,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Typography variant="body2" fontWeight={600}>
+                  Checklist progress
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography
+                    variant="body2"
+                    color={isAllRadiosChecked ? "success.main" : "text.secondary"}
+                  >
+                    {getProgressText()} · {qualityStats.yes} Yes ·{" "}
+                    {qualityStats.no} No
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    fontWeight={700}
+                    color={isAllRadiosChecked ? "success.main" : "primary.main"}
+                  >
+                    {qualityStats.percent}%
+                  </Typography>
+                </Box>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={qualityStats.percent}
+                color={isAllRadiosChecked ? "success" : "primary"}
+                sx={{ height: 8, borderRadius: 4 }}
+              />
+              <Typography
+                component="span"
+                color={isAllRadiosChecked ? "success.main" : "error"}
+                sx={{ mt: 0.75, display: "block", fontSize: "0.75rem" }}
+              >
+                {isAllRadiosChecked
+                  ? "✓ All questions answered — you can submit."
+                  : "(All questions must be answered)"}
+              </Typography>
+            </Paper>
             <Box>{qualityData.map(renderChecklist)}</Box>
           </Box>
         )}
@@ -947,6 +1043,15 @@ const MonitoringAssessmentIndex = () => {
 
         {showChecklist() && qualityData.length > 0 && (
           <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
+            <Tooltip
+              title={
+                !isAllRadiosChecked
+                  ? `Answer all questions first (${qualityStats.answered}/${qualityStats.total})`
+                  : ""
+              }
+              arrow
+            >
+              <span>
             <Button
               type="submit"
               variant="contained"
@@ -963,6 +1068,8 @@ const MonitoringAssessmentIndex = () => {
             >
               {submitting ? "Submitting..." : "Submit"}
             </Button>
+              </span>
+            </Tooltip>
           </Box>
         )}
       </Paper>

@@ -33,7 +33,6 @@ import { useNavigate } from "react-router-dom";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
-import FileUpload from "../../../components/file/FileUpload";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 import NcsService from "../../../api/services/internal/ncs/NcsService";
 
@@ -44,19 +43,13 @@ const RequiredStar = () => (
   </Typography>
 );
 
-// Helper function to convert file to base64
-const fileToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () =>
-      resolve({
-        name: file.name,
-        content: reader.result.split(",")[1],
-        contentType: file.type || "application/octet-stream",
-      });
-    reader.onerror = reject;
-  });
+// Today's date as YYYY-MM-DD in local time (used to block back-dating)
+const todayLocalISO = () => {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+};
 
 const ReAssessmentIndex = () => {
   const navigate = useNavigate();
@@ -309,7 +302,6 @@ const ReAssessmentIndex = () => {
     fundingSourceId: "",
     trainingLocationId: "",
     courseDescription: "",
-    files: [],
   };
 
   const validationSchema = Yup.object().shape({
@@ -323,7 +315,17 @@ const ReAssessmentIndex = () => {
       .required("Total number of trainees required"),
     courseStartDate: Yup.date()
       .typeError("Invalid date")
-      .required("Course Start Date required"),
+      .required("Course Start Date required")
+      .test(
+        "not-back-dated",
+        "Course start date cannot be a past date",
+        (value) => {
+          if (!value) return true;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return new Date(value).setHours(0, 0, 0, 0) >= today.getTime();
+        },
+      ),
     courseEndDate: Yup.date()
       .typeError("Invalid date")
       .required("Course End Date required")
@@ -337,18 +339,11 @@ const ReAssessmentIndex = () => {
     fundingSourceId: Yup.string().required("Funding Source is required"),
     trainingLocationId: Yup.string().required("Training Location is required"),
     courseDescription: Yup.string().required("Course Description is required"),
-    files: Yup.array()
-      .min(1, "Please upload required documents")
-      .max(5, "Maximum 5 files allowed"),
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
     setLoading(true);
     try {
-      const documents = await Promise.all(
-        values.files.map((file) => fileToBase64(file)),
-      );
-
       const payload = {
         instituteId: values.instituteId,
         serviceId: values.reassessmentTypeId,
@@ -364,7 +359,7 @@ const ReAssessmentIndex = () => {
         createdBy: actionId,
         statusId: 55,
         remarks: "",
-        documents: documents,
+        documents: [], // no supporting documents for reassessment
       };
 
       console.log("Submitting payload:", payload);
@@ -855,7 +850,10 @@ const ReAssessmentIndex = () => {
                       value={formik.values.courseStartDate}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
+                      slotProps={{
+                        inputLabel: { shrink: true },
+                        htmlInput: { min: todayLocalISO() },
+                      }}
                       error={
                         formik.touched.courseStartDate &&
                         Boolean(formik.errors.courseStartDate)
@@ -881,7 +879,12 @@ const ReAssessmentIndex = () => {
                       value={formik.values.courseEndDate}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
-                      InputLabelProps={{ shrink: true }}
+                      slotProps={{
+                        inputLabel: { shrink: true },
+                        htmlInput: {
+                          min: formik.values.courseStartDate || todayLocalISO(),
+                        },
+                      }}
                       error={
                         formik.touched.courseEndDate &&
                         Boolean(formik.errors.courseEndDate)
@@ -983,27 +986,6 @@ const ReAssessmentIndex = () => {
                     />
                   </Grid>
 
-                  <Grid item size={{ xs: 12 }}>
-                    <FileUpload
-                      files={formik.values.files}
-                      onFilesChange={(files) => {
-                        formik.setFieldValue("files", files);
-                        setTimeout(() => {
-                          formik.validateField("files");
-                        }, 100);
-                      }}
-                      error={
-                        formik.touched.files && Boolean(formik.errors.files)
-                      }
-                      helperText={formik.touched.files && formik.errors.files}
-                    />
-                    {!formik.touched.files &&
-                      formik.values.files.length === 0 && (
-                        <Typography variant="caption" color="textSecondary">
-                          Please upload required documents (PDF, DOC, etc.)
-                        </Typography>
-                      )}
-                  </Grid>
                 </Grid>
               </DialogContent>
               <DialogActions>

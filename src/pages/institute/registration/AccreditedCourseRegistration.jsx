@@ -25,7 +25,10 @@ import {
   CircularProgress,
   Tooltip,
   Alert,
+  LinearProgress,
 } from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
@@ -651,6 +654,76 @@ const AccreditedCourseRegistration = () => {
     return allAnswered && allYes;
   }, [qualitySelections, qualityData]);
 
+  // Checklist progress (answered / yes / no)
+  const qualityStats = useMemo(() => {
+    let total = 0;
+    let answered = 0;
+    let yes = 0;
+    let no = 0;
+    qualityData.forEach((standard) =>
+      standard.rows.forEach((row) => {
+        total++;
+        const v = qualitySelections[standard.id]?.[row.id];
+        if (v === "Y" || v === "N") answered++;
+        if (v === "Y") yes++;
+        if (v === "N") no++;
+      }),
+    );
+    return {
+      total,
+      answered,
+      yes,
+      no,
+      percent: total ? Math.round((answered / total) * 100) : 0,
+    };
+  }, [qualitySelections, qualityData]);
+
+  // Overall form progress: course details + checklist (all Yes) + documents
+  const COURSE_FIELDS = [
+    "curriculumId",
+    "sectorId",
+    "courseId",
+    "programmeTitle",
+    "feesPerTrainee",
+    "enrolmentCapacity",
+    "leadTrainerCidNo",
+    "leadTrainerName",
+    "genderId",
+    "qualificationId",
+    "professionalExperience",
+  ];
+  const getFormProgress = (values) => {
+    const filled = COURSE_FIELDS.filter(
+      (f) => values?.[f] !== undefined && values?.[f] !== null && String(values[f]).trim() !== "",
+    ).length;
+    const detailsDone = filled === COURSE_FIELDS.length;
+    const checklistDone = areAllQualityStandardsYes;
+    const docsDone = (values?.files?.length || 0) > 0;
+    // weights: details by field, checklist by Yes answers, documents as one step
+    const units = COURSE_FIELDS.length + qualityStats.total + 1;
+    const doneUnits = filled + qualityStats.yes + (docsDone ? 1 : 0);
+    return {
+      percent: units ? Math.round((doneUnits / units) * 100) : 0,
+      steps: [
+        {
+          label: "Course details",
+          done: detailsDone,
+          detail: `${filled}/${COURSE_FIELDS.length} fields`,
+        },
+        {
+          label: "Quality standards",
+          done: checklistDone,
+          detail: `${qualityStats.yes}/${qualityStats.total} Yes`,
+        },
+        {
+          label: "Documents",
+          done: docsDone,
+          detail: `${values?.files?.length || 0} file(s)`,
+        },
+      ],
+    };
+  };
+
   const handleRadioChange = (standardId, rowId, value) => {
     setQualitySelections((prev) => ({
       ...prev,
@@ -674,9 +747,36 @@ const AccreditedCourseRegistration = () => {
             width: "100%",
           }}
         >
-          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
-            {standard.title} <RequiredStar />
-          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1,
+              mb: 1,
+            }}
+          >
+            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }}>
+              {standard.title} <RequiredStar />
+            </Typography>
+            {(() => {
+              const answered = standard.rows.filter(
+                (r) => qualitySelections[standard.id]?.[r.id],
+              ).length;
+              const allYes = standard.rows.every(
+                (r) => qualitySelections[standard.id]?.[r.id] === "Y",
+              );
+              return (
+                <Chip
+                  size="small"
+                  label={`${answered}/${standard.rows.length}`}
+                  color={allYes ? "success" : answered === standard.rows.length ? "warning" : "default"}
+                  variant={answered === standard.rows.length ? "filled" : "outlined"}
+                  sx={{ height: 20, fontSize: "0.7rem" }}
+                />
+              );
+            })()}
+          </Box>
           <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
             <Table
               size="small"
@@ -1297,6 +1397,93 @@ const AccreditedCourseRegistration = () => {
           {(formik) => (
             <Form>
               <DialogContent dividers>
+                {/* Overall application progress */}
+                {dialogMode !== "view" &&
+                  (() => {
+                    const fp = getFormProgress(formik.values);
+                    return (
+                      <Paper
+                        sx={{
+                          p: 2,
+                          mb: 3,
+                          border: "1px solid",
+                          borderColor:
+                            fp.percent === 100 ? "success.main" : "divider",
+                          bgcolor: fp.percent === 100 ? "#f1f8f4" : "#f8fafc",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            mb: 1,
+                          }}
+                        >
+                          <Typography fontWeight={600}>
+                            Application progress
+                          </Typography>
+                          <Typography
+                            fontWeight={700}
+                            color={
+                              fp.percent === 100
+                                ? "success.main"
+                                : "primary.main"
+                            }
+                          >
+                            {fp.percent}%
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={fp.percent}
+                          color={fp.percent === 100 ? "success" : "primary"}
+                          sx={{ height: 8, borderRadius: 4 }}
+                        />
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 2.5,
+                            mt: 1.25,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {fp.steps.map((step) => (
+                            <Box
+                              key={step.label}
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              {step.done ? (
+                                <CheckCircleIcon
+                                  color="success"
+                                  sx={{ fontSize: 17 }}
+                                />
+                              ) : (
+                                <RadioButtonUncheckedIcon
+                                  color="disabled"
+                                  sx={{ fontSize: 17 }}
+                                />
+                              )}
+                              <Typography variant="caption" fontWeight={600}>
+                                {step.label}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                ({step.detail})
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      </Paper>
+                    );
+                  })()}
+
                 {/* Container 1: Basic Information */}
                 <Paper
                   sx={{
@@ -1796,6 +1983,52 @@ const AccreditedCourseRegistration = () => {
                   >
                     Please answer all quality indicator questions below
                   </Typography>
+                  {qualityData.length > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          mb: 0.5,
+                          gap: 1,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Typography variant="body2" fontWeight={600}>
+                          Checklist progress
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color={
+                            areAllQualityStandardsYes
+                              ? "success.main"
+                              : "text.secondary"
+                          }
+                        >
+                          {qualityStats.answered}/{qualityStats.total} answered ·{" "}
+                          {qualityStats.yes} Yes · {qualityStats.no} No
+                        </Typography>
+                      </Box>
+                      <LinearProgress
+                        variant="determinate"
+                        value={qualityStats.percent}
+                        color={
+                          areAllQualityStandardsYes
+                            ? "success"
+                            : qualityStats.no > 0
+                              ? "warning"
+                              : "primary"
+                        }
+                        sx={{ height: 8, borderRadius: 4 }}
+                      />
+                      {dialogMode !== "view" && qualityStats.no > 0 && (
+                        <Alert severity="warning" sx={{ mt: 1, py: 0 }}>
+                          {qualityStats.no} indicator(s) answered No. All quality
+                          indicators must be Yes before you can submit.
+                        </Alert>
+                      )}
+                    </Box>
+                  )}
                   <Grid container spacing={2} sx={{ width: "100%", margin: 0 }}>
                     {qualityData.map(renderChecklist)}
                   </Grid>

@@ -1,53 +1,54 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Button,
   alpha,
   TextField,
   InputAdornment,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Typography,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Chip,
-  Card,
-  CardContent,
   Stack,
   IconButton,
   Container,
   Grid,
+  Paper,
+  CircularProgress,
+  useMediaQuery,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import { Search } from "@mui/icons-material";
-
-import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import CampaignIcon from "@mui/icons-material/Campaign";
-import TrackChangesIcon from "@mui/icons-material/TrackChanges";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import BusinessIcon from "@mui/icons-material/Business";
-import GroupsIcon from "@mui/icons-material/Groups";
-import PublicIcon from "@mui/icons-material/Public";
+import SchoolIcon from "@mui/icons-material/School";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
+import PaymentsIcon from "@mui/icons-material/Payments";
+import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
+import DescriptionIcon from "@mui/icons-material/Description";
+import RateReviewIcon from "@mui/icons-material/RateReview";
+import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
+import InsightsIcon from "@mui/icons-material/Insights";
 
-// ── Imported components
+// ── Sections (content and data unchanged)
 import CourseTraineeAnnouncementsIndex from "./CourseTraineeAnnouncementsIndex";
 import OngoingProgramsIndex from "./OngoingProgramsIndex";
 import PieBarGraphDistributionIndex from "./PieBarGraphDistributionIndex";
 import TvetCardsIndex from "./TvetCardsIndex";
 import TvetIndicatorsInstituteProviderType from "./TvetIndicatorsInstituteProviderType";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
-import CommonService from "../../api/services/internal/common/CommonService";
 
 // ── Slider images
 import slide1 from "../../assets/slider/slide1.jpg";
@@ -59,12 +60,33 @@ import slide6 from "../../assets/slider/slide6.png";
 import slide7 from "../../assets/slider/slide7.png";
 const sliderImages = [slide1, slide2, slide3, slide4, slide5, slide6, slide7];
 
-// ── Brand palette
+// ── Palette: ministry blue + one saffron accent (used only for small markers)
+const NAVY = "#0a2d6e";
+const BLUE = "#1565c0";
+const SAFFRON = "#f2a900";
+const TINT = "#f3f6fb"; // alternate section background
+const LINE = "#dbe5f0";
+// used by the application status table (unchanged from before)
 const P = "#1565c0";
 const PD = "#0a2d6e";
 const PL = "#e8f1fb";
-const W = "#ffffff";
-const TEAL = "#0097a7";
+
+// ── Shared table styles
+const TS = {
+  "& th": {
+    bgcolor: PL,
+    fontWeight: 700,
+    fontSize: "0.77rem",
+    color: PD,
+    whiteSpace: "nowrap",
+  },
+  "& td": {
+    fontSize: "0.8rem",
+  },
+  borderCollapse: "collapse",
+  "& th, & td": { border: "1px solid #c5d5ea", py: 0.85, px: 1.2 },
+  "& tbody tr:hover td": { bgcolor: "#f5f9ff" },
+};
 
 const getStatusColor = (s) => {
   const statusMap = {
@@ -88,23 +110,6 @@ const getStatusLabel = (status) => {
   return labelMap[status?.toLowerCase()] || status || "N/A";
 };
 
-// ── Shared table styles
-const TS = {
-  "& th": {
-    bgcolor: PL,
-    fontWeight: 700,
-    fontSize: "0.77rem",
-    color: PD,
-    whiteSpace: "nowrap",
-  },
-  "& td": {
-    fontSize: "0.8rem",
-  },
-  "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
-  "& tbody tr:hover td": { bgcolor: "#f5f9ff" },
-};
-
-// ── Format date for notification display
 const formatNotificationDate = (dateString) => {
   if (!dateString) return "";
   const date = new Date(dateString);
@@ -115,60 +120,158 @@ const formatNotificationDate = (dateString) => {
   });
 };
 
-// ── Modern section heading
-const SectionTitle = ({ eyebrow, title, subtitle, align = "left" }) => (
-  <Box sx={{ textAlign: align, mb: 3 }}>
-    <Typography
-      sx={{
-        color: P,
-        fontSize: "0.66rem",
-        letterSpacing: 1.4,
-        fontWeight: 800,
-        textTransform: "uppercase",
-        mb: 0.8,
-      }}
-    >
-      {eyebrow}
-    </Typography>
-    <Typography
-      sx={{
-        fontWeight: 800,
-        fontSize: { xs: "1.2rem", md: "1.55rem" },
-        color: "#0a1929",
-        lineHeight: 1.2,
-        mb: 0.8,
-      }}
-    >
-      {title}
-    </Typography>
-    {subtitle && (
-      <Typography
+// Public services shown under the hero (all public routes)
+const SERVICES = [
+  {
+    label: "Apply for a course",
+    desc: "Open programmes taking applications",
+    href: "#course-announcements",
+    icon: <SchoolIcon />,
+  },
+  {
+    label: "RPL assessment",
+    desc: "Get your existing skills certified",
+    href: "/course/apply/rpl-assessment",
+    icon: <WorkspacePremiumIcon />,
+  },
+  {
+    label: "Assessment results",
+    desc: "Check your assessment outcome",
+    href: "/result/assessment-result",
+    icon: <FactCheckIcon />,
+  },
+  {
+    label: "Pay fees",
+    desc: "Pay with a payment advice number",
+    href: "/birms/payment-index",
+    icon: <PaymentsIcon />,
+  },
+];
+
+const RESOURCES = [
+  {
+    label: "National Competency Standards",
+    desc: "Browse NCS documents by sector and qualification level",
+    href: "/reports/ncs-publication",
+    icon: <VerifiedIcon />,
+  },
+  {
+    label: "Curriculum",
+    desc: "Download approved curricula for accredited TVET courses",
+    href: "/reports/curriculum-publication",
+    icon: <MenuBookIcon />,
+  },
+  {
+    label: "Publications",
+    desc: "Reports and publications on TVET in Bhutan",
+    href: "/publication/publication-index",
+    icon: <LibraryBooksIcon />,
+  },
+  {
+    label: "Forms",
+    desc: "Download application and reporting forms",
+    href: "/forms/forms-index",
+    icon: <DescriptionIcon />,
+  },
+  {
+    label: "Give feedback",
+    desc: "Tell us how we can improve TVET services",
+    href: "/feedback/form",
+    icon: <RateReviewIcon />,
+  },
+];
+
+// ── Section wrapper: one consistent width, spacing and header for every block
+const Section = ({ id, title, description, tinted, children, action }) => (
+  <Box
+    component="section"
+    id={id}
+    sx={{
+      bgcolor: tinted ? TINT : "background.paper",
+      py: { xs: 4, md: 5 },
+      scrollMarginTop: 72,
+    }}
+  >
+    {/* full page width, same as the hero image */}
+    <Container maxWidth={false} sx={{ px: { xs: 2, md: 3, lg: 4 } }}>
+      <Box
         sx={{
-          color: "text.secondary",
-          fontSize: "0.85rem",
-          lineHeight: 1.6,
-          maxWidth: 640,
-          mx: align === "center" ? "auto" : undefined,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: 2,
+          flexWrap: "wrap",
+          mb: 2.5,
         }}
       >
-        {subtitle}
-      </Typography>
-    )}
-    <Box
-      sx={{
-        mt: 1.4,
-        height: 3,
-        width: 52,
-        background: `linear-gradient(90deg, ${P}, ${TEAL})`,
-        borderRadius: 2,
-        mx: align === "center" ? "auto" : undefined,
-      }}
-    />
+        <Box sx={{ maxWidth: 720 }}>
+          <Box
+            sx={{
+              width: 28,
+              height: 3,
+              bgcolor: SAFFRON,
+              borderRadius: 2,
+              mb: 1.25,
+            }}
+          />
+          <Typography
+            component="h2"
+            sx={{
+              fontWeight: 700,
+              fontSize: { xs: "1.35rem", md: "1.7rem" },
+              lineHeight: 1.2,
+              color: tinted ? NAVY : "text.primary",
+            }}
+          >
+            {title}
+          </Typography>
+          {description && (
+            <Typography
+              sx={{
+                mt: 0.75,
+                color: "text.secondary",
+                fontSize: "0.95rem",
+                lineHeight: 1.6,
+              }}
+            >
+              {description}
+            </Typography>
+          )}
+        </Box>
+        {action}
+      </Box>
+      {children}
+    </Container>
   </Box>
 );
+Section.propTypes = {
+  id: PropTypes.string,
+  title: PropTypes.node.isRequired,
+  description: PropTypes.node,
+  tinted: PropTypes.bool,
+  children: PropTypes.node,
+  action: PropTypes.node,
+};
+
+// White panel that holds a section's existing component
+const Surface = ({ children, sx }) => (
+  <Paper
+    elevation={0}
+    sx={{
+      border: `1px solid ${LINE}`,
+      borderRadius: 2,
+      p: { xs: 1.5, md: 2.5 },
+      ...sx,
+    }}
+  >
+    {children}
+  </Paper>
+);
+Surface.propTypes = { children: PropTypes.node, sx: PropTypes.object };
 
 // ═══════════════════════════════════════════════════════════════════════════
 const PublicIndex = () => {
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [slide, setSlide] = useState(0);
   const timerRef = useRef(null);
 
@@ -182,88 +285,76 @@ const PublicIndex = () => {
     useState([]);
   const [notificationMessages, setNotificationMessages] = useState([]);
 
-  // Slider auto-advance
-  useEffect(() => {
+  // Slider auto-advance (off when the user prefers reduced motion)
+  const startTimer = useCallback(() => {
+    clearInterval(timerRef.current);
+    if (reduceMotion) return;
     timerRef.current = setInterval(
       () => setSlide((p) => (p + 1) % sliderImages.length),
-      4000,
+      6000,
     );
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    startTimer();
     return () => clearInterval(timerRef.current);
-  }, []);
+  }, [startTimer]);
 
   const goSlide = (d) => {
-    clearInterval(timerRef.current);
     setSlide((p) => (p + d + sliderImages.length) % sliderImages.length);
-    timerRef.current = setInterval(
-      () => setSlide((p) => (p + 1) % sliderImages.length),
-      4000,
-    );
+    startTimer();
   };
 
   useEffect(() => {
+    const fetchCourseAnnounceNotifications = async () => {
+      try {
+        const response =
+          await PublicPageService.getCourseAnnounceNotifications();
+        setCourseAnnounceNotifications(
+          Array.isArray(response?.data) ? response.data : [],
+        );
+      } catch (error) {
+        console.error(
+          "Error fetching course announcement notifications:",
+          error,
+        );
+      }
+    };
     fetchCourseAnnounceNotifications();
   }, []);
 
-  // Process notification messages whenever courseAnnounceNotifications changes
+  // Ticker messages from the open course announcements
   useEffect(() => {
     if (courseAnnounceNotifications.length > 0) {
-      const messages = courseAnnounceNotifications.map((notification) => {
-        const startDate = formatNotificationDate(
-          notification.course_start_date,
-        );
-        const endDate = formatNotificationDate(notification.course_end_date);
-        return `📢 ${notification.course_name} | ${startDate} - ${endDate} | Apply Now!`;
-      });
-      setNotificationMessages(messages);
+      setNotificationMessages(
+        courseAnnounceNotifications.map((n) => {
+          const startDate = formatNotificationDate(n.course_start_date);
+          const endDate = formatNotificationDate(n.course_end_date);
+          return `${n.course_name}: ${startDate} to ${endDate}. Applications open.`;
+        }),
+      );
     } else {
-      // Default messages if no notifications from API
       setNotificationMessages([
-        "New Course Applications open — Apply before 10th March 2026.",
-        "Institute registrations for 2026 are due soon. Complete your profile.",
-        "Check your application status using the search bar above.",
-        "New courses added in Thimphu and Paro locations.",
-        "ToT Certification Workshop in Thimphu — June 5 to 7, 2026.",
+        "Check your application status with your application number above.",
+        "Browse open courses below and apply online.",
       ]);
     }
   }, [courseAnnounceNotifications]);
-
-  const fetchCourseAnnounceNotifications = async () => {
-    try {
-      const response = await PublicPageService.getCourseAnnounceNotifications();
-      setCourseAnnounceNotifications(response.data);
-    } catch (error) {
-      console.error("Error fetching course announcement notifications:", error);
-    }
-  };
 
   const handleTrack = async () => {
     if (!trackQ.trim()) {
       setTrackErr(true);
       return;
     }
-
     setTrackErr(false);
     setTrackLoading(true);
     setTrackRes(null);
-
     try {
       const response = await PublicPageService.trackApplicationStatus(
         trackQ.trim(),
       );
-
-      if (response && response.data) {
-        const applicationData = Array.isArray(response.data)
-          ? response.data[0]
-          : response.data;
-
-        if (applicationData) {
-          setTrackRes(applicationData);
-        } else {
-          setTrackRes(null);
-        }
-      } else {
-        setTrackRes(null);
-      }
+      const data = response?.data;
+      setTrackRes((Array.isArray(data) ? data[0] : data) || null);
       setTrackOpen(true);
     } catch (error) {
       console.error("Error fetching application status:", error);
@@ -274,127 +365,106 @@ const PublicIndex = () => {
     }
   };
 
-  // ── Track Application card (reused — mobile inline & desktop floating)
+  // ── Track application card (in the hero)
   const trackCard = (
-    <Box
+    <Paper
+      elevation={0}
       sx={{
-        bgcolor: alpha(PD, 0.92),
-        backdropFilter: "blur(8px)",
-        borderRadius: 2.5,
-        border: `1px solid ${alpha(W, 0.12)}`,
-        boxShadow: "0 12px 36px rgba(0,0,0,0.4)",
-        p: 2.2,
-        width: { xs: "100%", md: 500 },
+        p: { xs: 2, md: 2.5 },
+        borderRadius: 2,
+        width: { xs: "100%", md: 520 },
+        borderTop: `4px solid ${SAFFRON}`,
+        boxShadow: "0 18px 40px rgba(6, 26, 64, 0.35)",
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.4 }}>
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            bgcolor: alpha("#90caf9", 0.15),
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <TrackChangesIcon sx={{ color: "#90caf9", fontSize: 18 }} />
-        </Box>
-        <Box>
-          <Typography
-            fontWeight={800}
-            sx={{
-              color: W,
-              fontSize: "0.88rem",
-              lineHeight: 1.1,
-            }}
-          >
-            Track Your Application
-          </Typography>
-          <Typography
-            sx={{
-              color: alpha(W, 0.65),
-              fontSize: "0.7rem",
-            }}
-          >
-            Check the status of your submission
-          </Typography>
-        </Box>
-      </Stack>
-      <Box sx={{ display: "flex" }}>
+      <Typography
+        component="h2"
+        fontWeight={700}
+        sx={{ fontSize: "1.05rem", color: NAVY }}
+      >
+        Track your application
+      </Typography>
+      <Typography
+        sx={{ color: "text.secondary", fontSize: "0.85rem", mt: 0.25, mb: 1.5 }}
+      >
+        Enter the application number from your submission.
+      </Typography>
+      <Box
+        component="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleTrack();
+        }}
+        sx={{ display: "flex", gap: 1 }}
+      >
         <TextField
           fullWidth
           size="small"
-          placeholder="Enter Application No."
+          placeholder="Application number"
           value={trackQ}
           onChange={(e) => {
             setTrackQ(e.target.value);
             if (trackErr) setTrackErr(false);
           }}
           error={trackErr}
-          onKeyDown={(e) => e.key === "Enter" && handleTrack()}
+          helperText={trackErr ? "Enter an application number" : undefined}
           slotProps={{
+            htmlInput: { "aria-label": "Application number" },
             input: {
-              sx: {
-                bgcolor: W,
-                borderRadius: "6px 0 0 6px",
-                height: 38,
-                fontSize: "0.82rem",
-              },
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: "#90a4ae", fontSize: 16 }} />
+                  <Search sx={{ fontSize: 18 }} />
                 </InputAdornment>
               ),
             },
           }}
-          sx={{ "& .MuiOutlinedInput-notchedOutline": { border: "none" } }}
         />
         <Button
+          type="submit"
           variant="contained"
-          onClick={handleTrack}
           disabled={trackLoading}
           sx={{
-            borderRadius: "0 6px 6px 0",
-            bgcolor: P,
-            height: 38,
-            px: 2.8,
-            fontSize: "0.78rem",
+            bgcolor: NAVY,
             textTransform: "none",
             fontWeight: 700,
+            px: 2.5,
+            height: 40,
             whiteSpace: "nowrap",
-            "&:hover": { bgcolor: "#0d47a1" },
+            "&:hover": { bgcolor: BLUE },
           }}
         >
-          {trackLoading ? "Searching..." : "Search"}
+          {trackLoading ? (
+            <CircularProgress size={18} sx={{ color: "#fff" }} />
+          ) : (
+            "Track"
+          )}
         </Button>
       </Box>
-    </Box>
+    </Paper>
   );
 
   return (
     <Box
       sx={{
-        bgcolor: "#f7f9fc",
+        bgcolor: "background.default",
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      {/* ── 1. Cinematic Hero ───────────────────────────────────────── */}
+      {/* ── Hero: photographs of TVET in Bhutan, headline, tracker ───── */}
       <Box
+        component="header"
         sx={{
           position: "relative",
-          width: "100%",
-          height: { xs: "auto", md: 440 },
           overflow: "hidden",
+          minHeight: { md: 460 },
         }}
       >
-        {/* Slider images */}
         {sliderImages.map((img, i) => (
           <Box
-            key={i}
+            key={img}
+            aria-hidden
             sx={{
               position: "absolute",
               inset: 0,
@@ -402,455 +472,476 @@ const PublicIndex = () => {
               backgroundSize: "cover",
               backgroundPosition: "center",
               opacity: i === slide ? 1 : 0,
-              transition: "opacity 1.2s ease-in-out",
+              transition: reduceMotion ? "none" : "opacity 1.2s ease-in-out",
             }}
           />
         ))}
-        <Box sx={{ height: { xs: 360, md: "100%" } }} />
-
+        {/* readable side: solid navy on the left fading out to the photo */}
         <Box
+          aria-hidden
           sx={{
             position: "absolute",
             inset: 0,
-            zIndex: 1,
-            background: `linear-gradient(135deg, ${alpha(PD, 0.82)} 0%, ${alpha(P, 0.45)} 50%, ${alpha("#000", 0.35)} 100%)`,
+            background: {
+              xs: alpha(NAVY, 0.86),
+              md: `linear-gradient(90deg, ${alpha(NAVY, 0.94)} 0%, ${alpha(NAVY, 0.82)} 42%, ${alpha(NAVY, 0.25)} 78%, ${alpha(NAVY, 0.1)} 100%)`,
+            },
           }}
         />
 
         <Container
-          maxWidth="xl"
+          maxWidth={false}
           sx={{
-            position: { xs: "static", md: "absolute" },
-            inset: { md: 0 },
-            zIndex: 2,
-            height: { md: "100%" },
+            px: { xs: 2, md: 3, lg: 4 },
+            position: "relative",
+            zIndex: 1,
+            py: { xs: 4, md: 7 },
+            pb: { xs: 4, md: 11 },
             display: "flex",
-            alignItems: "center",
-            pt: { xs: 4, md: 0 },
-            pb: { xs: 4, md: 0 },
+            flexDirection: { xs: "column", md: "row" },
+            alignItems: { md: "center" },
+            justifyContent: "space-between",
+            gap: { xs: 3, md: 4 },
           }}
         >
-          <Box sx={{ width: "100%", position: "relative" }}>
-            <Box sx={{ maxWidth: { xs: "100%", md: "62%" }, pr: { md: 4 } }}>
-              <Typography
-                sx={{
-                  color: "#90caf9",
-                  fontSize: "0.72rem",
-                  letterSpacing: 1.4,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  mb: 1.2,
-                }}
-              >
-                Royal Government of Bhutan
-              </Typography>
-              <Typography
-                sx={{
-                  color: W,
-                  fontWeight: 800,
-                  fontSize: { xs: "1.6rem", md: "2.3rem" },
-                  lineHeight: 1.15,
-                  mb: 1.8,
-                  textShadow: "0 2px 12px rgba(0,0,0,0.35)",
-                }}
-              >
-                Building Bhutan's
-                <br />
-                Skilled Workforce
-              </Typography>
-              <Typography
-                sx={{
-                  color: alpha(W, 0.9),
-                  fontSize: { xs: "0.85rem", md: "0.95rem" },
-                  lineHeight: 1.65,
-                  maxWidth: 560,
-                  mb: 3,
-                }}
-              >
-                The official TVET Management Information System — empowering
-                trainees, training providers and professionals with accredited
-                skills and certifications across all 20 Dzongkhags.
-              </Typography>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  href="#course-announcements"
-                  endIcon={<ArrowForwardIcon sx={{ fontSize: 18 }} />}
-                  sx={{
-                    bgcolor: W,
-                    color: P,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    fontSize: "0.9rem",
-                    px: 3,
-                    py: 1.1,
-                    borderRadius: 2,
-                    boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
-                    "&:hover": {
-                      bgcolor: alpha(W, 0.94),
-                      transform: "translateY(-2px)",
-                      boxShadow: "0 10px 28px rgba(0,0,0,0.4)",
-                    },
-                    transition: "all 0.25s",
-                  }}
-                >
-                  Apply Courses
-                </Button>
-              </Stack>
-            </Box>
-
-            <Box
+          <Box sx={{ maxWidth: 620 }}>
+            <Typography
+              sx={{ color: alpha("#fff", 0.8), fontSize: "0.95rem", mb: 1.25 }}
+            >
+              Ministry of Education and Skills Development
+            </Typography>
+            <Typography
+              component="h1"
               sx={{
-                position: { xs: "relative", md: "absolute" },
-                top: { md: "50%" },
-                right: { md: 0 },
-                transform: { md: "translateY(-50%)" },
-                mt: { xs: 3, md: 0 },
-                display: "flex",
-                justifyContent: "flex-end",
-                width: { xs: "100%", md: "auto" },
-                zIndex: 2,
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: { xs: "2rem", md: "3rem" },
+                lineHeight: 1.08,
+                mb: 2,
               }}
             >
-              {trackCard}
-            </Box>
+              Building Bhutan&apos;s skilled workforce
+            </Typography>
+            <Typography
+              sx={{
+                color: alpha("#fff", 0.88),
+                fontSize: { xs: "0.95rem", md: "1.05rem" },
+                lineHeight: 1.65,
+                maxWidth: 540,
+                mb: 3,
+              }}
+            >
+              Find accredited courses, apply online, get your skills certified
+              and follow your application, across all 20 Dzongkhags.
+            </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <Button
+                variant="contained"
+                size="large"
+                href="#course-announcements"
+                sx={{
+                  bgcolor: SAFFRON,
+                  color: NAVY,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  px: 3,
+                  "&:hover": { bgcolor: "#ffbf2e" },
+                }}
+              >
+                Apply for courses
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                href="/course/apply/rpl-assessment"
+                sx={{
+                  color: "#fff",
+                  borderColor: alpha("#fff", 0.6),
+                  textTransform: "none",
+                  fontWeight: 700,
+                  px: 3,
+                  "&:hover": {
+                    borderColor: "#fff",
+                    bgcolor: alpha("#fff", 0.08),
+                  },
+                }}
+              >
+                Apply for RPL assessment
+              </Button>
+            </Stack>
           </Box>
+
+          {trackCard}
         </Container>
 
-        <IconButton
-          onClick={() => goSlide(-1)}
-          sx={{
-            position: "absolute",
-            left: 10,
-            top: { xs: 180, md: "50%" },
-            transform: "translateY(-50%)",
-            zIndex: 3,
-            bgcolor: alpha(W, 0.2),
-            color: W,
-            display: { xs: "none", md: "inline-flex" },
-            "&:hover": { bgcolor: alpha(W, 0.35) },
-          }}
-        >
-          <KeyboardArrowLeftIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => goSlide(1)}
-          sx={{
-            position: "absolute",
-            right: 10,
-            top: { xs: 180, md: "50%" },
-            transform: "translateY(-50%)",
-            zIndex: 3,
-            bgcolor: alpha(W, 0.2),
-            color: W,
-            display: { xs: "none", md: "inline-flex" },
-            "&:hover": { bgcolor: alpha(W, 0.35) },
-          }}
-        >
-          <KeyboardArrowRightIcon />
-        </IconButton>
+        {/* slide controls */}
         <Stack
           direction="row"
-          spacing={0.8}
+          alignItems="center"
+          spacing={0.5}
           sx={{
             position: "absolute",
-            bottom: 14,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 3,
+            zIndex: 2,
+            right: { xs: 12, md: 24 },
+            bottom: { xs: 8, md: 72 },
             display: { xs: "none", md: "flex" },
           }}
         >
-          {sliderImages.map((_, i) => (
+          <IconButton
+            aria-label="Previous photo"
+            size="small"
+            onClick={() => goSlide(-1)}
+            sx={{
+              color: "#fff",
+              bgcolor: alpha("#000", 0.25),
+              "&:hover": { bgcolor: alpha("#000", 0.4) },
+            }}
+          >
+            <KeyboardArrowLeftIcon fontSize="small" />
+          </IconButton>
+          {sliderImages.map((img, i) => (
             <Box
-              key={i}
-              onClick={() => setSlide(i)}
+              key={img}
+              component="button"
+              type="button"
+              aria-label={`Show photo ${i + 1}`}
+              onClick={() => {
+                setSlide(i);
+                startTimer();
+              }}
               sx={{
-                width: i === slide ? 22 : 8,
+                p: 0,
+                border: 0,
+                width: i === slide ? 20 : 8,
                 height: 8,
                 borderRadius: 4,
-                bgcolor: W,
+                bgcolor: "#fff",
                 opacity: i === slide ? 1 : 0.5,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: reduceMotion ? "none" : "width 0.3s",
               }}
             />
           ))}
+          <IconButton
+            aria-label="Next photo"
+            size="small"
+            onClick={() => goSlide(1)}
+            sx={{
+              color: "#fff",
+              bgcolor: alpha("#000", 0.25),
+              "&:hover": { bgcolor: alpha("#000", 0.4) },
+            }}
+          >
+            <KeyboardArrowRightIcon fontSize="small" />
+          </IconButton>
         </Stack>
       </Box>
 
-      {/* ── 2. Dynamic News Ticker from API ─────────────────────────── */}
-      <Box
+      {/* ── Public services: one panel overlapping the bottom of the hero ── */}
+      <Container
+        maxWidth={false}
         sx={{
-          bgcolor: P,
-          py: 1.1,
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
+          px: { xs: 2, md: 3, lg: 4 },
+          position: "relative",
+          zIndex: 2,
+          mt: { xs: 2, md: -7 },
         }}
       >
-        <Box
+        <Paper
+          elevation={0}
+          component="nav"
+          aria-label="Public services"
           sx={{
-            bgcolor: PD,
-            px: 2.5,
-            py: 0.7,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 0.9,
-          }}
-        >
-          <CampaignIcon sx={{ color: "#90caf9", fontSize: 20 }} />
-        </Box>
-        <Box sx={{ overflow: "hidden", flex: 1, ml: 2 }}>
-          <Box component="style">{`@keyframes tk{from{transform:translateX(100%)}to{transform:translateX(-200%)}}`}</Box>
-          <Typography
-            sx={{
-              display: "inline-block",
-              animation: "tk 45s linear infinite",
-              color: "#e3f2fd",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {notificationMessages.join("   🎯   ")}
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* ── Page body ─────────────────────────────────────────────── */}
-      <Box sx={{ flex: 1 }}>
-        {/* ── 3. TVET by the Numbers ───────────────── */}
-        <Box
-          sx={{
-            position: "relative",
-            py: { xs: 5, md: 4 },
-            background: `
-              radial-gradient(circle at 15% 30%, ${alpha(P, 0.1)} 0%, transparent 45%),
-              radial-gradient(circle at 85% 70%, ${alpha(TEAL, 0.1)} 0%, transparent 45%),
-              linear-gradient(180deg, #f7faff 0%, #eef4fb 100%)
-            `,
+            borderRadius: 2,
+            border: `1px solid ${LINE}`,
+            boxShadow: { md: "0 10px 30px rgba(10, 45, 110, 0.12)" },
             overflow: "hidden",
-            borderTop: `1px solid ${alpha(P, 0.08)}`,
-            borderBottom: `1px solid ${alpha(P, 0.08)}`,
           }}
         >
-          <Box sx={{ px: 2 }}>
-            <SectionTitle
-              align="center"
-              eyebrow="by Numbers"
-              title="TVET at a Glance"
-              subtitle=""
-            />
-            <TvetCardsIndex />
-          </Box>
-        </Box>
-
-        {/* ── 4. National Statistics ─────────────────────────────────── */}
-        <Box sx={{ bgcolor: "#eef3fa", py: { xs: 2, md: 2 } }}>
-          <SectionTitle
-            align="center"
-            eyebrow=""
-            title="Key TVET Indicators"
-            subtitle="Detailed cumulative figures across all sectors — Public, Private and combined totals."
-          />
-          <TvetIndicatorsInstituteProviderType />
-        </Box>
-
-        {/* ── 5. Distribution overview ──────────────────────────────── */}
-        <Box sx={{ bgcolor: "#eef3fa", py: { xs: 2, md: 2 } }}>
-          <Box sx={{ px: 1 }}>
-            <SectionTitle
-              align="center"
-              eyebrow="Distribution Overview"
-              title="Where TVET is happening across Bhutan"
-              subtitle="Program distribution by sector and institute distribution by geographic location."
-            />
-            <PieBarGraphDistributionIndex />
-          </Box>
-        </Box>
-
-        {/* ── 6. Ongoing Programs with Dynamic Data ─── */}
-        <Box sx={{ p: 2 }}>
-          <SectionTitle
-            eyebrow="Active Programs"
-            title="Ongoing Programs"
-            subtitle="Latest program activity across Training Centre."
-          />
-          <Card
-            elevation={0}
-            sx={{
-              border: "1px solid #e3eaf4",
-              borderRadius: 3,
-              bgcolor: "#ffffff",
-            }}
-          >
-            <CardContent>
-              <OngoingProgramsIndex />
-            </CardContent>
-          </Card>
-        </Box>
-
-        {/* ── 7. Course Announcements ──── */}
-        <Box
-          id="course-announcements"
-          sx={{ bgcolor: "#eef3fa", py: { xs: 5, md: 6 } }}
-        >
-          <Box sx={{ px: 2 }}>
-            <SectionTitle
-              eyebrow="Latest Opportunities"
-              title="Course Announcements"
-              subtitle="Open programs accepting applications now — find the right course and apply online."
-            />
-            <Card
-              elevation={0}
-              sx={{
-                border: "1px solid #e3eaf4",
-                borderRadius: 3,
-                bgcolor: W,
-                p: 2.5,
-              }}
-            >
-              <Box
-                sx={{
-                  "& .MuiTable-root": { borderCollapse: "separate" },
-                  "& .MuiTableCell-root": {
-                    fontSize: "0.8rem",
-                    py: 0.85,
-                    px: 1.2,
-                    border: "1px solid #dbe5f0",
-                  },
-                  "& .MuiTableCell-head": {
-                    bgcolor: PL,
-                    fontWeight: 700,
-                    fontSize: "0.77rem",
-                    color: PD,
-                    whiteSpace: "nowrap",
-                  },
-                  "& .MuiTableBody-root tr:hover .MuiTableCell-root": {
-                    bgcolor: "#f5f9ff",
-                  },
-                  "& .MuiChip-root": {
-                    fontSize: "0.65rem",
-                    height: 20,
-                    fontWeight: 700,
-                  },
-                  "& .MuiButton-root": {
-                    fontSize: "0.7rem",
-                    py: 0.4,
-                  },
-                  "& .MuiInputBase-input": {
-                    fontSize: "0.82rem",
-                  },
-                  "& .MuiTablePagination-root": {
-                    fontSize: "0.75rem",
-                  },
-                }}
-              >
-                <CourseTraineeAnnouncementsIndex />
-              </Box>
-            </Card>
-          </Box>
-        </Box>
-
-        {/* ── 8. Quick Access ───────────────────────────────────────── */}
-        <Box sx={{ px: 2, pb: 6, pt: 2 }}>
-          <SectionTitle
-            align="center"
-            eyebrow=""
-            title="Quick Access"
-            subtitle="Frequently used resources for trainees, training providers and TVET professionals."
-          />
-          <Grid container spacing={2}>
-            {[
-              {
-                label: "National Competency Standards",
-                desc: "Browse all NCS documents by sector and qualification level",
-                href: "/reports/ncs-publication",
-                color: P,
-                icon: <VerifiedIcon sx={{ fontSize: 28 }} />,
-              },
-              {
-                label: "Curriculum",
-                desc: "Access and download approved curricula for accredited TVET courses",
-                href: "/reports/curriculum-publication",
-                color: TEAL,
-                icon: <MenuBookIcon sx={{ fontSize: 28 }} />,
-              },
-            ].map((link, i) => (
-              <Grid key={i} size={{ xs: 12, sm: 6 }}>
+          <Grid container>
+            {SERVICES.map((s, i) => (
+              <Grid key={s.href} size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box
                   component="a"
-                  href={link.href}
-                  rel="noreferrer"
-                  sx={{ textDecoration: "none" }}
+                  href={s.href}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                    p: 2,
+                    height: "100%",
+                    textDecoration: "none",
+                    color: "inherit",
+                    borderLeft: { md: i === 0 ? 0 : `1px solid ${LINE}` },
+                    borderTop: { xs: i === 0 ? 0 : `1px solid ${LINE}`, md: 0 },
+                    "&:hover, &:focus-visible": { bgcolor: TINT },
+                    "&:hover .svc-label, &:focus-visible .svc-label": {
+                      color: BLUE,
+                    },
+                    "&:focus-visible": {
+                      outline: `2px solid ${BLUE}`,
+                      outlineOffset: -2,
+                    },
+                  }}
                 >
                   <Box
                     sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      p: 2.2,
-                      border: `1.5px solid ${alpha(link.color, 0.28)}`,
-                      borderRadius: 2.5,
-                      bgcolor: alpha(link.color, 0.04),
-                      transition: "all 0.2s",
-                      "&:hover": {
-                        bgcolor: alpha(link.color, 0.09),
-                        borderColor: link.color,
-                        transform: "translateY(-2px)",
-                        boxShadow: `0 4px 14px ${alpha(link.color, 0.14)}`,
-                      },
+                      width: 42,
+                      height: 42,
+                      flexShrink: 0,
+                      borderRadius: 1.5,
+                      display: "grid",
+                      placeItems: "center",
+                      color: NAVY,
+                      bgcolor: alpha(BLUE, 0.08),
                     }}
                   >
-                    <Box
-                      sx={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: "50%",
-                        bgcolor: alpha(link.color, 0.13),
-                        color: link.color,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
+                    {s.icon}
+                  </Box>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography
+                      className="svc-label"
+                      fontWeight={700}
+                      sx={{ color: NAVY, fontSize: "0.98rem" }}
                     >
-                      {link.icon}
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography
-                        fontWeight={700}
-                        sx={{
-                          color: link.color,
-                          mb: 0.3,
-                        }}
-                      >
-                        {link.label}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "text.secondary",
-                        }}
-                      >
-                        {link.desc}
-                      </Typography>
-                    </Box>
-                    <OpenInNewIcon
-                      sx={{
-                        color: alpha(link.color, 0.45),
-                        fontSize: 18,
-                        flexShrink: 0,
-                      }}
-                    />
+                      {s.label}
+                    </Typography>
+                    <Typography
+                      sx={{ color: "text.secondary", fontSize: "0.82rem" }}
+                    >
+                      {s.desc}
+                    </Typography>
                   </Box>
                 </Box>
               </Grid>
             ))}
           </Grid>
+        </Paper>
+      </Container>
+
+      {/* ── Announcements ticker ─────────────────────────────────────── */}
+      <Container maxWidth={false} sx={{ px: { xs: 2, md: 3, lg: 4 }, mt: 2.5 }}>
+        <Box
+          role="region"
+          aria-label="Announcements"
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            borderRadius: 2,
+            overflow: "hidden",
+            bgcolor: NAVY,
+            "&:hover .ticker-text": { animationPlayState: "paused" },
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+              px: 2,
+              py: 1,
+              bgcolor: SAFFRON,
+              color: NAVY,
+              flexShrink: 0,
+              fontWeight: 700,
+              fontSize: "0.85rem",
+            }}
+          >
+            <CampaignIcon fontSize="small" />
+            Announcements
+          </Box>
+          <Box sx={{ overflow: "hidden", flex: 1, px: 2 }}>
+            <Box component="style">{`@keyframes tvetTicker{from{transform:translateX(100%)}to{transform:translateX(-100%)}}`}</Box>
+            <Typography
+              className="ticker-text"
+              sx={{
+                display: "inline-block",
+                whiteSpace: "nowrap",
+                color: "#e3f2fd",
+                fontSize: "0.9rem",
+                animation: reduceMotion
+                  ? "none"
+                  : "tvetTicker 50s linear infinite",
+              }}
+            >
+              {notificationMessages.join("     •     ")}
+            </Typography>
+          </Box>
         </Box>
+      </Container>
+
+      {/* ── Page body ─────────────────────────────────────────────────── */}
+      <Box sx={{ flex: 1, mt: 1 }}>
+        <Section
+          title="TVET at a glance"
+          description="Current figures for training institutes, programmes, trainers, trainees and Dzongkhags reached."
+        >
+          {/* same outer card as the "TVET Indicators Breakdown" card */}
+          <Paper
+            elevation={0}
+            sx={{
+              border: "1px solid #e3eaf4",
+              borderRadius: 3,
+              bgcolor: "#ffffff",
+              p: 2.5,
+              transition: "all 0.3s ease",
+              "&:hover": {
+                transform: "translateY(-4px)",
+                boxShadow: `0 12px 28px ${alpha(BLUE, 0.12)}`,
+                borderColor: alpha(BLUE, 0.3),
+              },
+            }}
+          >
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.2}
+              sx={{ mb: 2 }}
+            >
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 1.5,
+                  bgcolor: alpha(BLUE, 0.12),
+                  color: BLUE,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <InsightsIcon sx={{ fontSize: 20 }} />
+              </Box>
+              <Box>
+                <Typography
+                  fontWeight={800}
+                  sx={{ fontSize: "0.95rem", color: BLUE }}
+                >
+                  TVET by the numbers
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Training institutes, programmes, trainers, trainees and
+                  Dzongkhags reached
+                </Typography>
+              </Box>
+            </Stack>
+            <TvetCardsIndex />
+          </Paper>
+        </Section>
+
+        <Section
+          id="course-announcements"
+          tinted
+          title="Course announcements"
+          description="Programmes accepting applications now. Find the right course and apply online."
+        >
+          <Surface
+            sx={{
+              "& .MuiTableCell-root": {
+                fontSize: "0.82rem",
+                py: 0.85,
+                px: 1.2,
+                border: `1px solid ${LINE}`,
+              },
+              "& .MuiTableCell-head": {
+                bgcolor: TINT,
+                fontWeight: 700,
+                color: NAVY,
+                whiteSpace: "nowrap",
+              },
+              "& .MuiChip-root": {
+                fontSize: "0.68rem",
+                height: 22,
+                fontWeight: 700,
+              },
+            }}
+          >
+            <CourseTraineeAnnouncementsIndex />
+          </Surface>
+        </Section>
+
+        <Section
+          title="Ongoing programmes"
+          description="Programmes currently running at training providers."
+        >
+          <Surface>
+            <OngoingProgramsIndex />
+          </Surface>
+        </Section>
+
+        <Section
+          tinted
+          title="Key TVET indicators"
+          description="Cumulative figures by provider type: public, private and combined totals."
+        >
+          <TvetIndicatorsInstituteProviderType />
+        </Section>
+
+        <Section
+          title="Where TVET is happening across Bhutan"
+          description="Programmes by sector and training providers by Dzongkhag."
+        >
+          <PieBarGraphDistributionIndex />
+        </Section>
+
+        <Section
+          tinted
+          title="Resources"
+          description="Standards, curricula, publications and forms for trainees, training providers and TVET professionals."
+        >
+          <Grid container spacing={1.5}>
+            {RESOURCES.map((r) => (
+              <Grid key={r.href} size={{ xs: 12, sm: 6, lg: 4 }}>
+                <Box
+                  component="a"
+                  href={r.href}
+                  sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 1.5,
+                    p: 2,
+                    height: "100%",
+                    borderRadius: 2,
+                    bgcolor: "background.paper",
+                    border: `1px solid ${LINE}`,
+                    textDecoration: "none",
+                    color: "inherit",
+                    "&:hover, &:focus-visible": { borderColor: BLUE },
+                    "&:hover .res-label, &:focus-visible .res-label": {
+                      textDecoration: "underline",
+                    },
+                    "&:focus-visible": {
+                      outline: `2px solid ${BLUE}`,
+                      outlineOffset: 2,
+                    },
+                  }}
+                >
+                  <Box sx={{ color: BLUE, mt: 0.25, display: "flex" }}>
+                    {r.icon}
+                  </Box>
+                  <Box>
+                    <Typography
+                      className="res-label"
+                      fontWeight={700}
+                      sx={{ color: NAVY }}
+                    >
+                      {r.label}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        color: "text.secondary",
+                        fontSize: "0.85rem",
+                        mt: 0.25,
+                      }}
+                    >
+                      {r.desc}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </Section>
       </Box>
 
       {/* ── Track Application Modal ── */}
@@ -859,14 +950,14 @@ const PublicIndex = () => {
         onClose={() => setTrackOpen(false)}
         maxWidth="md"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 2.5 } }}
+        PaperProps={{ sx: { borderRadius: 2.5, border: "1px solid #c5d5ea" } }}
       >
         <DialogTitle
           sx={{
             fontWeight: 700,
             fontSize: "0.92rem",
             bgcolor: PL,
-            borderBottom: "1px solid #d4e2f4",
+            borderBottom: "1px solid #c5d5ea",
             py: 1.5,
             px: 3,
             color: PD,
@@ -874,11 +965,12 @@ const PublicIndex = () => {
         >
           Application Status
         </DialogTitle>
-        <DialogContent sx={{ p: 3 }}>
+        {/* MUI removes the top padding of content that follows a title; "&&" restores the gap */}
+        <DialogContent sx={{ p: 3, "&&": { pt: 3 } }}>
           <TableContainer
             component={Paper}
             elevation={0}
-            sx={{ border: "1px solid #d4e2f4", borderRadius: 2 }}
+            sx={{ border: "1px solid #c5d5ea", borderRadius: 2 }}
           >
             <Table sx={TS}>
               <TableHead>

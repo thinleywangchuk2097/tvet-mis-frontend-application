@@ -26,10 +26,11 @@ import {
   Radio,
   Alert,
   Chip,
+  Avatar,
   Card,
   CardContent,
-  Tooltip,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
 import BusinessIcon from "@mui/icons-material/Business";
 import VerifiedIcon from "@mui/icons-material/Verified";
@@ -37,37 +38,38 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
 import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
-import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import PaymentIcon from "@mui/icons-material/Payment";
 import FileDownload from "../../../components/file/FileDownload";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import ApplyNonAccreditedCourseService from "../../../api/services/internal/course/ApplyNonAccreditedCourseService";
 import CommonService from "../../../api/services/internal/common/CommonService";
-import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPaymentService";
 
 // ==================== CONSTANTS ====================
+// Bordered, compact checklist table (same look as the CMFG monitoring checklist)
 const TABLE_STYLE = {
-  border: "1px solid",
-  borderColor: "divider",
+  borderCollapse: "collapse",
   "& th, & td": {
     border: "1px solid",
     borderColor: "divider",
-    height: 28,
-    padding: "0px 6px",
-    fontSize: "0.80rem",
-    lineHeight: 1.2,
+    py: 0.5,
+    px: 1,
+    fontSize: "0.8rem",
+    lineHeight: 1.3,
     verticalAlign: "middle",
   },
   "& th": {
+    py: 0.75,
     fontWeight: 600,
-    backgroundColor: "#fafafa",
+    color: "text.secondary",
+    textTransform: "uppercase",
+    fontSize: "0.72rem",
+    letterSpacing: 0.4,
+    bgcolor: "#fafafa",
+    whiteSpace: "nowrap",
   },
 };
 
-const SERVICE_CODE = 100574;
 const QUALITY_SERVICE_ID = 13;
 const STATUS = {
   VERIFY_QAS1: 56,
@@ -96,6 +98,7 @@ const checklistQuestionPropTypes = {
     value: PropTypes.string,
   }).isRequired,
   index: PropTypes.number.isRequired,
+  sectionNo: PropTypes.number,
   categoryId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
     .isRequired,
   qualityResponses: PropTypes.object.isRequired,
@@ -115,25 +118,11 @@ const checklistCategoryPropTypes = {
       }),
     ),
   }).isRequired,
+  sectionNo: PropTypes.number,
   qualityResponses: PropTypes.object.isRequired,
   qualityRemarks: PropTypes.object.isRequired,
   onResponseChange: PropTypes.func.isRequired,
   onRemarkChange: PropTypes.func.isRequired,
-};
-
-const paymentInfoCardPropTypes = {
-  paymentStatus: PropTypes.shape({
-    paymentAdviceNo: PropTypes.string,
-    refNo: PropTypes.string,
-    taxPayerName: PropTypes.string,
-    paymentStatus: PropTypes.string,
-    paymentDueDate: PropTypes.string,
-    platform: PropTypes.string,
-    totalPayableAmount: PropTypes.number,
-    paymentMode: PropTypes.string,
-    redirectUrl: PropTypes.string,
-  }),
-  onGeneratePayment: PropTypes.func.isRequired,
 };
 
 const tabNavigationPropTypes = {
@@ -425,37 +414,6 @@ const useQualityStandards = (rawQualityData) => {
   };
 };
 
-// usePayment now accepts `enabled` flag
-// When enabled is false (programme type 137), it skips fetching entirely.
-const usePayment = (applicationNo, access_token, enabled = true) => {
-  const [paymentStatus, setPaymentStatus] = useState(null);
-
-  const fetchPaymentStatus = useCallback(async () => {
-    if (!enabled) {
-      setPaymentStatus(null);
-      return;
-    }
-    try {
-      const response = await BirmsPaymentService.getPaymentByApplicationNo(
-        applicationNo,
-        access_token,
-      );
-      setPaymentStatus(response.data);
-    } catch (error) {
-      console.error("Error fetching payment status:", error);
-      setPaymentStatus(null);
-    }
-  }, [applicationNo, access_token, enabled]);
-
-  const isPaymentPaid = useMemo(() => {
-    // When payment is not required (enabled === false), treat as "not blocking"
-    if (!enabled) return true;
-    return paymentStatus?.paymentStatus?.toLowerCase() === "paid";
-  }, [paymentStatus, enabled]);
-
-  return { paymentStatus, fetchPaymentStatus, isPaymentPaid };
-};
-
 const useActionDialog = () => {
   const [open, setOpen] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
@@ -522,6 +480,7 @@ ReadOnlyField.propTypes = readOnlyFieldPropTypes;
 const ChecklistQuestion = ({
   row,
   index,
+  sectionNo,
   categoryId,
   qualityResponses,
   qualityRemarks,
@@ -534,41 +493,50 @@ const ChecklistQuestion = ({
   const remark = qualityRemarks[categoryId]?.[row.id] || "";
 
   return (
-    <TableRow key={row.id}>
-      <TableCell>{index + 1}</TableCell>
-      <TableCell>{row.value}</TableCell>
+    <TableRow
+      sx={{
+        bgcolor: (t) => (isNo ? alpha(t.palette.error.main, 0.04) : "inherit"),
+      }}
+    >
+      <TableCell sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
+        {sectionNo ? `${sectionNo}.${index + 1}` : index + 1}
+      </TableCell>
+      <TableCell>
+        <Typography fontSize="0.8rem">{row.value}</Typography>
+      </TableCell>
       <TableCell align="center">
         <Radio
           size="small"
-          sx={{ p: 0.25 }}
+          color="success"
+          sx={{ p: 0.25, "& svg": { fontSize: 18 } }}
           checked={isYes}
-          onChange={() => {
-            const newValue = isYes ? undefined : "Y";
-            onResponseChange(categoryId, row.id, newValue);
-          }}
+          onChange={() =>
+            onResponseChange(categoryId, row.id, isYes ? undefined : "Y")
+          }
         />
       </TableCell>
       <TableCell align="center">
         <Radio
           size="small"
-          sx={{ p: 0.25 }}
+          color="error"
+          sx={{ p: 0.25, "& svg": { fontSize: 18 } }}
           checked={isNo}
-          onChange={() => {
-            const newValue = isNo ? undefined : "N";
-            onResponseChange(categoryId, row.id, newValue);
-          }}
+          onChange={() =>
+            onResponseChange(categoryId, row.id, isNo ? undefined : "N")
+          }
         />
       </TableCell>
       <TableCell>
         <TextField
           fullWidth
           size="small"
-          placeholder="Enter remarks"
+          variant="standard"
+          placeholder={isNo ? "Explain why (recommended)" : "Optional"}
           value={remark}
           onChange={(e) => onRemarkChange(categoryId, row.id, e.target.value)}
-          slotProps={{ input: { sx: { fontSize: "0.75rem" } } }}
           multiline
-          rows={2}
+          maxRows={3}
+          slotProps={{ input: { sx: { fontSize: "0.8rem" } } }}
         />
       </TableCell>
     </TableRow>
@@ -579,211 +547,106 @@ ChecklistQuestion.propTypes = checklistQuestionPropTypes;
 
 const ChecklistCategory = ({
   standard,
+  sectionNo,
   qualityResponses,
   qualityRemarks,
   onResponseChange,
   onRemarkChange,
-}) => (
-  <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
-      {standard.title}
-    </Typography>
-    <TableContainer>
-      <Table size="small" sx={TABLE_STYLE}>
-        <TableHead>
-          <TableRow>
-            <TableCell width="40">Sl. No</TableCell>
-            <TableCell>Quality Indicator</TableCell>
-            <TableCell align="center" width="80">
-              YES
-            </TableCell>
-            <TableCell align="center" width="80">
-              NO
-            </TableCell>
-            <TableCell width="250">Remarks</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {standard.rows.map((row, index) => (
-            <ChecklistQuestion
-              key={row.id}
-              row={row}
-              index={index}
-              categoryId={standard.id}
-              qualityResponses={qualityResponses}
-              qualityRemarks={qualityRemarks}
-              onResponseChange={onResponseChange}
-              onRemarkChange={onRemarkChange}
-            />
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  </Paper>
-);
-
-ChecklistCategory.propTypes = checklistCategoryPropTypes;
-
-const PaymentInfoCard = ({ paymentStatus, onGeneratePayment }) => {
-  if (paymentStatus) {
-    return (
-      <Card variant="outlined" sx={{ p: 0 }}>
-        <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-          <Grid container spacing={0.5}>
-            {[
-              {
-                label: "Payment Advice No:",
-                value: paymentStatus.paymentAdviceNo,
-              },
-              { label: "Ref No:", value: paymentStatus.refNo },
-              { label: "Tax Payer:", value: paymentStatus.taxPayerName },
-              {
-                label: "Status:",
-                value: paymentStatus.paymentStatus,
-                chip: true,
-                chipColor:
-                  paymentStatus.paymentStatus === "paid"
-                    ? "success"
-                    : "warning",
-              },
-              { label: "Due Date:", value: paymentStatus.paymentDueDate },
-              { label: "Platform:", value: paymentStatus.platform },
-              {
-                label: "Amount:",
-                value: `Nu. ${paymentStatus.totalPayableAmount || "0.00"}`,
-                highlight: true,
-              },
-              {
-                label: "Payment Mode:",
-                value: paymentStatus.paymentMode || "Not yet paid",
-              },
-            ].map((field, idx) => (
-              <Grid key={idx} size={{ xs: 12, sm: 6, md: 3 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    py: 0.25,
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ minWidth: field.chip ? 60 : 70 }}
-                  >
-                    {field.label}
-                  </Typography>
-                  {field.chip ? (
-                    <Chip
-                      label={field.value || "N/A"}
-                      color={field.chipColor}
-                      size="small"
-                      sx={{
-                        height: 20,
-                        fontSize: "0.65rem",
-                        "& .MuiChip-label": { px: 1 },
-                      }}
-                    />
-                  ) : field.highlight ? (
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
-                      color="primary"
-                      sx={{ fontSize: "0.8rem" }}
-                    >
-                      {field.value}
-                    </Typography>
-                  ) : (
-                    <Typography
-                      variant="body2"
-                      fontWeight={500}
-                      sx={{ fontSize: "0.75rem" }}
-                      noWrap
-                    >
-                      {field.value || "N/A"}
-                    </Typography>
-                  )}
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
-          {paymentStatus.redirectUrl && (
-            <Box sx={{ mt: 1.5, display: "flex", justifyContent: "center" }}>
-              <Button
-                variant="contained"
-                color="primary"
-                size="small"
-                startIcon={<PaymentIcon sx={{ fontSize: 18 }} />}
-                onClick={() => window.open(paymentStatus.redirectUrl, "_blank")}
-                sx={{
-                  px: 2.5,
-                  py: 0.5,
-                  fontWeight: 600,
-                  textTransform: "none",
-                  fontSize: "0.75rem",
-                }}
-              >
-                Proceed to Payment
-              </Button>
-            </Box>
-          )}
-          <Alert
-            severity="info"
-            sx={{
-              mt: 1,
-              py: 0.25,
-              "& .MuiAlert-message": { fontSize: "0.7rem", py: 0.25 },
-            }}
-          >
-            PA number already generated. Click above to proceed with payment.
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
+}) => {
+  const rows = standard.rows || [];
+  const answers = qualityResponses[standard.id] || {};
+  const answered = rows.filter((r) => answers[r.id]).length;
+  const noCount = rows.filter((r) => answers[r.id] === "N").length;
+  const complete = rows.length > 0 && answered === rows.length;
 
   return (
-    <Card variant="outlined">
-      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-        <Typography variant="body2" gutterBottom sx={{ fontSize: "0.8rem" }}>
-          Click the button below to generate a PA number and proceed to payment.
-        </Typography>
-        <Box sx={{ mt: 1.5, display: "flex", justifyContent: "center" }}>
-          <Button
-            variant="contained"
-            color="primary"
-            size="small"
-            startIcon={<SettingsSuggestIcon sx={{ fontSize: 18 }} />}
-            onClick={onGeneratePayment}
+    <Paper
+      variant="outlined"
+      sx={{ mb: 2, borderRadius: 1.5, overflow: "hidden" }}
+    >
+      {/* Section header */}
+      <Box
+        sx={{
+          px: 1.5,
+          py: 0.75,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          bgcolor: (t) => alpha(t.palette.primary.main, 0.05),
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        {sectionNo && (
+          <Avatar
             sx={{
-              px: 3,
-              py: 0.5,
-              fontWeight: 600,
-              textTransform: "none",
-              fontSize: "0.75rem",
+              width: 22,
+              height: 22,
+              fontSize: "0.72rem",
+              bgcolor: "primary.main",
             }}
           >
-            Generate PA Number
-          </Button>
-        </Box>
-        <Alert
-          severity="info"
-          sx={{
-            mt: 1.5,
-            py: 0.25,
-            "& .MuiAlert-message": { fontSize: "0.7rem", py: 0.25 },
-          }}
-        >
-          <strong>Note:</strong> This will create a payment request and redirect
-          you to the payment portal.
-        </Alert>
-      </CardContent>
-    </Card>
+            {sectionNo}
+          </Avatar>
+        )}
+        <Typography fontWeight={600} fontSize="0.9rem" sx={{ flex: 1 }}>
+          {standard.title}
+        </Typography>
+        {noCount > 0 && (
+          <Chip
+            size="small"
+            color="error"
+            variant="outlined"
+            label={`${noCount} No`}
+            sx={{ height: 20, fontSize: "0.7rem" }}
+          />
+        )}
+        <Chip
+          size="small"
+          color={complete ? "success" : "default"}
+          variant={complete ? "filled" : "outlined"}
+          label={`${answered}/${rows.length}`}
+          sx={{ height: 20, fontSize: "0.7rem" }}
+        />
+      </Box>
+
+      <TableContainer>
+        <Table size="small" sx={TABLE_STYLE}>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ width: 64 }}>No.</TableCell>
+              <TableCell>Quality indicator</TableCell>
+              <TableCell align="center" sx={{ width: 52 }}>
+                Yes
+              </TableCell>
+              <TableCell align="center" sx={{ width: 52 }}>
+                No
+              </TableCell>
+              <TableCell sx={{ width: "28%" }}>Remarks</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.map((row, index) => (
+              <ChecklistQuestion
+                key={row.id}
+                row={row}
+                index={index}
+                sectionNo={sectionNo}
+                categoryId={standard.id}
+                qualityResponses={qualityResponses}
+                qualityRemarks={qualityRemarks}
+                onResponseChange={onResponseChange}
+                onRemarkChange={onRemarkChange}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
   );
 };
 
-PaymentInfoCard.propTypes = paymentInfoCardPropTypes;
+ChecklistCategory.propTypes = checklistCategoryPropTypes;
 
 // ==================== TAB NAVIGATION COMPONENT ====================
 const TabNavigation = ({
@@ -877,16 +740,8 @@ const ViewNonAccreditedCourseRegistration = () => {
 
   const roleId = currentRoleId?.toString();
 
-  // Determine if this programme requires payment (only type 136 requires it)
+  // Programme type 137 = Non-BQF programme less than 140 hours
   const isLessThan140 = courseDataHook.courseData?.programme_type_id === "137";
-  const isPaymentRequired = !isLessThan140;
-
-  // Pass `enabled` to usePayment so it only fetches when payment is required
-  const paymentHook = usePayment(
-    applicationNo,
-    access_token,
-    isPaymentRequired,
-  );
 
   // Fetch all data on mount
   useEffect(() => {
@@ -910,13 +765,6 @@ const ViewNonAccreditedCourseRegistration = () => {
     };
     loadData();
   }, [applicationNo]);
-
-  // Fetch payment status only when payment is required and course data is loaded
-  useEffect(() => {
-    if (isPaymentRequired && courseDataHook.courseData) {
-      paymentHook.fetchPaymentStatus();
-    }
-  }, [isPaymentRequired, courseDataHook.courseData]);
 
   // Update quality responses when data changes
   useEffect(() => {
@@ -986,32 +834,14 @@ const ViewNonAccreditedCourseRegistration = () => {
     }
   };
 
-  const handlePaymentNavigation = useCallback(() => {
-    if (!courseDataHook.courseData) {
-      toast.error("Course data not found");
-      return;
-    }
-    const data = courseDataHook.courseData;
-    navigate(
-      `/birms/common-payment-index/${data.application_no}/${SERVICE_CODE}/${data.registration_no || "N/A"}/${data.email_id || "N/A"}/${data.mobile_no || "N/A"}/${data.proposed_institute_name || "N/A"}/${data.institute_id || 0}`,
-    );
-  }, [courseDataHook.courseData, navigate]);
-
-  // Tabs: only add "Generate PA Number" tab when payment is required (type 136)
-  const tabs = useMemo(() => {
-    const baseTabs = [
+  const tabs = useMemo(
+    () => [
       { icon: <BusinessIcon />, label: "Programme Information" },
       { icon: <VerifiedIcon />, label: "Quality Standards" },
       { icon: <FileOpenIcon />, label: "Supporting Documents" },
-    ];
-    if (currentRoleId == 7 && isPaymentRequired) {
-      baseTabs.push({
-        icon: <SettingsSuggestIcon />,
-        label: "Generate PA Number",
-      });
-    }
-    return baseTabs;
-  }, [currentRoleId, isPaymentRequired]);
+    ],
+    [],
+  );
 
   const getDialogContent = () => {
     const isRejectAction =
@@ -1080,22 +910,12 @@ const ViewNonAccreditedCourseRegistration = () => {
     <>
       {roleId === "7" && (
         <>
-          <Tooltip
-            title={
-              isPaymentRequired && !paymentHook.isPaymentPaid
-                ? "Payment must be completed before verification"
-                : ""
-            }
-            arrow
-          >
-            <span>
-              <Button
+          <Button
                 variant="contained"
                 color="success"
                 size="small"
                 startIcon={<CheckCircleIcon />}
                 onClick={() => dialogHook.openDialog(STATUS.VERIFY_QAS1)}
-                disabled={isPaymentRequired && !paymentHook.isPaymentPaid}
                 sx={{
                   px: 3,
                   py: 0.5,
@@ -1105,8 +925,6 @@ const ViewNonAccreditedCourseRegistration = () => {
               >
                 Verify
               </Button>
-            </span>
-          </Tooltip>
           <Button
             variant="contained"
             color="error"
@@ -1176,22 +994,12 @@ const ViewNonAccreditedCourseRegistration = () => {
         </Button>
       )}
       {roleId === "22" && (
-        <Tooltip
-          title={
-            isPaymentRequired && !paymentHook.isPaymentPaid
-              ? "Payment must be completed before approval"
-              : ""
-          }
-          arrow
-        >
-          <span>
             <Button
               variant="contained"
               color="success"
               size="small"
               startIcon={<CheckCircleIcon />}
               onClick={() => dialogHook.openDialog(STATUS.APPROVE_DG)}
-              disabled={isPaymentRequired && !paymentHook.isPaymentPaid}
               sx={{
                 px: 3,
                 py: 0.5,
@@ -1201,8 +1009,6 @@ const ViewNonAccreditedCourseRegistration = () => {
             >
               Approve
             </Button>
-          </span>
-        </Tooltip>
       )}
     </>
   );
@@ -1279,29 +1085,17 @@ const ViewNonAccreditedCourseRegistration = () => {
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
-                {/* Programme Type - with tooltip on hover */}
+                {/* Programme Type */}
                 <Grid size={{ xs: 12, md: 3 }}>
-                  <Tooltip
-                    title={
-                      isLessThan140
-                        ? "Non-BQF Programme less than 140 hours — no payment required."
-                        : "Non-BQF Programme more than 140 hours — payment is required before approval."
-                    }
-                    arrow
-                    placement="top"
-                  >
-                    <Box>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Programme Type"
-                        value={courseDataHook.getProgrammeTypeName(
-                          data.programme_type_id,
-                        )}
-                        slotProps={{ input: { readOnly: true } }}
-                      />
-                    </Box>
-                  </Tooltip>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Programme Type"
+                    value={courseDataHook.getProgrammeTypeName(
+                      data.programme_type_id,
+                    )}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
                 </Grid>
                 {/* Curriculum Title - Only show if not less than 140 hours */}
                 {!isLessThan140 && (
@@ -1431,10 +1225,11 @@ const ViewNonAccreditedCourseRegistration = () => {
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid size={{ xs: 12 }}>
                 {qualityHook.qualityData.length > 0 ? (
-                  qualityHook.qualityData.map((standard) => (
+                  qualityHook.qualityData.map((standard, sIdx) => (
                     <ChecklistCategory
                       key={standard.id}
                       standard={standard}
+                      sectionNo={sIdx + 1}
                       qualityResponses={qualityHook.qualityResponses}
                       qualityRemarks={qualityHook.qualityRemarks}
                       onResponseChange={qualityHook.handleQualityResponseChange}
@@ -1488,29 +1283,6 @@ const ViewNonAccreditedCourseRegistration = () => {
             </Grid>
           )}
 
-          {/* Generate PA Number Tab - Only for type 136 */}
-          {currentRoleId == 7 && isPaymentRequired && tabValue === 3 && (
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid size={{ xs: 12 }}>
-                <Paper
-                  sx={{ p: 2, border: "1px solid", borderColor: "divider" }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <AccountBalanceIcon
-                      sx={{ mr: 1, color: "primary.main", fontSize: 20 }}
-                    />
-                    <Typography variant="subtitle1" fontWeight={600}>
-                      Generate PA Number
-                    </Typography>
-                  </Box>
-                  <PaymentInfoCard
-                    paymentStatus={paymentHook.paymentStatus}
-                    onGeneratePayment={handlePaymentNavigation}
-                  />
-                </Paper>
-              </Grid>
-            </Grid>
-          )}
         </TabNavigation>
       </Paper>
 

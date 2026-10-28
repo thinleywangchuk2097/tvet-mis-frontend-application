@@ -45,6 +45,21 @@ class GenerateTracerService {
       .catch((error) => error);
   }
 
+  // Sent surveys + submitted answers of one tracer ({ sends: [], responses: [] })
+  getTracerResponses(application_no, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/tracer/get-tracer-responses/${application_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getTracerDetailsByApplicationNo(application_no, token) {
     return apiClient
       .get(`/api/v1/user/management/tracer/get-tracer/${application_no}`, {

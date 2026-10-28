@@ -102,6 +102,15 @@ const formDateFieldPropTypes = {
   formik: PropTypes.object.isRequired,
   name: PropTypes.string.isRequired,
   label: PropTypes.node.isRequired,
+  min: PropTypes.string,
+};
+
+// Today's date as YYYY-MM-DD in local time (used to block back-dating)
+const todayLocalISO = () => {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
 };
 
 // ==================== CUSTOM HOOKS ====================
@@ -398,7 +407,7 @@ const FormTextField = ({
 
 FormTextField.propTypes = formTextFieldPropTypes;
 
-const FormDateField = ({ formik, name, label }) => (
+const FormDateField = ({ formik, name, label, min }) => (
   <TextField
     type="date"
     fullWidth
@@ -408,7 +417,10 @@ const FormDateField = ({ formik, name, label }) => (
     value={formik.values[name] || ""}
     onChange={formik.handleChange}
     onBlur={formik.handleBlur}
-    InputLabelProps={{ shrink: true }}
+    slotProps={{
+      inputLabel: { shrink: true },
+      htmlInput: min ? { min } : undefined,
+    }}
     error={formik.touched[name] && Boolean(formik.errors[name])}
     helperText={formik.touched[name] && formik.errors[name]}
   />
@@ -553,7 +565,17 @@ const RPLAssessmentIndex = () => {
       .required("Total number of trainees required"),
     applicationStartDate: Yup.date()
       .typeError("Invalid date")
-      .required("Application Start Date required"),
+      .required("Application Start Date required")
+      .test(
+        "not-back-dated",
+        "Application start date cannot be a past date",
+        (value) => {
+          if (!value) return true;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return new Date(value).setHours(0, 0, 0, 0) >= today.getTime();
+        },
+      ),
     applicationEndDate: Yup.date()
       .typeError("Invalid date")
       .required("Application End Date required")
@@ -816,6 +838,7 @@ const RPLAssessmentIndex = () => {
                     <FormDateField
                       formik={formik}
                       name="applicationStartDate"
+                      min={todayLocalISO()}
                       label={
                         <>
                           <RequiredStar /> Application Start Date
@@ -828,6 +851,7 @@ const RPLAssessmentIndex = () => {
                     <FormDateField
                       formik={formik}
                       name="applicationEndDate"
+                      min={formik.values.applicationStartDate || todayLocalISO()}
                       label={
                         <>
                           <RequiredStar /> Application End Date

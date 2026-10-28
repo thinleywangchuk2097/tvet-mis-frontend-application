@@ -27,6 +27,7 @@ import {
   TableHead,
   TableRow,
   Chip,
+  LinearProgress,
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as Yup from "yup";
@@ -40,12 +41,15 @@ import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import DescriptionIcon from "@mui/icons-material/Description";
 import SchoolIcon from "@mui/icons-material/School";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import FileUpload from "../../components/file/FileUpload";
 import { toast } from "react-toastify";
 import CommonService from "../../api/services/internal/common/CommonService";
 import CourseEnrollmentService from "../../api/services/internal/course/CourseEnrollmentService";
 import DatahubService from "../../api/services/external/datahub/DatahubService";
 import BcseaStudentResultService from "../../api/services/external/bcsea/BcseaStudentResultService";
+import GyalsungApiService from "../../api/services/external/gyalsung/GyalsungApiService";
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) =>
@@ -169,6 +173,73 @@ const validationSchema = Yup.object({
   files: Yup.array().min(1, "Please upload your academic mark sheets"),
 });
 
+/* ---------- Progress ---------- */
+// Mirrors the submit rules above: one unit per required field (+1 for documents).
+const isFilled = (v) =>
+  v !== undefined && v !== null && String(v).trim() !== "";
+
+const getFormProgress = (values = {}) => {
+  const personal = [
+    "hasCid",
+    "name",
+    "email",
+    "mobileNo",
+    "traineeTypeId",
+    "employmentStatusId",
+    "academicQualificationId",
+  ];
+  if (values.hasCid === "yes") personal.push("cidNo");
+  if (values.hasCid === "no") personal.push("referenceNo", "genderId");
+
+  const valid = (f) => {
+    const v = values[f];
+    if (!isFilled(v)) return false;
+    if (f === "cidNo") return /^[0-9]{11}$/.test(v);
+    if (f === "mobileNo" || f === "guardianMobileNo")
+      return /^[0-9]{8}$/.test(v);
+    if (f === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    return true;
+  };
+
+  const groups = [
+    { label: "Personal details", fields: personal },
+    { label: "Address", fields: ["presentDzongkhagId", "presentGewogId"] },
+    {
+      label: "Guardian details",
+      fields: [
+        "guardianName",
+        "guardianMobileNo",
+        "guardianOccupationId",
+        "guardianMaritalStatusId",
+      ],
+    },
+  ];
+
+  let units = 0;
+  let done = 0;
+  const steps = groups.map((g) => {
+    const filled = g.fields.filter(valid).length;
+    units += g.fields.length;
+    done += filled;
+    return {
+      label: g.label,
+      done: filled === g.fields.length,
+      detail: `${filled}/${g.fields.length}`,
+    };
+  });
+
+  const docsDone = (values.files?.length || 0) > 0;
+  units += 1;
+  done += docsDone ? 1 : 0;
+  steps.push({
+    label: "Documents",
+    done: docsDone,
+    detail: docsDone ? `${values.files.length} file(s)` : "none",
+  });
+
+  return { percent: units ? Math.round((done / units) * 100) : 0, steps };
+};
+
 /* ---------- Component ---------- */
 
 const ApplyCourse = () => {
@@ -190,6 +261,8 @@ const ApplyCourse = () => {
   const [gewogs, setGewogs] = useState([]);
   const [activeStep, setActiveStep] = useState(0);
   const [academicResults, setAcademicResults] = useState(null);
+  // Gyalsung (National Service) status for the applicant's CID
+  const [gyalsungDetails, setGyalsungDetails] = useState(null);
   const [isDataFromApi, setIsDataFromApi] = useState(false);
   const [hasCheckedAcademicData, setHasCheckedAcademicData] = useState(false);
   const [hasAcademicData, setHasAcademicData] = useState(false);
@@ -333,7 +406,6 @@ const ApplyCourse = () => {
     try {
       const response =
         await BcseaStudentResultService.getBcseaStudentResult(citizenId);
-      console.log("BcseaStudentResult :", response.data);
       if (response.data?.studentresults?.studentresult) {
         const results = response.data.studentresults.studentresult;
 
@@ -409,10 +481,30 @@ const ApplyCourse = () => {
   };
 
   // Function to fetch citizen details from Datahub
+  const fetchGyalsungDetails = async (citizenId) => {
+    const res = await GyalsungApiService.getGyalsungDetails(citizenId);
+    console.log("Gyalsung API response data:", res.data);
+    if (res instanceof Error || res?.isAxiosError || !res?.data) {
+      console.error("Gyalsung lookup failed:", res);
+      setGyalsungDetails(null);
+      return;
+    }
+    const { completed, year, academy, trainingStartDate, trainingEndDate } =
+      res.data;
+    setGyalsungDetails({
+      completed: completed ?? null,
+      year: year ?? null,
+      academy: academy ?? null,
+      trainingStartDate: trainingStartDate ?? null,
+      trainingEndDate: trainingEndDate ?? null,
+    });
+  };
+
   const fetchCitizenDetails = async (citizenId) => {
     if (!citizenId || citizenId.length !== 11) {
       return;
     }
+    setGyalsungDetails(null);
 
     setFetchingCitizen(true);
     setHasCheckedAcademicData(false);
@@ -454,6 +546,9 @@ const ApplyCourse = () => {
         }
 
         toast.success("Citizen details fetched successfully");
+
+        // Gyalsung status (sent with the application)
+        await fetchGyalsungDetails(citizenId);
 
         // Fetch academic results from BCSEA
         await fetchStudentAcademicResults(citizenId);
@@ -698,6 +793,23 @@ const ApplyCourse = () => {
           // The backend expects "traineeMarks" with "subject" and "total"
           traineeMarks: traineeMarks,
           documents: documents,
+          // Gyalsung details (only for applicants with a CID)
+          completed:
+            values.hasCid === "yes"
+              ? (gyalsungDetails?.completed ?? null)
+              : null,
+          year:
+            values.hasCid === "yes" ? (gyalsungDetails?.year ?? null) : null,
+          academy:
+            values.hasCid === "yes" ? (gyalsungDetails?.academy ?? null) : null,
+          trainingStartDate:
+            values.hasCid === "yes"
+              ? (gyalsungDetails?.trainingStartDate ?? null)
+              : null,
+          trainingEndDate:
+            values.hasCid === "yes"
+              ? (gyalsungDetails?.trainingEndDate ?? null)
+              : null,
         };
 
         console.log("payload : ", payload);
@@ -918,6 +1030,73 @@ const ApplyCourse = () => {
           </Card>
         )}
 
+        {/* Overall application progress */}
+        {(() => {
+          const fp = getFormProgress(formik.values);
+          const full = fp.percent === 100;
+          return (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 1.5,
+                mb: 2.5,
+                borderColor: full ? "success.main" : "divider",
+                bgcolor: full ? "#f1f8f4" : "#f8fafc",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 1,
+                }}
+              >
+                <Typography fontWeight={600} fontSize="0.9rem">
+                  Application progress
+                </Typography>
+                <Typography
+                  fontWeight={700}
+                  color={full ? "success.main" : "primary.main"}
+                >
+                  {fp.percent}%
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={fp.percent}
+                color={full ? "success" : "primary"}
+                sx={{ height: 8, borderRadius: 4 }}
+              />
+              <Box
+                sx={{ display: "flex", gap: 2.5, mt: 1.25, flexWrap: "wrap" }}
+              >
+                {fp.steps.map((step) => (
+                  <Box
+                    key={step.label}
+                    sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                  >
+                    {step.done ? (
+                      <CheckCircleIcon color="success" sx={{ fontSize: 17 }} />
+                    ) : (
+                      <RadioButtonUncheckedIcon
+                        color="disabled"
+                        sx={{ fontSize: 17 }}
+                      />
+                    )}
+                    <Typography variant="caption" fontWeight={600}>
+                      {step.label}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      ({step.detail})
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+          );
+        })()}
+
         {/* Stepper with completion status */}
         <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
           {currentSteps.map((label, index) => {
@@ -965,6 +1144,7 @@ const ApplyCourse = () => {
                       formik.setFieldValue("dob", "");
                       formik.setFieldValue("genderId", "");
                       setAcademicResults(null);
+                      setGyalsungDetails(null);
                       setIsDataFromApi(false);
                       setAcademicEntries([]);
                       setHasCheckedAcademicData(false);
@@ -1011,6 +1191,7 @@ const ApplyCourse = () => {
                               formik.setFieldValue("dob", "");
                               formik.setFieldValue("genderId", "");
                               setAcademicResults(null);
+                              setGyalsungDetails(null);
                               setIsDataFromApi(false);
                               setAcademicEntries([]);
                               setHasCheckedAcademicData(false);
@@ -1772,6 +1953,7 @@ const ApplyCourse = () => {
 
               {/* Show academic mark sheet upload if no API data */}
               {(!academicResults || academicResults.length === 0) &&
+                !formik.values.files?.length &&
                 formik.values.hasCid === "yes" &&
                 formik.values.cidNo.length === 11 && (
                   <Alert severity="warning" sx={{ mb: 2 }}>
@@ -1786,17 +1968,19 @@ const ApplyCourse = () => {
                 )}
 
               {/* Show message for non-CID users */}
-              {formik.values.hasCid === "no" && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  <Typography variant="body2">
-                    Since you don't have a Citizen ID, please upload your
-                    academic mark sheets in the Documents section.
-                  </Typography>
-                </Alert>
-              )}
+              {formik.values.hasCid === "no" &&
+                !formik.values.files?.length && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      Since you don't have a Citizen ID, please upload your
+                      academic mark sheets in the Documents section.
+                    </Typography>
+                  </Alert>
+                )}
 
               {/* Conditional message based on whether academic data exists */}
-              {academicResults && academicResults.length > 0 ? (
+              {formik.values.files?.length > 0 ? null : academicResults &&
+                academicResults.length > 0 ? (
                 <Alert severity="success" sx={{ mb: 2 }}>
                   <Typography variant="body2">
                     <strong>Academic records found.</strong> Please upload any
@@ -1816,8 +2000,10 @@ const ApplyCourse = () => {
               <FileUpload
                 files={formik.values.files}
                 onFilesChange={(files) => {
-                  formik.setFieldValue("files", files);
-                  formik.setFieldTouched("files", true);
+                  // touch first without validating (it would validate the old, empty list),
+                  // then set the value, which validates with the new files
+                  formik.setFieldTouched("files", true, false);
+                  formik.setFieldValue("files", files, true);
                 }}
                 error={formik.touched.files && Boolean(formik.errors.files)}
                 helperText={formik.touched.files && formik.errors.files}
@@ -1847,6 +2033,7 @@ const ApplyCourse = () => {
             <Box sx={{ display: "flex", gap: 1.5 }}>
               {activeStep === currentSteps.length - 1 ? (
                 <Button
+                  key="submit-btn"
                   type="submit"
                   variant="contained"
                   size="small"
@@ -1864,6 +2051,8 @@ const ApplyCourse = () => {
                 </Button>
               ) : (
                 <Button
+                  key="next-btn"
+                  type="button"
                   variant="contained"
                   onClick={handleNext}
                   size="small"
@@ -1884,6 +2073,7 @@ const ApplyCourse = () => {
                   formik.resetForm();
                   setActiveStep(0);
                   setAcademicResults(null);
+                  setGyalsungDetails(null);
                   setIsDataFromApi(false);
                   setAcademicEntries([]);
                   setHasCheckedAcademicData(false);

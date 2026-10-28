@@ -25,7 +25,11 @@ import {
   Divider,
   CircularProgress,
   IconButton,
+  Avatar,
+  Chip,
+  Alert,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import BusinessIcon from "@mui/icons-material/Business";
 import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
@@ -34,32 +38,40 @@ import FileOpenIcon from "@mui/icons-material/FileOpen";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
+import SkipNextIcon from "@mui/icons-material/SkipNext";
+import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
 import FileDownload from "../../components/file/FileDownload";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from "react-toastify";
 import CommonService from "../../api/services/internal/common/CommonService";
 import InstituteRegistrationRenewalService from "../../api/services/internal/registration/InstituteRegistrationRenewalService";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import DatahubService from "../../api/services/external/datahub/DatahubService";
 
 // Constants
+// Bordered, compact checklist table (same look as the CMFG monitoring checklist)
 const TABLE_STYLE = {
-  border: "1px solid",
-  borderColor: "divider",
+  borderCollapse: "collapse",
   "& th, & td": {
     border: "1px solid",
     borderColor: "divider",
-    height: 28,
-    padding: "0px 6px",
-    fontSize: "0.80rem",
-    lineHeight: 1.2,
+    py: 0.5,
+    px: 1,
+    fontSize: "0.8rem",
+    lineHeight: 1.3,
     verticalAlign: "middle",
   },
   "& th": {
+    py: 0.75,
     fontWeight: 600,
-    backgroundColor: "#fafafa",
+    color: "text.secondary",
+    textTransform: "uppercase",
+    fontSize: "0.72rem",
+    letterSpacing: 0.4,
+    bgcolor: "#fafafa",
+    whiteSpace: "nowrap",
   },
 };
 
@@ -125,14 +137,17 @@ const initialTuition = {
   tutorQualification: "",
 };
 
+// Services whose renewal does NOT need a completed monitoring assessment
+const SKIP_MONITORING_CHECK_SERVICES = ["7", "36", "4"];
+
 // Service ID mapping for renewal submissions
 const getMappedServiceId = (originalServiceId) => {
   const serviceIdMap = {
-    '7': '8',  
-    '36': '53',
-    '4': '52',  
+    7: "8",
+    36: "53",
+    4: "52",
   };
-  
+
   const stringId = originalServiceId?.toString();
   return serviceIdMap[stringId] || originalServiceId;
 };
@@ -163,9 +178,10 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [existingDocuments, setExistingDocuments] = useState([]);
   const { serviceId } = useParams();
+  const navigate = useNavigate();
   const [instituteRenewalStatus, setInstituteRenewalStatus] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
-  
+
   // Refs to prevent infinite loops
   const hasFetchedData = useRef(false);
   const hasFetchedInstitute = useRef(false);
@@ -177,8 +193,15 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
     return serviceId === "36" || serviceId === 36;
   }, [serviceId]);
 
-  // Check if renewal is allowed (status_id === 57)
+  const skipMonitoringCheck = SKIP_MONITORING_CHECK_SERVICES.includes(
+    serviceId?.toString(),
+  );
+
+  // Check if renewal is allowed (status_id === 57), or the service needs no monitoring check
   const isRenewalAllowed = useMemo(() => {
+    if (skipMonitoringCheck) {
+      return true;
+    }
     if (!instituteRenewalStatus || instituteRenewalStatus.length === 0) {
       return false;
     }
@@ -189,7 +212,7 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
     });
 
     return allowed;
-  }, [instituteRenewalStatus]);
+  }, [instituteRenewalStatus, skipMonitoringCheck]);
 
   // Get renewal status message
   const getRenewalStatusMessage = useMemo(() => {
@@ -663,11 +686,20 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
             ),
           }));
         }
-        console.log("submitData", submitData)
+        console.log("submitData", submitData);
         const response =
           await InstituteRegistrationRenewalService.resubmitInstitute(
             submitData,
           );
+
+        // The service returns the error object instead of throwing
+        if (response instanceof Error || response?.isAxiosError) {
+          toast.error(
+            response?.response?.data?.message ||
+              "Submission failed. Please try again.",
+          );
+          return;
+        }
 
         toast.success(serviceName + " renewal submitted successfully!");
         resetForm();
@@ -677,6 +709,7 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
         setCourseError("");
         setTuitionError("");
         setExistingDocuments([]);
+        navigate("/");
       } catch (error) {
         console.error("Submission error:", error);
         toast.error(error.message || "Submission failed. Please try again.");
@@ -782,31 +815,12 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
         }
       }
 
-      // Populate quality standards selections
-      if (
-        qualityResponses &&
-        qualityResponses.length > 0 &&
-        qualityData.length > 0
-      ) {
-        const selections = {};
-        qualityResponses.forEach((response) => {
-          const standard = qualityData.find((q) =>
-            q.rows.some((row) => row.id === response.standardId?.toString()),
-          );
-          if (standard) {
-            if (!selections[standard.id]) {
-              selections[standard.id] = {};
-            }
-            selections[standard.id][response.standardId.toString()] =
-              response.responseId;
-          }
-        });
-        setQualitySelections(selections);
-      }
+      // Quality checklist is NOT pre-filled from the previous application:
+      // the institute must answer every indicator again for this renewal.
+      setQualitySelections({});
     },
     [
       formik,
-      qualityData,
       isTuitionService,
       getOwnershipTypeName,
       getNationalityName,
@@ -835,7 +849,7 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
         );
 
       let data = response.data;
-      console.log("response", response.data)
+      console.log("response", response.data);
       if (Array.isArray(data) && data.length > 0) {
         data = data[0];
       }
@@ -1095,16 +1109,16 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
 
     try {
       setLoadingInitialData(true);
-      
+
       // Step 1: Fetch service name
       await fetchServiceName();
-      
+
       // Step 2: Fetch renewal status
       await fetchInstitutesRenewalStatus();
-      
+
       // Step 3: Fetch dropdown data
       const dropdownLoaded = await fetchAllDropdownData();
-      
+
       if (!dropdownLoaded) {
         setLoadingInitialData(false);
         return;
@@ -1336,65 +1350,129 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
     isTuitionService,
   ]);
 
-  const renderChecklist = (standard) => {
+  const renderChecklist = (standard, sIdx) => {
+    const sectionNo = sIdx + 1;
+    const rows = standard.rows || [];
+    const answers = qualitySelections[standard.id] || {};
+    const answered = rows.filter((r) => answers[r.id]).length;
+    const noCount = rows.filter((r) => answers[r.id] === "N").length;
+    const complete = rows.length > 0 && answered === rows.length;
+
     return (
-      <Grid item xs={12} key={standard.id}>
-        <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} mb={1}>
+      <Paper
+        key={standard.id}
+        variant="outlined"
+        sx={{ mb: 2, borderRadius: 1.5, overflow: "hidden" }}
+      >
+        {/* Section header */}
+        <Box
+          sx={{
+            px: 1.5,
+            py: 0.75,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.05),
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Avatar
+            sx={{
+              width: 22,
+              height: 22,
+              fontSize: "0.72rem",
+              bgcolor: "primary.main",
+            }}
+          >
+            {sectionNo}
+          </Avatar>
+          <Typography fontWeight={600} fontSize="0.9rem" sx={{ flex: 1 }}>
             {standard.title}
           </Typography>
-          <TableContainer>
-            <Table size="small" sx={TABLE_STYLE}>
-              <TableHead>
-                <TableRow>
-                  <TableCell width="60">Sl. No</TableCell>
-                  <TableCell>
-                    Quality Indicator <span style={{ color: "red" }}>*</span>
-                  </TableCell>
-                  <TableCell align="center" width="100">
-                    YES
-                  </TableCell>
-                  <TableCell align="center" width="100">
-                    NO
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {standard.rows.map((row, index) => {
-                  const selectedValue =
-                    qualitySelections[standard.id]?.[row.id];
-                  return (
-                    <TableRow key={row.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>{row.value}</TableCell>
-                      <TableCell align="center">
-                        <Radio
-                          size="small"
-                          sx={{ p: 0.25 }}
-                          checked={selectedValue === "Y"}
-                          onChange={() =>
-                            handleRadioChange(standard.id, row.id, "Y")
-                          }
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Radio
-                          size="small"
-                          sx={{ p: 0.25 }}
-                          checked={selectedValue === "N"}
-                          onChange={() =>
-                            handleRadioChange(standard.id, row.id, "N")
-                          }
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      </Grid>
+          {noCount > 0 && (
+            <Chip
+              size="small"
+              color="error"
+              variant="outlined"
+              label={`${noCount} No`}
+              sx={{ height: 20, fontSize: "0.7rem" }}
+            />
+          )}
+          <Chip
+            size="small"
+            color={complete ? "success" : "default"}
+            variant={complete ? "filled" : "outlined"}
+            label={`${answered}/${rows.length}`}
+            sx={{ height: 20, fontSize: "0.7rem" }}
+          />
+        </Box>
+
+        <TableContainer>
+          <Table size="small" sx={TABLE_STYLE}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: 64 }}>No.</TableCell>
+                <TableCell>
+                  Quality indicator <span style={{ color: "red" }}>*</span>
+                </TableCell>
+                <TableCell align="center" sx={{ width: 52 }}>
+                  Yes
+                </TableCell>
+                <TableCell align="center" sx={{ width: 52 }}>
+                  No
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((row, index) => {
+                const selectedValue = answers[row.id];
+                const isNo = selectedValue === "N";
+                return (
+                  <TableRow
+                    key={row.id}
+                    sx={{
+                      bgcolor: (t) =>
+                        isNo ? alpha(t.palette.error.main, 0.04) : "inherit",
+                    }}
+                  >
+                    <TableCell
+                      sx={{ color: "text.secondary", whiteSpace: "nowrap" }}
+                    >
+                      {sectionNo}.{index + 1}
+                    </TableCell>
+                    <TableCell>
+                      <Typography fontSize="0.8rem">{row.value}</Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Radio
+                        size="small"
+                        color="success"
+                        sx={{ p: 0.25, "& svg": { fontSize: 18 } }}
+                        checked={selectedValue === "Y"}
+                        onChange={() =>
+                          handleRadioChange(standard.id, row.id, "Y")
+                        }
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Radio
+                        size="small"
+                        color="error"
+                        sx={{ p: 0.25, "& svg": { fontSize: 18 } }}
+                        checked={isNo}
+                        onChange={() =>
+                          handleRadioChange(standard.id, row.id, "N")
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
     );
   };
 
@@ -1507,21 +1585,23 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
           {serviceName} - Renewal Application
         </Typography>
 
-        {/* Success banner */}
-        <Box
-          sx={{
-            mb: 3,
-            p: 2,
-            backgroundColor: "#e8f5e9",
-            borderRadius: 1,
-            border: "1px solid #4caf50",
-          }}
-        >
-          <Typography variant="body2" sx={{ color: "#2e7d32" }}>
-            ✓ Your monitoring assessment is completed. You can proceed with your
-            renewal application.
-          </Typography>
-        </Box>
+        {/* Success banner (only when the monitoring check applies) */}
+        {!skipMonitoringCheck && (
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              backgroundColor: "#e8f5e9",
+              borderRadius: 1,
+              border: "1px solid #4caf50",
+            }}
+          >
+            <Typography variant="body2" sx={{ color: "#2e7d32" }}>
+              ✓ Your monitoring assessment is completed. You can proceed with
+              your renewal application.
+            </Typography>
+          </Box>
+        )}
 
         <Divider />
 
@@ -2701,6 +2781,12 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
         {tabValue === (isTuitionService ? 2 : 3) && (
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item size={{ xs: 12 }}>
+              {qualityData.length > 0 && !areAllQualityStandardsYes && (
+                <Alert severity="info" sx={{ mb: 2, py: 0.25 }}>
+                  All quality indicators must be answered <strong>Yes</strong>{" "}
+                  before the renewal can be submitted.
+                </Alert>
+              )}
               {qualityData.slice(0, 3).map(renderChecklist)}
             </Grid>
           </Grid>
@@ -2756,35 +2842,78 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
           </Grid>
         )}
 
-        {/* Buttons */}
-        <Grid container spacing={2} sx={{ mt: 3 }}>
-          <Grid item>
-            <Button
-              variant="contained"
-              size="small"
-              disabled={!isSubmitEnabled || loading}
-              onClick={formik.handleSubmit}
-              startIcon={
-                loading ? (
-                  <CircularProgress size={20} sx={{ color: "#fff" }} />
-                ) : null
-              }
+        {/* Navigation: Previous / Next on every tab; Submit + Reset only on the last tab */}
+        {(() => {
+          const lastTab = getTabs.length - 1;
+          const isFirstTab = tabValue === 0;
+          const isLastTab = tabValue === lastTab;
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 1,
+                mt: 3,
+                flexWrap: "wrap",
+              }}
             >
-              {loading ? "Submitting..." : "Submit Renewal"}
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button
-              color="error"
-              variant="contained"
-              size="small"
-              onClick={handleReset}
-              startIcon={<RotateLeftIcon />}
-            >
-              Reset
-            </Button>
-          </Grid>
-        </Grid>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<SkipPreviousIcon />}
+                disabled={isFirstTab}
+                onClick={() => setTabValue((t) => Math.max(t - 1, 0))}
+              >
+                Previous
+              </Button>
+
+              <Box sx={{ display: "flex", gap: 1 }}>
+                {isLastTab ? (
+                  <>
+                    <Button
+                      key="reset-btn"
+                      type="button"
+                      color="error"
+                      variant="contained"
+                      size="small"
+                      onClick={handleReset}
+                      startIcon={<RotateLeftIcon />}
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      key="submit-btn"
+                      type="button"
+                      variant="contained"
+                      size="small"
+                      disabled={!isSubmitEnabled || loading}
+                      onClick={formik.handleSubmit}
+                      startIcon={
+                        loading ? (
+                          <CircularProgress size={20} sx={{ color: "#fff" }} />
+                        ) : null
+                      }
+                    >
+                      {loading ? "Submitting..." : "Submit Renewal"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    key="next-btn"
+                    type="button"
+                    variant="contained"
+                    size="small"
+                    endIcon={<SkipNextIcon />}
+                    onClick={() => setTabValue((t) => Math.min(t + 1, lastTab))}
+                  >
+                    Next
+                  </Button>
+                )}
+              </Box>
+            </Box>
+          );
+        })()}
       </Paper>
     </Box>
   );
