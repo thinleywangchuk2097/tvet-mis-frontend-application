@@ -12,7 +12,7 @@ import {
   Grid,
   TextField,
   MenuItem,
-  Chip,
+  Tooltip,
   Typography,
   TablePagination,
   alpha,
@@ -22,63 +22,109 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
-import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import SearchIcon from "@mui/icons-material/Search";
 import CampaignIcon from "@mui/icons-material/Campaign";
+import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
 import CommonService from "../../api/services/internal/common/CommonService";
 
 // ── Animations (optimized - keeping only essential ones)
-const gradientShift = keyframes`
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-`;
-
-const pulse = keyframes`
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.02); }
-`;
-
-const slideIn = keyframes`
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-`;
-
-const fadeInUp = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-`;
-
 const tableRowAnimation = keyframes`
   from { opacity: 0; transform: translateX(-10px); }
   to { opacity: 1; transform: translateX(0); }
 `;
 
 // ── Shared table styles with animation
+const NAVY = "#0a2d6e";
+const LINE = "#e3eaf4";
+
 const TS = {
   "& th": {
-    bgcolor: "#e8f1fb",
+    bgcolor: NAVY,
+    color: "#fff",
     fontWeight: 700,
-    fontSize: "0.77rem",
-    color: "#0a2d6e",
-    whiteSpace: "nowrap",
+    fontSize: "0.74rem",
+    letterSpacing: 0.2,
+    lineHeight: 1.25,
+    borderBottom: "none",
+    py: 1,
+    px: 1.25,
   },
   "& td": {
     fontSize: "0.8rem",
+    color: "#0f1f3d",
+    borderBottom: `1px solid ${LINE}`,
+    py: 1,
+    px: 1.25,
+    verticalAlign: "middle",
   },
-  "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
-  "& tbody tr": {
-    animation: `${fadeInUp} 0.4s ease-out`,
-    "&:hover td": { bgcolor: "#f5f9ff" },
-  },
+  "& tbody tr:nth-of-type(even) td": { bgcolor: "#fafcff" },
+  "& tbody tr:hover td": { bgcolor: "#f1f6fd" },
 };
+
+// "2026-11-12" -> "12 Nov 2026"
+const fmtDate = (d) =>
+  d
+    ? new Date(d).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+
+// course length as "7 months", "1 month 2 days" or "20 days"
+const courseDuration = (start, end) => {
+  if (!start || !end) return null;
+  const a = new Date(start);
+  const b = new Date(end);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b < a) return null;
+  let months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  // step back a month if the end day has not reached the start day yet
+  let anchor = new Date(a.getFullYear(), a.getMonth() + months, a.getDate());
+  while (months > 0 && anchor > b) {
+    months -= 1;
+    anchor = new Date(a.getFullYear(), a.getMonth() + months, a.getDate());
+  }
+  const days = Math.round((b - anchor) / 86400000);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  if (months <= 0) return plural(Math.max(days, 1), "day");
+  return days > 0 ? `${plural(months, "month")} ${plural(days, "day")}` : plural(months, "month");
+};
+
+// "Closes in N days" / "Closed" tag from the application end date (none while open)
+const applicationStatus = (end) => {
+  if (!end) return null;
+  const days = Math.ceil(
+    (new Date(end).setHours(23, 59, 59) - Date.now()) / 86400000,
+  );
+  if (days < 0) return { label: "Closed", color: "#78909c" };
+  if (days === 0) return { label: "Closes today", color: "#e65100" };
+  if (days <= 7)
+    return { label: `Closes in ${days} day${days > 1 ? "s" : ""}`, color: "#e65100" };
+  return null; // open: no tag
+};
+
+const Pill = ({ label, color }) => (
+  <Box
+    component="span"
+    sx={{
+      display: "inline-block",
+      px: 1,
+      py: 0.25,
+      borderRadius: 10,
+      fontSize: "0.7rem",
+      fontWeight: 600,
+      color,
+      bgcolor: alpha(color, 0.1),
+      whiteSpace: "nowrap",
+    }}
+  >
+    {label}
+  </Box>
+);
+Pill.propTypes = { label: PropTypes.node, color: PropTypes.string };
 
 // Style for TextField
 const textFieldStyle = {
@@ -102,33 +148,6 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
   const startTimeRef = useRef(null);
   // how many copies of the list are rendered; enough to always fill the banner
   const [copies, setCopies] = useState(3);
-
-  // 2. All useCallback hooks
-  const getCourseIcon = useCallback((courseName) => {
-    const icons = {
-      carpenter: "🔨",
-      mason: "🧱",
-      welding: "⚡",
-      plumbing: "🚰",
-      electrical: "⚡",
-      computer: "💻",
-      accounting: "📊",
-      business: "💼",
-      hospitality: "🏨",
-      cooking: "🍳",
-      driving: "🚗",
-      language: "📚",
-      default: "🎓",
-    };
-
-    const lowerName = courseName?.toLowerCase() || "";
-    for (const [key, icon] of Object.entries(icons)) {
-      if (lowerName.includes(key)) {
-        return icon;
-      }
-    }
-    return icons.default;
-  }, []);
 
   // 3. All useMemo hooks
   const displayItems = useMemo(() => {
@@ -218,207 +237,119 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
   // 6. Render
   return (
     <Box
-      ref={containerRef}
       sx={{
-        mb: 3,
-        overflow: "hidden",
-        whiteSpace: "nowrap",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        mb: 2.5,
+        display: "flex",
+        alignItems: "stretch",
         borderRadius: 2,
-        py: 1.5,
-        position: "relative",
-        cursor: "pointer",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background:
-            "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
-          backgroundSize: "200% 100%",
-          animation: `${shimmer} 3s infinite`,
-          pointerEvents: "none",
-        },
+        overflow: "hidden",
+        border: `1px solid ${LINE}`,
+        bgcolor: "#f6f9fe",
+        height: 44,
       }}
     >
-      {/* Speaker/Megaphone Icon */}
+      {/* fixed label */}
       <Box
         sx={{
-          position: "absolute",
-          left: 10,
-          top: "50%",
-          transform: "translateY(-50%)",
-          zIndex: 2,
-          bgcolor: "rgba(255,255,255,0.2)",
-          borderRadius: "50%",
-          width: 32,
-          height: 32,
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          animation: `${pulse} 1.5s ease-in-out infinite`,
+          gap: 0.75,
+          px: 1.75,
+          bgcolor: NAVY,
+          color: "#fff",
+          fontSize: "0.74rem",
+          fontWeight: 700,
+          letterSpacing: 0.6,
+          textTransform: "uppercase",
+          whiteSpace: "nowrap",
         }}
       >
-        <CampaignIcon sx={{ color: "white", fontSize: 18 }} />
+        <CampaignIcon sx={{ fontSize: 18, color: "#f9a825" }} />
+        Now open
       </Box>
 
-      {/* Moving Announcements */}
+      {/* moving list (pauses on hover); faded at both edges */}
       <Box
-        ref={contentRef}
+        ref={containerRef}
         sx={{
-          display: "inline-block",
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
           whiteSpace: "nowrap",
-          willChange: "transform",
-          ml: 6,
+          display: "flex",
+          alignItems: "center",
+          maskImage:
+            "linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 40px), transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 40px), transparent 100%)",
         }}
       >
-        {displayItems.map((announcement, idx) => (
-          <Box
-            key={`${announcement.id}-${idx}`}
-            component="span"
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              mx: 3,
-              color: "white",
-              fontWeight: "bold",
-              fontSize: "0.95rem",
-              textShadow: "1px 1px 2px rgba(0,0,0,0.2)",
-              gap: 1.5,
-            }}
-          >
-            {/* Icon */}
+        <Box
+          ref={contentRef}
+          sx={{ display: "inline-flex", alignItems: "center", willChange: "transform" }}
+        >
+          {displayItems.map((announcement, idx) => (
             <Box
-              component="span"
-              sx={{
-                display: "inline-block",
-                fontSize: "1.1rem",
-              }}
-            >
-              {getCourseIcon(announcement.courseName)}
-            </Box>
-
-            {/* Course Title */}
-            <Box
-              component="span"
-              sx={{
-                display: "inline-block",
-                px: 1.5,
-                py: 0.3,
-                bgcolor: "rgba(255,255,255,0.2)",
-                borderRadius: 2,
-                fontSize: "0.9rem",
-                fontWeight: 700,
-              }}
-            >
-              {announcement.courseName}
-            </Box>
-
-            {/* Institute */}
-            <Box
-              component="span"
-              sx={{
-                opacity: 0.8,
-                fontSize: "0.85rem",
-              }}
-            >
-              @{" "}
-              {announcement.instituteName.length > 20
-                ? announcement.instituteName.substring(0, 20) + "..."
-                : announcement.instituteName}
-            </Box>
-
-            {/* Date Range */}
-            <Box
+              key={`${announcement.id}-${idx}`}
               component="span"
               sx={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 0.5,
-              }}
-            >
-              <Box component="span" sx={{ fontSize: "0.9rem" }}>
-                📅
-              </Box>
-              <Box
-                component="span"
-                sx={{
-                  fontSize: "0.85rem",
-                }}
-              >
-                {announcement.startDate} - {announcement.endDate}
-              </Box>
-            </Box>
-
-            {/* Fee */}
-            {announcement.fee && (
-              <Box
-                component="span"
-                sx={{
-                  px: 1,
-                  py: 0.2,
-                  bgcolor: "rgba(255,215,0,0.2)",
-                  borderRadius: 2,
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                }}
-              >
-                Nu. {announcement.fee.toLocaleString()}
-              </Box>
-            )}
-
-            {/* Separator */}
-            <Box component="span" sx={{ opacity: 0.5 }}>
-              |
-            </Box>
-
-            {/* Apply Now CTA */}
-            <Box
-              component="span"
-              sx={{
-                px: 1.8,
-                py: 0.4,
-                bgcolor: "#ff6b6b",
-                borderRadius: 3,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 0.5,
+                gap: 1.25,
+                px: 2.25,
+                borderRight: `1px solid ${LINE}`,
                 fontSize: "0.8rem",
-                fontWeight: "bold",
-                transition: "all 0.3s ease",
-                cursor: "pointer",
-                "&:hover": {
-                  transform: "scale(1.05)",
-                  bgcolor: "#ff5252",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                },
+                color: "#0f1f3d",
               }}
-              onClick={() =>
-                navigate(`/course/apply-course/${announcement.id}`)
-              }
             >
-              <Box component="span" sx={{ fontSize: "0.9rem" }}>
-                🎯
+              <SchoolOutlinedIcon sx={{ fontSize: 17, color: "#1565c0" }} />
+              <Box component="span" sx={{ fontWeight: 700, color: NAVY }}>
+                {announcement.courseName}
               </Box>
-              Apply Now!
+              <Box component="span" sx={{ color: "#5f6f86" }}>
+                {announcement.instituteName}
+              </Box>
+              <Box
+                component="span"
+                sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, color: "#5f6f86" }}
+              >
+                <EventOutlinedIcon sx={{ fontSize: 15 }} />
+                {announcement.startDate} – {announcement.endDate}
+              </Box>
+              {announcement.fee ? (
+                <Box component="span" sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                  Nu. {Number(announcement.fee).toLocaleString()}
+                </Box>
+              ) : null}
+              <Box
+                component="button"
+                type="button"
+                onClick={() => navigate(`/course/apply-course/${announcement.id}`)}
+                sx={{
+                  border: 0,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.25,
+                  px: 1.25,
+                  py: 0.35,
+                  borderRadius: 1.5,
+                  bgcolor: "#1565c0",
+                  color: "#fff",
+                  fontSize: "0.74rem",
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  "&:hover": { bgcolor: NAVY },
+                  "&:focus-visible": { outline: "2px solid #f9a825", outlineOffset: 2 },
+                }}
+              >
+                Apply
+                <ArrowForwardIcon sx={{ fontSize: 14 }} />
+              </Box>
             </Box>
-
-            {/* Separator between announcements */}
-            <Box
-              component="span"
-              sx={{
-                width: 4,
-                height: 4,
-                borderRadius: "50%",
-                bgcolor: "rgba(255,255,255,0.5)",
-                mx: 1,
-              }}
-            />
-          </Box>
-        ))}
+          ))}
+        </Box>
       </Box>
     </Box>
   );
@@ -574,7 +505,8 @@ const CourseTraineeAnnouncementsIndex = ({
 
       const matchesSearch =
         app.application_no?.toLowerCase().includes(searchText.toLowerCase()) ||
-        app.course_name?.toLowerCase().includes(searchText.toLowerCase());
+        app.course_name?.toLowerCase().includes(searchText.toLowerCase()) ||
+        app.institute_name?.toLowerCase().includes(searchText.toLowerCase());
 
       const matchesLocation = locationFilter
         ? parseInt(app.training_location_id) === parseInt(locationFilter)
@@ -607,7 +539,7 @@ const CourseTraineeAnnouncementsIndex = ({
   }, []);
 
   return (
-    <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+    <Paper elevation={0} sx={{ p: 0, bgcolor: "transparent" }}>
       {/* Moving Announcements Banner - OPTIMIZED */}
       <MovingAnnouncementBanner
         announcements={movingAnnouncements}
@@ -636,79 +568,11 @@ const CourseTraineeAnnouncementsIndex = ({
         </Alert>
       )}
 
-      {/* Header Section with Animation */}
-      <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 3 }}>
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            borderRadius: 1.5,
-            bgcolor: alpha("#1565c0", 0.12),
-            color: "#1565c0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            animation: `${pulse} 2s ease-in-out infinite`,
-          }}
-        >
-          <NotificationsActiveIcon sx={{ fontSize: 22 }} />
-        </Box>
-        <Box sx={{ flex: 1 }}>
-          <Typography
-            fontWeight={800}
-            sx={{
-              fontSize: "1rem",
-              background:
-                "linear-gradient(135deg, #0a1929 0%, #1565c0 50%, #0a1929 100%)",
-              backgroundSize: "200% auto",
-              color: "transparent",
-              backgroundClip: "text",
-              WebkitBackgroundClip: "text",
-              animation: `${gradientShift} 3s ease infinite`,
-            }}
-          >
-            Course Announcements
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              color: "text.secondary",
-              display: "block",
-              animation: `${slideIn} 0.5s ease-out`,
-            }}
-          >
-            <Box
-              component="span"
-              sx={{
-                display: "inline-block",
-                position: "relative",
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: -2,
-                  left: 0,
-                  width: "100%",
-                  height: "2px",
-                  background:
-                    "linear-gradient(90deg, #1565c0, #42a5f5, #1565c0)",
-                  animation: `${gradientShift} 2s ease infinite`,
-                  backgroundSize: "200% auto",
-                },
-              }}
-            >
-              Available courses
-            </Box>
-            {" for application"}
-          </Typography>
-        </Box>
-      </Stack>
-
-      {/* Filters Section */}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        {/* Search */}
-        <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
+      {/* Filters */}
+      <Grid container spacing={1.5} sx={{ mb: 2 }} alignItems="center">
+        <Grid size={{ xs: 12, md: 4 }}>
           <TextField
-            label="Search by Application No or Course"
+            placeholder="Search by application no, course or training provider"
             size="small"
             fullWidth
             value={searchText}
@@ -719,21 +583,17 @@ const CourseTraineeAnnouncementsIndex = ({
             slotProps={{
               input: {
                 startAdornment: (
-                  <SearchIcon
-                    sx={{ color: "#90a4ae", fontSize: 16, mr: 0.5 }}
-                  />
+                  <SearchIcon sx={{ color: "#90a4ae", fontSize: 18, mr: 0.75 }} />
                 ),
               },
             }}
             sx={textFieldStyle}
           />
         </Grid>
-
-        {/* Location Filter */}
-        <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <TextField
             select
-            label="Filter by Location"
+            label="Location"
             size="small"
             fullWidth
             value={locationFilter}
@@ -743,7 +603,7 @@ const CourseTraineeAnnouncementsIndex = ({
             }}
             sx={textFieldStyle}
           >
-            <MenuItem value="">All Locations</MenuItem>
+            <MenuItem value="">All locations</MenuItem>
             {dzongkhags.map((dzongkhag) => (
               <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
                 {dzongkhag.dzonkhagName}
@@ -751,12 +611,10 @@ const CourseTraineeAnnouncementsIndex = ({
             ))}
           </TextField>
         </Grid>
-
-        {/* Course Date Filter */}
-        <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <TextField
             select
-            label="Filter by Course Start Date"
+            label="Course start date"
             size="small"
             fullWidth
             value={courseDateFilter}
@@ -766,70 +624,54 @@ const CourseTraineeAnnouncementsIndex = ({
             }}
             sx={textFieldStyle}
           >
-            <MenuItem value="">All Dates</MenuItem>
+            <MenuItem value="">All dates</MenuItem>
             {courseDates.map((date) => (
               <MenuItem key={date} value={date}>
-                {new Date(date).toLocaleDateString()}
+                {fmtDate(date)}
               </MenuItem>
             ))}
           </TextField>
         </Grid>
-
-        {/* Reset Button */}
         <Grid
-          item
-          size={{ xs: 12, sm: 6, md: 3 }}
-          sx={{ display: "flex", alignItems: "center" }}
+          size={{ xs: 12, md: 2 }}
+          sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: { md: "flex-end" } }}
         >
           <Button
-            variant="contained"
-            color="error"
+            variant="outlined"
             size="small"
             startIcon={<RestartAltIcon />}
-            fullWidth
             onClick={handleReset}
-            sx={{
-              height: 40,
-              transition: "all 0.3s ease",
-              "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: 3,
-              },
-              "&:active": {
-                transform: "translateY(0)",
-              },
-            }}
+            sx={{ height: 40, textTransform: "none", fontWeight: 600, flex: { xs: 1, md: "none" } }}
           >
             Reset
           </Button>
         </Grid>
       </Grid>
 
-      {/* Table Container with Animation */}
+      <Typography sx={{ fontSize: "0.78rem", color: "text.secondary", mb: 1 }}>
+        {filteredApplications.length} course
+        {filteredApplications.length === 1 ? "" : "s"} open for application
+      </Typography>
+
+      {/* Table: related details grouped so it reads at a glance */}
       <TableContainer
-        sx={{
-          borderRadius: 1.5,
-          border: "1px solid #dbe5f0",
-          overflowX: "auto",
-        }}
+        sx={{ borderRadius: 2, border: `1px solid ${LINE}`, overflowX: "auto" }}
       >
-        <Table size="small" sx={TS}>
+        <Table size="small" sx={{ ...TS, minWidth: 1200 }}>
           <TableHead>
             <TableRow>
-              <TableCell>Application No</TableCell>
-              <TableCell>Institute Name</TableCell>
-              <TableCell>Course Name</TableCell>
-              <TableCell>Programme Type</TableCell>
-              <TableCell>Training Location</TableCell>
-              <TableCell>Certification Level</TableCell>
-              <TableCell>Funding Source</TableCell>
-              <TableCell>Fees Per Trainee</TableCell>
-              <TableCell>Application Period</TableCell>
-              <TableCell>Course Period</TableCell>
-              <TableCell>Entry Requirement</TableCell>
-              <TableCell>Enrollment Capacity</TableCell>
-              <TableCell>Total Applied</TableCell>
-              <TableCell>Action</TableCell>
+              <TableCell align="center" sx={{ width: 44 }}>#</TableCell>
+              <TableCell align="center">Action</TableCell>
+              <TableCell sx={{ minWidth: 155 }}>Course</TableCell>
+              <TableCell>Type / Level</TableCell>
+              <TableCell sx={{ minWidth: 150 }}>Description</TableCell>
+              <TableCell sx={{ minWidth: 150 }}>Training Provider / Location</TableCell>
+              <TableCell>Funding</TableCell>
+              <TableCell align="right">Course Fee</TableCell>
+              <TableCell>Application Date</TableCell>
+              <TableCell>Course Date</TableCell>
+              <TableCell sx={{ minWidth: 150 }}>Entry Requirement</TableCell>
+              <TableCell sx={{ minWidth: 110 }}>Seats</TableCell>
             </TableRow>
           </TableHead>
 
@@ -840,134 +682,151 @@ const CourseTraineeAnnouncementsIndex = ({
                   appPage * appRowsPerPage,
                   appPage * appRowsPerPage + appRowsPerPage,
                 )
-                .map((app, index) => (
-                  <TableRow
-                    key={app.application_no}
-                    hover
-                    sx={{
-                      animation: `${tableRowAnimation} 0.3s ease-out ${index * 0.05}s both`,
-                    }}
-                  >
-                    <TableCell sx={{ fontWeight: 500 }}>
-                      <Chip
-                        label={app.application_no}
-                        size="small"
-                        sx={{
-                          bgcolor: alpha("#1565c0", 0.1),
-                          color: "#1565c0",
-                          fontWeight: 600,
-                          fontSize: "0.7rem",
-                          height: 24,
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>{app.institute_name || "N/A"}</TableCell>
-                    <TableCell>{app.course_name || "N/A"}</TableCell>
-                    <TableCell>{app.announcement_type || "N/A"}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getDzongkhagName(app.training_location_id)}
-                        size="small"
-                        sx={{
-                          bgcolor: alpha("#0097a7", 0.1),
-                          color: "#0097a7",
-                          fontWeight: 500,
-                          fontSize: "0.7rem",
-                          height: 24,
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {getCertificationLevelName(app.certification_level_id)}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getFundingSourceName(app.funding_source_id)}
-                        size="small"
-                        sx={{
-                          bgcolor: alpha("#2e7d32", 0.1),
-                          color: "#2e7d32",
-                          fontWeight: 500,
-                          fontSize: "0.7rem",
-                          height: 24,
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      Nu. {app.fees_per_trainee?.toLocaleString()}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: "0.75rem" }}>
-                      {app.application_start_date && app.application_end_date
-                        ? `${new Date(app.application_start_date).toLocaleDateString()} - ${new Date(app.application_end_date).toLocaleDateString()}`
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: "0.75rem" }}>
-                      {app.course_start_date && app.course_end_date
-                        ? `${new Date(app.course_start_date).toLocaleDateString()} - ${new Date(app.course_end_date).toLocaleDateString()}`
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                      >
-                        <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ color: "#1565c0", fontSize: "0.8rem" }}
-                        />
-                        <Typography variant="caption">
-                          {app.entry_requirement?.length > 30
-                            ? `${app.entry_requirement.substring(0, 30)}...`
-                            : app.entry_requirement || "N/A"}
+                .map((app, index) => {
+                  const status = applicationStatus(app.application_end_date);
+                  const capacity = Number(app.enrollment_capacity) || 0;
+                  const applied = Number(app.total_applied) || 0;
+                  const fill = capacity ? Math.min(100, (applied / capacity) * 100) : 0;
+                  return (
+                    <TableRow
+                      key={app.application_no}
+                      sx={{
+                        animation: `${tableRowAnimation} 0.3s ease-out ${index * 0.04}s both`,
+                      }}
+                    >
+                      <TableCell align="center" sx={{ color: "text.secondary" }}>
+                        {appPage * appRowsPerPage + index + 1}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          variant="contained"
+                          size="small"
+                          disableElevation
+                          endIcon={<ArrowForwardIcon sx={{ fontSize: "16px !important" }} />}
+                          disabled={status?.label === "Closed"}
+                          onClick={() => navigate(`/course/apply-course/${app.application_no}`)}
+                          sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2, whiteSpace: "nowrap", px: 1.5 }}
+                        >
+                          Apply
+                        </Button>
+                      </TableCell>
+
+                      {/* course name and application no */}
+                      <TableCell>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.84rem", color: NAVY, lineHeight: 1.3 }}>
+                          {app.course_name || "N/A"}
                         </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography sx={{ fontWeight: 700, color: "#1565c0" }}>
-                        {app.enrollment_capacity}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{app.total_applied}</TableCell>
-                    <TableCell>
-                      <Chip
-                        icon={<ArrowUpwardIcon fontSize="small" />}
-                        label="Apply Now"
-                        size="small"
-                        color="primary"
-                        onClick={() =>
-                          navigate(`/course/apply-course/${app.application_no}`)
-                        }
-                        sx={{
-                          cursor: "pointer",
-                          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                          fontWeight: 600,
-                          "&:hover": {
-                            transform: "translateY(-2px)",
-                            boxShadow: 3,
-                            bgcolor: "#1565c0",
-                          },
-                          "&:active": {
-                            transform: "scale(0.95)",
-                          },
-                        }}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))
+                        <Typography sx={{ fontSize: "0.7rem", color: "#90a4ae", mt: 0.4, fontVariantNumeric: "tabular-nums" }}>
+                          Application No: {app.application_no}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography sx={{ fontSize: "0.8rem" }}>
+                          {app.announcement_type || "N/A"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.74rem", color: "text.secondary" }}>
+                          {getCertificationLevelName(app.certification_level_id)}
+                        </Typography>
+                      </TableCell>
+
+                      {/* description: 3 lines, full text on hover */}
+                      <TableCell sx={{ maxWidth: 240 }}>
+                        {app.course_description ? (
+                          <Tooltip title={app.course_description} arrow placement="bottom-start">
+                            <Typography
+                              sx={{
+                                fontSize: "0.76rem",
+                                color: "text.secondary",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {app.course_description}
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography sx={{ fontSize: "0.8rem", lineHeight: 1.3, mb: 0.4 }}>
+                          {app.institute_name || "N/A"}
+                        </Typography>
+                        <Pill label={getDzongkhagName(app.training_location_id)} color="#00838f" />
+                      </TableCell>
+                      <TableCell>
+                        <Pill label={getFundingSourceName(app.funding_source_id)} color="#2e7d32" />
+                      </TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                        {app.fees_per_trainee != null
+                          ? `Nu. ${Number(app.fees_per_trainee).toLocaleString()}`
+                          : "—"}
+                      </TableCell>
+
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        <Typography sx={{ fontSize: "0.76rem" }}>
+                          {fmtDate(app.application_start_date)} –
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.76rem", mb: 0.25 }}>
+                          {fmtDate(app.application_end_date)}
+                        </Typography>
+                        {status && <Pill label={status.label} color={status.color} />}
+                      </TableCell>
+
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        <Typography sx={{ fontSize: "0.76rem" }}>
+                          {fmtDate(app.course_start_date)} –
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.76rem", mb: 0.25 }}>
+                          {fmtDate(app.course_end_date)}
+                        </Typography>
+                        {courseDuration(app.course_start_date, app.course_end_date) && (
+                          <Pill
+                            label={courseDuration(app.course_start_date, app.course_end_date)}
+                            color="#1565c0"
+                          />
+                        )}
+                      </TableCell>
+
+                      <TableCell sx={{ fontSize: "0.76rem !important", maxWidth: 240 }}>
+                        {app.entry_requirement || "—"}
+                      </TableCell>
+
+                      {/* applied of capacity, with a fill bar */}
+                      <TableCell>
+                        <Typography sx={{ fontSize: "0.78rem", fontVariantNumeric: "tabular-nums" }}>
+                          <b>{applied}</b>
+                          <Box component="span" sx={{ color: "text.secondary" }}> / {capacity || "—"} applied</Box>
+                        </Typography>
+                        <Box sx={{ mt: 0.5, height: 5, borderRadius: 3, bgcolor: alpha(NAVY, 0.08), overflow: "hidden" }}>
+                          <Box
+                            sx={{
+                              height: "100%",
+                              width: `${fill}%`,
+                              borderRadius: 3,
+                              bgcolor: fill >= 100 ? "#c62828" : "#1565c0",
+                            }}
+                          />
+                        </Box>
+                      </TableCell>
+
+                    </TableRow>
+                  );
+                })
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={14}
-                  align="center"
-                  sx={{ color: "error.main", fontWeight: 600, py: 4 }}
-                >
-                  <Box sx={{ textAlign: "center" }}>
-                    <Typography sx={{ fontWeight: 600, mb: 1 }}>
-                      No data available
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "#666" }}>
-                      No course announcements found
-                    </Typography>
-                  </Box>
+                <TableCell colSpan={12} align="center" sx={{ py: 5 }}>
+                  <SearchIcon sx={{ fontSize: 34, color: "#cfd8e3" }} />
+                  <Typography sx={{ fontWeight: 600, color: "text.secondary" }}>
+                    No course announcements found
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                    Try another location or date, or reset the filters.
+                  </Typography>
                 </TableCell>
               </TableRow>
             )}
@@ -988,7 +847,7 @@ const CourseTraineeAnnouncementsIndex = ({
           }}
           rowsPerPageOptions={[5, 10, 25]}
           sx={{
-            mt: 1,
+            mt: 0.5,
             "& .MuiTablePagination-toolbar": { minHeight: 40 },
             "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
               { fontSize: "0.75rem" },

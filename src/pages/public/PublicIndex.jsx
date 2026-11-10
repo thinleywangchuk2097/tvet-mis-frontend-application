@@ -37,7 +37,6 @@ import FactCheckIcon from "@mui/icons-material/FactCheck";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import DescriptionIcon from "@mui/icons-material/Description";
-import RateReviewIcon from "@mui/icons-material/RateReview";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import TrackChangesIcon from "@mui/icons-material/TrackChanges";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -45,9 +44,10 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 // ── Sections (content and data unchanged)
 import CourseTraineeAnnouncementsIndex from "./CourseTraineeAnnouncementsIndex";
 import OngoingProgramsIndex from "./OngoingProgramsIndex";
-import PieBarGraphDistributionIndex from "./PieBarGraphDistributionIndex";
 import TvetCardsIndex from "./TvetCardsIndex";
-import TvetIndicatorsInstituteProviderType from "./TvetIndicatorsInstituteProviderType";
+import KeyIndicatorsTable from "./glance/KeyIndicatorsTable";
+import ProviderSplitCard from "./glance/ProviderSplitCard";
+import DistributionCharts from "./glance/DistributionCharts";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
 
 // ── Slider images
@@ -158,31 +158,29 @@ const RESOURCES = [
     label: "National Competency Standards",
     desc: "Browse NCS documents by sector and qualification level",
     href: "/reports/ncs-publication",
+    accent: "#1565c0",
     icon: <VerifiedIcon />,
   },
   {
     label: "Curriculum",
     desc: "Download approved curricula for accredited TVET courses",
     href: "/reports/curriculum-publication",
+    accent: "#00897b",
     icon: <MenuBookIcon />,
   },
   {
     label: "Publications",
     desc: "Reports and publications on TVET in Bhutan",
     href: "/publication/publication-index",
+    accent: "#6a1b9a",
     icon: <LibraryBooksIcon />,
   },
   {
     label: "Forms",
     desc: "Download application and reporting forms",
     href: "/forms/forms-index",
+    accent: "#e65100",
     icon: <DescriptionIcon />,
-  },
-  {
-    label: "Give feedback",
-    desc: "Tell us how we can improve TVET services",
-    href: "/feedback/form",
-    icon: <RateReviewIcon />,
   },
 ];
 
@@ -796,65 +794,48 @@ const PublicIndex = () => {
       {/* ── Page body ─────────────────────────────────────────────────── */}
       <Box sx={{ flex: 1 }}>
         <Section
+          tinted
           title="TVET at a glance"
+          description="Key figures on training providers, programmes and trainees across Bhutan."
           compact
         >
           <TvetCardsIndex />
-          {/* Key TVET indicators, in the same section */}
-          <Box sx={{ mt: { xs: 3, md: 3.5 } }}>
-            <Typography
-              component="h3"
-              sx={{ fontWeight: 700, fontSize: { xs: "1.05rem", md: "1.2rem" }, color: NAVY }}
-            >
-              Key TVET indicators
-            </Typography>
-            <Typography sx={{ mt: 0.5, mb: 2, color: "text.secondary", fontSize: "0.9rem" }}>
-              Cumulative figures by provider type: public, private and combined totals.
-            </Typography>
-            <TvetIndicatorsInstituteProviderType />
-          </Box>
-          {/* Where TVET is happening, in the same section */}
-          <Box sx={{ mt: { xs: 3, md: 3.5 } }}>
-            <Typography
-              component="h3"
-              sx={{ fontWeight: 700, fontSize: { xs: "1.05rem", md: "1.2rem" }, color: NAVY }}
-            >
-              Where TVET is happening across Bhutan
-            </Typography>
-            <Typography sx={{ mt: 0.5, mb: 2, color: "text.secondary", fontSize: "0.9rem" }}>
-              Programmes by sector and training providers by Dzongkhag.
-            </Typography>
-            <PieBarGraphDistributionIndex />
-          </Box>
+          {/* Indicators, provider split, enrolment and where TVET happens */}
+          <Grid container spacing={2} sx={{ mt: 2 }}>
+            <Grid size={{ xs: 12, lg: 7 }} sx={{ display: "flex", minWidth: 0, "& > *": { flex: 1, minWidth: 0 } }}>
+              <KeyIndicatorsTable />
+            </Grid>
+            {/* public / private split, sector and Dzongkhag charts in one column */}
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <Stack
+                spacing={2}
+                sx={{
+                  height: "100%",
+                  // provider card keeps its own height; the chart row takes any spare space
+                  "& > :first-of-type": { height: "auto", flex: "0 0 auto" },
+                  "& > :last-child": { flex: 1 },
+                }}
+              >
+                <ProviderSplitCard />
+                {/* sector and Dzongkhag charts side by side */}
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6 }} sx={{ display: "flex", minWidth: 0, "& > *": { flex: 1, minWidth: 0 } }}>
+                    <DistributionCharts part="sector" />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }} sx={{ display: "flex", minWidth: 0, "& > *": { flex: 1, minWidth: 0 } }}>
+                    <DistributionCharts part="dzongkhag" />
+                  </Grid>
+                </Grid>
+              </Stack>
+            </Grid>
+          </Grid>
         </Section>
 
         <Section
           id="course-announcements"
-          tinted
           title="Course announcements"
-          description="Programmes accepting applications now. Find the right course and apply online."
         >
-          <Surface
-            sx={{
-              "& .MuiTableCell-root": {
-                fontSize: "0.82rem",
-                py: 0.85,
-                px: 1.2,
-                border: `1px solid ${LINE}`,
-              },
-              "& .MuiTableCell-head": {
-                bgcolor: TINT,
-                fontWeight: 700,
-                color: NAVY,
-                whiteSpace: "nowrap",
-              },
-              "& .MuiChip-root": {
-                fontSize: "0.68rem",
-                height: 22,
-                fontWeight: 700,
-              },
-            }}
-          >
+          <Surface>
             <CourseTraineeAnnouncementsIndex
               serviceIds={rplOnly ? RPL_SERVICE_IDS : null}
               serviceFilterLabel="RPL assessment"
@@ -864,6 +845,7 @@ const PublicIndex = () => {
         </Section>
 
         <Section
+          tinted
           title="Ongoing programmes"
           description="Programmes currently running at training providers."
         >
@@ -873,30 +855,50 @@ const PublicIndex = () => {
         </Section>
 
         <Section
-          tinted
           title="Resources"
           description="Standards, curricula, publications and forms for trainees, training providers and TVET professionals."
         >
-          <Grid container spacing={1.5}>
+          {/* one row of four on desktop, two on tablet, one on phone */}
+          <Grid container spacing={2}>
             {RESOURCES.map((r) => (
-              <Grid key={r.href} size={{ xs: 12, sm: 6, lg: 4 }}>
+              <Grid key={r.href} size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box
                   component="a"
                   href={r.href}
                   sx={{
+                    position: "relative",
                     display: "flex",
-                    alignItems: "flex-start",
-                    gap: 1.5,
-                    p: 2,
+                    flexDirection: "column",
                     height: "100%",
-                    borderRadius: 2,
+                    p: 2.5,
+                    borderRadius: 3,
                     bgcolor: "background.paper",
                     border: `1px solid ${LINE}`,
+                    boxShadow: "0 2px 8px rgba(10,45,110,0.05)",
                     textDecoration: "none",
                     color: "inherit",
-                    "&:hover, &:focus-visible": { borderColor: BLUE },
-                    "&:hover .res-label, &:focus-visible .res-label": {
-                      textDecoration: "underline",
+                    overflow: "hidden",
+                    transition: "transform .2s ease, box-shadow .2s ease, border-color .2s ease",
+                    "&::before": {
+                      content: '""',
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 3,
+                      background: `linear-gradient(90deg, ${BLUE}, ${NAVY})`,
+                      transform: "scaleX(0)",
+                      transformOrigin: "left",
+                      transition: "transform .25s ease",
+                    },
+                    "&:hover, &:focus-visible": {
+                      transform: "translateY(-3px)",
+                      borderColor: alpha(BLUE, 0.35),
+                      boxShadow: "0 14px 30px rgba(10,45,110,0.12)",
+                    },
+                    "&:hover::before, &:focus-visible::before": { transform: "scaleX(1)" },
+                    "&:hover .res-arrow, &:focus-visible .res-arrow": {
+                      transform: "translateX(4px)",
                     },
                     "&:focus-visible": {
                       outline: `2px solid ${BLUE}`,
@@ -904,26 +906,45 @@ const PublicIndex = () => {
                     },
                   }}
                 >
-                  <Box sx={{ color: BLUE, mt: 0.25, display: "flex" }}>
+                  <Box
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 2,
+                      display: "grid",
+                      placeItems: "center",
+                      color: r.accent,
+                      bgcolor: alpha(r.accent, 0.1),
+                      mb: 1.5,
+                      "& svg": { fontSize: 20 },
+                    }}
+                  >
                     {r.icon}
                   </Box>
-                  <Box>
-                    <Typography
-                      className="res-label"
-                      fontWeight={700}
-                      sx={{ color: NAVY }}
-                    >
-                      {r.label}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: "text.secondary",
-                        fontSize: "0.85rem",
-                        mt: 0.25,
-                      }}
-                    >
-                      {r.desc}
-                    </Typography>
+                  <Typography fontWeight={700} sx={{ color: NAVY, fontSize: "1.02rem" }}>
+                    {r.label}
+                  </Typography>
+                  <Typography
+                    sx={{ color: "text.secondary", fontSize: "0.85rem", mt: 0.5, flex: 1 }}
+                  >
+                    {r.desc}
+                  </Typography>
+                  <Box
+                    sx={{
+                      mt: 2,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      color: BLUE,
+                      fontWeight: 600,
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    View
+                    <ArrowForwardIcon
+                      className="res-arrow"
+                      sx={{ fontSize: 16, transition: "transform .2s ease" }}
+                    />
                   </Box>
                 </Box>
               </Grid>
