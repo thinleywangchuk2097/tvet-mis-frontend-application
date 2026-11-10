@@ -844,34 +844,8 @@ const ViewCurriculumIndex = () => {
             <Grid item size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
-                label="Curriculum Title"
-                value={curriculumData.curriculum_title || "N/A"}
-                size="small"
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                  },
-                }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
                 label="Programme Type"
                 value={getCourseTypeName()}
-                size="small"
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                  },
-                }}
-              />
-            </Grid>
-            <Grid item size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                label="Programme Title"
-                value={getProgrammeTitle()}
                 size="small"
                 slotProps={{
                   input: {
@@ -918,6 +892,32 @@ const ViewCurriculumIndex = () => {
                 fullWidth
                 label="Certificate Level"
                 value={getCertificateLevelName()}
+                size="small"
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                  },
+                }}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Curriculum Title"
+                value={curriculumData.curriculum_title || "N/A"}
+                size="small"
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                  },
+                }}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Programme Title"
+                value={getProgrammeTitle()}
                 size="small"
                 slotProps={{
                   input: {

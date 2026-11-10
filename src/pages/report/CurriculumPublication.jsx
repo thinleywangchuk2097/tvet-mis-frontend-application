@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Paper,
   Typography,
@@ -10,18 +10,56 @@ import {
   TableCell,
   TableBody,
   TableContainer,
-  InputAdornment,
   MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  Button,
   Box,
-  Divider,
   TablePagination,
+  Chip,
+  CircularProgress,
+  Link,
 } from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import { toast } from "react-toastify";
+import PublicPageService from "../../api/services/internal/public/PublicPageService";
+import CommonService from "../../api/services/internal/common/CommonService";
+import {
+  PAPER_PROPS,
+  TABLE_SX,
+  INPUT_SX,
+  SELECT_SX,
+  ROWS_PER_PAGE_OPTIONS,
+} from "../public/reports/reportStyles";
+
+/** Parse a JSON column that may arrive as a string or an array. */
+const parseJsonArray = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+/** Map an API row to the fields shown on this page (same as the curriculum page). */
+const transformCurriculum = (item) => ({
+  id: item.id,
+  applicationNo: item.application_no || "",
+  sector: item.sector_name || "N/A",
+  occupation: item.occupation_name || "N/A",
+  curriculumTitle: item.curriculum_title || "N/A",
+  programmeTitle: item.programme_title || "N/A",
+  curriculumType: item.curriculum_type || "N/A",
+  certificateLevel: item.certificate_level_name || "N/A",
+  institute: item.institute_name || "N/A",
+  documents: parseJsonArray(item.documents)
+    .filter((d) => d && (d.id || d.url))
+    .map((d) => ({
+      id: d.id,
+      name: d.documentName || d.name || "Unnamed file",
+      url: d.url || null,
+    })),
+});
 
 const CurriculumPublication = () => {
   const [filters, setFilters] = useState({
@@ -31,120 +69,63 @@ const CurriculumPublication = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [allCurriculums, setAllCurriculums] = useState([]);
-  const [filteredCurriculums, setFilteredCurriculums] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  // Sample data from the image
-  const sampleData = [
-    {
-      id: 1,
-      sector: "ICT",
-      occupation: "Computer Systems and Network Technician",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "April 1st 2024",
-      fileAttachment: "ICT_Computer_Systems_Network_Technician.pdf",
-    },
-    {
-      id: 2,
-      sector: "Zorig Chusum",
-      occupation: "Patra",
-      qualificationLevel: "BQF Diploma",
-      validity: "August 8th 2024",
-      fileAttachment: "Zorig_Chusum_Patra.pdf",
-    },
-    {
-      id: 3,
-      sector: "Zorig Chusum",
-      occupation: "Troezo",
-      qualificationLevel: "BQF Diploma",
-      validity: "August 8th 2024",
-      fileAttachment: "Zorig_Chusum_Troezo.pdf",
-    },
-    {
-      id: 4,
-      sector: "Manufacturing",
-      occupation: "HVAC Technician",
-      qualificationLevel: "BQF Certificate 3",
-      validity: "August 8th 2024",
-      fileAttachment: "Manufacturing_HVAC_Technician.pdf",
-    },
-    {
-      id: 5,
-      sector: "Manufacturing",
-      occupation: "Refrigeration and Air Conditioning Technician",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "August 8th 2024",
-      fileAttachment: "Manufacturing_Refrigeration_Air_Conditioning.pdf",
-    },
-    {
-      id: 6,
-      sector: "Manufacturing",
-      occupation: "Metal Art and Fabrication Technician",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "August 8th 2024",
-      fileAttachment: "Manufacturing_Metal_Art_Fabrication.pdf",
-    },
-    {
-      id: 7,
-      sector: "Power",
-      occupation: "Solar Power Technician",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "August 8th 2024",
-      fileAttachment: "Power_Solar_Technician.pdf",
-    },
-    {
-      id: 8,
-      sector: "Zorig Chusum",
-      occupation: "Thagzo",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "November 15th 2023",
-      fileAttachment: "Zorig_Chusum_Thagzo.pdf",
-    },
-    {
-      id: 9,
-      sector: "Zorig Chusum",
-      occupation: "Shagzo",
-      qualificationLevel: "BQF Certificate 2",
-      validity: "October 9th 2023",
-      fileAttachment: "Zorig_Chusum_Shagzo.pdf",
-    },
-  ];
-
-  // Get unique sectors from data
-  const sectors = ["All", ...new Set(sampleData.map(item => item.sector))];
-
-  // Load data on component mount
+  // Load Endorsed curricula from the backend
   useEffect(() => {
-    setAllCurriculums(sampleData);
-    setFilteredCurriculums(sampleData);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await PublicPageService.getCurriculumPublications();
+        if (res instanceof Error || res?.isAxiosError) throw res;
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        setAllCurriculums(rows.map(transformCurriculum));
+      } catch (error) {
+        console.error("Error fetching curriculum publications:", error);
+        toast.error("Failed to load curriculum");
+        setAllCurriculums([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
-  // Apply filters whenever allCurriculums, sector, or search changes
-  useEffect(() => {
-    if (allCurriculums.length > 0) {
-      applyFilters();
-    }
-  }, [allCurriculums, filters.sector, filters.search]);
+  // Unique sectors from data
+  const sectors = useMemo(
+    () => ["All", ...new Set(allCurriculums.map((item) => item.sector))],
+    [allCurriculums],
+  );
 
-  const applyFilters = () => {
-    let result = [...allCurriculums];
+  const filteredCurriculums = useMemo(() => {
+    let result = allCurriculums;
 
     if (filters.sector && filters.sector !== "All") {
       result = result.filter((item) => item.sector === filters.sector);
     }
 
     if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+      const q = filters.search.toLowerCase();
+      const has = (v) => String(v || "").toLowerCase().includes(q);
       result = result.filter(
         (item) =>
-          item.occupation.toLowerCase().includes(searchLower) ||
-          item.sector.toLowerCase().includes(searchLower) ||
-          item.qualificationLevel.toLowerCase().includes(searchLower)
+          has(item.sector) ||
+          has(item.occupation) ||
+          has(item.curriculumTitle) ||
+          has(item.programmeTitle) ||
+          has(item.curriculumType) ||
+          has(item.certificateLevel) ||
+          has(item.institute),
       );
     }
 
-    setFilteredCurriculums(result);
+    return result;
+  }, [allCurriculums, filters.sector, filters.search]);
+
+  useEffect(() => {
     setPage(0);
-  };
+  }, [filters.sector, filters.search]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -154,16 +135,7 @@ const CurriculumPublication = () => {
     }));
   };
 
-  const handleClearFilters = () => {
-    setFilters({
-      sector: "All",
-      search: "",
-    });
-    setFilteredCurriculums(allCurriculums);
-    setPage(0);
-  };
-
-  const handleChangePage = (event, newPage) => {
+  const handleChangePage = (_event, newPage) => {
     setPage(newPage);
   };
 
@@ -172,170 +144,181 @@ const CurriculumPublication = () => {
     setPage(0);
   };
 
+  // Download a stored document (same API as the curriculum page)
+  const handleDownload = async (file) => {
+    if (!file?.url) {
+      toast.error("File not available");
+      return;
+    }
+    setDownloading(true);
+    try {
+      const response = await CommonService.fetchDocument(file.name, file.url);
+      const blob = new Blob([response.data], {
+        type: response.headers?.["content-type"] || "application/octet-stream",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name || "download";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      toast.error("Failed to download file");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const paginatedCurriculums = filteredCurriculums.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
+  const COLS = 9;
+
   return (
-    <Paper sx={{ p: 3, mt: 2 }}>
-      <Typography variant="h5" gutterBottom fontWeight={600}>
+    <Paper {...PAPER_PROPS}>
+      <Typography variant="h5" gutterBottom>
         Curriculum
       </Typography>
 
-      <Grid container spacing={2} sx={{ mb: 3, mt: 1 }}>
-        <Grid item size={{ xs: 12, md: 3 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Sector</InputLabel>
-            <Select
-              name="sector"
-              value={filters.sector}
-              onChange={handleFilterChange}
-              label="Sector"
-            >
-              {sectors.map((sector) => (
-                <MenuItem key={sector} value={sector}>
-                  {sector}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="body2" color="text.secondary">
+          Endorsed curricula with their programme, certificate level and
+          attachments.
+        </Typography>
+      </Box>
 
+      <Grid
+        container
+        spacing={1}
+        alignItems="center"
+        sx={{ justifyContent: "flex-end", mb: 2 }}
+      >
         <Grid item size={{ xs: 12, md: 3 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Show</InputLabel>
-            <Select
-              value={rowsPerPage}
-              onChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
-              label="Show"
-            >
-              <MenuItem value={10}>10 entries</MenuItem>
-              <MenuItem value={25}>25 entries</MenuItem>
-              <MenuItem value={50}>50 entries</MenuItem>
-              <MenuItem value={100}>100 entries</MenuItem>
-            </Select>
-          </FormControl>
+          <TextField
+            select
+            label="Sector"
+            name="sector"
+            size="small"
+            fullWidth
+            value={filters.sector}
+            onChange={handleFilterChange}
+            sx={SELECT_SX}
+          >
+            {sectors.map((sector) => (
+              <MenuItem key={sector} value={sector}>
+                {sector}
+              </MenuItem>
+            ))}
+          </TextField>
         </Grid>
-
-        <Grid item size={{ xs: 12, md: 6 }}>
-          <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-            <TextField
-              size="small"
-              placeholder="Search..."
-              name="search"
-              value={filters.search}
-              onChange={handleFilterChange}
-              sx={{ flex: 1, maxWidth: 300 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Button
-              variant="contained"
-              color="secondary"
-              onClick={handleClearFilters}
-            >
-              Clear
-            </Button>
-          </Box>
+        <Grid item size={{ xs: 12, md: 4 }}>
+          <TextField
+            label="Search Curriculum"
+            name="search"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={filters.search}
+            onChange={handleFilterChange}
+            placeholder="Search by Title, Occupation or Institute"
+            sx={INPUT_SX}
+          />
         </Grid>
       </Grid>
 
-      <Divider sx={{ my: 2 }} />
-
-      <TableContainer>
-        <Table
-          size="small"
-          sx={{
-            border: "1px solid #ddd",
-            "& th, & td": {
-              border: "1px solid #ddd",
-              padding: "10px 12px",
-            },
-          }}
-        >
+      <TableContainer component={Paper} elevation={1}>
+        <Table size="small" sx={TABLE_SX}>
           <TableHead>
-            <TableRow sx={{ background: "#f5f7fa" }}>
-              <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Sector</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Occupation</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Qualification Level</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Validity</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>File Attachment(s)</TableCell>
+            <TableRow>
+              <TableCell>#</TableCell>
+              <TableCell>Sector</TableCell>
+              <TableCell>Occupation</TableCell>
+              <TableCell>Curriculum Title</TableCell>
+              <TableCell>Programme Title</TableCell>
+              <TableCell>Curriculum Type</TableCell>
+              <TableCell>Certificate Level</TableCell>
+              <TableCell>Institute</TableCell>
+              <TableCell>File Attachment(s)</TableCell>
             </TableRow>
           </TableHead>
 
           <TableBody>
-            {paginatedCurriculums.length > 0 ? (
-              paginatedCurriculums.map((item, index) => {
-                return (
-                  <TableRow key={item.id} hover>
-                    <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                    <TableCell>{item.sector}</TableCell>
-                    <TableCell>{item.occupation}</TableCell>
-                    <TableCell>{item.qualificationLevel}</TableCell>
-                    <TableCell>{item.validity}</TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                          fontSize: "0.75rem",
-                          color: "#1976d2",
-                          cursor: "pointer",
-                          "&:hover": {
-                            textDecoration: "underline",
-                          },
-                        }}
-                      >
-                        <AttachFileIcon sx={{ fontSize: "16px" }} />
-                        Download
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={COLS} align="center">
+                  <CircularProgress size={30} />
+                </TableCell>
+              </TableRow>
+            ) : paginatedCurriculums.length > 0 ? (
+              paginatedCurriculums.map((item, index) => (
+                <TableRow key={item.id ?? index}>
+                  <TableCell>{page * rowsPerPage + index + 1}</TableCell>
+                  <TableCell>{item.sector}</TableCell>
+                  <TableCell>{item.occupation}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium">
+                      {item.curriculumTitle}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{item.programmeTitle}</TableCell>
+                  <TableCell>{item.curriculumType}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={item.certificateLevel}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>{item.institute}</TableCell>
+                  <TableCell>
+                    {item.documents.length > 0 ? (
+                      item.documents.map((doc, idx) => (
+                        <Box
+                          key={doc.id ?? idx}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                            mb: 0.5,
+                          }}
+                        >
+                          <AttachFileIcon sx={{ fontSize: 16 }} color="primary" />
+                          <Link
+                            component="button"
+                            variant="body2"
+                            onClick={() => handleDownload(doc)}
+                            disabled={downloading || !doc.url}
+                            sx={{ textAlign: "left", wordBreak: "break-word" }}
+                          >
+                            {doc.name}
+                          </Link>
+                        </Box>
+                      ))
+                    ) : (
+                      "No files"
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                  <Typography color="text.secondary">
-                    {filters.search || filters.sector !== "All"
-                      ? "No records found matching your filters"
-                      : "No data available"}
-                  </Typography>
+                <TableCell colSpan={COLS} align="center">
+                  {filters.search || filters.sector !== "All"
+                    ? "No records match your filters"
+                    : "No data available in table"}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-      </TableContainer>
-
-      <Divider sx={{ my: 2 }} />
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 1,
-        }}
-      >
-        <Typography variant="caption" color="text.secondary">
-          Showing {paginatedCurriculums.length} of {filteredCurriculums.length}{" "}
-          entries
-        </Typography>
         <TablePagination
-          rowsPerPageOptions={[10, 25, 50, 100]}
+          rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
           component="div"
           count={filteredCurriculums.length}
           rowsPerPage={rowsPerPage}
@@ -343,7 +326,7 @@ const CurriculumPublication = () => {
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
-      </Box>
+      </TableContainer>
     </Paper>
   );
 };

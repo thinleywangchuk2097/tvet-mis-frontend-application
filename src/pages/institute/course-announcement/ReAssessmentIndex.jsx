@@ -34,7 +34,6 @@ import InstituteRegistrationService from "../../../api/services/internal/registr
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
-import NcsService from "../../../api/services/internal/ncs/NcsService";
 
 // Helper component for required field indicator
 const RequiredStar = () => (
@@ -50,6 +49,10 @@ const todayLocalISO = () => {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${mm}-${dd}`;
 };
+
+// RPL Programme ReAssessment service and the certificate (non-diploma) levels
+const RPL_REASSESSMENT_ID = "41";
+const CERTIFICATE_LEVEL_IDS = ["108", "109", "110"];
 
 const ReAssessmentIndex = () => {
   const navigate = useNavigate();
@@ -68,10 +71,14 @@ const ReAssessmentIndex = () => {
   const [reassessmentTypes, setReassessmentTypes] = useState([]);
   const [filterReassessmentType, setFilterReassessmentType] = useState("");
   const [filterCertificationLevel, setFilterCertificationLevel] = useState("");
-  const [ncsProgrammes, setNcsProgrammes] = useState([]);
   const [accreditedProgramme, setAccreditedProgrammes] = useState([]);
+  // RPL re-assessment (41): certificate-level approved courses only
+  const [certificateProgrammes, setCertificateProgrammes] = useState([]);
 
   const access_token = useSelector((state) => state.auth.accessToken);
+  // role 12: RPL Programme ReAssessment (41) only
+  const currentRoleId = useSelector((state) => state.auth.current_roleId);
+  const isRole12 = String(currentRoleId) === "12";
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
 
@@ -90,7 +97,6 @@ const ReAssessmentIndex = () => {
       const response =
         await InstituteRegistrationService.getInstituteDetails(registration_no);
       setInstituteDetails(response.data);
-      console.log("Institute Details:", response.data);
     } catch (error) {
       console.error("Error fetching institute data:", error);
     }
@@ -100,7 +106,6 @@ const ReAssessmentIndex = () => {
     try {
       const levelsResponse = await CommonService.getByParentId(27);
       setCertificationLevels(levelsResponse.data);
-
       const fundingResponse = await CommonService.getByParentId(16);
       setFundingSources(fundingResponse.data);
     } catch (error) {
@@ -112,7 +117,6 @@ const ReAssessmentIndex = () => {
     try {
       const dzongkhagLists = await CommonService.getAllDzongkhags();
       setDzongkhags(dzongkhagLists.data);
-      console.log("Dzongkhags:", dzongkhagLists.data);
     } catch (error) {
       console.error("Error fetching dzongkhags:", error);
     }
@@ -122,10 +126,11 @@ const ReAssessmentIndex = () => {
     try {
       const response =
         await CourseEnrollmentService.getReAssessmentServiceName(access_token);
-      console.log("Re-assessment Service Name:", response.data);
       if (response.data && Array.isArray(response.data)) {
-        const filteredTypes = response.data.filter(
-          (type) => type.id === "41" || type.id === "42",
+        const filteredTypes = response.data.filter((type) =>
+          isRole12
+            ? String(type.id) === RPL_REASSESSMENT_ID
+            : type.id === "41" || type.id === "42",
         );
         setReassessmentTypes(filteredTypes);
       }
@@ -136,32 +141,26 @@ const ReAssessmentIndex = () => {
 
   const fetchAllNcsProgrammeData = async () => {
     try {
-      const ncsResponse = await NcsService.getAllNcsProgrammes(access_token);
-      console.log("NCS Programmes response:", ncsResponse.data);
-      const mappedNcsProgramme = ncsResponse.data.map((ncs) => ({
-        id: ncs.id,
-        name: ncs.programme_title,
-        serviceId: "41",
-        originalData: ncs,
-      }));
-      setNcsProgrammes(mappedNcsProgramme);
-      console.log("NCS Programmes loaded:", mappedNcsProgramme);
-
-      const accreditedResponse =
-        await ApplyAccreditedCourseService.getAccreditedApprovedCourseByUserId(
+      // 42 = all approved accredited courses, 41 (RPL) = certificate-level ones only
+      const [accreditedResponse, certificateResponse] = await Promise.all([
+        ApplyAccreditedCourseService.getAccreditedApprovedCourseByUserId(
           registration_no,
           access_token,
-        );
-      const mappedAccreditedCourses = accreditedResponse.data.map(
-        (programmeData) => ({
+        ),
+        ApplyAccreditedCourseService.getAccreditedApprovedCertificateCourseByUserId(
+          registration_no,
+          access_token,
+        ),
+      ]);
+      const mapCourses = (res) =>
+        (Array.isArray(res?.data) ? res.data : []).map((programmeData) => ({
           id: programmeData.id,
           name: programmeData.programme_title,
-          serviceId: "42",
           originalData: programmeData,
-        }),
-      );
+        }));
+      const mappedAccreditedCourses = mapCourses(accreditedResponse);
       setAccreditedProgrammes(mappedAccreditedCourses);
-      console.log("Accredited Programmes loaded:", mappedAccreditedCourses);
+      setCertificateProgrammes(mapCourses(certificateResponse));
     } catch (error) {
       console.error("Error fetching all programmes data:", error);
       toast.error("Failed to load programmes data");
@@ -181,14 +180,8 @@ const ReAssessmentIndex = () => {
           reassessmentTypeId,
           access_token,
         );
-      console.log("Fetched enrolled programmes", response.data);
+
       setProgrammes(response.data);
-      console.log(
-        "Enrolled Programmes for type",
-        reassessmentTypeId,
-        ":",
-        response.data,
-      );
     } catch (error) {
       console.error("Error fetching programmes:", error);
       setProgrammes([]);
@@ -200,11 +193,18 @@ const ReAssessmentIndex = () => {
     try {
       const statusResponse = await CommonService.getByParentId(4);
       setStatusList(statusResponse.data);
-      console.log("Status List:", statusResponse.data);
     } catch (error) {
       console.error("Error fetching status list:", error);
     }
   };
+
+  // RPL Programme ReAssessment (41): certificate levels only, no diploma
+  const getLevelsForType = (reassessmentTypeId) =>
+    String(reassessmentTypeId) === RPL_REASSESSMENT_ID
+      ? certificationLevels.filter((l) =>
+          CERTIFICATE_LEVEL_IDS.includes(String(l.id)),
+        )
+      : certificationLevels;
 
   const fetchApprovedCourses = async (reassessmentTypeId) => {
     try {
@@ -213,15 +213,12 @@ const ReAssessmentIndex = () => {
         return;
       }
 
-      if (reassessmentTypeId === "42" || reassessmentTypeId === 42) {
-        setApprovedProgrammes(accreditedProgramme);
-        console.log("Using Accredited Programmes:", accreditedProgramme);
-      } else if (reassessmentTypeId === "41" || reassessmentTypeId === 41) {
-        setApprovedProgrammes(ncsProgrammes);
-        console.log("Using NCS Programmes:", ncsProgrammes);
-      } else {
-        setApprovedProgrammes([]);
-      }
+      // same approved accredited course list for both reassessment types
+      setApprovedProgrammes(
+        String(reassessmentTypeId) === RPL_REASSESSMENT_ID
+          ? certificateProgrammes
+          : accreditedProgramme,
+      );
     } catch (error) {
       console.error("Error fetching approved programmes:", error);
       setApprovedProgrammes([]);
@@ -249,24 +246,12 @@ const ReAssessmentIndex = () => {
     return type ? type.service_name : "N/A";
   };
 
-  const getProgrammeName = (programmeId, serviceId) => {
+  const getProgrammeName = (programmeId) => {
     if (!programmeId) return "N/A";
 
-    let programme = null;
-
-    if (serviceId === "41" || serviceId === 41) {
-      programme = ncsProgrammes.find(
-        (c) => String(c.id) === String(programmeId),
-      );
-    } else if (serviceId === "42" || serviceId === 42) {
-      programme = accreditedProgramme.find(
-        (c) => String(c.id) === String(programmeId),
-      );
-    } else {
-      programme = approvedProgrammes.find(
-        (c) => String(c.id) === String(programmeId),
-      );
-    }
+    const programme = [...accreditedProgramme, ...certificateProgrammes].find(
+      (c) => String(c.id) === String(programmeId),
+    );
 
     return programme ? programme.name : programmeId;
   };
@@ -288,7 +273,6 @@ const ReAssessmentIndex = () => {
 
     return matchesSearch && matchesCertificationLevel;
   });
-  console.log("Filtered courses:", filteredProgrammes);
 
   const initialValues = {
     instituteId: institute.institute_id || "",
@@ -361,8 +345,6 @@ const ReAssessmentIndex = () => {
         remarks: "",
         documents: [], // no supporting documents for reassessment
       };
-
-      console.log("Submitting payload:", payload);
 
       const response = await CourseEnrollmentService.submitCourseAnnouncement(
         payload,
@@ -582,7 +564,7 @@ const ReAssessmentIndex = () => {
                   sx={{ height: "36px" }}
                 >
                   <MenuItem value="">All Certification Levels</MenuItem>
-                  {certificationLevels.map((level) => (
+                  {getLevelsForType(filterReassessmentType).map((level) => (
                     <MenuItem key={level.id} value={level.id}>
                       {level.name}
                     </MenuItem>
@@ -694,6 +676,15 @@ const ReAssessmentIndex = () => {
                         const value = e.target.value;
                         formik.handleChange(e);
                         formik.setFieldValue("programmeId", "");
+                        // RPL reassessment allows certificate levels only: clear a diploma choice
+                        if (
+                          String(value) === RPL_REASSESSMENT_ID &&
+                          !CERTIFICATE_LEVEL_IDS.includes(
+                            String(formik.values.certificationLevelId),
+                          )
+                        ) {
+                          formik.setFieldValue("certificationLevelId", "");
+                        }
                         if (value) {
                           await fetchApprovedCourses(value);
                         } else {
@@ -731,7 +722,22 @@ const ReAssessmentIndex = () => {
                       size="small"
                       select
                       value={formik.values.programmeId}
-                      onChange={formik.handleChange}
+                      onChange={(e) => {
+                        formik.handleChange(e);
+                        // auto-fill the certification level from the chosen course
+                        const course = approvedProgrammes.find(
+                          (p) => String(p.id) === String(e.target.value),
+                        );
+                        const levelId =
+                          course?.originalData?.certificate_level_id;
+                        const level = certificationLevels.find(
+                          (l) => String(l.id) === String(levelId),
+                        );
+                        formik.setFieldValue(
+                          "certificationLevelId",
+                          level ? level.id : (levelId ?? ""),
+                        );
+                      }}
                       onBlur={formik.handleBlur}
                       error={
                         formik.touched.programmeId &&
@@ -792,6 +798,10 @@ const ReAssessmentIndex = () => {
                       size="small"
                       value={formik.values.certificationLevelId}
                       onChange={formik.handleChange}
+                      // filled from the chosen programme
+                      slotProps={{
+                        input: { readOnly: Boolean(formik.values.programmeId) },
+                      }}
                       onBlur={formik.handleBlur}
                       error={
                         formik.touched.certificationLevelId &&
@@ -803,11 +813,13 @@ const ReAssessmentIndex = () => {
                       }
                     >
                       <MenuItem value="">-select-</MenuItem>
-                      {certificationLevels.map((level) => (
-                        <MenuItem key={level.id} value={level.id}>
-                          {level.name}
-                        </MenuItem>
-                      ))}
+                      {getLevelsForType(formik.values.reassessmentTypeId).map(
+                        (level) => (
+                          <MenuItem key={level.id} value={level.id}>
+                            {level.name}
+                          </MenuItem>
+                        ),
+                      )}
                     </TextField>
                   </Grid>
 
@@ -985,7 +997,6 @@ const ReAssessmentIndex = () => {
                       }
                     />
                   </Grid>
-
                 </Grid>
               </DialogContent>
               <DialogActions>

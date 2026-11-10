@@ -132,6 +132,7 @@ const RegularIndex = () => {
     const data = traineeList.map((item, index) => ({
       SlNo: index + 1,
       ApplicationNo: item.application_no || "N/A",
+      ServiceName: item.service_name || "N/A",
       ApplicantName: item.applicant_name || "N/A",
       CID: item.cid_no || "N/A",
       Gender: item.gender || "N/A",
@@ -148,7 +149,20 @@ const RegularIndex = () => {
       Status: item.status_name || "N/A",
     }));
 
-    exportToExcel(data, `Trainee_Details_${today}`);
+    // file name: Trainee_Details_<institute name>_<service name>_<date>
+    const first = traineeList[0] || {};
+    const safe = (text) =>
+      String(text || "")
+        .trim()
+        .replace(/[\\/:*?"<>|]+/g, "")
+        .replace(/\s+/g, "_");
+    const nameParts = [
+      "Trainee_Details",
+      safe(first.institute_name),
+      safe(first.service_name),
+      today,
+    ].filter(Boolean);
+    exportToExcel(data, nameParts.join("_"));
   };
 
   return (

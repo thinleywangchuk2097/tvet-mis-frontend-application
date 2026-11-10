@@ -1150,8 +1150,10 @@ const CurriculumForm = ({
         )}
       </Grid>
 
-      {/* Curriculum Title */}
-      <Grid size={{ xs: 12, md: 6 }}>{renderCurriculumTitleField()}</Grid>
+      {/* Curriculum Title - Endorsement only: after Curriculum Type */}
+      {isEndorse && (
+        <Grid size={{ xs: 12, md: 6 }}>{renderCurriculumTitleField()}</Grid>
+      )}
 
       {/* Programme Type */}
       <Grid size={{ xs: 12, md: 6 }}>
@@ -1256,6 +1258,11 @@ const CurriculumForm = ({
         )}
         {renderNcsStatusMessage()}
       </Grid>
+
+      {/* Curriculum Title (Endorsement shows it right after Curriculum Type) */}
+      {!isEndorse && (
+        <Grid size={{ xs: 12, md: 6 }}>{renderCurriculumTitleField()}</Grid>
+      )}
 
       {/* Programme Title */}
       <Grid size={{ xs: 12, md: 6 }}>
@@ -2600,6 +2607,7 @@ const CurriculumIndex = () => {
               <TableCell>Application No</TableCell>
               <TableCell>Curriculum Title</TableCell>
               <TableCell>Curriculum Type</TableCell>
+              <TableCell>Certificate Level</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>Attachment</TableCell>
               <TableCell>Status</TableCell>
@@ -2620,6 +2628,9 @@ const CurriculumIndex = () => {
                       <TableCell>{item.curriculum_title}</TableCell>
                       <TableCell>
                         {getCurriculumTypeName(item.curriculum_type_id)}
+                      </TableCell>
+                      <TableCell>
+                        {item.certificate_level_name || "-"}
                       </TableCell>
                       <TableCell>{item.description}</TableCell>
                       <TableCell>
@@ -2703,7 +2714,7 @@ const CurriculumIndex = () => {
                 })
             ) : (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   No data available in table
                 </TableCell>
               </TableRow>

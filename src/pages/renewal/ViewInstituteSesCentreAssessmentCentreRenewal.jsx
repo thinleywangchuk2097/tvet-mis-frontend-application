@@ -51,6 +51,7 @@ import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import CommonService from "../../api/services/internal/common/CommonService";
 import InstituteRegistrationRenewalService from "../../api/services/internal/registration/InstituteRegistrationRenewalService";
+import InstituteRegistrationService from "../../api/services/internal/registration/InstituteRegistrationService";
 import BirmsPaymentService from "../../api/services/internal/birms/BirmsPaymentService";
 
 // ==================== CONSTANTS ====================
@@ -525,23 +526,32 @@ const useQualityStandards = () => {
   };
 };
 
-const usePayment = (applicationNo) => {
+const usePayment = (applicationNo, access_token) => {
   const [paymentStatus, setPaymentStatus] = useState(null);
 
   const fetchPaymentStatus = useCallback(async () => {
+    if (!applicationNo || !access_token) return null;
     try {
       const response = await BirmsPaymentService.getPaymentByApplicationNo(
         applicationNo,
         access_token,
       );
-      setPaymentStatus(response.data);
-      return response.data;
+      // service returns the error object instead of throwing
+      if (response instanceof Error || response?.isAxiosError) {
+        setPaymentStatus(null);
+        return null;
+      }
+      const data = Array.isArray(response?.data)
+        ? response.data[0]
+        : response?.data;
+      setPaymentStatus(data || null);
+      return data || null;
     } catch (error) {
       console.error("Error fetching payment status:", error);
       setPaymentStatus(null);
       return null;
     }
-  }, [applicationNo]);
+  }, [applicationNo, access_token]);
 
   const isPaymentPaid = useMemo(() => {
     return paymentStatus?.paymentStatus?.toLowerCase() === "paid";
@@ -1306,13 +1316,40 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
   // Custom hooks
   const masterData = useMasterData();
   const qualityStandards = useQualityStandards();
-  const payment = usePayment(applicationNo);
+  const payment = usePayment(applicationNo, access_token);
   const dialog = useActionDialog();
 
   // Local state
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [renewalData, setRenewalData] = useState(null);
+  // renewal period from the latest Self Assessment Report grade
+  const [renewalValidity, setRenewalValidity] = useState(null);
+
+  useEffect(() => {
+    const regNo = renewalData?.renewal_registration_no;
+    if (!regNo) return;
+    InstituteRegistrationService.getRenewalValidity(
+      regNo,
+      renewalData?.service_id,
+    ).then((res) => {
+      if (!(res instanceof Error) && !res?.isAxiosError && res?.data) {
+        setRenewalValidity(res.data);
+      }
+    });
+  }, [renewalData?.renewal_registration_no, renewalData?.service_id]);
+
+  // institute_id of the registration being renewed (stored on the payment)
+  const [instituteId, setInstituteId] = useState(null);
+  useEffect(() => {
+    const regNo = renewalData?.renewal_registration_no;
+    if (!regNo) return;
+    InstituteRegistrationService.getInstituteDetails(regNo).then((res) => {
+      if (res instanceof Error || res?.isAxiosError) return;
+      const row = Array.isArray(res?.data) ? res.data[0] : res?.data;
+      if (row?.institute_id) setInstituteId(row.institute_id);
+    });
+  }, [renewalData?.renewal_registration_no]);
   const [documents, setDocuments] = useState([]);
   const [newDocuments, setNewDocuments] = useState([]);
   const [overallRemarks, setOverallRemarks] = useState("");
@@ -1343,8 +1380,12 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
     if (applicationNo) {
       fetchRenewalData();
     }
-    payment.fetchPaymentStatus();
   }, [applicationNo]);
+
+  // payment details (re-run once the token is available)
+  useEffect(() => {
+    payment.fetchPaymentStatus();
+  }, [payment.fetchPaymentStatus]);
 
   const fetchRenewalData = async () => {
     setLoading(true);
@@ -1461,10 +1502,18 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
         overallRemarks: currentRoleId == 23 ? overallRemarks : "",
       };
 
-      await InstituteRegistrationRenewalService.verifyInstituteRenewal(
-        payload,
-        access_token,
-      );
+      const res =
+        await InstituteRegistrationRenewalService.verifyInstituteRenewal(
+          payload,
+          access_token,
+        );
+      // service returns the error object instead of throwing
+      if (res instanceof Error || res?.isAxiosError || res?.status >= 400) {
+        const msg =
+          res?.response?.data?.message || res?.message || "Request failed";
+        toast.error(`Failed to process renewal: ${msg}`);
+        return;
+      }
 
       const statusMessages = {
         [STATUS.VERIFY]: "Renewal verified successfully",
@@ -1521,7 +1570,10 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
       return;
     }
     const applicationNo = renewalData.application_no;
-    const instituteId = 0;
+    if (!instituteId) {
+      toast.error("Institute not found for this renewal. Please try again.");
+      return;
+    }
     const serviceCode = getServiceCodeForPayment(renewalData.service_id);
     const taxPayerNo = renewalData.application_no || "N/A";
     const taxPayerEmail = renewalData.email_id || "N/A";
@@ -1531,7 +1583,7 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
     navigate(
       `/birms/common-payment-index/${applicationNo}/${serviceCode}/${taxPayerNo}/${taxPayerEmail}/${taxPayerMobileNo}/${taxPayerName}/${instituteId}`,
     );
-  }, [renewalData, navigate]);
+  }, [renewalData, instituteId, navigate]);
 
   const renderBasicInfo = useCallback(() => {
     const fields = [
@@ -1723,20 +1775,22 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
         <Grid size={{ xs: 12 }}>
           {qualityStandards.qualityData.length > 0 ? (
             <>
-              {qualityStandards.qualityData.slice(0, 3).map((standard, sIdx) => (
-                <QualityChecklistTable
-                  key={standard.id}
-                  standard={standard}
-                  sectionNo={sIdx + 1}
-                  qualityResponses={qualityStandards.qualityResponses}
-                  qualityRemarks={qualityStandards.qualityRemarks}
-                  onResponseChange={
-                    qualityStandards.handleQualityResponseChange
-                  }
-                  onRemarkChange={qualityStandards.handleQualityRemarkChange}
-                  isReadOnly={isReadOnly}
-                />
-              ))}
+              {qualityStandards.qualityData
+                .slice(0, 3)
+                .map((standard, sIdx) => (
+                  <QualityChecklistTable
+                    key={standard.id}
+                    standard={standard}
+                    sectionNo={sIdx + 1}
+                    qualityResponses={qualityStandards.qualityResponses}
+                    qualityRemarks={qualityStandards.qualityRemarks}
+                    onResponseChange={
+                      qualityStandards.handleQualityResponseChange
+                    }
+                    onRemarkChange={qualityStandards.handleQualityRemarkChange}
+                    isReadOnly={isReadOnly}
+                  />
+                ))}
               {currentRoleId == 23 && (
                 <Paper
                   sx={{
@@ -1962,6 +2016,50 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
         <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
           Renewal Application Details
         </Typography>
+
+        {/* Renewal period: service 8 by SAR grade (C 2y, B 3y, A 4y, A+ 5y, otherwise 1y); others 1y */}
+        {renewalValidity && !renewalValidity.gradeBased && (
+          <Alert severity="info" icon={<VerifiedIcon />} sx={{ mb: 2 }}>
+            Renewal period <strong>1 year</strong>. If approved today, valid
+            until <strong>{renewalValidity.validUntilIfApprovedToday}</strong>
+            {renewalValidity.currentValidity
+              ? ` (currently valid until ${renewalValidity.currentValidity}).`
+              : "."}
+          </Alert>
+        )}
+        {renewalValidity && renewalValidity.gradeBased && (
+          <Alert
+            severity={renewalValidity.grade ? "info" : "warning"}
+            icon={<VerifiedIcon />}
+            sx={{ mb: 2 }}
+          >
+            {renewalValidity.grade ? (
+              <>
+                Latest Self Assessment grade:{" "}
+                <Chip
+                  size="small"
+                  color="primary"
+                  label={renewalValidity.grade}
+                  sx={{ height: 20, fontWeight: 700, mx: 0.5 }}
+                />
+                — renewal period{" "}
+                <strong>{renewalValidity.years} year(s)</strong> (1 year +{" "}
+                {renewalValidity.additionalYears} additional year
+                {renewalValidity.additionalYears === 1 ? "" : "s"}).
+              </>
+            ) : (
+              <>
+                No Self Assessment grade found — renewal period{" "}
+                <strong>1 year</strong>.
+              </>
+            )}{" "}
+            If approved today, valid until{" "}
+            <strong>{renewalValidity.validUntilIfApprovedToday}</strong>
+            {renewalValidity.currentValidity
+              ? ` (currently valid until ${renewalValidity.currentValidity}).`
+              : "."}
+          </Alert>
+        )}
         <Divider />
 
         <Tabs

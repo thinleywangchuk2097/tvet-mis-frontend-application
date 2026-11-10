@@ -66,6 +66,26 @@ const buildPdfPayload = (record) => ({
   overall_result: val(record, "overall_result", "result"),
 });
 
+// RPL (39) and RPL re-assessment (41): Viva + Practical, no Internal (CA) mark
+// Diploma levels (111, 112) are marked out of 100: Total = Internal + Theory + Practical
+const DIPLOMA_LEVEL_IDS = [111, 112];
+const isDiplomaRecord = (record) =>
+  DIPLOMA_LEVEL_IDS.includes(Number(record?.certification_level_id));
+
+/** Total mark for diploma rows ("—" when not a diploma or a mark is missing). */
+const totalMark = (record) => {
+  if (!isDiplomaRecord(record)) return "—";
+  const parts = [
+    record.internal_assessment_mark,
+    record.theory_assessment_mark,
+    record.practical_assessment_mark,
+  ].map((v) => (v === null || v === undefined || v === "" ? NaN : Number(v)));
+  if (parts.some((n) => Number.isNaN(n))) return "—";
+  return String(Math.round(parts.reduce((a, b) => a + b, 0) * 100) / 100);
+};
+
+const isRplRecord = (record) => ["39", "41"].includes(String(record?.service_id));
+
 const TraineeCertificateIndex = () => {
   // ==================== STATE ====================
   const [applicationNo, setApplicationNo] = useState("");
@@ -79,6 +99,10 @@ const TraineeCertificateIndex = () => {
 
   const access_token = useSelector((state) => state.auth.accessToken);
   const registration_no = useSelector((state) => state.auth.userId);
+
+  // RPL rows show the Viva mark in the Theory column
+  const allRpl = reports.length > 0 && reports.every(isRplRecord);
+  const someRpl = reports.some(isRplRecord);
 
   // ==================== FETCH ====================
   const fetchTrainees = useCallback(async () => {
@@ -214,8 +238,9 @@ const TraineeCertificateIndex = () => {
               <TableCell>Course End Date</TableCell>
               <TableCell>Certificate</TableCell>
               <TableCell>Internal</TableCell>
-              <TableCell>Theory</TableCell>
+              <TableCell>{allRpl ? "Viva" : someRpl ? "Theory / Viva" : "Theory"}</TableCell>
               <TableCell>Practical</TableCell>
+              <TableCell>Total</TableCell>
               <TableCell>Result</TableCell>
               <TableCell align="center">Action</TableCell>
             </TableRow>
@@ -224,7 +249,7 @@ const TraineeCertificateIndex = () => {
           <TableBody>
             {loadingReports ? (
               <TableRow>
-                <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={15} align="center" sx={{ py: 4 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
@@ -241,11 +266,20 @@ const TraineeCertificateIndex = () => {
                   <TableCell>{formatDate(report.course_end_date)}</TableCell>
                   <TableCell>{val(report, "certification_level")}</TableCell>
                   <TableCell>
-                    {val(report, "internal_assessment_mark")}
+                    {isRplRecord(report)
+                      ? "—"
+                      : val(report, "internal_assessment_mark")}
                   </TableCell>
-                  <TableCell>{val(report, "theory_assessment_mark")}</TableCell>
+                  <TableCell>
+                    {isRplRecord(report)
+                      ? val(report, "viva_assessment_mark")
+                      : val(report, "theory_assessment_mark")}
+                  </TableCell>
                   <TableCell>
                     {val(report, "practical_assessment_mark")}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: isDiplomaRecord(report) ? 600 : 400 }}>
+                    {totalMark(report)}
                   </TableCell>
                   <TableCell>{val(report, "overall_result")}</TableCell>
                   <TableCell align="center">
@@ -264,7 +298,7 @@ const TraineeCertificateIndex = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={14} align="center" sx={{ py: 3 }}>
+                <TableCell colSpan={15} align="center" sx={{ py: 3 }}>
                   {hasSearched
                     ? "No reports found for the given Application No."
                     : "Enter an Application No and click Search."}

@@ -289,6 +289,21 @@ const AssessorAccreditorQMSAuditor = () => {
     }
   };
 
+  /**
+   * Match the Datahub gender to a gender dropdown option.
+   * Compares trimmed, case-insensitive names first, then the first letter (M / F / O).
+   */
+  const findGenderOption = (options, gender) => {
+    const g = String(gender || "").trim().toLowerCase();
+    if (!g || !Array.isArray(options)) return null;
+    const norm = (v) => String(v || "").trim().toLowerCase();
+    return (
+      options.find((opt) => norm(opt.name) === g) ||
+      options.find((opt) => norm(opt.name).charAt(0) === g.charAt(0)) ||
+      null
+    );
+  };
+
   const fetchAndFillCitizenDetails = async (cid, formik) => {
     if (!cid || cid.length !== 11) {
       toast.warning("Please enter a valid 11-digit CID");
@@ -310,10 +325,8 @@ const AssessorAccreditorQMSAuditor = () => {
         ].filter(Boolean);
         const fullName = nameParts.join(" ").trim();
 
-        // FIXED: gender comes as "Male"/"Female" (not "M"/"F")
-        const genderOption = dropdownData.genders.find(
-          (opt) => opt.name === citizen.gender,
-        );
+        // Datahub gender may be "Male"/"Female", "MALE", "M"/"F" ... match loosely
+        const genderOption = findGenderOption(dropdownData.genders, citizen.gender);
 
         formik.setFieldValue("fullName", fullName);
         formik.setFieldValue("genderId", genderOption?.id || "");
@@ -544,7 +557,9 @@ const AssessorAccreditorQMSAuditor = () => {
             error={formik.touched.genderId && Boolean(formik.errors.genderId)}
             helperText={formik.touched.genderId && formik.errors.genderId}
             disabled={
-              hasCitizenId === "yes" && formik.values.citizenId?.length === 11
+              hasCitizenId === "yes" &&
+              formik.values.citizenId?.length === 11 &&
+              Boolean(formik.values.genderId)
             }
           >
             <MenuItem value="">Select</MenuItem>

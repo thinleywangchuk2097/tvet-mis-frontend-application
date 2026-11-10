@@ -1,651 +1,524 @@
-import React, { useState } from "react";
+// DWPS 1 (role 21) dashboard: curriculum applications and tracer surveys, plus the role's open tasks.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import {
-  Box,
-  Grid,
-  Paper,
-  Typography,
   Avatar,
+  Box,
+  Button,
   Chip,
+  Grid,
+  IconButton,
+  LinearProgress,
+  Paper,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination,
-  useTheme,
+  Tooltip as MuiTooltip,
+  Typography,
 } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 import {
-  School as SchoolIcon,
-  People as PeopleIcon,
-  Assignment as AssignmentIcon,
-  Verified as VerifiedIcon,
-  CheckCircle as CheckCircleIcon,
-  PendingActions as PendingIcon,
-} from "@mui/icons-material";
-import { alpha } from "@mui/material/styles";
-import {
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
+  Bar,
+  BarChart,
   CartesianGrid,
-  Tooltip,
   Legend,
   ResponsiveContainer,
-  BarChart,
-  Bar,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
+import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import AssignmentIcon from "@mui/icons-material/Assignment";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import QuizIcon from "@mui/icons-material/Quiz";
+import SendIcon from "@mui/icons-material/Send";
+import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
+import InsightsIcon from "@mui/icons-material/Insights";
+import InstituteDashboardService from "../../api/services/internal/dashboard/InstituteDashboardService";
+import { Empty, Kpi, Panel } from "./DashboardParts";
+import { fmtNum, headCellSx } from "./dashboardUtils";
 
-// ===== Mock Data =====
-const statsData = [
-  {
-    id: 1,
-    title: "Total Institutes",
-    value: "156",
-    change: "+12",
-    trend: "up",
-    icon: <SchoolIcon />,
-    color: "primary",
-  },
-  {
-    id: 2,
-    title: "Active Trainers",
-    value: "1,284",
-    change: "+48",
-    trend: "up",
-    icon: <PeopleIcon />,
-    color: "secondary",
-  },
-  {
-    id: 3,
-    title: "ToT",
-    value: "23",
-    change: "35",
-    trend: "down",
-    icon: <AssignmentIcon />,
-    color: "warning",
-  },
-  {
-    id: 4,
-    title: "Course Endorse",
-    value: "94%",
-    change: "5%",
-    trend: "up",
-    icon: <VerifiedIcon />,
-    color: "success",
-  },
-];
+const ROLE_ID = 21;
+const ENDORSED_STATUS_ID = 59;
 
-const instituteGrowthData = [
-  { month: "Jan", institutes: 65, trainers: 420 },
-  { month: "Feb", institutes: 78, trainers: 560 },
-  { month: "Mar", institutes: 90, trainers: 680 },
-  { month: "Apr", institutes: 95, trainers: 720 },
-  { month: "May", institutes: 110, trainers: 890 },
-  { month: "Jun", institutes: 125, trainers: 980 },
-  { month: "Jul", institutes: 140, trainers: 1100 },
-  { month: "Aug", institutes: 156, trainers: 1284 },
-];
+const isError = (res) => res instanceof Error || res?.isAxiosError;
+const num = (v) => Number(v) || 0;
 
-const instituteDistributionData = [
-  { name: "Technical Institutes", value: 85, color: "#4e73df" },
-  { name: "Tourism & Hospitality", value: 45, color: "#1cc88a" },
-  { name: "Training Providers", value: 26, color: "#f6c23e" },
-];
+const fmtDate = (d) => {
+  if (!d) return "—";
+  const date = new Date(d);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+};
 
-const monthlyPerformanceData = [
-  { name: "Jan", approved: 45, pending: 12, rejected: 3 },
-  { name: "Feb", approved: 52, pending: 8, rejected: 4 },
-  { name: "Mar", approved: 48, pending: 15, rejected: 2 },
-  { name: "Apr", approved: 61, pending: 10, rejected: 5 },
-  { name: "May", approved: 55, pending: 13, rejected: 3 },
-  { name: "Jun", approved: 67, pending: 9, rejected: 2 },
-];
+const BORDERED_TABLE = {
+  borderCollapse: "collapse",
+  "& th, & td": {
+    border: "1px solid",
+    borderColor: "divider",
+    py: 0.5,
+    px: 1,
+    fontSize: "0.8rem",
+    lineHeight: 1.3,
+    verticalAlign: "middle",
+  },
+  "& th": { ...headCellSx, py: 0.75 },
+};
 
-const recentProposalsData = [
-  {
-    id: "IN001",
-    institute: "Robotics & IoT Institute",
-    type: "New Registration",
-    submitted: "2024-03-15",
-    status: "Pending",
-  },
-  {
-    id: "IN002",
-    institute: "Bhutan Skills Center",
-    type: "Program Addition",
-    submitted: "2024-03-14",
-    status: "Under Review",
-  },
-  {
-    id: "IN003",
-    institute: "Digital Literacy Hub",
-    type: "Instructor Update",
-    submitted: "2024-03-13",
-    status: "Approved",
-  },
-  {
-    id: "IN004",
-    institute: "Hospitality Academy",
-    type: "Course Modification",
-    submitted: "2024-03-12",
-    status: "Rejected",
-  },
-  {
-    id: "IN005",
-    institute: "Green Energy Institute",
-    type: "New Registration",
-    submitted: "2024-03-11",
-    status: "Pending",
-  },
-];
+// Single-series bar chart (one hue, no legend; the panel title names the series)
+const CountBarChart = ({ data, name, color, horizontal = false }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <BarChart
+      data={data}
+      layout={horizontal ? "vertical" : "horizontal"}
+      margin={horizontal ? { left: 8, right: 16 } : { left: -20, right: 8 }}
+      barCategoryGap={4}
+    >
+      <CartesianGrid strokeDasharray="3 3" vertical={horizontal} horizontal={!horizontal} />
+      {horizontal ? (
+        <>
+          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+          <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} />
+        </>
+      ) : (
+        <>
+          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+        </>
+      )}
+      <Tooltip cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+      <Bar
+        dataKey="value"
+        name={name}
+        fill={color}
+        radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
+        barSize={horizontal ? 14 : 22}
+      />
+    </BarChart>
+  </ResponsiveContainer>
+);
+CountBarChart.propTypes = {
+  data: PropTypes.array.isRequired,
+  name: PropTypes.string.isRequired,
+  color: PropTypes.string.isRequired,
+  horizontal: PropTypes.bool,
+};
 
-const activityTimeline = [
-  {
-    id: 1,
-    action: "New Institute Registration",
-    institute: "Digital Marketing Academy",
-    time: "10 minutes ago",
-    type: "success",
-  },
-  {
-    id: 2,
-    action: "Document Verification",
-    institute: "Construction Skills Institute",
-    time: "25 minutes ago",
-    type: "warning",
-  },
-  {
-    id: 3,
-    action: "Trainer Certification",
-    institute: "Healthcare Training Center",
-    time: "1 hour ago",
-    type: "info",
-  },
-  {
-    id: 4,
-    action: "Quality Audit",
-    institute: "Tourism & Hospitality School",
-    time: "3 hours ago",
-    type: "primary",
-  },
-  {
-    id: 5,
-    action: "Program Approval",
-    institute: "IT Professional Academy",
-    time: "5 hours ago",
-    type: "success",
-  },
-];
-
-const pendingTasksData = [
-  { task: "Document Verification", count: 12, progress: 60, color: "primary" },
-  { task: "Institute Approvals", count: 8, progress: 40, color: "warning" },
-  { task: "Trainer Certifications", count: 15, progress: 75, color: "success" },
-];
-
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+const toChart = (rows) => (rows || []).map((r) => ({ name: r.name, value: num(r.value) }));
 
 const DWPS1Dashboard = () => {
   const theme = useTheme();
-  // Pagination states
-  const [proposalPage, setProposalPage] = useState(0);
-  const [proposalRowsPerPage, setProposalRowsPerPage] = useState(5);
+  const navigate = useNavigate();
+  const accessToken = useSelector((state) => state.auth.accessToken);
 
-  const [activityPage, setActivityPage] = useState(0);
-  const [activityRowsPerPage, setActivityRowsPerPage] = useState(5);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [data, setData] = useState(null);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Approved":
-        return "success";
-      case "Pending":
-        return "warning";
-      case "Rejected":
-        return "error";
-      case "Under Review":
-        return "info";
-      default:
-        return "default";
+  const load = useCallback(async () => {
+    if (!accessToken) return;
+    setLoading(true);
+    setLoadError("");
+    try {
+      const res = await InstituteDashboardService.getDwps1Overview(ROLE_ID, accessToken);
+      if (isError(res)) throw res;
+      setData(res?.data || null);
+    } catch (e) {
+      console.error("DWPS 1 dashboard load failed:", e);
+      setLoadError("Failed to load dashboard data. Try refreshing.");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [accessToken]);
 
-  const tableStyle = {
-    border: "1px solid",
-    borderColor: "divider",
-    "& th, & td": {
-      border: "1px solid",
-      borderColor: "divider",
-    },
-  };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const curriculum = data?.curriculum || {};
+  const tracer = data?.tracer || {};
+  const tasks = data?.pendingTasks || {};
+
+  const endorsed = useMemo(
+    () =>
+      (curriculum.byStatus || [])
+        .filter((s) => Number(s.id) === ENDORSED_STATUS_ID)
+        .reduce((a, s) => a + num(s.value), 0),
+    [curriculum.byStatus],
+  );
+
+  // sent vs responded per month (last 12 months)
+  const monthly = useMemo(() => {
+    const responded = {};
+    (tracer.respondedByMonth || []).forEach((m) => {
+      responded[m.month] = num(m.value);
+    });
+    return (tracer.byMonth || []).map((m) => ({
+      label: m.label,
+      Sent: num(m.value),
+      Responded: responded[m.month] || 0,
+    }));
+  }, [tracer.byMonth, tracer.respondedByMonth]);
+
+  const surveys = (tracer.bySurvey || []).slice(0, 8);
+  const busy = loading && !data;
 
   return (
-    <Paper sx={{ p: 3, mt: 1 }}>
-      <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-        DWPS I Dashboard
-      </Typography>
+    <Paper elevation={3} sx={{ p: 2, m: 1 }}>
+      {/* ---------------- Header ---------------- */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, md: 2.5 },
+          mb: 2,
+          borderRadius: 3,
+          background: (t) =>
+            `linear-gradient(120deg, ${alpha(t.palette.primary.main, 0.08)}, ${alpha(
+              t.palette.primary.main,
+              0.01,
+            )})`,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          <Avatar sx={{ bgcolor: "primary.main", width: 52, height: 52 }} variant="rounded">
+            <InsightsIcon />
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 220 }}>
+            <Typography variant="h6" fontWeight={700}>
+              DWPS Dashboard
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Curriculum applications and tracer surveys
+            </Typography>
+          </Box>
+          <MuiTooltip title="Refresh">
+            <span>
+              <IconButton onClick={load} disabled={loading} size="small">
+                <RefreshIcon />
+              </IconButton>
+            </span>
+          </MuiTooltip>
+        </Box>
 
-      {/* -------------------- Stats Cards -------------------- */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        {statsData.map((stat) => (
-          <Grid item size={{ xs: 6, sm: 6, md: 3 }} key={stat.id}>
-            <Paper
-              sx={{
-                p: 2,
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
-                borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
-              }}
+        {/* Quick actions */}
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
+          {[
+            { label: "Task list", to: "/tasklist/task-details-index", icon: <AssignmentIcon /> },
+            { label: "Tracer questions", to: "/tracer/generate-tracer-index", icon: <QuizIcon /> },
+            { label: "Send tracer", to: "/tracer/send-tracer", icon: <SendIcon /> },
+            { label: "Tracer responses", to: "/tracer/response-tracer", icon: <MarkEmailReadIcon /> },
+          ].map((a) => (
+            <Button
+              key={a.to}
+              size="small"
+              variant="outlined"
+              startIcon={a.icon}
+              onClick={() => navigate(a.to)}
+              sx={{ textTransform: "none", bgcolor: "background.paper" }}
             >
-              <Avatar
-                sx={{
-                  bgcolor: `${stat.color}.light`,
-                  color: `${stat.color}.main`,
-                }}
-              >
-                {stat.icon}
-              </Avatar>
-              <Box>
-                <Typography fontWeight={700}>{stat.value}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {stat.title}
-                </Typography>
-                <Chip
-                  label={stat.change}
-                  size="small"
-                  color={stat.trend === "up" ? "success" : "error"}
-                  sx={{ mt: 0.5, height: 20, fontSize: "0.7rem" }}
-                />
-              </Box>
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
+              {a.label}
+            </Button>
+          ))}
+        </Box>
+      </Paper>
 
-      {/* -------------------- Charts Row -------------------- */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        {/* Institute Growth Chart */}
-        <Grid item size={{ xs: 12, md: 7 }}>
-          <Paper
-            sx={{
-              p: 2,
-              height: 350,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Institute Growth Overview
-            </Typography>
-            <ResponsiveContainer width="100%" height="90%">
-              <AreaChart data={instituteGrowthData}>
-                <defs>
-                  <linearGradient
-                    id="colorInstitutes"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="5%"
-                      stopColor={theme.palette.primary.main}
-                      stopOpacity={0.3}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={theme.palette.primary.main}
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                  <linearGradient
-                    id="colorTrainers"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="5%"
-                      stopColor={theme.palette.success.main}
-                      stopOpacity={0.3}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={theme.palette.success.main}
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="institutes"
-                  stroke={theme.palette.primary.main}
-                  fill="url(#colorInstitutes)"
-                  strokeWidth={2}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="trainers"
-                  stroke={theme.palette.success.main}
-                  fill="url(#colorTrainers)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </Paper>
+      {loading && !busy && <LinearProgress sx={{ mb: 1.5, borderRadius: 1 }} />}
+      {loadError && !loading && (
+        <Typography color="error" variant="body2" sx={{ mb: 1.5 }}>
+          {loadError}
+        </Typography>
+      )}
+
+      {/* ---------------- KPIs ---------------- */}
+      <Grid container spacing={1.5} sx={{ mb: 2 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <Kpi
+            title="Pending tasks"
+            value={fmtNum(tasks.total)}
+            sub={`${fmtNum(tasks.unclaimed)} unclaimed · ${fmtNum(tasks.claimed)} claimed`}
+            icon={<AssignmentIcon />}
+            color="warning"
+            loading={loading}
+            highlight={num(tasks.total) > 0}
+          />
         </Grid>
-
-        {/* Institute Distribution */}
-        <Grid item size={{ xs: 12, md: 5 }}>
-          <Paper
-            sx={{
-              p: 2,
-              height: 350,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Institute Distribution
-            </Typography>
-            <ResponsiveContainer width="100%" height="80%">
-              <PieChart>
-                <Pie
-                  data={instituteDistributionData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                  label={({ name, percent }) =>
-                    `${name} ${(percent * 100).toFixed(0)}%`
-                  }
-                >
-                  {instituteDistributionData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </Paper>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <Kpi
+            title="Curriculum applications"
+            value={fmtNum(curriculum.total)}
+            sub={`${fmtNum(endorsed)} endorsed`}
+            icon={<MenuBookIcon />}
+            color="secondary"
+            loading={loading}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <Kpi
+            title="Tracer surveys"
+            value={fmtNum(tracer.surveys)}
+            icon={<QuizIcon />}
+            color="primary"
+            loading={loading}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <Kpi
+            title="Tracers sent"
+            value={fmtNum(tracer.sent)}
+            sub={`${fmtNum(tracer.responded)} responded`}
+            icon={<SendIcon />}
+            color="info"
+            loading={loading}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+          <Kpi
+            title="Response rate"
+            value={`${num(tracer.responseRate)}%`}
+            icon={<MarkEmailReadIcon />}
+            color="success"
+            loading={loading}
+          />
         </Grid>
       </Grid>
 
-      {/* -------------------- Second Row -------------------- */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        {/* Monthly Performance */}
-        <Grid item size={{ xs: 12, md: 7 }}>
-          <Paper
-            sx={{
-              p: 2,
-              height: 350,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Monthly Performance
-            </Typography>
-            <ResponsiveContainer width="100%" height="90%">
-              <BarChart data={monthlyPerformanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar
-                  dataKey="approved"
-                  fill={theme.palette.success.main}
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="pending"
-                  fill={theme.palette.warning.main}
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="rejected"
-                  fill={theme.palette.error.main}
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-
-        {/* Pending Tasks */}
-        <Grid item size={{ xs: 12, md: 5 }}>
-          <Paper
-            sx={{
-              p: 2,
-              height: 350,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Pending Tasks
-            </Typography>
-            <Box sx={{ mt: 2 }}>
-              {pendingTasksData.map((task, index) => (
-                <Box key={index} sx={{ mb: 3 }}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      mb: 1,
-                    }}
-                  >
-                    <Typography variant="body2">{task.task}</Typography>
-                    <Typography variant="body2" fontWeight={600}>
-                      {task.count}
-                    </Typography>
-                  </Box>
-                  <Box
-                    sx={{
-                      height: 8,
-                      borderRadius: 4,
-                      bgcolor: alpha(theme.palette[task.color].main, 0.1),
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: `${task.progress}%`,
-                        height: "100%",
-                        bgcolor: `${task.color}.main`,
-                        borderRadius: 4,
-                      }}
-                    />
-                  </Box>
-                </Box>
-              ))}
+      {/* ---------------- Tracer ---------------- */}
+      <Grid container spacing={1.5} sx={{ mb: 2 }}>
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Panel title="Tracers sent vs responded (last 12 months)">
+            <Box sx={{ height: 260 }}>
+              {loading ? (
+                <Skeleton variant="rounded" height="100%" />
+              ) : monthly.some((m) => m.Sent || m.Responded) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthly} margin={{ left: -20, right: 8 }} barCategoryGap={6}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="Sent" fill={theme.palette.info.main} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Responded" fill={theme.palette.success.main} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <Empty text="No tracers sent in the last 12 months" />
+              )}
             </Box>
-          </Paper>
+          </Panel>
+        </Grid>
+        <Grid size={{ xs: 12, md: 5 }}>
+          <Panel title="Tracers sent by type">
+            <Box sx={{ height: 260 }}>
+              {loading ? (
+                <Skeleton variant="rounded" height="100%" />
+              ) : (tracer.byType || []).length ? (
+                <CountBarChart
+                  data={toChart(tracer.byType)}
+                  name="Sent"
+                  color={theme.palette.primary.main}
+                  horizontal
+                />
+              ) : (
+                <Empty text="No tracers sent yet" />
+              )}
+            </Box>
+          </Panel>
         </Grid>
       </Grid>
 
-      {/* -------------------- Tables -------------------- */}
-      <Grid container spacing={2}>
-        {/* Recent Proposals Table */}
-        <Grid item size={{ xs: 12, md: 12 }}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Recent Proposals
-            </Typography>
-
-            <TableContainer>
-              <Table size="small" sx={tableStyle}>
+      <Grid container spacing={1.5} sx={{ mb: 2 }}>
+        <Grid size={{ xs: 12 }}>
+          <Panel
+            title="Tracer surveys"
+            action={
+              <Button
+                size="small"
+                onClick={() => navigate("/tracer/response-tracer")}
+                sx={{ textTransform: "none" }}
+              >
+                View responses
+              </Button>
+            }
+          >
+            <TableContainer sx={{ maxHeight: 360 }}>
+              <Table size="small" stickyHeader sx={BORDERED_TABLE}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Institute Name</TableCell>
+                    <TableCell>Survey</TableCell>
                     <TableCell>Type</TableCell>
-                    <TableCell>Submitted Date</TableCell>
-                    <TableCell>Status</TableCell>
+                    <TableCell align="center">Questions</TableCell>
+                    <TableCell align="center">Sent</TableCell>
+                    <TableCell align="center">Response rate</TableCell>
+                    <TableCell>Last sent</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {recentProposalsData
-                    .slice(
-                      proposalPage * proposalRowsPerPage,
-                      proposalPage * proposalRowsPerPage + proposalRowsPerPage,
-                    )
-                    .map((proposal) => (
-                      <TableRow key={proposal.id} hover>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6}>
+                        <Skeleton />
+                      </TableCell>
+                    </TableRow>
+                  ) : surveys.length ? (
+                    surveys.map((sv) => {
+                      const sent = num(sv.sent);
+                      const pct = sent ? Math.round((num(sv.responded) / sent) * 100) : 0;
+                      return (
+                        <TableRow key={sv.application_no} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={600} fontSize="0.8rem">
+                              {sv.tracer_title || "—"}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {sv.application_no}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            {sv.tracer_type || "—"}
+                            {sv.sub_tracer_type && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {sv.sub_tracer_type}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell align="center">{fmtNum(sv.questions)}</TableCell>
+                          <TableCell align="center">{fmtNum(sent)}</TableCell>
+                          <TableCell align="center">
+                            {sent ? (
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={pct}
+                                  sx={{ flex: 1, height: 6, borderRadius: 3 }}
+                                  color={pct >= 60 ? "success" : pct >= 30 ? "primary" : "warning"}
+                                />
+                                <Typography variant="caption" sx={{ minWidth: 72, textAlign: "right" }}>
+                                  {fmtNum(sv.responded)}/{fmtNum(sent)} ({pct}%)
+                                </Typography>
+                              </Box>
+                            ) : (
+                              <Chip size="small" label="Not sent" variant="outlined" sx={{ height: 20, fontSize: "0.7rem" }} />
+                            )}
+                          </TableCell>
+                          <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(sv.last_sent)}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        No tracer surveys yet
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Panel>
+        </Grid>
+      </Grid>
+
+      {/* ---------------- Curriculum ---------------- */}
+      <Grid container spacing={1.5}>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Panel title="Curriculum by status">
+            <Box sx={{ height: 200 }}>
+              {loading ? (
+                <Skeleton variant="rounded" height="100%" />
+              ) : (curriculum.byStatus || []).length ? (
+                <CountBarChart
+                  data={toChart(curriculum.byStatus)}
+                  name="Curricula"
+                  color={theme.palette.secondary.main}
+                  horizontal
+                />
+              ) : (
+                <Empty text="No curriculum applications yet" />
+              )}
+            </Box>
+            <Typography fontWeight={600} fontSize="0.85rem" sx={{ mt: 1.5, mb: 0.5 }}>
+              By type
+            </Typography>
+            <Box sx={{ height: 160 }}>
+              {loading ? (
+                <Skeleton variant="rounded" height="100%" />
+              ) : (curriculum.byType || []).length ? (
+                <CountBarChart
+                  data={toChart(curriculum.byType)}
+                  name="Curricula"
+                  color={theme.palette.primary.main}
+                  horizontal
+                />
+              ) : (
+                <Empty text="No curriculum applications yet" />
+              )}
+            </Box>
+          </Panel>
+        </Grid>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Panel title="Recent curriculum applications">
+            <TableContainer sx={{ maxHeight: 420 }}>
+              <Table size="small" stickyHeader sx={BORDERED_TABLE}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Application No.</TableCell>
+                    <TableCell>Curriculum</TableCell>
+                    <TableCell>Institute</TableCell>
+                    <TableCell align="center">Status</TableCell>
+                    <TableCell>Date</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <Skeleton />
+                      </TableCell>
+                    </TableRow>
+                  ) : (curriculum.recent || []).length ? (
+                    curriculum.recent.map((c) => (
+                      <TableRow key={c.application_no} hover>
+                        <TableCell sx={{ whiteSpace: "nowrap" }}>{c.application_no}</TableCell>
                         <TableCell>
-                          <Typography fontWeight={600}>
-                            {proposal.id}
+                          <Typography variant="body2" fontWeight={600} fontSize="0.8rem">
+                            {c.curriculum_title || "—"}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {c.curriculum_type || ""}
                           </Typography>
                         </TableCell>
-                        <TableCell>{proposal.institute}</TableCell>
-                        <TableCell>{proposal.type}</TableCell>
-                        <TableCell>{proposal.submitted}</TableCell>
-                        <TableCell>
+                        <TableCell>{c.institute_name || "—"}</TableCell>
+                        <TableCell align="center">
                           <Chip
-                            label={proposal.status}
-                            color={getStatusColor(proposal.status)}
                             size="small"
-                            sx={{ fontWeight: 600, minWidth: 90 }}
+                            variant="outlined"
+                            color={Number(c.status_id) === ENDORSED_STATUS_ID ? "success" : "default"}
+                            label={c.status_name || "Pending"}
+                            sx={{ height: 20, fontSize: "0.7rem" }}
                           />
                         </TableCell>
+                        <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(c.created_at)}</TableCell>
                       </TableRow>
-                    ))}
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        No curriculum applications yet
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
-
-            <TablePagination
-              component="div"
-              count={recentProposalsData.length}
-              page={proposalPage}
-              onPageChange={(e, newPage) => setProposalPage(newPage)}
-              rowsPerPage={proposalRowsPerPage}
-              onRowsPerPageChange={(e) => {
-                setProposalRowsPerPage(parseInt(e.target.value, 10));
-                setProposalPage(0);
-              }}
-              rowsPerPageOptions={[5, 10]}
-            />
-          </Paper>
-        </Grid>
-
-        {/* Recent Activity Table */}
-        <Grid item size={{ xs: 12, md: 12 }}>
-          <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-            <Typography fontWeight={600} sx={{ mb: 2 }}>
-              Recent Activity
-            </Typography>
-
-            <TableContainer>
-              <Table size="small" sx={tableStyle}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Action</TableCell>
-                    <TableCell>Institute</TableCell>
-                    <TableCell>Time</TableCell>
-                    <TableCell>Type</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {activityTimeline
-                    .slice(
-                      activityPage * activityRowsPerPage,
-                      activityPage * activityRowsPerPage + activityRowsPerPage,
-                    )
-                    .map((activity) => (
-                      <TableRow key={activity.id} hover>
-                        <TableCell>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <Avatar
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                bgcolor: alpha(
-                                  theme.palette[activity.type].main,
-                                  0.1,
-                                ),
-                                color: theme.palette[activity.type].main,
-                              }}
-                            >
-                              {activity.type === "success" && (
-                                <CheckCircleIcon sx={{ fontSize: 16 }} />
-                              )}
-                              {activity.type === "warning" && (
-                                <PendingIcon sx={{ fontSize: 16 }} />
-                              )}
-                              {activity.type === "info" && (
-                                <AssignmentIcon sx={{ fontSize: 16 }} />
-                              )}
-                              {activity.type === "primary" && (
-                                <VerifiedIcon sx={{ fontSize: 16 }} />
-                              )}
-                            </Avatar>
-                            {activity.action}
-                          </Box>
-                        </TableCell>
-                        <TableCell>{activity.institute}</TableCell>
-                        <TableCell>{activity.time}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={activity.type}
-                            size="small"
-                            color={
-                              activity.type === "success"
-                                ? "success"
-                                : activity.type === "warning"
-                                  ? "warning"
-                                  : activity.type === "info"
-                                    ? "info"
-                                    : "primary"
-                            }
-                            sx={{ textTransform: "capitalize" }}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            <TablePagination
-              component="div"
-              count={activityTimeline.length}
-              page={activityPage}
-              onPageChange={(e, newPage) => setActivityPage(newPage)}
-              rowsPerPage={activityRowsPerPage}
-              onRowsPerPageChange={(e) => {
-                setActivityRowsPerPage(parseInt(e.target.value, 10));
-                setActivityPage(0);
-              }}
-              rowsPerPageOptions={[5, 10]}
-            />
-          </Paper>
+          </Panel>
         </Grid>
       </Grid>
     </Paper>

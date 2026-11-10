@@ -39,10 +39,34 @@ import BirmsPaymentService from "../../../api/services/internal/birms/BirmsPayme
 import { format } from "date-fns";
 import { useSelector } from "react-redux";
 
+// Workflow statuses / roles for an institute change request
+const STATUS_VERIFY = 56; // role 7 verifies -> forwarded to role 22
+const STATUS_APPROVE = 57; // role 22 approves -> change applied
+const STATUS_REJECT = 58;
+const APPROVER_ROLE_ID = 22;
+// new requests waiting for role 7: 55 = submitted (current form), 115 = older records
+const PENDING_STATUS_IDS = [55, 115];
+
+// Shared look for the sections on this page
+const SECTION_SX = { p: 2, mb: 2, borderRadius: 2 };
+const FIELD_LABEL_SX = {
+  fontSize: "0.7rem",
+  fontWeight: 600,
+  letterSpacing: 0.4,
+  textTransform: "uppercase",
+  color: "text.secondary",
+};
+
 const ViewInstituteChange = () => {
   const { applicationNo } = useParams();
   const navigate = useNavigate();
   const access_token = useSelector((state) => state.auth.accessToken);
+  const actionId = useSelector((state) => state.auth.id);
+  const loginUserId = useSelector((state) => state.auth.userId);
+  const currentRoleId = useSelector((state) => state.auth.current_roleId);
+  // role 22 approves what role 7 has verified
+  const isApprover = Number(currentRoleId) === APPROVER_ROLE_ID;
+  const actionLabel = isApprover ? "Approve" : "Verify";
   const [loading, setLoading] = useState(true);
   const [changeRequestData, setChangeRequestData] = useState(null);
   const [dzongkhags, setDzongkhags] = useState([]);
@@ -61,8 +85,6 @@ const ViewInstituteChange = () => {
   const [paymentStatus, setPaymentStatus] = useState(null);
 
   // Status IDs
-  const STATUS_VERIFY = 56;
-  const STATUS_REJECT = 58;
   const SERVICE_CODE = 100591;
 
   useEffect(() => {
@@ -78,7 +100,6 @@ const ViewInstituteChange = () => {
         access_token,
       );
       setPaymentStatus(response.data);
-      console.log("Payment status fetched:", response.data);
     } catch (error) {
       console.error("Error fetching payment status:", error);
       setPaymentStatus(null);
@@ -115,9 +136,7 @@ const ViewInstituteChange = () => {
         await InstituteRegistrationService.getInstituteChangeByApplicationNo(
           applicationNo,
         );
-
-      console.log("response : ", response.data);
-
+      console.log("Change Request Details Response:", response.data);
       if (response.data) {
         let data = response.data;
 
@@ -162,8 +181,6 @@ const ViewInstituteChange = () => {
           const instituteId = data.institute_id || data.instituteId;
           const instituteResponse =
             await CommonService.getInstituteNameByInstituteId(instituteId);
-          console.log("instituteResponse : ", instituteResponse.data);
-
           if (instituteResponse.data) {
             const instituteData =
               Array.isArray(instituteResponse.data) &&
@@ -219,7 +236,12 @@ const ViewInstituteChange = () => {
 
   const getStatusBadge = (statusId) => {
     const statusMap = {
+      55: { label: "Pending", color: "warning" },
       115: { label: "Pending", color: "warning" },
+      56: { label: "Verified", color: "info" },
+      57: { label: "Approved", color: "success" },
+      58: { label: "Rejected", color: "error" },
+      // older records
       116: { label: "Approved", color: "success" },
       117: { label: "Rejected", color: "error" },
       118: { label: "In Review", color: "info" },
@@ -304,26 +326,33 @@ const ViewInstituteChange = () => {
   };
 
   // Handle Verify
+  // Remarks are optional when verifying (required only for rejection)
   const handleVerify = async () => {
-    if (!remarks.trim()) {
-      toast.warning("Please provide remarks before verifying");
-      return;
-    }
-
     setActionLoading(true);
     try {
       const payload = {
         applicationNo: applicationNo,
-        statusId: STATUS_VERIFY,
-        remarks: remarks,
-        updatedBy: 51,
+        statusId: isApprover ? STATUS_APPROVE : STATUS_VERIFY,
+        currentRoleId: Number(currentRoleId) || null,
+        remarks: remarks.trim() || "Verified",
+        updatedBy: actionId,
+        userId: loginUserId,
       };
-
+      console.log("Verify Payload:", payload);
       const response =
         await InstituteRegistrationService.verifyInstituteChange(payload);
+      if (response instanceof Error || response?.isAxiosError) {
+        throw new Error(
+          response?.response?.data?.message || "Failed to verify change request",
+        );
+      }
 
       if (response.status === 200 || response.status === 201) {
-        toast.success("Change request verified successfully!");
+        toast.success(
+          isApprover
+            ? "Change request approved and applied successfully!"
+            : "Change request verified and forwarded for approval!",
+        );
         setVerifyDialogOpen(false);
         setRemarks("");
         setCurrentAction(null);
@@ -349,12 +378,19 @@ const ViewInstituteChange = () => {
       const payload = {
         applicationNo: applicationNo,
         statusId: STATUS_REJECT,
+        currentRoleId: Number(currentRoleId) || null,
         remarks: remarks,
-        updatedBy: 51,
+        updatedBy: actionId,
+        userId: loginUserId,
       };
 
       const response =
         await InstituteRegistrationService.rejectInstituteChange(payload);
+      if (response instanceof Error || response?.isAxiosError) {
+        throw new Error(
+          response?.response?.data?.message || "Failed to reject change request",
+        );
+      }
 
       if (response.status === 200 || response.status === 201) {
         toast.success("Change request rejected successfully!");
@@ -419,7 +455,11 @@ const ViewInstituteChange = () => {
   );
 
   // Check if the request is pending (can be verified or rejected)
-  const isPending = changeRequestData?.status_id === "115";
+  // role 7 acts on new requests (115); role 22 acts on verified ones (56)
+  const statusIdNum = Number(changeRequestData?.status_id);
+  const isPending = isApprover
+    ? statusIdNum === STATUS_VERIFY
+    : PENDING_STATUS_IDS.includes(statusIdNum);
 
   // Open dialog with action type
   const openVerifyDialog = () => {
@@ -436,7 +476,7 @@ const ViewInstituteChange = () => {
 
   // Get dialog title based on action
   const getDialogTitle = () => {
-    if (currentAction === STATUS_VERIFY) return "Verify Change Request";
+    if (currentAction === STATUS_VERIFY) return `${actionLabel} Change Request`;
     if (currentAction === STATUS_REJECT) return "Reject Change Request";
     return "Confirm Action";
   };
@@ -471,13 +511,27 @@ const ViewInstituteChange = () => {
       );
     }
     return (
-      <DialogContentText>
-        Are you sure you want to verify this change request?
-        <br />
-        <strong>Application No: {applicationNo}</strong>
-        <br />
-        <strong>Institute: {changeRequestData?.institute_name || "N/A"}</strong>
-      </DialogContentText>
+      <>
+        <DialogContentText sx={{ mb: 2 }}>
+          {isApprover
+            ? "Approve this change request? The change will be applied to the institute's records."
+            : "Verify this change request? It will be forwarded for approval."}
+          <br />
+          <strong>Application No: {applicationNo}</strong>
+          <br />
+          <strong>Institute: {changeRequestData?.institute_name || "N/A"}</strong>
+        </DialogContentText>
+        <TextField
+          autoFocus
+          margin="dense"
+          label="Remarks (optional)"
+          fullWidth
+          multiline
+          rows={3}
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+        />
+      </>
     );
   };
 
@@ -491,7 +545,7 @@ const ViewInstituteChange = () => {
   // Get confirm button text
   const getConfirmButtonText = () => {
     if (actionLoading) return <CircularProgress size={24} />;
-    if (currentAction === STATUS_VERIFY) return "Confirm Verify";
+    if (currentAction === STATUS_VERIFY) return `Confirm ${actionLabel}`;
     if (currentAction === STATUS_REJECT) return "Confirm Reject";
     return "Confirm";
   };
@@ -541,93 +595,73 @@ const ViewInstituteChange = () => {
 
   return (
     <Box sx={{ m: 1 }}>
-      <Paper sx={{ p: 3 }}>
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 2.5 } }}>
         {/* Header */}
-        <Box textAlign="center" sx={{ mb: 4 }}>
-          <Typography
-            textTransform="uppercase"
-            fontWeight="bold"
-            sx={{ textDecoration: "underline", fontSize: "1.3rem" }}
-          >
-            Request for Institute Change - View
-          </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            View submitted change request details
-          </Typography>
-          <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            gap={2}
-            mt={1}
-            flexWrap="wrap"
-          >
-            <Typography variant="caption" color="primary">
-              Application No:{" "}
-              {changeRequestData.application_no || applicationNo}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
+            pb: 2,
+            mb: 2.5,
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              Request for Institute Change
             </Typography>
-            {changeRequestData.status_id && (
-              <Box>{getStatusBadge(changeRequestData.status_id)}</Box>
-            )}
-            <Typography variant="caption" color="textSecondary">
-              Submitted on: {formatDate(changeRequestData.created_at)}
+            <Typography variant="body2" color="text.secondary">
+              Submitted on {formatDate(changeRequestData.created_at)}
             </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+            <Chip
+              label={changeRequestData.application_no || applicationNo}
+              size="small"
+              variant="outlined"
+              color="primary"
+              sx={{ fontWeight: 600 }}
+            />
+            {changeRequestData.status_id && getStatusBadge(changeRequestData.status_id)}
           </Box>
         </Box>
 
         {/* Current Institute Information */}
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <BusinessIcon color="primary" fontSize="small" />
-              <Typography variant="subtitle1" fontWeight={600}>
-                Current Institute Information
-              </Typography>
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              <Grid item size={{ xs: 12, md: 3 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Registration No:
-                </Typography>
-                <Typography variant="body1" fontWeight="medium">
-                  {currentInstituteData?.registration_no || "N/A"}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Institute Name:
-                </Typography>
-                <Typography variant="body1" fontWeight="medium">
-                  {currentInstituteData?.instituteName || "N/A"}
+        <Paper variant="outlined" sx={SECTION_SX}>
+          <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+            <BusinessIcon color="primary" fontSize="small" />
+            <Typography variant="subtitle1" fontWeight={600}>
+              Current Institute Information
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <Grid container spacing={2}>
+            {[
+              ["Registration No", currentInstituteData?.registration_no || "N/A"],
+              ["Institute Name", currentInstituteData?.instituteName || "N/A"],
+              ["Dzongkhag", getDzongkhagName(currentInstituteData?.dzongkhag_id)],
+              ["Exact Location", currentInstituteData?.exact_location || "N/A"],
+            ].map(([label, value]) => (
+              <Grid item key={label} size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography sx={FIELD_LABEL_SX}>{label}</Typography>
+                <Typography sx={{ fontSize: "0.92rem", fontWeight: 600, mt: 0.25 }}>
+                  {value}
                 </Typography>
               </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Dzongkhag:
-                </Typography>
-                <Typography variant="body1" fontWeight="medium">
-                  {getDzongkhagName(currentInstituteData?.dzongkhag_id)}
-                </Typography>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 3 }}>
-                <Typography variant="body2" color="textSecondary">
-                  Exact Location:
-                </Typography>
-                <Typography variant="body1" fontWeight="medium">
-                  {currentInstituteData?.exact_location || "N/A"}
-                </Typography>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+            ))}
+          </Grid>
+        </Paper>
 
         {/* Change Type Selection - Read Only */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            Change Type <span style={{ color: "red" }}>*</span>
+        <Paper variant="outlined" sx={SECTION_SX}>
+          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
+            Change Type
           </Typography>
-          <Divider sx={{ mb: 3 }} />
+          <Divider sx={{ mb: 2 }} />
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
             <Chip
               icon={<LocationOnIcon />}
@@ -672,14 +706,14 @@ const ViewInstituteChange = () => {
 
         {/* Location Change Section */}
         {changeRequestData.change_type === "location" && (
-          <Paper sx={{ p: 3, mb: 4 }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <Paper variant="outlined" sx={SECTION_SX}>
+            <Box display="flex" alignItems="center" gap={1} mb={1.5}>
               <LocationOnIcon color="info" fontSize="small" />
               <Typography variant="subtitle1" fontWeight={600}>
                 Change Location
               </Typography>
             </Box>
-            <Divider sx={{ mb: 3 }} />
+            <Divider sx={{ mb: 2 }} />
             <Alert severity="info" sx={{ mb: 2 }}>
               Current Location:{" "}
               {getDzongkhagName(currentInstituteData?.dzongkhag_id)} -{" "}
@@ -705,14 +739,14 @@ const ViewInstituteChange = () => {
 
         {/* Name Change Section */}
         {changeRequestData.change_type === "name" && (
-          <Paper sx={{ p: 3, mb: 4 }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <Paper variant="outlined" sx={SECTION_SX}>
+            <Box display="flex" alignItems="center" gap={1} mb={1.5}>
               <DescriptionIcon color="success" fontSize="small" />
               <Typography variant="subtitle1" fontWeight={600}>
                 Change Name
               </Typography>
             </Box>
-            <Divider sx={{ mb: 3 }} />
+            <Divider sx={{ mb: 2 }} />
             <Alert severity="info" sx={{ mb: 2 }}>
               Current Name: {currentInstituteData?.instituteName || "N/A"}
             </Alert>
@@ -720,7 +754,8 @@ const ViewInstituteChange = () => {
               <Grid item size={{ xs: 12, md: 4 }}>
                 {renderReadOnlyField(
                   "New Institute Name *",
-                  changeRequestData.institute_name,
+                  // requested name (institute_name is the current name)
+                  changeRequestData.new_institute_name,
                 )}
               </Grid>
             </Grid>
@@ -729,14 +764,14 @@ const ViewInstituteChange = () => {
 
         {/* Ownership Change Section */}
         {changeRequestData.change_type === "ownership" && (
-          <Paper sx={{ p: 3, mb: 4 }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <Paper variant="outlined" sx={SECTION_SX}>
+            <Box display="flex" alignItems="center" gap={1} mb={1.5}>
               <PeopleIcon color="warning" fontSize="small" />
               <Typography variant="subtitle1" fontWeight={600}>
                 Change Ownership
               </Typography>
             </Box>
-            <Divider sx={{ mb: 3 }} />
+            <Divider sx={{ mb: 2 }} />
 
             <Alert severity="info" sx={{ mb: 2 }}>
               Current Ownership:{" "}
@@ -921,11 +956,11 @@ const ViewInstituteChange = () => {
         )}
 
         {/* Reason for Change */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            Reason for Change <span style={{ color: "red" }}>*</span>
+        <Paper variant="outlined" sx={SECTION_SX}>
+          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
+            Reason for Change
           </Typography>
-          <Divider sx={{ mb: 3 }} />
+          <Divider sx={{ mb: 2 }} />
           {renderReadOnlyField(
             "Reason for Change *",
             changeRequestData.reason_for_change,
@@ -935,12 +970,14 @@ const ViewInstituteChange = () => {
         </Paper>
 
         {/* Supporting Documents - Using FileDownload component */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Box display="flex" alignItems="center" gap={1} mb={2}>
+        <Paper variant="outlined" sx={SECTION_SX}>
+          <Box display="flex" alignItems="center" gap={1} mb={1.5}>
             <AttachFileIcon color="primary" fontSize="small" />
-            <Typography fontWeight={600}>Supporting Documents</Typography>
+            <Typography variant="subtitle1" fontWeight={600}>
+              Supporting Documents
+            </Typography>
           </Box>
-          <Divider sx={{ mb: 3 }} />
+          <Divider sx={{ mb: 2 }} />
           <FileDownload
             initialFiles={documents}
             onFileUpload={handleFileUpload}
@@ -949,8 +986,8 @@ const ViewInstituteChange = () => {
         </Paper>
 
         {/* Generate PA Number Section */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+        <Paper variant="outlined" sx={SECTION_SX}>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
             <AccountBalanceIcon
               sx={{ mr: 1, color: "primary.main", fontSize: 20 }}
             />
@@ -958,7 +995,7 @@ const ViewInstituteChange = () => {
               Generate PA Number
             </Typography>
           </Box>
-          <Divider sx={{ mb: 3 }} />
+          <Divider sx={{ mb: 2 }} />
 
           {paymentStatus ? (
             <Card variant="outlined" sx={{ p: 0 }}>
@@ -1267,15 +1304,37 @@ const ViewInstituteChange = () => {
 
         {/* Action Buttons */}
         <Box
-          sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 1.5,
+            mt: 1,
+            pt: 2,
+            borderTop: "1px solid",
+            borderColor: "divider",
+          }}
         >
+          {/* no action for this role at the current status: say why */}
+          {!isPending && (
+            <Typography variant="body2" color="text.secondary" sx={{ mr: "auto" }}>
+              {statusIdNum === STATUS_VERIFY
+                ? "Verified — waiting for approval (role 22)."
+                : statusIdNum === STATUS_APPROVE
+                  ? "Approved — the change has been applied."
+                  : statusIdNum === STATUS_REJECT
+                    ? "This change request was rejected."
+                    : PENDING_STATUS_IDS.includes(statusIdNum)
+                      ? "Pending — waiting for verification (role 7)."
+                      : `No action available (status ${changeRequestData?.status_id ?? "—"}).`}
+            </Typography>
+          )}
           {isPending && (
             <>
               <Tooltip
                 title={
                   !isPaymentPaid
-                    ? "Payment must be completed before verification"
-                    : "Verify this change request"
+                    ? `Payment must be completed before ${isApprover ? "approval" : "verification"}`
+                    : `${actionLabel} this change request`
                 }
                 arrow
               >
@@ -1294,11 +1353,13 @@ const ViewInstituteChange = () => {
                       textTransform: "none",
                     }}
                   >
-                    Verify
+                    {actionLabel}
                   </Button>
                 </span>
               </Tooltip>
-              <Tooltip title="Reject this change request" arrow>
+{/* Reject: only for the verifier (role 7); role 22 only approves */}
+              {!isApprover && (
+                            <Tooltip title="Reject this change request" arrow>
                 <span>
                   <Button
                     variant="contained"
@@ -1317,6 +1378,7 @@ const ViewInstituteChange = () => {
                   </Button>
                 </span>
               </Tooltip>
+              )}
             </>
           )}
         </Box>

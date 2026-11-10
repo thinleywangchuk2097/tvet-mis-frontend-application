@@ -1,11 +1,8 @@
 // ChangeAssessmentCentre.jsx
-// Same design and flow as the institute change request (InstituteChange),
-// worded for assessment centres. Design only for now: the final submit is not
-// sent to the backend until the assessment centre change service is set up.
+// Assessment centre change request: same form, service (10) and approval flow as the
+// institute change request (role 7 verifies -> role 22 approves), worded for assessment centres.
 import InstituteChange from "../../institute/registration/InstituteChange";
 
-const ChangeAssessmentCentre = () => (
-  <InstituteChange entityLabel="Assessment Centre" designOnly />
-);
+const ChangeAssessmentCentre = () => <InstituteChange entityLabel="Assessment Centre" />;
 
 export default ChangeAssessmentCentre;

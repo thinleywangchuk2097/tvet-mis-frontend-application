@@ -28,6 +28,37 @@ export const loadImageAsDataUrl = async (url) => {
   });
 };
 
+/** Fetch a font file (Vite asset url) as a base64 string — cached per url. */
+const fontCache = {};
+const loadFontBase64 = async (url) => {
+  if (!fontCache[url]) {
+    fontCache[url] = fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((buf) => {
+        const bytes = new Uint8Array(buf);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        }
+        return btoa(binary);
+      });
+  }
+  return fontCache[url];
+};
+
+/**
+ * Register custom TTF fonts on a doc.
+ * fonts: [{ family, style: "normal" | "bold", url }]
+ */
+export const registerFonts = async (doc, fonts = []) => {
+  for (const { family, style = "normal", url } of fonts) {
+    const fileName = `${family}-${style}.ttf`;
+    const base64 = await loadFontBase64(url);
+    doc.addFileToVFS(fileName, base64);
+    doc.addFont(fileName, family, style);
+  }
+};
+
 /**
  * Normalize config into an array of pages.
  * Accepts either:
@@ -52,6 +83,7 @@ export const generateSingle = async (record, config) => {
   if (pages.length === 0) return null;
 
   const doc = createDoc();
+  await registerFonts(doc, config.fonts);
 
   for (let i = 0; i < pages.length; i++) {
     const { background, render } = pages[i];
@@ -76,6 +108,7 @@ export const generateBulk = async (records, config) => {
   if (pages.length === 0) return null;
 
   const doc = createDoc();
+  await registerFonts(doc, config.fonts);
   let isFirstPage = true;
 
   for (const record of records) {

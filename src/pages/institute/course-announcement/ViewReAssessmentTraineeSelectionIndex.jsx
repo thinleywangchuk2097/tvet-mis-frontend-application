@@ -112,6 +112,14 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
   const isServiceId41 = serviceId === "41";
 
+  // RPL re-assessment (41) has no Internal Assessment (CA), same as RPL 39:
+  // its Viva / Practical columns are always shown (editable after payment)
+  // and the steps that wait for CA marks are open for it.
+  const assessmentsEnabled = hasInternalAssessmentForCourse || isServiceId41;
+  const traineeCanBeAssessed = (trainee) =>
+    isServiceId41 ||
+    (trainee.internal_assessment !== null && trainee.internal_assessment !== "");
+
   const isDiplomaCertificationLevel = () => {
     const levelId = courseDetails?.certification_level_id;
     return levelId === "111" || levelId === "112";
@@ -143,18 +151,20 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const getVivaPracticalMaxValue = () =>
     isDiplomaCertificationLevel() ? 60 : null;
 
-  // Per-field editability for diploma courses:
-  // - Theory/Viva editable only when value < 10
-  // - Practical/VivaPractical editable only when value < 36
-  const isFieldEditable = (fieldType, value) => {
+  // Re-assessment: only what the trainee did not pass can be assessed again.
+  // `savedValue` is the trainee's previous result (not what is being typed now):
+  // - empty: editable (nothing recorded yet)
+  // - diploma marks: Theory/Viva editable when < 10, Practical when < 36 (failed)
+  // - certificate competency: editable unless it is "Competent"
+  const isFieldEditable = (fieldType, savedValue) => {
     // Base permission still required
     if (!isEditable) return false;
 
-    if (isDiplomaCertificationLevel()) {
-      // Allow editing empty fields so a value can be entered
-      if (value === "" || value === null || value === undefined) return true;
+    if (savedValue === "" || savedValue === null || savedValue === undefined)
+      return true;
 
-      const numValue = Number(value);
+    if (isDiplomaCertificationLevel()) {
+      const numValue = Number(savedValue);
       if (Number.isNaN(numValue)) return false;
 
       if (fieldType === "theory" || fieldType === "viva") {
@@ -163,11 +173,17 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       if (fieldType === "practical" || fieldType === "vivaPractical") {
         return numValue < 36;
       }
+      return true;
     }
 
-    // Non-diploma: fall back to global rule
-    return isEditable;
+    // certificate levels: Not Competent / Not Yet Competent can be changed
+    return !isCompetent(savedValue);
   };
+
+  const isCompetent = (competencyId) =>
+    String(competencyMap[competencyId] || "")
+      .trim()
+      .toLowerCase() === "competent";
 
   // Business rules
   const allCAmarksExist = () => {
@@ -185,14 +201,10 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   };
 
   const allTraineesHaveAssessments = () => {
-    if (!hasInternalAssessmentForCourse) return true;
+    if (!assessmentsEnabled) return true;
 
     return selectedTrainees.every((trainee) => {
-      const hasInternalAssessment =
-        trainee.internal_assessment !== null &&
-        trainee.internal_assessment !== "";
-
-      if (!hasInternalAssessment) return true;
+      if (!traineeCanBeAssessed(trainee)) return true;
 
       if (isServiceId41) {
         const viva =
@@ -216,7 +228,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     });
   };
 
-  const isGeneratePAEnabled = () => allCAmarksExist();
+  const caStepDone = () => isServiceId41 || allCAmarksExist();
+
+  const isGeneratePAEnabled = () => caStepDone();
 
   const isApproveEnabled = () =>
     areAssessorsAssigned() && allTraineesHaveAssessments();
@@ -798,7 +812,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
             : "Application approved",
       };
 
-      if (hasInternalAssessmentForCourse) {
+      if (hasInternalAssessmentForCourse && !isServiceId41) {
         const traineeMarksList = selectedTrainees.map((trainee) => ({
           traineeId: parseInt(trainee.id),
           internalAssessment: parseInternalAssessment(trainee),
@@ -811,10 +825,9 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
         }
       }
 
-      if (isServiceId41 && hasInternalAssessmentForCourse) {
+      if (isServiceId41) {
         const traineeVivaList = selectedTrainees.map((trainee) => ({
           traineeId: parseInt(trainee.id),
-          internalAssessment: parseInternalAssessment(trainee),
           vivaAssessment: parseViva(trainee),
           practicalAssessment: parseVivaPractical(trainee),
         }));
@@ -923,8 +936,8 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
   const getTableColSpan = () => {
     let cols = 6;
-    if (hasInternalAssessmentForCourse) {
-      cols += 1;
+    if (assessmentsEnabled) {
+      if (!isServiceId41) cols += 1; // CA mark / competency
       cols += 2;
     }
     return cols;
@@ -942,6 +955,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
           firstField: {
             type: "viva",
             value: traineeVivaAssessments[trainee.id] || "",
+            savedValue: trainee.viva_assessment,
             onChange: (value) => handleVivaAssessmentChange(trainee.id, value),
             maxValue: getVivaMaxValue() || 100,
             tooltipMessage: getVivaTooltipMessage(),
@@ -949,6 +963,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
           secondField: {
             type: "vivaPractical",
             value: traineeVivaPracticalAssessments[trainee.id] || "",
+            savedValue: trainee.practical_assessment,
             onChange: (value) =>
               handleVivaPracticalAssessmentChange(trainee.id, value),
             maxValue: getVivaPracticalMaxValue() || 100,
@@ -960,6 +975,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
           firstField: {
             type: "theory",
             value: traineeTheoryAssessments[trainee.id] || "",
+            savedValue: trainee.theory_assessment,
             onChange: (value) =>
               handleTheoryAssessmentChange(trainee.id, value),
             maxValue: getTheoryMaxValue() || 100,
@@ -968,6 +984,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
           secondField: {
             type: "practical",
             value: traineePracticalAssessments[trainee.id] || "",
+            savedValue: trainee.practical_assessment,
             onChange: (value) =>
               handlePracticalAssessmentChange(trainee.id, value),
             maxValue: getPracticalMaxValue() || 100,
@@ -982,7 +999,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     const renderAssessmentField = (fieldConfig, isNumericField) => {
       const fieldReadOnly = !isFieldEditable(
         fieldConfig.type,
-        fieldConfig.value,
+        fieldConfig.savedValue,
       );
 
       // Tooltip: permission issues > lock-reason > max-value hint
@@ -991,6 +1008,8 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
         tooltipMsg = "You do not have permission to edit assessments";
       } else if (!isPaymentCompleted()) {
         tooltipMsg = "Payment must be completed before editing assessments";
+      } else if (!isDiplomaCertificationLevel() && fieldReadOnly) {
+        tooltipMsg = "Already Competent — only Not Competent results can be changed";
       } else if (isDiplomaCertificationLevel() && fieldReadOnly) {
         if (fieldConfig.type === "theory" || fieldConfig.type === "viva") {
           tooltipMsg =
@@ -1230,7 +1249,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
       )}
 
       {/* Assessor Assignment Section */}
-      {allCAmarksExist() && !isActionDisabled() && (
+      {caStepDone() && !isActionDisabled() && (
         <AssessorAssignmentCard
           canEdit={isRole9}
           assignedAssessors={assignedAssessors}
@@ -1281,10 +1300,10 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                   <TableCell align="center">Contact</TableCell>
                   <TableCell align="center">Email</TableCell>
                   <TableCell align="center">Qualification</TableCell>
-                  {hasInternalAssessmentForCourse && (
+                  {hasInternalAssessmentForCourse && !isServiceId41 && (
                     <TableCell align="center">CA Mark/Competency</TableCell>
                   )}
-                  {hasInternalAssessmentForCourse && (
+                  {assessmentsEnabled && (
                     <>
                       <TableCell align="center">
                         {isServiceId41
@@ -1323,7 +1342,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                               trainee.academic_qualification_id,
                             )}
                           </TableCell>
-                          {hasInternalAssessmentForCourse && (
+                          {hasInternalAssessmentForCourse && !isServiceId41 && (
                             <TableCell align="center">
                               {isDiplomaCertificationLevel() ? (
                                 <Chip
@@ -1344,7 +1363,7 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
                               )}
                             </TableCell>
                           )}
-                          {hasInternalAssessmentForCourse &&
+                          {assessmentsEnabled &&
                             renderAssessmentColumn(trainee)}
                         </TableRow>
                       );

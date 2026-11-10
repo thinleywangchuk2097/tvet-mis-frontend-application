@@ -38,7 +38,7 @@ const AppLayout = () => {
           <Box
             sx={{
               pt: `${headerHeight}px`,
-              height: `calc(100vh - ${headerHeight}px)`,
+              height: "100vh",
               boxSizing: "border-box",
             }}
           >
@@ -57,7 +57,7 @@ const AppLayout = () => {
             borderRight: "1px solid #ddd",
             zIndex: 1200,
             boxSizing: "border-box",
-            overflow: "hidden", // no scroll
+            overflow: "hidden", // the menu inside the sidebar scrolls
           }}
         >
           <Sidebar />

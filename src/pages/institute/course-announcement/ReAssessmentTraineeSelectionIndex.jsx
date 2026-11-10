@@ -18,6 +18,7 @@ import {
   Divider,
   CircularProgress,
   Tooltip,
+  TextField,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -36,13 +37,13 @@ import {
   tableStyleReassessment as tableStyle,
   headerCellStyle,
   bodyCellStyle,
+  disabledTextFieldSx,
 } from "./shared/utils/traineeSelectionStyles";
 import {
   getQualificationName,
   getStatusName,
   getStatusColor,
   getResultStatusName,
-  getResultStatusColor,
   getCompetencyName,
 } from "./shared/utils/traineeSelectionHelpers";
 import ReadOnlyDropdown from "./shared/components/ReadOnlyDropdown";
@@ -98,6 +99,9 @@ const ReAssessmentTraineeSelectionIndex = () => {
   const hasCADates =
     programmeDetails?.ca_start_date && programmeDetails?.ca_end_date;
   const isServiceId41 = programmeDetails?.service_id === "41";
+  // RPL re-assessment (41) has no Internal Assessment (CA), same as RPL 39
+  const showInternalAssessment = !isServiceId41;
+  const useCAMarks = Boolean(hasCADates) && showInternalAssessment;
 
   // Determine visibility of other assessment columns + result status in Selected table
   const showOtherAssessmentsAndResultStatus =
@@ -246,7 +250,10 @@ const ReAssessmentTraineeSelectionIndex = () => {
   // Sequential fetch — ensures certificationLevelId is available
   const fetchData = async () => {
     const details = await fetchProgrammeDetails();
-    await fetchFailedTraineesLists(details?.certification_level_id);
+    await fetchFailedTraineesLists(
+      details?.certification_level_id,
+      details?.service_id,
+    );
   };
 
   const fetchAcademicCompetency = async () => {
@@ -275,6 +282,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
         ? response.data[0]
         : response.data;
       setProgrammeDetails(courseData);
+      console.log("Fetched programme details:", courseData);
       return courseData;
     } catch (error) {
       console.error("Error fetching re-assessment details:", error);
@@ -283,8 +291,15 @@ const ReAssessmentTraineeSelectionIndex = () => {
     }
   };
 
-  // Accepts certificationLevelId and passes it to the service
-  const fetchFailedTraineesLists = async (certificationLevelId) => {
+  // Failed trainees come from the original programme:
+  // RPL re-assessment (41) -> RPL (39), BQF re-assessment (42) -> BQF programme (37)
+  const ORIGINAL_SERVICE_FOR_REASSESSMENT = { 41: 39, 42: 37 };
+
+  // Accepts certificationLevelId (and the re-assessment service) and passes them to the service
+  const fetchFailedTraineesLists = async (
+    certificationLevelId,
+    reassessmentServiceId,
+  ) => {
     try {
       setLoading(true);
       const response =
@@ -300,6 +315,8 @@ const ReAssessmentTraineeSelectionIndex = () => {
             registration_no,
             programmeId,
             certificationLevelId,
+            ORIGINAL_SERVICE_FOR_REASSESSMENT[Number(reassessmentServiceId)] ??
+              null,
           );
         trainees = failedResponse.data || [];
       }
@@ -501,7 +518,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
       return;
     }
 
-    if (hasCADates) {
+    if (useCAMarks) {
       const missingAssessments = selectedTrainees.filter(
         (trainee) =>
           !traineeInternalAssessments[trainee.id] ||
@@ -521,7 +538,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
     setSubmitting(true);
     try {
       let traineeInternalAssessmentsList = [];
-      if (hasCADates) {
+      if (useCAMarks) {
         traineeInternalAssessmentsList = selectedTrainees.map((trainee) => ({
           traineeId: parseInt(trainee.id),
           internalAssessment:
@@ -590,7 +607,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
         payload.traineeIds = traineeStatusList;
       }
 
-      if (hasCADates && traineeInternalAssessmentsList.length > 0) {
+      if (useCAMarks && traineeInternalAssessmentsList.length > 0) {
         payload.traineeInternalAssessments = traineeInternalAssessmentsList;
       }
 
@@ -675,10 +692,25 @@ const ReAssessmentTraineeSelectionIndex = () => {
     );
   };
 
+  // Overall Result: same read-only box as the assessment values
+  const renderResultValue = (trainee) => (
+    <TextField
+      size="small"
+      value={
+        trainee.result_status_id
+          ? getResultStatusName(trainee.result_status_id, statusList)
+          : "N/A"
+      }
+      fullWidth
+      disabled
+      sx={disabledTextFieldSx}
+    />
+  );
+
   // Column span helpers
   const getSelectedTableColSpan = () => {
     let cols = 9;
-    cols++; // internal assessment
+    if (showInternalAssessment) cols++; // internal assessment
     if (showOtherAssessmentsAndResultStatus) {
       cols += 2;
     }
@@ -687,7 +719,7 @@ const ReAssessmentTraineeSelectionIndex = () => {
 
   const getPendingTableColSpan = () => {
     let cols = 8;
-    cols++; // internal assessment
+    if (showInternalAssessment) cols++; // internal assessment
     cols += 2; // theory/viva + practical
     cols++; // action
     return cols; // = 12
@@ -876,12 +908,11 @@ const ReAssessmentTraineeSelectionIndex = () => {
                     <TableCell sx={headerCellStyle}>Email</TableCell>
                     <TableCell sx={headerCellStyle}>Qualification</TableCell>
                     <TableCell sx={headerCellStyle}>Status</TableCell>
-                    {showOtherAssessmentsAndResultStatus && (
-                      <TableCell sx={headerCellStyle}>Overall Result</TableCell>
+                    {showInternalAssessment && (
+                      <TableCell sx={headerCellStyle}>
+                        Internal Assessment
+                      </TableCell>
                     )}
-                    <TableCell sx={headerCellStyle}>
-                      Internal Assessment
-                    </TableCell>
                     {showOtherAssessmentsAndResultStatus &&
                       (isServiceId41 ? (
                         <>
@@ -902,6 +933,10 @@ const ReAssessmentTraineeSelectionIndex = () => {
                           </TableCell>
                         </>
                       ))}
+                    {/* Overall Result: last column */}
+                    {showOtherAssessmentsAndResultStatus && (
+                      <TableCell sx={headerCellStyle}>Overall Result</TableCell>
+                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -958,32 +993,20 @@ const ReAssessmentTraineeSelectionIndex = () => {
                               )}
                             />
                           </TableCell>
-                          {showOtherAssessmentsAndResultStatus && (
+                          {showInternalAssessment && (
                             <TableCell sx={bodyCellStyle}>
-                              {trainee.result_status_id ? (
-                                <Chip
-                                  label={getResultStatusName(
-                                    trainee.result_status_id,
-                                    statusList,
-                                  )}
-                                  size="small"
-                                  sx={getResultStatusColor(
-                                    trainee.result_status_id,
-                                    statusList,
-                                  )}
-                                />
-                              ) : (
-                                "N/A"
+                              {renderAssessmentValue(
+                                traineeInternalAssessments[trainee.id],
                               )}
                             </TableCell>
                           )}
-                          <TableCell sx={bodyCellStyle}>
-                            {renderAssessmentValue(
-                              traineeInternalAssessments[trainee.id],
-                            )}
-                          </TableCell>
                           {showOtherAssessmentsAndResultStatus &&
                             renderSelectedAssessmentColumns(trainee)}
+                          {showOtherAssessmentsAndResultStatus && (
+                            <TableCell sx={bodyCellStyle}>
+                              {renderResultValue(trainee)}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                   ) : (
@@ -1131,10 +1154,11 @@ const ReAssessmentTraineeSelectionIndex = () => {
                     <TableCell sx={headerCellStyle}>Contact</TableCell>
                     <TableCell sx={headerCellStyle}>Email</TableCell>
                     <TableCell sx={headerCellStyle}>Qualification</TableCell>
-                    <TableCell sx={headerCellStyle}>Overall Result</TableCell>
-                    <TableCell sx={headerCellStyle}>
-                      Internal Assessment
-                    </TableCell>
+                    {showInternalAssessment && (
+                      <TableCell sx={headerCellStyle}>
+                        Internal Assessment
+                      </TableCell>
+                    )}
                     {isServiceId41 ? (
                       <>
                         <TableCell sx={headerCellStyle}>
@@ -1154,6 +1178,8 @@ const ReAssessmentTraineeSelectionIndex = () => {
                         </TableCell>
                       </>
                     )}
+                    {/* Overall Result: just before Action */}
+                    <TableCell sx={headerCellStyle}>Overall Result</TableCell>
                     <TableCell sx={headerCellStyle} align="center">
                       Action
                     </TableCell>
@@ -1197,27 +1223,15 @@ const ReAssessmentTraineeSelectionIndex = () => {
                               qualificationMap,
                             )}
                           </TableCell>
-                          <TableCell sx={bodyCellStyle}>
-                            {trainee.result_status_id ? (
-                              <Chip
-                                label={getResultStatusName(
-                                  trainee.result_status_id,
-                                  statusList,
-                                )}
-                                size="small"
-                                sx={getResultStatusColor(
-                                  trainee.result_status_id,
-                                  statusList,
-                                )}
-                              />
-                            ) : (
-                              "N/A"
-                            )}
-                          </TableCell>
-                          <TableCell sx={bodyCellStyle}>
-                            {renderAssessmentValue(trainee.internal_assessment)}
-                          </TableCell>
+                          {showInternalAssessment && (
+                            <TableCell sx={bodyCellStyle}>
+                              {renderAssessmentValue(trainee.internal_assessment)}
+                            </TableCell>
+                          )}
                           {renderPendingAssessmentColumns(trainee)}
+                          <TableCell sx={bodyCellStyle}>
+                            {renderResultValue(trainee)}
+                          </TableCell>
                           <TableCell sx={bodyCellStyle} align="center">
                             <Tooltip
                               title={

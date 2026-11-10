@@ -32,6 +32,7 @@ import ReceiptIcon from "@mui/icons-material/Receipt";
 import PrintIcon from "@mui/icons-material/Print";
 import DownloadIcon from "@mui/icons-material/Download";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import SearchIcon from "@mui/icons-material/Search";
 import CancelIcon from "@mui/icons-material/Cancel";
 import CloseIcon from "@mui/icons-material/Close";
 import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
@@ -70,6 +71,9 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
   const navigate = useNavigate();
   const registrationNo = useSelector((state) => state.auth.userId);
   const [search, setSearch] = useState("");
+  // institute view: data is loaded only when Search is clicked
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [openReceiptDialog, setOpenReceiptDialog] = useState(false);
@@ -142,7 +146,7 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
 
   // Fetch data on component mount
   useEffect(() => {
-    fetchPaymentDetails();
+    if (!instituteView) fetchPaymentDetails();
     fetchDropdownData();
     if (!instituteView) fetchInstitutes();
   }, []);
@@ -150,9 +154,23 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
   // Apply filters whenever filter criteria or payments change
   useEffect(() => {
     applyFilters();
-  }, [payments, search, selectedInstitute, selectedCourse, selectedStatus]);
+  }, [
+    payments,
+    search,
+    appliedSearch,
+    selectedInstitute,
+    selectedCourse,
+    selectedStatus,
+  ]);
 
-  const fetchPaymentDetails = async () => {
+  // institute view: fetch this institute's payments, then filter by the search text
+  const handleInstituteSearch = () => {
+    setAppliedSearch(search.trim());
+    setHasSearched(true);
+    fetchPaymentDetails(search.trim());
+  };
+
+  const fetchPaymentDetails = async (searchQuery = "") => {
     try {
       setLoading(true);
       let response;
@@ -166,9 +184,10 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
           setPayments([]);
           return;
         }
-        fetchCoursesByInstitute(instId);
-        response = await BirmsPaymentService.getPaymentDetailsByInstituteId(
-          instId,
+        // search on the server: this institute's payments (institute_id)
+        // matching the Application No / Payment Advice No
+        response = await BirmsPaymentService.searchInstitutePayments(
+          { instituteId: instId, query: searchQuery },
           token,
         );
       } else {
@@ -210,7 +229,7 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
         platform: item.platform,
         receipt_no: item.receipt_no,
         receipt_status: item.receipt_status,
-        redirect_url: item.redirect_url,
+        redirect_url: item.redirect_url || item.redirectUrl || "",
         service_code: item.service_code,
         tax_payer_name: item.tax_payer_name,
         tax_payer_no: item.tax_payer_no,
@@ -301,7 +320,19 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
 
   const applyFilters = () => {
     let filtered = [...payments];
-    if (search) {
+    if (instituteView && appliedSearch) {
+      // institute view: search by Payment Advice No or Application No only
+      const q = appliedSearch.toLowerCase();
+      filtered = filtered.filter(
+        (payment) =>
+          String(payment.payment_advice_no || "")
+            .toLowerCase()
+            .includes(q) ||
+          String(payment.application_no || "")
+            .toLowerCase()
+            .includes(q),
+      );
+    } else if (search && !instituteView) {
       filtered = filtered.filter(
         (payment) =>
           payment.payment_no?.toLowerCase().includes(search.toLowerCase()) ||
@@ -340,6 +371,11 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
     setSelectedCourse("");
     setSelectedStatus("");
     setSearch("");
+    if (instituteView) {
+      setAppliedSearch("");
+      setHasSearched(false);
+      setPayments([]);
+    }
     // the institute view keeps its own course list
     if (!instituteView) setCourses([]);
   };
@@ -728,7 +764,8 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
     ...new Set(payments.map((p) => p.payment_status).filter(Boolean)),
   ];
 
-  if (loading && payments.length === 0) {
+  // institute view keeps the search bar on screen (spinner is on the Search button)
+  if (loading && payments.length === 0 && !instituteView) {
     return (
       <Paper
         elevation={3}
@@ -774,14 +811,17 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
         </Grid>
         )}
 
-        <Grid item size={{ xs: 12, md: instituteView ? 4 : 3 }}>
+        {/* Course / Status filters: agency view only */}
+        {!instituteView && (
+          <>
+        <Grid item size={{ xs: 12, md: 3 }}>
           <FormControl fullWidth size="small">
             <InputLabel>Course</InputLabel>
             <Select
               value={selectedCourse}
               onChange={(e) => setSelectedCourse(e.target.value)}
               label="Course"
-              disabled={!instituteView && !selectedInstitute}
+              disabled={!selectedInstitute}
             >
               <MenuItem value="">All Courses</MenuItem>
               {courses.map((course) => (
@@ -793,7 +833,7 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
           </FormControl>
         </Grid>
 
-        <Grid item size={{ xs: 12, md: instituteView ? 4 : 3 }}>
+        <Grid item size={{ xs: 12, md: 3 }}>
           <FormControl fullWidth size="small">
             <InputLabel>Status</InputLabel>
             <Select
@@ -810,18 +850,47 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
             </Select>
           </FormControl>
         </Grid>
+          </>
+        )}
 
-        <Grid item size={{ xs: 12, md: instituteView ? 4 : 3 }}>
+        <Grid item size={{ xs: 12, md: instituteView ? 6 : 3 }}>
           <TextField
             label="Search"
             variant="outlined"
             size="small"
             fullWidth
-            placeholder="Payment/Invoice/Name"
+            placeholder={
+              instituteView
+                ? "Payment Advice No / Application No"
+                : "Payment/Invoice/Name"
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (instituteView && e.key === "Enter") handleInstituteSearch();
+            }}
           />
         </Grid>
+        {instituteView && (
+          <Grid item size={{ xs: 12, md: "auto" }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleInstituteSearch}
+              disabled={loading}
+              startIcon={
+                loading ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <SearchIcon />
+                )
+              }
+              sx={{ textTransform: "none", height: 40 }}
+            >
+              Search
+            </Button>
+          </Grid>
+        )}
 
         <Grid item size={{ xs: 12, md: 12 }}>
           <Box display="flex" justifyContent="flex-end" gap={1}>
@@ -892,8 +961,11 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
               filteredPayments
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((payment, index) => {
-                  const isPaid = payment.payment_status === "paid";
-                  const isPending = payment.payment_status === "pending";
+                  const statusLower = String(
+                    payment.payment_status || "",
+                  ).toLowerCase();
+                  const isPaid = statusLower === "paid";
+                  const isPending = statusLower === "pending";
                   return (
                     <TableRow
                       key={payment.id || index}
@@ -1006,9 +1078,10 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
                                 variant="contained"
                                 color="primary"
                                 size="small"
-                                onClick={() =>
-                                  window.open(payment.redirect_url, "_blank")
-                                }
+                                // go to the BIRMS payment page (redirect_url saved with the PA)
+                                onClick={() => {
+                                  window.location.href = payment.redirect_url;
+                                }}
                                 startIcon={<PaymentsIcon />}
                                 sx={{
                                   textTransform: "none",
@@ -1088,7 +1161,9 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
               <TableRow>
                 <TableCell colSpan={instituteView ? 10 : 11} align="center">
                   <Typography variant="body1" sx={{ py: 3 }}>
-                    No payment records found
+                    {instituteView && !hasSearched
+                      ? "Enter Payment Advice No or Application No and click Search"
+                      : "No payment records found"}
                   </Typography>
                 </TableCell>
               </TableRow>

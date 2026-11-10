@@ -86,7 +86,7 @@ const fmtDate = (d) => {
 };
 
 const CHOICE_TYPES = ["radio", "dropdown", "checkbox", "multiSelect"];
-const SUBMITTED = 2; // send status: 2 = submitted
+const SUBMITTED = 55; // send status: NULL = not submitted, 55 = submitted
 
 // Compact bordered table (same look as the other pages)
 const TABLE_STYLE = {

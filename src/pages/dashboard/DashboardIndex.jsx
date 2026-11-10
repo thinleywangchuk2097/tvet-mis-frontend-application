@@ -1,15 +1,17 @@
 import { useSelector } from "react-redux";
-import TraineeDashboard from "./TraineeDashboard";
 import AdminDashboard from "./AdminDashboard";
 import DefaultDashboard from "./DefaultDashboard";
 import InstituteDashboard from "./InstituteDashboard";
 import QASLevel1Dashboard from "./QASLevel1Dashboard";
 import ACSLevel1Dashboard from "./ACSLevel1Dashboard";
-import ApproverBQPCADashboard from "./ApproverBQPCADashboard";
 import TvetDataManagerFocalDashboard from "./TvetDataManagerFocalDashboard";
 import DWPS1Dashboard from "./DWPS1Dashboard";
 import TVETQCDashboard from "./TVETQCDashboard";
 import SESCentreDashboard from "./SESCentreDashboard";
+import AssessmentCentreDashboard from "./AssessmentCentreDashboard";
+import SQSDashboard from "./SQSDashboard";
+import VerifierTTTRCDashboard from "./VerifierTTTRCDashboard";
+import HeadTTTRCDashboard from "./HeadTTTRCDashboard";
 
 const DashboardIndex = () => {
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
@@ -17,16 +19,16 @@ const DashboardIndex = () => {
   switch (String(currentRoleId)) {
     case "1": //Admin role ID
       return <AdminDashboard />;
-    case "2": //Trainee role ID
-      return <TraineeDashboard />;
     case "7": //QAS Level 1 role ID
       return <QASLevel1Dashboard />;
-    case "8": //TVET BQPCA role ID
-      return <ApproverBQPCADashboard />;
     case "9": //ACS Level 1 role ID
       return <ACSLevel1Dashboard />;
     case "11": //Institute role ID
       return <InstituteDashboard />;
+    case "14": //Verifier TTTRC role ID
+      return <VerifierTTTRCDashboard />;  
+    case "15": //Head TTTRC role ID
+      return <HeadTTTRCDashboard />;
     case "20": //Tvet Data Manager Focal role ID
       return <TvetDataManagerFocalDashboard />;
     case "21": //dwps1 role ID
@@ -35,6 +37,10 @@ const DashboardIndex = () => {
       return <TVETQCDashboard />;
     case "28": //SESCentre role ID
       return <SESCentreDashboard />;
+    case "12": //Assessment Centre role ID
+      return <AssessmentCentreDashboard />;
+    case "33": //SQS role ID
+      return <SQSDashboard />;
     default:
       return <DefaultDashboard />; // for default or common roles
   }

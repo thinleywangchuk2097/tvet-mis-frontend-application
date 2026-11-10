@@ -34,7 +34,7 @@ import InstituteRegistrationService from "../../../api/services/internal/registr
 import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
 import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
-import NcsService from "../../../api/services/internal/ncs/NcsService";
+import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
 // ==================== UTILITY FUNCTIONS ====================
 const fileToBase64 = (file) =>
@@ -151,7 +151,7 @@ const useRPLData = (registration_no, access_token) => {
     async (values, resetForm) => {
       setLoading(true);
       try {
-        const documents = await Promise.all(values.files.map(fileToBase64));
+        const documents = await Promise.all((values.files || []).map(fileToBase64));
         const payload = {
           instituteId: values.instituteId,
           programmeId: values.programmeId,
@@ -210,7 +210,7 @@ const useRPLData = (registration_no, access_token) => {
   };
 };
 
-const useDropdownData = (access_token) => {
+const useDropdownData = (access_token, registration_no) => {
   const [certificationLevels, setCertificationLevels] = useState([]);
   const [fundingSources, setFundingSources] = useState([]);
   const [dzongkhags, setDzongkhags] = useState([]);
@@ -232,7 +232,11 @@ const useDropdownData = (access_token) => {
         CommonService.getByParentId(16),
         CommonService.getByParentId(4),
         CommonService.getAllDzongkhags(),
-        NcsService.getAllNcsProgrammes(access_token),
+        // the institute's own approved accredited courses (id + programme_title)
+        ApplyAccreditedCourseService.getAccreditedApprovedCertificateCourseByUserId(
+          registration_no,
+          access_token,
+        ),
       ]);
 
       // Ensure we're setting arrays, even if the response is undefined or null
@@ -257,7 +261,6 @@ const useDropdownData = (access_token) => {
           : programmesResponse.data.data || [];
       }
 
-      console.log("Fetched programme data:", programmes);
       setApprovedProgrammes(programmes);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
@@ -270,7 +273,7 @@ const useDropdownData = (access_token) => {
     } finally {
       setLoading(false);
     }
-  }, [access_token]);
+  }, [access_token, registration_no]);
 
   return {
     certificationLevels,
@@ -442,7 +445,7 @@ const RPLAssessmentIndex = () => {
 
   // Custom hooks
   const rplData = useRPLData(registration_no, access_token);
-  const dropdownData = useDropdownData(access_token);
+  const dropdownData = useDropdownData(access_token, registration_no);
 
   // Fetch all data on mount
   useEffect(() => {
@@ -612,9 +615,8 @@ const RPLAssessmentIndex = () => {
     courseDescription: Yup.string().required(
       "Programme/Assessment Description is required",
     ),
-    files: Yup.array()
-      .min(1, "Please upload required documents")
-      .max(5, "Maximum 5 files allowed"),
+    // documents are optional
+    files: Yup.array().max(5, "Maximum 5 files allowed"),
   });
 
   // Handle form submission
@@ -791,6 +793,35 @@ const RPLAssessmentIndex = () => {
                       select
                       options={dropdownData.approvedProgrammes}
                       optionLabelKey="programme_title"
+                      // auto-fill fee, certification level and capacity from the approved course
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        formik.setFieldValue("programmeId", value);
+                        const course = (
+                          dropdownData.approvedProgrammes || []
+                        ).find((c) => String(c.id) === String(value));
+                        const level = (
+                          dropdownData.certificationLevels || []
+                        ).find(
+                          (l) =>
+                            String(l.id) ===
+                            String(course?.certificate_level_id),
+                        );
+                        formik.setFieldValue(
+                          "feesPerTrainee",
+                          course?.fees_per_trainee ?? "",
+                        );
+                        formik.setFieldValue(
+                          "certificationLevelId",
+                          level
+                            ? level.id
+                            : (course?.certificate_level_id ?? ""),
+                        );
+                        formik.setFieldValue(
+                          "enrollmentCapacity",
+                          course?.enrolment_capacity ?? "",
+                        );
+                      }}
                     />
                   </Grid>
 
@@ -804,6 +835,9 @@ const RPLAssessmentIndex = () => {
                         </>
                       }
                       type="number"
+                      slotProps={{
+                        input: { readOnly: Boolean(formik.values.programmeId) },
+                      }}
                     />
                   </Grid>
 
@@ -818,6 +852,9 @@ const RPLAssessmentIndex = () => {
                       }
                       select
                       options={dropdownData.certificationLevels}
+                      slotProps={{
+                        input: { readOnly: Boolean(formik.values.programmeId) },
+                      }}
                     />
                   </Grid>
 
@@ -831,6 +868,9 @@ const RPLAssessmentIndex = () => {
                         </>
                       }
                       type="number"
+                      slotProps={{
+                        input: { readOnly: Boolean(formik.values.programmeId) },
+                      }}
                     />
                   </Grid>
 
@@ -851,7 +891,9 @@ const RPLAssessmentIndex = () => {
                     <FormDateField
                       formik={formik}
                       name="applicationEndDate"
-                      min={formik.values.applicationStartDate || todayLocalISO()}
+                      min={
+                        formik.values.applicationStartDate || todayLocalISO()
+                      }
                       label={
                         <>
                           <RequiredStar /> Application End Date
@@ -945,7 +987,7 @@ const RPLAssessmentIndex = () => {
                     {!formik.touched.files &&
                       formik.values.files.length === 0 && (
                         <Typography variant="caption" color="textSecondary">
-                          Please upload required documents (PDF, DOC, etc.)
+                          Supporting documents are optional (PDF, DOC, etc.)
                         </Typography>
                       )}
                   </Grid>

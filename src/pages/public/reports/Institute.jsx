@@ -1,717 +1,405 @@
-import React, { useState, useMemo } from "react";
+// Public report: registered institutes and their accredited courses
+import { useState, useMemo, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
-  Paper, Typography, TextField, Table, TableHead, TableRow, TableCell,
-  TableBody, TableContainer, InputAdornment, Box, Divider, TablePagination,
-  Chip, IconButton, TableSortLabel, alpha, Stack, Select, MenuItem,
-  FormControl, InputLabel, Modal, Backdrop, Fade, Button,
+  Paper,
+  Typography,
+  TextField,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  TableContainer,
+  TablePagination,
+  Box,
+  Grid,
+  Chip,
+  Button,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  CircularProgress,
 } from "@mui/material";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
-import SearchIcon from "@mui/icons-material/Search";
-import ClearIcon from "@mui/icons-material/Clear";
-import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import CloseIcon from "@mui/icons-material/Close";
-import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
+import {
+  PAPER_PROPS,
+  TABLE_SX,
+  INPUT_SX,
+  SELECT_SX,
+  ROWS_PER_PAGE_OPTIONS,
+  parseJsonArray,
+} from "./reportStyles";
 
-// ── Theme (shared with Assessor) ──────────────────────────────────────────────
-const theme = createTheme({
-  palette: {
-    mode: "light",
-    primary: { main: "#1B3A6B", light: "#2C5282", dark: "#122952" },
-    secondary: { main: "#C9A84C", light: "#D4B96A", dark: "#A8832C" },
-    success: { main: "#1A6B4A", light: "#E8F5EE" },
-    error: { main: "#8B1A1A", light: "#FDEAEA" },
-    background: { default: "#F4F6F9", paper: "#FFFFFF" },
-    text: { primary: "#1A2540", secondary: "#5A6A85" },
-    divider: "#E2E8F0",
-  },
-  typography: {
-    fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-    h5: { fontWeight: 700, letterSpacing: "-0.02em" },
-    h6: { fontWeight: 700, letterSpacing: "-0.01em" },
-    body2: { fontSize: "0.8625rem" },
-    caption: { fontSize: "0.75rem", letterSpacing: "0.04em" },
-  },
-  shape: { borderRadius: 10 },
-  components: {
-    MuiTableCell: { styleOverrides: { root: { borderColor: "#EDF0F5", padding: "11px 16px" } } },
-    MuiChip: { styleOverrides: { root: { borderRadius: 6 } } },
-  },
-});
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-const DZONGKHAGS = [
-  "Bumthang", "Chhukha", "Dagana", "Gasa", "Haa", "Lhuntse", "Mongar", "Paro",
-  "Pema Gatshel", "Punakha", "Samdrup Jongkhar", "Samtse", "Sarpang", "Thimphu",
-  "Trashigang", "Trashi Yangtse", "Trongsa", "Tsirang", "Wangdue Phodrang", "Zhemgang",
-];
-
-const REG_TYPES = ["Institute", "SES Centre", "Assessment Centre"];
-
-// ── Sample Data ───────────────────────────────────────────────────────────────
-const INSTITUTES = [
-  {
-    id: 1, regNo: "2026030239", name: "AAA Skills Institute", dzongkhag: "Thimphu",
-    contactNo: "77111590", ownership: "Private (Partnership)", email: "sonamtenzy@gmail.com",
-    validityTill: "Mar 30th 2027", type: "Institute", sector: "Private",
-    courses: [
-      { id: 1, title: "Heavy Vehicle Driving", theory: 432, practical: 84, ojt: null, total: 516, feesPerHead: null, enrollment: 12, certLevel: "BQF Certificate 2", accredited: "Yes" },
-      { id: 2, title: "Automotive Technician", theory: 432, practical: 84, ojt: null, total: 516, feesPerHead: null, enrollment: 30, certLevel: "BQF Certificate 2", accredited: "Yes" },
-      { id: 3, title: "Auto Electrician", theory: 432, practical: 84, ojt: null, total: 516, feesPerHead: null, enrollment: 30, certLevel: "BQF Certificate 3", accredited: "Yes" },
-      { id: 4, title: "Heavy Auto Mechanic", theory: null, practical: null, ojt: null, total: null, feesPerHead: null, enrollment: 21, certLevel: "BQF Certificate 2", accredited: "Yes" },
-      { id: 5, title: "Excavator Operator", theory: 432, practical: 84, ojt: null, total: 516, feesPerHead: null, enrollment: 12, certLevel: "BQF Certificate 2", accredited: "Yes" },
-    ],
-  },
-  {
-    id: 2, regNo: "2020090593", name: "Athang Learning Institute", dzongkhag: "Thimphu",
-    contactNo: "17172141", ownership: "Private (Partnership)", email: "choki@athang.com",
-    validityTill: "Sep 9th 2026", type: "Institute", sector: "Private",
-    courses: [
-      { id: 1, title: "Carpentry", theory: 240, practical: 120, ojt: 60, total: 420, feesPerHead: 500, enrollment: 20, certLevel: "BQF Certificate 2", accredited: "Yes" },
-      { id: 2, title: "Plumbing", theory: 200, practical: 100, ojt: 50, total: 350, feesPerHead: 450, enrollment: 15, certLevel: "BQF Certificate 2", accredited: "No" },
-    ],
-  },
-  {
-    id: 3, regNo: "2015050068", name: "Samthang Technical Training Institute", dzongkhag: "Wangdue Phodrang",
-    contactNo: "77105319", ownership: "Public (Govt.)", email: "tti.samthang@gmail.com",
-    validityTill: "May 13th 2029", type: "Institute", sector: "Public (Govt.)",
-    courses: [
-      { id: 1, title: "Welding", theory: 300, practical: 150, ojt: 80, total: 530, feesPerHead: null, enrollment: 25, certLevel: "BQF Certificate 3", accredited: "Yes" },
-      { id: 2, title: "Masonry", theory: 280, practical: 140, ojt: 70, total: 490, feesPerHead: null, enrollment: 18, certLevel: "BQF Certificate 2", accredited: "Yes" },
-    ],
-  },
-  {
-    id: 4, regNo: "2018070112", name: "Paro Vocational Training Centre", dzongkhag: "Paro",
-    contactNo: "77234567", ownership: "Public (Govt.)", email: "pvtc@gov.bt",
-    validityTill: "Jun 15th 2028", type: "SES Centre", sector: "Public (Govt.)",
-    courses: [
-      { id: 1, title: "Solar Panel Installation", theory: 180, practical: 90, ojt: 40, total: 310, feesPerHead: null, enrollment: 22, certLevel: "BQF Certificate 2", accredited: "Yes" },
-    ],
-  },
-  {
-    id: 5, regNo: "2022011045", name: "Chhukha Assessment Centre", dzongkhag: "Chhukha",
-    contactNo: "17345678", ownership: "Private (Company)", email: "cac@bhutan.bt",
-    validityTill: "Dec 1st 2027", type: "Assessment Centre", sector: "Private",
-    courses: [
-      { id: 1, title: "Construction Safety", theory: 100, practical: 50, ojt: null, total: 150, feesPerHead: 300, enrollment: 40, certLevel: "BQF Certificate 1", accredited: "Yes" },
-      { id: 2, title: "Equipment Operation", theory: 200, practical: 100, ojt: 60, total: 360, feesPerHead: 400, enrollment: 35, certLevel: "BQF Certificate 2", accredited: "Yes" },
-    ],
-  },
-  {
-    id: 6, regNo: "2019030287", name: "Punakha Skills Centre", dzongkhag: "Punakha",
-    contactNo: "17456789", ownership: "Private (Partnership)", email: "psc@punakha.bt",
-    validityTill: "Apr 20th 2026", type: "SES Centre", sector: "Private",
-    courses: [
-      { id: 1, title: "Agriculture Technology", theory: 160, practical: 80, ojt: 40, total: 280, feesPerHead: 200, enrollment: 30, certLevel: "BQF Certificate 2", accredited: "No" },
-    ],
-  },
-  {
-    id: 7, regNo: "2021050399", name: "Mongar Community Training", dzongkhag: "Mongar",
-    contactNo: "17567890", ownership: "NGO", email: "mct@mongar.bt",
-    validityTill: "Nov 30th 2028", type: "Institute", sector: "NGO",
-    courses: [
-      { id: 1, title: "Handicraft & Weaving", theory: 120, practical: 200, ojt: null, total: 320, feesPerHead: 100, enrollment: 28, certLevel: "BQF Certificate 1", accredited: "Yes" },
-    ],
-  },
-  {
-    id: 8, regNo: "2023020801", name: "Trongsa Assessment Hub", dzongkhag: "Trongsa",
-    contactNo: "77678901", ownership: "Public (Govt.)", email: "tah@trongsa.bt",
-    validityTill: "Feb 28th 2030", type: "Assessment Centre", sector: "Public (Govt.)",
-    courses: [
-      { id: 1, title: "Electrical Wiring", theory: 220, practical: 110, ojt: 55, total: 385, feesPerHead: null, enrollment: 16, certLevel: "BQF Certificate 3", accredited: "Yes" },
-      { id: 2, title: "Plumbing & Sanitation", theory: 200, practical: 100, ojt: 50, total: 350, feesPerHead: null, enrollment: 20, certLevel: "BQF Certificate 2", accredited: "Yes" },
-    ],
-  },
-];
-
-// ── Shared sort label sx ──────────────────────────────────────────────────────
-const sortLabelSx = (active) => ({
-  fontSize: "0.78rem",
-  fontWeight: 700,
-  color: "text.secondary",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  "&.Mui-active": { color: "primary.main" },
-  "& .MuiTableSortLabel-icon": { fontSize: 16, opacity: active ? 1 : 0.35 },
-  "&:hover .MuiTableSortLabel-icon": { opacity: 1 },
-});
-
-// ── Course Details Modal ──────────────────────────────────────────────────────
-const CourseModal = ({ institute, onClose }) => {
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-
-  const handleSort = (key) => {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
-    }));
-  };
-
-  const sortedCourses = useMemo(() => {
-    if (!sortConfig.key || !institute) return institute?.courses ?? [];
-    return [...institute.courses].sort((a, b) => {
-      let av = a[sortConfig.key], bv = b[sortConfig.key];
-      if (av == null) av = "";
-      if (bv == null) bv = "";
-      if (typeof av === "number") return sortConfig.direction === "asc" ? av - bv : bv - av;
-      av = String(av).toLowerCase(); bv = String(bv).toLowerCase();
-      if (av < bv) return sortConfig.direction === "asc" ? -1 : 1;
-      if (av > bv) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [institute, sortConfig]);
-
-  if (!institute) return null;
-
-  const courseCols = [
-    { id: "id", label: "#", width: "4%" },
-    { id: "title", label: "Course Title", width: "18%" },
-    { id: "theory", label: "Theory (hrs)", width: "10%" },
-    { id: "practical", label: "Practical (hrs)", width: "11%" },
-    { id: "ojt", label: "OJT (hrs)", width: "9%" },
-    { id: "total", label: "Total (hrs)", width: "9%" },
-    { id: "feesPerHead", label: "Fees Per Head", width: "10%" },
-    { id: "enrollment", label: "Enrollment Per Course", width: "12%" },
-    { id: "certLevel", label: "Certificate Level", width: "11%" },
-    { id: "accredited", label: "Accredited", width: "6%" },
-  ];
-
-  return (
-    <Modal open={!!institute} onClose={onClose} closeAfterTransition slots={{ backdrop: Backdrop }}
-      slotProps={{ backdrop: { timeout: 200, sx: { backgroundColor: "rgba(10,20,50,0.45)" } } }}>
-      <Fade in={!!institute}>
-        <Box sx={{
-          position: "absolute", top: "50%", left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: { xs: "95vw", md: "85vw", lg: "78vw" },
-          maxHeight: "88vh",
-          backgroundColor: "background.paper",
-          borderRadius: 3,
-          boxShadow: "0 24px 64px rgba(10,20,50,0.18)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          outline: "none",
-        }}>
-          {/* Modal Header */}
-          <Box sx={{
-            px: 3, py: 2.5,
-            borderBottom: "1px solid",
-            borderColor: "divider",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexShrink: 0,
-          }}>
-            <Stack direction="row" alignItems="center" spacing={1.5}>
-              <Box sx={{
-                width: 32, height: 32, borderRadius: 1.5,
-                background: "linear-gradient(135deg, #1B3A6B 0%, #2C5282 100%)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <SchoolOutlinedIcon sx={{ fontSize: 18, color: "#fff" }} />
-              </Box>
-              <Typography variant="h6" color="text.primary">
-                Institute Course Details
-              </Typography>
-            </Stack>
-            <IconButton onClick={onClose} size="small"
-              sx={{ borderRadius: 1.5, "&:hover": { backgroundColor: alpha("#1B3A6B", 0.06) } }}>
-              <CloseIcon sx={{ fontSize: 20 }} />
-            </IconButton>
-          </Box>
-
-          {/* Info Banner */}
-          <Box sx={{
-            mx: 3, mt: 2.5, mb: 2,
-            p: 2.5,
-            borderRadius: 2,
-            background: "linear-gradient(135deg, #1B7A8A 0%, #1A9BAD 100%)",
-            flexShrink: 0,
-          }}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 0 }}
-              justifyContent="space-between">
-              <Box>
-                <InfoRow label="Sector" value={institute.sector} />
-                <InfoRow label="Grade" value="A" />
-                <InfoRow label="Email" value={institute.email} />
-              </Box>
-              <Box>
-                <InfoRow label="Location" value={institute.dzongkhag} />
-                <InfoRow label="Dzongkhag" value={institute.dzongkhag} />
-                <InfoRow label="Contact No" value={institute.contactNo} />
-              </Box>
-              <Box>
-                <InfoRow label="Registration No" value={institute.regNo} />
-                <InfoRow label="Validity" value={institute.validityTill} />
-              </Box>
-            </Stack>
-          </Box>
-
-          {/* Course Table */}
-          <Box sx={{ px: 3, pb: 3, overflow: "auto", flex: 1 }}>
-            <TableContainer sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {courseCols.map((col) => (
-                      <TableCell key={col.id} width={col.width}
-                        sx={{ backgroundColor: "#F8FAFB", borderBottom: "2px solid", borderColor: "divider", py: "10px" }}>
-                        <TableSortLabel
-                          active={sortConfig.key === col.id}
-                          direction={sortConfig.key === col.id ? sortConfig.direction : "asc"}
-                          onClick={() => handleSort(col.id)}
-                          sx={sortLabelSx(sortConfig.key === col.id)}
-                        >
-                          {col.label}
-                        </TableSortLabel>
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {sortedCourses.map((course, idx) => (
-                    <TableRow key={course.id} hover sx={{
-                      "&:nth-of-type(even)": { backgroundColor: alpha("#1B3A6B", 0.015) },
-                      "&:hover": { backgroundColor: alpha("#1B3A6B", 0.04) },
-                      "&:last-child td": { borderBottom: 0 },
-                      transition: "background-color 0.15s",
-                    }}>
-                      <TableCell>
-                        <Typography variant="caption" color="text.disabled" fontWeight={600} fontFamily="monospace">
-                          {String(idx + 1).padStart(2, "0")}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600} color="text.primary">{course.title}</Typography>
-                      </TableCell>
-                      <TableCell><Typography variant="body2" color="text.secondary">{course.theory ?? "—"}</Typography></TableCell>
-                      <TableCell><Typography variant="body2" color="text.secondary">{course.practical ?? "—"}</Typography></TableCell>
-                      <TableCell><Typography variant="body2" color="text.secondary">{course.ojt ?? "—"}</Typography></TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600} color="text.primary">{course.total ?? "—"}</Typography>
-                      </TableCell>
-                      <TableCell><Typography variant="body2" color="text.secondary">{course.feesPerHead ?? "—"}</Typography></TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{
-                          display: "inline-block",
-                          backgroundColor: alpha("#1B3A6B", 0.06),
-                          color: "primary.main",
-                          px: 1, py: 0.3,
-                          borderRadius: 1,
-                          fontWeight: 600,
-                          fontFamily: "monospace",
-                          fontSize: "0.8rem",
-                        }}>
-                          {course.enrollment}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={course.certLevel} size="small"
-                          sx={{
-                            height: 24, fontSize: "0.77rem", fontWeight: 500,
-                            backgroundColor: alpha("#C9A84C", 0.1),
-                            color: "#7A600A",
-                            border: `1px solid ${alpha("#C9A84C", 0.3)}`,
-                          }} />
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={course.accredited} size="small"
-                          sx={{
-                            height: 24, fontSize: "0.77rem", fontWeight: 700,
-                            backgroundColor: course.accredited === "Yes" ? alpha("#1A6B4A", 0.1) : alpha("#8B1A1A", 0.1),
-                            color: course.accredited === "Yes" ? "#1A6B4A" : "#8B1A1A",
-                            border: `1px solid ${course.accredited === "Yes" ? alpha("#1A6B4A", 0.25) : alpha("#8B1A1A", 0.25)}`,
-                          }} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        </Box>
-      </Fade>
-    </Modal>
-  );
+/** Short type label from the registration service name. */
+const typeLabel = (serviceName) => {
+  const n = String(serviceName || "").toLowerCase();
+  if (n.includes("ses")) return "SES Centre";
+  if (n.includes("assessment")) return "Assessment Centre";
+  return "Institute";
 };
 
-const InfoRow = ({ label, value }) => (
-  <Typography variant="body2" sx={{ color: "#fff", lineHeight: 1.9 }}>
-    <Box component="span" fontWeight={700}>{label}</Box>
-    {" - "}
-    <Box component="span" sx={{ color: alpha("#fff", 0.88) }}>{value}</Box>
-  </Typography>
-);
+const fmtDate = (d) =>
+  d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
-// ── Dropdown filter ───────────────────────────────────────────────────────────
-const FilterSelect = ({ label, value, onChange, options, icon: Icon }) => (
-  <FormControl size="small" sx={{ minWidth: 180 }}>
-    <InputLabel sx={{ fontSize: "0.875rem" }}>{label}</InputLabel>
-    <Select
-      value={value}
-      label={label}
-      onChange={onChange}
-      startAdornment={Icon ? <Icon sx={{ fontSize: 16, mr: 0.5, color: "text.secondary" }} /> : null}
-      sx={{
-        fontSize: "0.875rem",
-        borderRadius: 2,
-        backgroundColor: alpha("#1B3A6B", 0.03),
-        "& .MuiOutlinedInput-notchedOutline": { borderColor: "#E2E8F0" },
-        "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2C5282" },
-        "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#1B3A6B", borderWidth: 1.5 },
-      }}
-    >
-      <MenuItem value=""><em>All</em></MenuItem>
-      {options.map((o) => <MenuItem key={o} value={o} sx={{ fontSize: "0.875rem" }}>{o}</MenuItem>)}
-    </Select>
-  </FormControl>
-);
+/** Institute validity: validity_date, or (older records) one year from the last renewal. */
+const validityTill = (validityDate, renewalDate) => {
+  let d = validityDate ? new Date(validityDate) : null;
+  if (!d || Number.isNaN(d.getTime())) {
+    if (!renewalDate) return "—";
+    d = new Date(renewalDate);
+    if (Number.isNaN(d.getTime())) return "—";
+    d.setFullYear(d.getFullYear() + 1);
+  }
+  return fmtDate(d);
+};
 
-// ── Main Component ─────────────────────────────────────────────────────────────
-const Institute = () => {
-  const [filters, setFilters] = useState({ search: "", type: "", dzongkhag: "" });
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-  const [selectedInstitute, setSelectedInstitute] = useState(null);
+const show = (v) => (v === null || v === undefined || v === "" ? "—" : v);
 
-  const handleSort = (key) => {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
-    }));
-  };
+const toInstitute = (item) => ({
+  id: item.institute_id,
+  regNo: item.registration_no || "—",
+  name: item.institute_name || "—",
+  dzongkhag: item.dzongkhag_name || "—",
+  location: item.exact_location || "—",
+  contactNo: item.contact_no || "—",
+  ownership: item.ownership || "—",
+  email: item.email_id || "—",
+  validityTill: validityTill(item.validity_date, item.institute_renewal_date),
+  type: typeLabel(item.registration_type),
+  courses: parseJsonArray(item.courses)
+    .filter((c) => c && c.id)
+    .map((c) => ({
+      id: c.id,
+      title: c.title || "—",
+      theory: c.theory,
+      practical: c.practical,
+      ojt: c.ojt,
+      total: c.total,
+      feesPerHead: c.feesPerHead,
+      enrollment: c.enrollment,
+      certLevel: c.certLevel || "—",
+    })),
+});
 
-  const filtered = useMemo(() => {
-    let result = INSTITUTES.filter((r) => {
-      if (filters.type && r.type !== filters.type) return false;
-      if (filters.dzongkhag && r.dzongkhag !== filters.dzongkhag) return false;
-      if (filters.search) {
-        const s = filters.search.toLowerCase();
-        return (
-          r.name.toLowerCase().includes(s) ||
-          r.regNo.toLowerCase().includes(s) ||
-          r.dzongkhag.toLowerCase().includes(s) ||
-          r.contactNo.includes(s) ||
-          r.ownership.toLowerCase().includes(s) ||
-          r.email.toLowerCase().includes(s)
-        );
-      }
-      return true;
-    });
+// ── Course details dialog ─────────────────────────────────────────────────────
+const CourseDialog = ({ institute, onClose }) => (
+  <Dialog open={Boolean(institute)} onClose={onClose} maxWidth="lg" fullWidth>
+    {institute && (
+      <>
+        <DialogTitle sx={{ pr: 6 }}>
+          {institute.name}
+          <Typography variant="body2" color="text.secondary">
+            {institute.type} · Registration No. {institute.regNo}
+          </Typography>
+          <IconButton onClick={onClose} sx={{ position: "absolute", right: 8, top: 8 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            {[
+              ["Ownership", institute.ownership],
+              ["Dzongkhag", institute.dzongkhag],
+              ["Location", institute.location],
+              ["Contact No.", institute.contactNo],
+              ["Email", institute.email],
+              ["Validity Till", institute.validityTill],
+            ].map(([label, value]) => (
+              <Grid item key={label} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {label}
+                </Typography>
+                <Typography variant="body2" fontWeight="medium">
+                  {value}
+                </Typography>
+              </Grid>
+            ))}
+          </Grid>
 
-    if (sortConfig.key) {
-      result = [...result].sort((a, b) => {
-        let av = a[sortConfig.key], bv = b[sortConfig.key];
-        if (typeof av === "number") return sortConfig.direction === "asc" ? av - bv : bv - av;
-        av = String(av ?? "").toLowerCase(); bv = String(bv ?? "").toLowerCase();
-        if (av < bv) return sortConfig.direction === "asc" ? -1 : 1;
-        if (av > bv) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-    return result;
-  }, [filters, sortConfig]);
-
-  const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-
-  const setFilter = (key, val) => { setFilters((f) => ({ ...f, [key]: val })); setPage(0); };
-
-  const clearAll = () => { setFilters({ search: "", type: "", dzongkhag: "" }); setPage(0); };
-  const hasFilters = filters.search || filters.type || filters.dzongkhag;
-
-  const columns = [
-    { id: "id", label: "#", width: "4%" },
-    { id: "regNo", label: "Registered No.", width: "12%" },
-    { id: "name", label: "Institute Name", width: "20%" },
-    { id: "dzongkhag", label: "Dzongkhag", width: "10%" },
-    { id: "contactNo", label: "Contact No", width: "10%" },
-    { id: "ownership", label: "Ownership", width: "15%" },
-    { id: "email", label: "Email", width: "15%" },
-    { id: "validityTill", label: "Validity Till", width: "9%" },
-    { id: "courses", label: "Course Details", width: "5%", noSort: true },
-  ];
-
-  return (
-    <ThemeProvider theme={theme}>
-      <Box sx={{ minHeight: "100vh", backgroundColor: "background.default", p: { xs: 2, md: 3.5 } }}>
-
-        {/* ── Page Header ── */}
-        <Box sx={{ mb: 3 }}>
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Box sx={{
-              width: 36, height: 36, borderRadius: 2,
-              background: "linear-gradient(135deg, #1B3A6B 0%, #2C5282 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <AccountBalanceOutlinedIcon sx={{ fontSize: 20, color: "#fff" }} />
-            </Box>
-            <Typography variant="h5" color="text.primary">
-              Institutes Registered
-            </Typography>
-          </Stack>
-        </Box>
-
-        {/* ── Table Panel ── */}
-        <Paper elevation={0} sx={{ borderRadius: 2.5, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
-
-          {/* Toolbar */}
-          <Box sx={{ px: 2.5, pt: 2.5, pb: 2 }}>
-            <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }} flexWrap="wrap" gap={1.5}>
-
-              {/* Left: filters */}
-              <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-                <FilterSelect
-                  label="Registration Type"
-                  value={filters.type}
-                  onChange={(e) => setFilter("type", e.target.value)}
-                  options={REG_TYPES}
-                />
-                <FilterSelect
-                  label="Dzongkhag"
-                  value={filters.dzongkhag}
-                  onChange={(e) => setFilter("dzongkhag", e.target.value)}
-                  options={DZONGKHAGS}
-                />
-                {hasFilters && (
-                  <Button size="small" onClick={clearAll} startIcon={<ClearIcon sx={{ fontSize: 15 }} />}
-                    sx={{
-                      fontSize: "0.8125rem", color: "text.secondary", textTransform: "none",
-                      "&:hover": { color: "primary.main", backgroundColor: alpha("#1B3A6B", 0.05) }
-                    }}>
-                    Clear
-                  </Button>
-                )}
-              </Stack>
-
-              {/* Right: record count + search */}
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <FilterListIcon sx={{ fontSize: 18, color: "text.secondary" }} />
-                  <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                    <Box component="span" color="text.primary">{filtered.length}</Box>
-                    {" "}record{filtered.length !== 1 ? "s" : ""}
-                  </Typography>
-                </Stack>
-                <TextField
-                  size="small"
-                  placeholder="Search institute, email, contact…"
-                  value={filters.search}
-                  onChange={(e) => setFilter("search", e.target.value)}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} /></InputAdornment>,
-                    endAdornment: filters.search && (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setFilter("search", "")}>
-                          <ClearIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    width: 280,
-                    "& .MuiOutlinedInput-root": {
-                      fontSize: "0.875rem", borderRadius: 2,
-                      backgroundColor: alpha("#1B3A6B", 0.03),
-                      "& fieldset": { borderColor: "divider" },
-                      "&:hover fieldset": { borderColor: "primary.light" },
-                      "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1.5 },
-                    },
-                  }}
-                />
-              </Stack>
-            </Stack>
-          </Box>
-
-          <Divider />
-
-          {/* Table */}
-          <TableContainer sx={{ maxHeight: "60vh" }}>
-            <Table size="small" stickyHeader>
+          <Typography variant="subtitle2" color="primary" gutterBottom>
+            Accredited Courses
+            <Chip label={`${institute.courses.length} Total`} size="small" sx={{ ml: 1 }} />
+          </Typography>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small" sx={TABLE_SX}>
               <TableHead>
-                <TableRow>
-                  {columns.map((col) => (
-                    <TableCell key={col.id} width={col.width}
-                      sx={{ backgroundColor: "#F8FAFB", borderBottom: "2px solid", borderColor: "divider", py: "10px" }}>
-                      {col.noSort ? (
-                        <Typography sx={{
-                          fontSize: "0.78rem", fontWeight: 700, color: "text.secondary",
-                          textTransform: "uppercase", letterSpacing: "0.06em"
-                        }}>
-                          {col.label}
-                        </Typography>
-                      ) : (
-                        <TableSortLabel
-                          active={sortConfig.key === col.id}
-                          direction={sortConfig.key === col.id ? sortConfig.direction : "asc"}
-                          onClick={() => handleSort(col.id)}
-                          sx={sortLabelSx(sortConfig.key === col.id)}
-                        >
-                          {col.label}
-                        </TableSortLabel>
-                      )}
-                    </TableCell>
-                  ))}
+                <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+                  <TableCell>#</TableCell>
+                  <TableCell>Course Title</TableCell>
+                  <TableCell align="center">Theory (hrs)</TableCell>
+                  <TableCell align="center">Practical (hrs)</TableCell>
+                  <TableCell align="center">OJT (hrs)</TableCell>
+                  <TableCell align="center">Total (hrs)</TableCell>
+                  <TableCell align="center">Fees Per Head</TableCell>
+                  <TableCell align="center">Enrollment Per Course</TableCell>
+                  <TableCell>Certificate Level</TableCell>
                 </TableRow>
               </TableHead>
-
               <TableBody>
-                {paginated.length > 0 ? (
-                  paginated.map((row, idx) => (
-                    <TableRow key={row.id} hover sx={{
-                      "&:nth-of-type(even)": { backgroundColor: alpha("#1B3A6B", 0.015) },
-                      "&:hover": { backgroundColor: alpha("#1B3A6B", 0.04) },
-                      "&:last-child td": { borderBottom: 0 },
-                      transition: "background-color 0.15s",
-                    }}>
-                      {/* # */}
-                      <TableCell>
-                        <Typography variant="caption" color="text.disabled" fontWeight={600} fontFamily="monospace">
-                          {String(page * rowsPerPage + idx + 1).padStart(2, "0")}
-                        </Typography>
-                      </TableCell>
-
-                      {/* Registered No */}
-                      <TableCell>
-                        <Typography variant="caption" fontFamily="monospace" sx={{
-                          backgroundColor: alpha("#1B3A6B", 0.06), color: "primary.main",
-                          px: 1, py: 0.4, borderRadius: 1, fontWeight: 600, letterSpacing: "0.04em",
-                        }}>
-                          {row.regNo}
-                        </Typography>
-                      </TableCell>
-
-                      {/* Institute Name */}
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600} color="text.primary">{row.name}</Typography>
-                        <Chip label={row.type} size="small" sx={{
-                          mt: 0.4, height: 20, fontSize: "0.72rem", fontWeight: 600,
-                          backgroundColor:
-                            row.type === "Institute" ? alpha("#1B3A6B", 0.08) :
-                              row.type === "SES Centre" ? alpha("#1A6B4A", 0.08) :
-                                alpha("#C9A84C", 0.12),
-                          color:
-                            row.type === "Institute" ? "#1B3A6B" :
-                              row.type === "SES Centre" ? "#1A6B4A" :
-                                "#7A600A",
-                          border: "none",
-                        }} />
-                      </TableCell>
-
-                      {/* Dzongkhag */}
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                          <LocationOnOutlinedIcon sx={{ fontSize: 14, color: "text.disabled" }} />
-                          <Typography variant="body2" color="text.secondary">{row.dzongkhag}</Typography>
-                        </Stack>
-                      </TableCell>
-
-                      {/* Contact No */}
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary" fontFamily="monospace">{row.contactNo}</Typography>
-                      </TableCell>
-
-                      {/* Ownership */}
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">{row.ownership}</Typography>
-                      </TableCell>
-
-                      {/* Email */}
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary" sx={{
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180,
-                        }}>
-                          {row.email}
-                        </Typography>
-                      </TableCell>
-
-                      {/* Validity Till */}
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-                          {row.validityTill}
-                        </Typography>
-                      </TableCell>
-
-                      {/* Course Details */}
-                      <TableCell align="center">
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<VisibilityOutlinedIcon sx={{ fontSize: 14 }} />}
-                          onClick={() => setSelectedInstitute(row)}
-                          sx={{
-                            fontSize: "0.78rem", fontWeight: 600, textTransform: "none",
-                            borderRadius: 1.5, px: 1.5, py: 0.4,
-                            borderColor: alpha("#1B3A6B", 0.3),
-                            color: "primary.main",
-                            whiteSpace: "nowrap",
-                            "&:hover": { borderColor: "primary.main", backgroundColor: alpha("#1B3A6B", 0.05) },
-                          }}
-                        >
-                          View More
-                        </Button>
-                      </TableCell>
+                {institute.courses.length > 0 ? (
+                  institute.courses.map((c, i) => (
+                    <TableRow key={c.id}>
+                      <TableCell>{i + 1}</TableCell>
+                      <TableCell>{c.title}</TableCell>
+                      <TableCell align="center">{show(c.theory)}</TableCell>
+                      <TableCell align="center">{show(c.practical)}</TableCell>
+                      <TableCell align="center">{show(c.ojt)}</TableCell>
+                      <TableCell align="center">{show(c.total)}</TableCell>
+                      <TableCell align="center">{show(c.feesPerHead)}</TableCell>
+                      <TableCell align="center">{show(c.enrollment)}</TableCell>
+                      <TableCell>{c.certLevel}</TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={columns.length} align="center" sx={{ py: 8 }}>
-                      <AccountBalanceOutlinedIcon sx={{ fontSize: 44, color: "text.disabled", mb: 1 }} />
-                      <Typography variant="body1" color="text.secondary" fontWeight={600}>No records found</Typography>
-                      <Typography variant="body2" color="text.disabled" mt={0.5}>
-                        {hasFilters ? "Try adjusting your filters or search term" : "No institute data available"}
-                      </Typography>
+                    <TableCell colSpan={9} align="center">
+                      No accredited courses
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      </>
+    )}
+  </Dialog>
+);
 
-          {/* Footer */}
-          <Box sx={{
-            px: 2.5, py: 1.5, borderTop: "1px solid", borderColor: "divider",
-            backgroundColor: "#FAFBFC", display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
-            <Typography variant="caption" color="text.secondary">
-              Showing{" "}
-              <Box component="span" fontWeight={700} color="text.primary">
-                {paginated.length > 0 ? page * rowsPerPage + 1 : 0}–
-                {Math.min((page + 1) * rowsPerPage, filtered.length)}
-              </Box>{" "}
-              of{" "}
-              <Box component="span" fontWeight={700} color="text.primary">{filtered.length}</Box>{" "}
-              records
-            </Typography>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={filtered.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={(_, p) => setPage(p)}
-              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
-              sx={{
-                ".MuiTablePagination-toolbar": { minHeight: 40, p: 0 },
-                ".MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows": {
-                  fontSize: "0.8125rem", margin: 0, color: "text.secondary",
-                },
-                ".MuiTablePagination-actions button": {
-                  borderRadius: 1.5,
-                  "&:hover": { backgroundColor: alpha("#1B3A6B", 0.08) },
-                },
-              }}
-            />
-          </Box>
-        </Paper>
+CourseDialog.propTypes = {
+  institute: PropTypes.object,
+  onClose: PropTypes.func.isRequired,
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
+const Institute = () => {
+  const [institutes, setInstitutes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState({ search: "", type: "", dzongkhag: "" });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await InstituteRegistrationService.getRegisteredInstitutes();
+        if (res instanceof Error || res?.isAxiosError) throw res;
+        setInstitutes(Array.isArray(res?.data) ? res.data.map(toInstitute) : []);
+      } catch (error) {
+        console.error("Error loading institutes:", error);
+        setInstitutes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const typeOptions = useMemo(
+    () => [...new Set(institutes.map((i) => i.type))].sort(),
+    [institutes],
+  );
+  const dzongkhagOptions = useMemo(
+    () => [...new Set(institutes.map((i) => i.dzongkhag).filter((d) => d !== "—"))].sort(),
+    [institutes],
+  );
+
+  const setFilter = (key, value) => {
+    setFilters((f) => ({ ...f, [key]: value }));
+    setPage(0);
+  };
+
+  const filtered = useMemo(() => {
+    const s = filters.search.trim().toLowerCase();
+    const has = (v) => String(v).toLowerCase().includes(s);
+    return institutes.filter((r) => {
+      if (filters.type && r.type !== filters.type) return false;
+      if (filters.dzongkhag && r.dzongkhag !== filters.dzongkhag) return false;
+      if (!s) return true;
+      return (
+        has(r.name) || has(r.regNo) || has(r.dzongkhag) || has(r.contactNo) ||
+        has(r.ownership) || has(r.email)
+      );
+    });
+  }, [institutes, filters]);
+
+  const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const COLS = 10;
+
+  return (
+    <Paper {...PAPER_PROPS}>
+      <Typography variant="h5" gutterBottom>
+        Registered Institutes
+      </Typography>
+
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="body2" color="text.secondary">
+          Institutes, SES Centres and Assessment Centres registered with BQPCA.
+          Click &quot;View Courses&quot; to see an institute&apos;s accredited courses.
+        </Typography>
       </Box>
 
-      {/* Course Details Modal */}
-      <CourseModal institute={selectedInstitute} onClose={() => setSelectedInstitute(null)} />
-    </ThemeProvider>
+      <Grid container spacing={1} alignItems="center" sx={{ justifyContent: "flex-end", mb: 2 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 2 }}>
+          <TextField
+            select
+            label="Type"
+            size="small"
+            fullWidth
+            value={filters.type}
+            onChange={(e) => setFilter("type", e.target.value)}
+            sx={SELECT_SX}
+          >
+            <MenuItem value="">All</MenuItem>
+            {typeOptions.map((t) => (
+              <MenuItem key={t} value={t}>
+                {t}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+        <Grid item size={{ xs: 12, sm: 6, md: 2 }}>
+          <TextField
+            select
+            label="Dzongkhag"
+            size="small"
+            fullWidth
+            value={filters.dzongkhag}
+            onChange={(e) => setFilter("dzongkhag", e.target.value)}
+            sx={SELECT_SX}
+          >
+            <MenuItem value="">All</MenuItem>
+            {dzongkhagOptions.map((d) => (
+              <MenuItem key={d} value={d}>
+                {d}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+        <Grid item size={{ xs: 12, md: 4 }}>
+          <TextField
+            label="Search Institutes"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={filters.search}
+            onChange={(e) => setFilter("search", e.target.value)}
+            placeholder="Search by Name, Registration No. or Email"
+            sx={INPUT_SX}
+          />
+        </Grid>
+      </Grid>
+
+      <TableContainer component={Paper} elevation={1}>
+        <Table size="small" sx={TABLE_SX}>
+          <TableHead>
+            <TableRow>
+              <TableCell>#</TableCell>
+              <TableCell>Registration No.</TableCell>
+              <TableCell>Institute Name</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Dzongkhag</TableCell>
+              <TableCell>Contact No.</TableCell>
+              <TableCell>Ownership</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Validity Till</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={COLS} align="center">
+                  <CircularProgress size={30} />
+                </TableCell>
+              </TableRow>
+            ) : paginated.length > 0 ? (
+              paginated.map((row, index) => (
+                <TableRow key={row.id ?? index}>
+                  <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium">
+                      {row.regNo}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium">
+                      {row.name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={row.type}
+                      size="small"
+                      color={row.type === "Institute" ? "primary" : "default"}
+                    />
+                  </TableCell>
+                  <TableCell>{row.dzongkhag}</TableCell>
+                  <TableCell>{row.contactNo}</TableCell>
+                  <TableCell>{row.ownership}</TableCell>
+                  <TableCell>{row.email}</TableCell>
+                  <TableCell>{row.validityTill}</TableCell>
+                  <TableCell>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="primary"
+                      onClick={() => setSelected(row)}
+                      sx={{ textTransform: "none", fontSize: "0.75rem", whiteSpace: "nowrap" }}
+                    >
+                      View Courses
+                      <Chip
+                        label={row.courses.length}
+                        size="small"
+                        color="primary"
+                        sx={{
+                          ml: 1,
+                          height: 20,
+                          backgroundColor: "rgba(255,255,255,0.25)",
+                          "& .MuiChip-label": { fontSize: "0.7rem", px: 1 },
+                        }}
+                      />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={COLS} align="center">
+                  {filters.search || filters.type || filters.dzongkhag
+                    ? "No records match your filters"
+                    : "No data available in table"}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        <TablePagination
+          rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
+          component="div"
+          count={filtered.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(_, p) => setPage(p)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+        />
+      </TableContainer>
+
+      <CourseDialog institute={selected} onClose={() => setSelected(null)} />
+    </Paper>
   );
 };
 

@@ -46,6 +46,7 @@ import * as Yup from "yup";
 import { toast } from "react-toastify";
 import CommonService from "../../api/services/internal/common/CommonService";
 import InstituteRegistrationRenewalService from "../../api/services/internal/registration/InstituteRegistrationRenewalService";
+import InstituteRegistrationService from "../../api/services/internal/registration/InstituteRegistrationService";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import DatahubService from "../../api/services/external/datahub/DatahubService";
@@ -178,6 +179,122 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [existingDocuments, setExistingDocuments] = useState([]);
   const { serviceId } = useParams();
+
+  // current validity of the registration being renewed
+  const [validity, setValidity] = useState(null);
+
+  useEffect(() => {
+    if (!registration_no) return;
+    InstituteRegistrationService.getRenewalValidity(
+      registration_no,
+      getMappedServiceId(serviceId),
+    ).then((res) => {
+      if (!(res instanceof Error) && !res?.isAxiosError && res?.data) {
+        setValidity(res.data);
+      }
+    });
+  }, [registration_no, serviceId]);
+
+  const validityBar = useMemo(() => {
+    if (!validity) return null;
+    const raw = validity.currentValidity;
+    const date = raw ? new Date(raw) : null;
+    const fmt = (d) =>
+      new Date(d).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysLeft = date ? Math.ceil((date - today) / 86400000) : null;
+    const expired = date ? daysLeft < 0 : false;
+    const dueSoon = date ? !expired && daysLeft <= 90 : false;
+    const color = expired ? "#c62828" : dueSoon ? "#e65100" : "#2e7d32";
+    return (
+      <Box sx={{ mb: 2 }}>
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 1,
+            border: "1px solid",
+            borderColor: alpha(color, 0.4),
+            backgroundColor: alpha(color, 0.06),
+            borderRadius: 1,
+          }}
+        >
+          <Typography variant="body2">
+            Registration No: <strong>{registration_no}</strong>
+          </Typography>
+          {date && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2">
+                Valid until: <strong>{fmt(date)}</strong>
+              </Typography>
+              <Chip
+                size="small"
+                label={
+                  expired
+                    ? `Expired ${Math.abs(daysLeft)} day(s) ago`
+                    : `${daysLeft} day(s) left`
+                }
+                sx={{
+                  height: 22,
+                  fontWeight: 600,
+                  color,
+                  backgroundColor: alpha(color, 0.12),
+                }}
+              />
+            </Box>
+          )}
+        </Box>
+
+        {/* renewal period rule by latest Self Assessment Report grade (institute renewal only) */}
+        {getMappedServiceId(serviceId) == 8 && (
+          <Box
+            sx={{
+              mt: 1,
+              px: 2,
+              py: 1,
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 1,
+              backgroundColor: "#fafafa",
+            }}
+          >
+            <Typography variant="body2">
+              TVET Provider Accreditation grade:{" "}
+              <strong>{validity.grade || "Not available"}</strong>
+              {" · "}Renewal period:{" "}
+              <strong>
+                {validity.years} year{validity.years > 1 ? "s" : ""}
+              </strong>
+              {validity.validUntilIfApprovedToday && (
+                <>
+                  {" · "}Valid until (if approved today):{" "}
+                  <strong>{fmt(validity.validUntilIfApprovedToday)}</strong>
+                </>
+              )}
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+            >
+              Renewal validity depends on the latest Self Assessment Report
+              grade: C = 1 + 1 = 2 years, B = 1 + 2 = 3 years, A = 1 + 3 = 4
+              years, A+ = 1 + 4 = 5 years, otherwise 1 year.
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    );
+  }, [validity, registration_no, serviceId]);
   const navigate = useNavigate();
   const [instituteRenewalStatus, setInstituteRenewalStatus] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -1523,6 +1640,8 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
             {serviceName} - Renewal Application
           </Typography>
 
+          {validityBar}
+
           <Divider sx={{ mb: 3 }} />
 
           <Box
@@ -1584,6 +1703,8 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
         <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
           {serviceName} - Renewal Application
         </Typography>
+
+        {validityBar}
 
         {/* Success banner (only when the monitoring check applies) */}
         {!skipMonitoringCheck && (

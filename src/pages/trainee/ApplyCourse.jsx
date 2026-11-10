@@ -536,8 +536,8 @@ const ApplyCourse = () => {
 
         if (citizenData.gender) {
           const genderMap = {
-            Male: "30",
-            Female: "31",
+            M: "30",
+            F: "31",
           };
           const genderId = genderMap[citizenData.gender];
           if (genderId) {

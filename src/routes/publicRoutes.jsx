@@ -6,7 +6,6 @@ import InstituteSesCentreAssessmentCentreProposal from "../pages/public/proposal
 import InstituteSesCentreAssessmentCentre from "../pages/public/registration/InstituteSesCentreAssessmentCentre";
 import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
 import AssessorAccreditorQMSAuditorRenewal from "../pages/renewal/AssessorAccreditorQMSAuditorRenewal";
-import RPLAssessment from "../pages/public/courses/RPLAssessment";
 
 // assessment result path
 import AssessmentResult from "../pages/public/assessment/AssessmentResult";
@@ -109,7 +108,6 @@ export const publicRoutes = [
   {
     path: "course",
     children: [
-      { path: "apply/rpl-assessment", element: <RPLAssessment /> },
       { path: "apply-course/:applicationNo", element: <ApplyCourse /> },
     ],
   },

@@ -90,6 +90,7 @@ const ViewAccreditedCourseRegistration = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
+  const loggedInUserId = useSelector((state) => state.auth.userId);
 
   // State
   const [loading, setLoading] = useState(true);
@@ -143,6 +144,9 @@ const ViewAccreditedCourseRegistration = () => {
   const isPaymentCompleted = useCallback(() => {
     return paymentStatus?.paymentStatus === "paid";
   }, [paymentStatus]);
+
+  // application made from an NCS programme (role 12): no curriculum attached
+  const isNcsBased = Boolean(courseData && !courseData.curriculum_id);
 
   const getCertificateLevelName = useCallback(
     (id) => {
@@ -705,10 +709,16 @@ const ViewAccreditedCourseRegistration = () => {
     setRemarksError("");
   };
 
+  // Renewal flow (service 54): 115 Revision -> role 7 Verify 56 / Reject 58 -> role 22 Approve 57 / Reject 58.
+  // A new registration reaches role 22 only after REC endorsement, so 56 at role 22 means renewal.
+  const isRenewalFlow =
+    Number(currentStatusId) === 115 ||
+    (roleId === "22" && Number(currentStatusId) === 56);
+
   const validateAssignments = (statusId) => {
     const currentStatus = Number(currentStatusId);
     if (currentStatus === 115) return true;
-    if (statusId === 127 || statusId === 58 || statusId === 60) {
+    if (statusId === 58 || statusId === 60) {
       // Skip REC validation
     } else if (isRole7 && assignedRecs.length === 0) {
       toast.error("Please assign at least one REC member before proceeding");
@@ -756,8 +766,7 @@ const ViewAccreditedCourseRegistration = () => {
         userId: acc.userId,
       }));
 
-      const serviceId =
-        selectedStatusId === 127 || selectedStatusId === 126 ? 54 : 26;
+      const serviceId = isRenewalFlow ? 54 : 26;
 
       const payload = {
         applicationNo,
@@ -772,6 +781,8 @@ const ViewAccreditedCourseRegistration = () => {
         assignedAccreditors: assignedAccreditorsPayload,
         enrolmentCapacity:
           enrolmentCapacity === "" ? null : Number(enrolmentCapacity),
+        // REC stage: every assigned REC member must act; the last one forwards the course
+        ...(isRole23 && { recMemberUserId: loggedInUserId }),
       };
       console.log("Payload for action:", payload);
       const response =
@@ -780,15 +791,20 @@ const ViewAccreditedCourseRegistration = () => {
           access_token,
         );
 
-      if (response.status === 200 || response.status === 201) {
+      if (
+        (response.status === 200 || response.status === 201) &&
+        response.data?.pendingRecMembers > 0
+      ) {
+        // other REC members still have to act -> course stays with REC
+        toast.info(response.data.message);
+        closeDialog();
+        navigate("/tasklist/task-details-index");
+      } else if (response.status === 200 || response.status === 201) {
         const messages = {
           56: "Course verified successfully",
-          62: "Course verified successfully",
           59: "Course endorsed successfully",
-          126: "Course renewed successfully",
           57: "Course approved successfully",
           58: "Course rejected successfully",
-          127: "Forwarded to Level 2 successfully",
         };
         toast.success(
           messages[selectedStatusId] || "Action completed successfully",
@@ -814,8 +830,6 @@ const ViewAccreditedCourseRegistration = () => {
       59: "Endorse Course Application",
       57: "Approve Course Application",
       58: "Reject Course Application",
-      126: "Renew Course Application",
-      127: "Forward to Level 2",
     };
     return titles[selectedStatusId] || "Confirm Action";
   };
@@ -858,8 +872,6 @@ const ViewAccreditedCourseRegistration = () => {
       56: "verify",
       62: "verify",
       59: "endorse",
-      126: "renew",
-      127: "forward",
       57: "approve",
     };
     const actionText = actionTexts[selectedStatusId] || "process";
@@ -886,8 +898,6 @@ const ViewAccreditedCourseRegistration = () => {
       58: "error",
       59: "primary",
       60: "warning",
-      126: "primary",
-      127: "primary",
     };
     return colors[selectedStatusId] || "primary";
   };
@@ -901,8 +911,6 @@ const ViewAccreditedCourseRegistration = () => {
       57: "Confirm Approve",
       58: "Confirm Reject",
       60: "Confirm Reject",
-      126: "Confirm Renew",
-      127: "Confirm Forward",
     };
     return texts[selectedStatusId] || "Confirm";
   };
@@ -1121,8 +1129,7 @@ const ViewAccreditedCourseRegistration = () => {
       { icon: <FileOpenIcon />, label: "Supporting Documents" },
     ];
 
-    const shouldHideAssignTabs =
-      Number(currentStatusId) === 115 || Number(currentStatusId) === 127;
+    const shouldHideAssignTabs = Number(currentStatusId) === 115;
 
     if (isRole7) {
       baseTabs.push({
@@ -1235,22 +1242,38 @@ const ViewAccreditedCourseRegistration = () => {
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Curriculum Title"
-                    value={curriculumTypes?.curriculumTitle || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
+                {/* NCS-based application (no curriculum): Programme Title right after Institute Name */}
+                {isNcsBased && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Programme Title"
+                      value={courseData.programme_title || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
+                {!isNcsBased && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Curriculum Title"
+                      value={curriculumTypes?.curriculumTitle || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
                 <Grid size={{ xs: 12, md: 3 }}>
                   <TextField
                     fullWidth
                     size="small"
                     label="Certificate Level"
                     value={getCertificateLevelName(
-                      curriculumTypes?.certificateLevelId,
+                      isNcsBased
+                        ? courseData.certification_id
+                        : curriculumTypes?.certificateLevelId,
                     )}
                     slotProps={{ input: { readOnly: true } }}
                   />
@@ -1273,15 +1296,17 @@ const ViewAccreditedCourseRegistration = () => {
                     slotProps={{ input: { readOnly: true } }}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Programme Title"
-                    value={courseData.programme_title || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
+                {!isNcsBased && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Programme Title"
+                      value={courseData.programme_title || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
                 <Grid size={{ xs: 12, md: 3 }}>
                   <TextField
                     fullWidth
@@ -1318,42 +1343,50 @@ const ViewAccreditedCourseRegistration = () => {
                     disabled={!isRole7}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Total Program Duration (Hours)"
-                    value={curriculumTypes?.totalProgramDuration || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Theory Duration (Hours)"
-                    value={curriculumTypes?.totalTheoryDuration || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Practical Duration (Hours)"
-                    value={curriculumTypes?.totalPracticalDuration || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 3 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="OJT Duration (Hours)"
-                    value={curriculumTypes?.totalOjtDuration || "N/A"}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                </Grid>
+                {!isNcsBased && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Total Program Duration (Hours)"
+                      value={curriculumTypes?.totalProgramDuration || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
+                {!isNcsBased && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Theory Duration (Hours)"
+                      value={curriculumTypes?.totalTheoryDuration || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
+                {!isNcsBased && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Practical Duration (Hours)"
+                      value={curriculumTypes?.totalPracticalDuration || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
+                {!isNcsBased && (
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="OJT Duration (Hours)"
+                      value={curriculumTypes?.totalOjtDuration || "N/A"}
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                  </Grid>
+                )}
               </Grid>
             </Paper>
 
@@ -1448,336 +1481,209 @@ const ViewAccreditedCourseRegistration = () => {
         )}
 
         {/* Generate PA Number Tab */}
-        {isRole7 && tabValue === paNumberIndex && (
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 12 }}>
-              <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                  <AccountBalanceIcon
-                    sx={{ mr: 1, color: "primary.main", fontSize: 20 }}
-                  />
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    Generate PA Number
-                  </Typography>
-                </Box>
+        {isRole7 &&
+          tabValue === paNumberIndex &&
+          (() => {
+            const paid =
+              String(paymentStatus?.paymentStatus || "").toLowerCase() ===
+              "paid";
+            const tone = paymentStatus
+              ? paid
+                ? "success"
+                : "warning"
+              : "primary";
+            const amount =
+              paymentStatus?.totalPayableAmount !== null &&
+              paymentStatus?.totalPayableAmount !== undefined &&
+              paymentStatus?.totalPayableAmount !== ""
+                ? `Nu. ${Number(paymentStatus.totalPayableAmount).toLocaleString("en-US")}`
+                : "Nu. 0.00";
+            const statusLabel = paymentStatus?.paymentStatus
+              ? paymentStatus.paymentStatus.charAt(0).toUpperCase() +
+                paymentStatus.paymentStatus.slice(1)
+              : "Pending";
+            const fields = paymentStatus
+              ? [
+                  {
+                    label: "Payment Advice No",
+                    value: paymentStatus.paymentAdviceNo,
+                  },
+                  { label: "Reference No", value: paymentStatus.refNo },
+                  { label: "Tax Payer", value: paymentStatus.taxPayerName },
+                  { label: "Amount", value: amount, color: "primary.main" },
+                  { label: "Due Date", value: paymentStatus.paymentDueDate },
+                  { label: "Platform", value: paymentStatus.platform },
+                  {
+                    label: "Payment Mode",
+                    value: paymentStatus.paymentMode || "Not yet paid",
+                  },
+                ]
+              : [];
+            return (
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid size={{ xs: 12 }}>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      borderRadius: 2,
+                      overflow: "hidden",
+                      borderLeft: "4px solid",
+                      borderLeftColor: `${tone}.main`,
+                    }}
+                  >
+                    {/* Header */}
+                    <Box
+                      sx={{
+                        px: 2,
+                        py: 1.25,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        flexWrap: "wrap",
+                        bgcolor: (t) => alpha(t.palette[tone].main, 0.07),
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      <AccountBalanceIcon fontSize="small" color={tone} />
+                      <Typography sx={{ fontWeight: 700, fontSize: "1rem" }}>
+                        Generate PA Number
+                      </Typography>
+                      {paymentStatus && (
+                        <Chip
+                          icon={paid ? <CheckCircleIcon /> : undefined}
+                          label={statusLabel}
+                          color={tone}
+                          size="small"
+                          sx={{ ml: "auto", height: 24, fontWeight: 600 }}
+                        />
+                      )}
+                    </Box>
 
-                {paymentStatus ? (
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                      <Grid container spacing={0.5}>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 100 }}
-                            >
-                              Payment Advice No:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.paymentAdviceNo || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Ref No:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.refNo || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Tax Payer:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                              noWrap
-                            >
-                              {paymentStatus.taxPayerName || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 60 }}
-                            >
-                              Status:
-                            </Typography>
-                            <Chip
-                              label={paymentStatus.paymentStatus || "N/A"}
-                              color={
-                                paymentStatus.paymentStatus === "paid"
-                                  ? "success"
-                                  : "warning"
-                              }
-                              size="small"
+                    <Box sx={{ p: 2 }}>
+                      {paymentStatus ? (
+                        <>
+                          {/* label over value, like the Payment Status card */}
+                          <Grid container spacing={2}>
+                            {fields.map((f) => (
+                              <Grid
+                                size={{ xs: 6, sm: 4, md: 3 }}
+                                key={f.label}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 600,
+                                    letterSpacing: 0.4,
+                                    textTransform: "uppercase",
+                                    color: "text.secondary",
+                                  }}
+                                >
+                                  {f.label}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.92rem",
+                                    fontWeight: 600,
+                                    mt: 0.25,
+                                    wordBreak: "break-word",
+                                  }}
+                                  color={f.color || "text.primary"}
+                                >
+                                  {f.value || "N/A"}
+                                </Typography>
+                              </Grid>
+                            ))}
+                          </Grid>
+
+                          {paymentStatus.redirectUrl && !paid && (
+                            <Box
                               sx={{
-                                height: 20,
-                                fontSize: "0.65rem",
-                                "& .MuiChip-label": { px: 1 },
+                                mt: 2,
+                                pt: 1.5,
+                                borderTop: "1px dashed",
+                                borderColor: "divider",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 1,
+                                flexWrap: "wrap",
                               }}
-                            />
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
                             >
-                              Due Date:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.paymentDueDate || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 60 }}
-                            >
-                              Platform:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.platform || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Amount:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={600}
-                              color="primary"
-                              sx={{ fontSize: "0.8rem" }}
-                            >
-                              Nu. {paymentStatus.totalPayableAmount || "0.00"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Payment Mode:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.paymentMode || "Not yet paid"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      </Grid>
-
-                      {paymentStatus.redirectUrl && (
+                              <Typography
+                                sx={{
+                                  fontSize: "0.8rem",
+                                  color: "text.secondary",
+                                }}
+                              >
+                                PA number already generated. Proceed to complete
+                                the payment.
+                              </Typography>
+                              <Button
+                                variant="contained"
+                                color="primary"
+                                size="small"
+                                startIcon={<PaymentIcon />}
+                                onClick={() =>
+                                  handleRedirectToPayment(
+                                    paymentStatus.redirectUrl,
+                                  )
+                                }
+                                sx={{ textTransform: "none", fontWeight: 600 }}
+                              >
+                                Proceed to Payment
+                              </Button>
+                            </Box>
+                          )}
+                        </>
+                      ) : (
                         <Box
                           sx={{
-                            mt: 1.5,
                             display: "flex",
-                            justifyContent: "center",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 2,
+                            flexWrap: "wrap",
                           }}
                         >
+                          <Box sx={{ minWidth: 240, flex: 1 }}>
+                            <Typography
+                              sx={{ fontSize: "0.9rem", fontWeight: 600 }}
+                            >
+                              No PA number yet
+                            </Typography>
+                            <Typography
+                              sx={{
+                                fontSize: "0.8rem",
+                                color: "text.secondary",
+                              }}
+                            >
+                              Generating a PA number creates the payment request
+                              and takes you to the payment portal.
+                            </Typography>
+                          </Box>
                           <Button
                             variant="contained"
                             color="primary"
                             size="small"
-                            startIcon={<PaymentIcon sx={{ fontSize: 18 }} />}
-                            onClick={() =>
-                              handleRedirectToPayment(paymentStatus.redirectUrl)
-                            }
+                            startIcon={<SettingsSuggestIcon />}
+                            onClick={handleGeneratePANumber}
                             sx={{
-                              px: 2.5,
-                              py: 0.5,
-                              fontWeight: 600,
                               textTransform: "none",
-                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              px: 2.5,
                             }}
                           >
-                            Proceed to Payment
+                            Generate PA Number
                           </Button>
                         </Box>
                       )}
-                      <Alert
-                        severity="info"
-                        sx={{
-                          mt: 1,
-                          py: 0.25,
-                          "& .MuiAlert-message": {
-                            fontSize: "0.7rem",
-                            py: 0.25,
-                          },
-                        }}
-                      >
-                        PA number already generated. Click above to proceed with
-                        payment.
-                      </Alert>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                      <Typography
-                        variant="body2"
-                        gutterBottom
-                        sx={{ fontSize: "0.8rem" }}
-                      >
-                        Click the button below to generate a PA number and
-                        proceed to payment.
-                      </Typography>
-                      <Box
-                        sx={{
-                          mt: 1.5,
-                          display: "flex",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          size="small"
-                          startIcon={
-                            <SettingsSuggestIcon sx={{ fontSize: 18 }} />
-                          }
-                          onClick={handleGeneratePANumber}
-                          sx={{
-                            px: 3,
-                            py: 0.5,
-                            fontWeight: 600,
-                            textTransform: "none",
-                            fontSize: "0.75rem",
-                          }}
-                        >
-                          Generate PA Number
-                        </Button>
-                      </Box>
-                      <Alert
-                        severity="info"
-                        sx={{
-                          mt: 1.5,
-                          py: 0.25,
-                          "& .MuiAlert-message": {
-                            fontSize: "0.7rem",
-                            py: 0.25,
-                          },
-                        }}
-                      >
-                        <strong>Note:</strong> This will create a payment
-                        request and redirect you to the payment portal.
-                      </Alert>
-                    </CardContent>
-                  </Card>
-                )}
-              </Paper>
-            </Grid>
-          </Grid>
-        )}
+                    </Box>
+                  </Paper>
+                </Grid>
+              </Grid>
+            );
+          })()}
 
         {/* Add Accreditors Tab */}
         {isRole7 && tabValue === accreditorIndex && (
@@ -2204,69 +2110,22 @@ const ViewAccreditedCourseRegistration = () => {
             <>
               {roleId === "7" && (
                 <>
-                  {[115, 127].includes(Number(currentStatusId)) ? (
-                    <Tooltip
-                      title={
-                        !isPaymentCompleted()
-                          ? "Payment must be completed before forwarding to Level 2"
-                          : "Forward this application to Level 2"
-                      }
-                      arrow
-                    >
-                      <span>
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          size="small"
-                          startIcon={<SkipNextIcon />}
-                          onClick={() => openActionDialog(127)}
-                          disabled={!isPaymentCompleted()}
-                          sx={{
-                            px: 3,
-                            py: 0.5,
-                            fontWeight: 600,
-                            textTransform: "none",
-                          }}
-                        >
-                          Forwarded LEVEL 2
-                        </Button>
-                      </span>
-                    </Tooltip>
-                  ) : (
-                    <>
-                      <Tooltip
-                        title={
-                          !isPaymentCompleted()
-                            ? "Payment must be completed before verification"
-                            : "Verify this accredited course application"
-                        }
-                        arrow
-                      >
-                        <span>
-                          <Button
-                            variant="contained"
-                            color="success"
-                            size="small"
-                            startIcon={<CheckCircleIcon />}
-                            onClick={() => openActionDialog(56)}
-                            disabled={!isPaymentCompleted()}
-                            sx={{
-                              px: 3,
-                              py: 0.5,
-                              fontWeight: 600,
-                              textTransform: "none",
-                            }}
-                          >
-                            Verify
-                          </Button>
-                        </span>
-                      </Tooltip>
+                  <Tooltip
+                    title={
+                      !isPaymentCompleted()
+                        ? "Payment must be completed before verification"
+                        : "Verify this accredited course application"
+                    }
+                    arrow
+                  >
+                    <span>
                       <Button
                         variant="contained"
-                        color="error"
+                        color="success"
                         size="small"
-                        startIcon={<CancelIcon />}
-                        onClick={() => openActionDialog(58)}
+                        startIcon={<CheckCircleIcon />}
+                        onClick={() => openActionDialog(56)}
+                        disabled={!isPaymentCompleted()}
                         sx={{
                           px: 3,
                           py: 0.5,
@@ -2274,10 +2133,25 @@ const ViewAccreditedCourseRegistration = () => {
                           textTransform: "none",
                         }}
                       >
-                        Reject
+                        Verify
                       </Button>
-                    </>
-                  )}
+                    </span>
+                  </Tooltip>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    size="small"
+                    startIcon={<CancelIcon />}
+                    onClick={() => openActionDialog(58)}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
+                  >
+                    Reject
+                  </Button>
                 </>
               )}
 
@@ -2360,34 +2234,51 @@ const ViewAccreditedCourseRegistration = () => {
 
               {roleId === "22" && (
                 <>
-                  {Number(currentStatusId) === 127 ? (
-                    <Tooltip
-                      title={
-                        !isPaymentCompleted()
-                          ? "Payment must be completed before renewal"
-                          : "Renew this accredited course application"
-                      }
-                      arrow
-                    >
-                      <span>
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          size="small"
-                          startIcon={<VerifiedIcon />}
-                          onClick={() => openActionDialog(126)}
-                          disabled={!isPaymentCompleted()}
-                          sx={{
-                            px: 3,
-                            py: 0.5,
-                            fontWeight: 600,
-                            textTransform: "none",
-                          }}
-                        >
-                          Renew
-                        </Button>
-                      </span>
-                    </Tooltip>
+                  {isRenewalFlow ? (
+                    <>
+                      <Tooltip
+                        title={
+                          !isPaymentCompleted()
+                            ? "Payment must be completed before approval"
+                            : "Approve this renewal"
+                        }
+                        arrow
+                      >
+                        <span>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<CheckCircleIcon />}
+                            onClick={() => openActionDialog(57)}
+                            disabled={!isPaymentCompleted()}
+                            sx={{
+                              px: 3,
+                              py: 0.5,
+                              fontWeight: 600,
+                              textTransform: "none",
+                            }}
+                          >
+                            Approve
+                          </Button>
+                        </span>
+                      </Tooltip>
+                      <Button
+                        variant="contained"
+                        color="error"
+                        size="small"
+                        startIcon={<CancelIcon />}
+                        onClick={() => openActionDialog(58)}
+                        sx={{
+                          px: 3,
+                          py: 0.5,
+                          fontWeight: 600,
+                          textTransform: "none",
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </>
                   ) : (
                     <Tooltip
                       title={

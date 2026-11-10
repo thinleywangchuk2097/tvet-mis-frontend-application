@@ -27,13 +27,18 @@ import {
   Divider,
   Box,
   CircularProgress,
+  Avatar,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PersonIcon from "@mui/icons-material/Person";
 import WorkIcon from "@mui/icons-material/Work";
 import SchoolIcon from "@mui/icons-material/School";
+import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
+import CloseIcon from "@mui/icons-material/Close";
+import SaveIcon from "@mui/icons-material/Save";
 import { Formik, Field, FieldArray, Form, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import { useSelector } from "react-redux";
@@ -88,16 +93,16 @@ const SectionHeader = ({ icon: Icon, title, subtitle }) => (
         justifyContent: "center",
         width: 32,
         height: 32,
-        borderRadius: "50%",
-        bgcolor: "primary.main",
-        color: "white",
+        borderRadius: 1.5,
+        bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+        color: "primary.main",
         mr: 1.5,
       }}
     >
       <Icon sx={{ fontSize: 18 }} />
     </Box>
     <Box>
-      <Typography variant="subtitle1" fontWeight={600} color="primary.main">
+      <Typography sx={{ fontWeight: 700, fontSize: "0.98rem" }}>
         {title}
       </Typography>
       {subtitle && (
@@ -284,13 +289,15 @@ const StaffManagement = () => {
         setFieldValue("name", fullName);
 
         if (citizenData.gender) {
-          const genderMap = {
-            Male: "1",
-            Female: "2",
-          };
-          const genderId = genderMap[citizenData.gender];
-          if (genderId) {
-            setFieldValue("genderId", genderId);
+          // Datahub sends "M" / "F": match the gender dropdown by its first letter
+          const g = String(citizenData.gender).trim().toLowerCase();
+          const option = genders.find(
+            (opt) =>
+              String(opt.name || "").trim().toLowerCase() === g ||
+              String(opt.name || "").trim().toLowerCase().charAt(0) === g.charAt(0),
+          );
+          if (option) {
+            setFieldValue("genderId", String(option.id));
           }
         }
 
@@ -645,6 +652,12 @@ const StaffManagement = () => {
       )
     : [];
 
+  // position in the full staff list (the table shows a filtered, paged slice)
+  const staffIndexOf = (member) =>
+    staff.findIndex(
+      (s) => s === member || (member.id && String(s.id) === String(member.id)),
+    );
+
   return (
     <Paper elevation={3} sx={{ p: 3, m: 2 }}>
       <Typography variant="h5" gutterBottom>
@@ -719,7 +732,7 @@ const StaffManagement = () => {
                         size="small"
                         color="primary"
                         onClick={() => {
-                          setEditingIndex(index);
+                          setEditingIndex(staffIndexOf(staffMember));
                           setOpenDialog(true);
                         }}
                       >
@@ -728,7 +741,7 @@ const StaffManagement = () => {
                       <IconButton
                         size="small"
                         onClick={() => {
-                          setSelectedIndex(index);
+                          setSelectedIndex(staffIndexOf(staffMember));
                           setOpenDeleteDialog(true);
                         }}
                         sx={{
@@ -776,11 +789,47 @@ const StaffManagement = () => {
         onClose={() => setOpenDialog(false)}
         maxWidth="xl"
         fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 2, overflow: "hidden" } } }}
       >
-        <DialogTitle>
-          {editingIndex !== null ? "Edit Staff" : "Add Staff"}
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            py: 1.5,
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.06),
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Avatar
+            variant="rounded"
+            sx={{ bgcolor: "primary.main", width: 36, height: 36 }}
+          >
+            {editingIndex !== null ? (
+              <EditIcon fontSize="small" />
+            ) : (
+              <PersonAddAlt1Icon fontSize="small" />
+            )}
+          </Avatar>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: "1.1rem", lineHeight: 1.2 }}>
+              {editingIndex !== null ? "Edit Staff" : "Add Staff"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Personal details, employment history and training history
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setOpenDialog(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent
+          sx={{
+            bgcolor: (t) => (t.palette.mode === "dark" ? "background.default" : "#f7f9fc"),
+            pt: "20px !important",
+          }}
+        >
           <Formik
             initialValues={
               editingIndex !== null
@@ -822,7 +871,7 @@ const StaffManagement = () => {
                   {/* Section 1: Personal Details */}
                   <Grid item size={{ xs: 12, md: 12 }}>
                     <Card
-                      elevation={2}
+                      elevation={0}
                       sx={{
                         border: "1px solid",
                         borderColor: "divider",
@@ -895,7 +944,7 @@ const StaffManagement = () => {
                                       setFieldValue("citizenId", value);
                                       if (
                                         value.length === 11 &&
-                                        !editingIndex
+                                        editingIndex === null
                                       ) {
                                         debouncedFetchCitizen(
                                           value,
@@ -1066,7 +1115,7 @@ const StaffManagement = () => {
                   {/* Section 2: Employment History */}
                   <Grid item size={{ xs: 12, md: 12 }}>
                     <Card
-                      elevation={2}
+                      elevation={0}
                       sx={{
                         border: "1px solid",
                         borderColor: "divider",
@@ -1244,7 +1293,7 @@ const StaffManagement = () => {
                   {/* Section 3: Training History */}
                   <Grid item size={{ xs: 12, md: 12 }}>
                     <Card
-                      elevation={2}
+                      elevation={0}
                       sx={{
                         border: "1px solid",
                         borderColor: "divider",
@@ -1456,13 +1505,22 @@ const StaffManagement = () => {
 
                   {/* Action Buttons */}
                   <Grid item size={{ xs: 12, md: 12 }}>
-                    <DialogActions sx={{ p: 0 }}>
+                    <DialogActions
+                      sx={{
+                        p: 0,
+                        pt: 2,
+                        gap: 1,
+                        borderTop: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
                       <Button
                         size="small"
-                        color="error"
-                        variant="contained"
+                        color="inherit"
+                        variant="outlined"
                         onClick={() => setOpenDialog(false)}
                         disabled={isSubmitting}
+                        sx={{ textTransform: "none", px: 2 }}
                       >
                         Cancel
                       </Button>
@@ -1472,8 +1530,16 @@ const StaffManagement = () => {
                         variant="contained"
                         color="primary"
                         disabled={isSubmitting}
+                        startIcon={
+                          isSubmitting ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <SaveIcon fontSize="small" />
+                          )
+                        }
+                        sx={{ textTransform: "none", fontWeight: 600, px: 2.5 }}
                       >
-                        {isSubmitting ? <CircularProgress size={24} /> : "Save"}
+                        {editingIndex !== null ? "Update Staff" : "Save Staff"}
                       </Button>
                     </DialogActions>
                   </Grid>

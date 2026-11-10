@@ -34,6 +34,7 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import FileUpload from "../../../components/file/FileUpload";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 
+
 // Helper component for required field indicator
 const RequiredStar = () => (
   <Typography component="span" sx={{ color: "red" }}>
@@ -247,9 +248,8 @@ const AccreditatedCourse = () => {
     fundingSourceId: Yup.string().required("Funding Source is required"),
     trainingLocationId: Yup.string().required("Training Location is required"),
     courseDescription: Yup.string().required("Course Description is required"),
-    files: Yup.array()
-      .min(1, "Please upload required documents")
-      .max(5, "Maximum 5 files allowed"),
+    // documents are optional
+    files: Yup.array().max(5, "Maximum 5 files allowed"),
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
@@ -257,7 +257,7 @@ const AccreditatedCourse = () => {
     try {
       // Convert files to base64
       const documents = await Promise.all(
-        values.files.map((file) => fileToBase64(file)),
+        (values.files || []).map((file) => fileToBase64(file)),
       );
 
       const payload = {
@@ -951,7 +951,7 @@ const AccreditatedCourse = () => {
                       {!formik.touched.files &&
                         formik.values.files.length === 0 && (
                           <Typography variant="caption" color="textSecondary">
-                            Please upload required documents (PDF, DOC, etc.)
+                            Supporting documents are optional (PDF, DOC, etc.)
                           </Typography>
                         )}
                     </Grid>

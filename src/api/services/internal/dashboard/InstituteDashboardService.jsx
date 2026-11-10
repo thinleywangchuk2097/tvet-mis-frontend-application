@@ -44,6 +44,30 @@ class InstituteDashboardService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  // TTTRC dashboards (Verifier 14 / Head 15): TOT + curriculum data and open tasks
+  getTttrcOverview(roleId, token) {
+    return apiClient
+      .get(`/api/v1/user/management/dashboard/tttrc-overview/${roleId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  // DWPS 1 dashboard: curriculum applications, tracer surveys and open tasks
+  getDwps1Overview(roleId, token) {
+    return apiClient
+      .get(`/api/v1/user/management/dashboard/dwps1-overview/${roleId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new InstituteDashboardService();

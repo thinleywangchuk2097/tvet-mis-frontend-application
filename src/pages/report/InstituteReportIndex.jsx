@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -48,6 +48,8 @@ const InstituteReportIndex = () => {
     location: "",
     status: "",
     search: "",
+    fromDate: "", // created_at from (YYYY-MM-DD)
+    toDate: "", // created_at to (YYYY-MM-DD)
   });
 
   // Report type options
@@ -91,7 +93,12 @@ const InstituteReportIndex = () => {
   const fetchInstituteRegistrationType = async () => {
     try {
       const response = await ReportService.getInstituteRegistrationType(access_token);
-      setInstituteRegistrationType(response.data);
+      // Assessor (32) / Accreditor (5) registrations are not institute registrations
+      setInstituteRegistrationType(
+        (Array.isArray(response?.data) ? response.data : []).filter(
+          (t) => ![32, 5].includes(Number(t.id)),
+        ),
+      );
       console.log("Institute Registration Types:", response.data);
     } catch (error) {
       console.error("Error fetching institute registration types:", error);
@@ -156,6 +163,19 @@ const InstituteReportIndex = () => {
     return status ? status.name : "N/A";
   };
 
+  // created_at -> "YYYY-MM-DD" (handles ISO strings and [y, m, d, ...] arrays)
+  const toDateOnly = (value) => {
+    if (!value) return "N/A";
+    if (Array.isArray(value) && value.length >= 3) {
+      const [y, m, d] = value;
+      return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    const str = String(value);
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+    const dt = new Date(str);
+    return Number.isNaN(dt.getTime()) ? "N/A" : dt.toISOString().split("T")[0];
+  };
+
   // Get current data based on selected report type
   const getCurrentData = () => {
     if (filters.reportType === "1") {
@@ -168,7 +188,8 @@ const InstituteReportIndex = () => {
         location_id: proposal.dzongkhag_id,
         status: getStatusName(proposal.status_id),
         status_id: proposal.status_id,
-        date: proposal.created_at ? proposal.created_at.split('T')[0] : "N/A",
+        date: toDateOnly(proposal.created_at),
+        raw: proposal, // full row for the Excel export
       }));
     } else if (filters.reportType === "2") {
       return instituteRegistrationList.map(registration => ({
@@ -180,7 +201,8 @@ const InstituteReportIndex = () => {
         location_id: registration.dzongkhag_id,
         status: getStatusName(registration.status_id),
         status_id: registration.status_id,
-        date: registration.created_at ? registration.created_at.split('T')[0] : "N/A",
+        date: toDateOnly(registration.created_at),
+        raw: registration, // full row for the Excel export
       }));
     }
     return [];
@@ -206,18 +228,56 @@ const InstituteReportIndex = () => {
   const today = new Date().toISOString().split("T")[0];
 
   // Excel Export function
+  // Excel: the report columns plus every field of the proposal / registration
+  // (ids and user ids left out; their names are in the report columns)
   const handleExcelExport = () => {
-    const data = filteredReports.map((item, index) => ({
-      SlNo: index + 1,
-      ApplicationNo: item.application_no || "N/A",
-      ReportName: item.name,
-      Type: getReportTypeName(item.type_id),
-      Location: item.location,
-      Status: item.status,
-      Date: item.date,
-    }));
+    const header = (key) =>
+      key
+        .split("_")
+        .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+        .join(" ");
 
-    exportToExcel(data, `Institute_Reports_${today}`);
+    const isIdColumn = (key) =>
+      key === "id" ||
+      key.endsWith("_id") ||
+      key === "created_by" ||
+      key === "updated_by";
+
+    const fmt = (key, value) => {
+      if (value === null || value === undefined) return "";
+      if (key.endsWith("_at") || key.endsWith("_date")) {
+        const d = toDateOnly(value);
+        return d === "N/A" ? "" : d;
+      }
+      return typeof value === "object" ? JSON.stringify(value) : value;
+    };
+
+    const data = filteredReports.map((item, index) => {
+      const row = {
+        "Sl No": index + 1,
+        "Application No": item.application_no || "N/A",
+        Name: item.name,
+        Type: getReportTypeName(item.type_id),
+        Location: item.location,
+        Status: item.status,
+        Date: item.date,
+      };
+      Object.entries(item.raw || {}).forEach(([key, value]) => {
+        if (isIdColumn(key) || key === "application_no") return;
+        const label = header(key);
+        if (!(label in row)) row[label] = fmt(key, value);
+      });
+      return row;
+    });
+
+    // same columns on every row (proposal / registration rows can differ)
+    const allKeys = [...new Set(data.flatMap((r) => Object.keys(r)))];
+    const normalized = data.map((r) =>
+      Object.fromEntries(allKeys.map((k) => [k, r[k] ?? ""])),
+    );
+
+    const typePart = filters.reportType === "1" ? "Proposal" : "Registration";
+    exportToExcel(normalized, `Institute_${typePart}_Report_${today}`);
   };
 
   // Handle filter changes
@@ -238,6 +298,8 @@ const InstituteReportIndex = () => {
       location: "",
       status: "",
       search: "",
+      fromDate: "",
+      toDate: "",
     });
     setPage(0);
   };
@@ -248,6 +310,9 @@ const InstituteReportIndex = () => {
       (filters.subReportType === "" || report.type_id === parseInt(filters.subReportType)) &&
       (filters.location === "" || report.location === filters.location) &&
       (filters.status === "" || report.status === filters.status) &&
+      // created_at date range (inclusive)
+      (filters.fromDate === "" || (report.date !== "N/A" && report.date >= filters.fromDate)) &&
+      (filters.toDate === "" || (report.date !== "N/A" && report.date <= filters.toDate)) &&
       (filters.search === "" ||
         report.name?.toLowerCase().includes(filters.search.toLowerCase()) ||
         report.application_no?.toLowerCase().includes(filters.search.toLowerCase()))
@@ -414,9 +479,41 @@ const InstituteReportIndex = () => {
       {/* Divider after filters */}
       <Divider sx={{ my: 2 }} />
 
-      {/* Search - Right aligned */}
-      <Grid container justifyContent="flex-end" sx={{ mb: 2 }}>
-        <Grid item>
+      {/* Date range (created date) + Search */}
+      <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 2 }}>
+          <TextField
+            type="date"
+            size="small"
+            fullWidth
+            label="From Date"
+            name="fromDate"
+            value={filters.fromDate}
+            onChange={handleFilterChange}
+            disabled={!filters.reportType}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { max: filters.toDate || undefined },
+            }}
+          />
+        </Grid>
+        <Grid item size={{ xs: 12, sm: 6, md: 2 }}>
+          <TextField
+            type="date"
+            size="small"
+            fullWidth
+            label="End Date"
+            name="toDate"
+            value={filters.toDate}
+            onChange={handleFilterChange}
+            disabled={!filters.reportType}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { min: filters.fromDate || undefined },
+            }}
+          />
+        </Grid>
+        <Grid item sx={{ ml: "auto" }}>
           <TextField
             size="small"
             placeholder="Search by name or application no..."

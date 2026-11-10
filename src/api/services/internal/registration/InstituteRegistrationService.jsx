@@ -87,6 +87,41 @@ class InstituteRegistrationService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  // Public report: registered institutes with their accredited courses
+  getRegisteredInstitutes() {
+    return apiClient
+      .get(`/api/v1/public/institute-registration/get-registered-institutes`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  // Institute change: verify (status 56) -> registration saved to audit, then the change is applied
+  verifyInstituteChange(data) {
+    return apiClient
+      .post(`/api/v1/public/institute-registration/verify-institute-change`, data)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  // Institute change: reject (status 58) — same endpoint, registration is left unchanged
+  rejectInstituteChange(data) {
+    return apiClient
+      .post(`/api/v1/public/institute-registration/verify-institute-change`, data)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  // Renewal period by latest SAR grade (C 2y, B 3y, A 4y, A+ 5y, else 1y)
+  getRenewalValidity(registrationNo, serviceId) {
+    return apiClient
+      .get(
+        `/api/v1/public/institute-registration/get-renewal-validity/${encodeURIComponent(registrationNo)}`,
+        { params: serviceId ? { serviceId } : {} },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new InstituteRegistrationService();
