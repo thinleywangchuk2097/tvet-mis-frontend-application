@@ -1,6 +1,21 @@
 import apiClient from "../../../axios";
 
 class SectorOccupationService {
+  // One sector with its occupations
+  getSectorOccupationsBySector(sectorId, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/sector-occupation/get-sector-occupation-details/${sectorId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getAllSectorOccupationsList(token) {
     return apiClient
       .get(

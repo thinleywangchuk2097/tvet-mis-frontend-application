@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useMemo,
-  useEffect,
-  useRef,
-  useCallback,
-} from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   Button,
@@ -24,8 +18,10 @@ import {
   alpha,
   keyframes,
   Stack,
+  Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import PropTypes from "prop-types";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
@@ -429,10 +425,18 @@ const MovingAnnouncementBanner = ({ announcements, navigate }) => {
 };
 
 // ── MAIN COMPONENT ──
-const CourseTraineeAnnouncementsIndex = () => {
+// RPL re-assessment (41) appears only in the RPL view, not in the general list
+const RPL_ONLY_SERVICE_IDS = ["41"];
+
+// serviceIds: show only these services (e.g. RPL: [39, 41]); onClearServiceFilter: back to all
+const CourseTraineeAnnouncementsIndex = ({
+  serviceIds = null,
+  serviceFilterLabel = "",
+  onClearServiceFilter = null,
+}) => {
   const navigate = useNavigate();
   const [appPage, setAppPage] = useState(0);
-  const [appRowsPerPage, setAppRowsPerPage] = useState(5);
+  const [appRowsPerPage, setAppRowsPerPage] = useState(10);
   const [searchText, setSearchText] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [courseDateFilter, setCourseDateFilter] = useState("");
@@ -454,8 +458,9 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchCourseAnnouncementDetails = async () => {
     try {
       const response = await CommonService.getAllCourseAnnouncement();
-      console.log("CourseAnnouncementDetails", response?.data);
-      setCourseAnnouncementDetails(Array.isArray(response?.data) ? response.data : []);
+      setCourseAnnouncementDetails(
+        Array.isArray(response?.data) ? response.data : [],
+      );
     } catch (error) {
       console.error("Error fetching course announcements:", error);
     }
@@ -464,10 +469,14 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchDropdownData = async () => {
     try {
       const levelsResponse = await CommonService.getAllCertificateLevels();
-      setCertificationLevels(Array.isArray(levelsResponse?.data) ? levelsResponse.data : []);
+      setCertificationLevels(
+        Array.isArray(levelsResponse?.data) ? levelsResponse.data : [],
+      );
 
       const fundingResponse = await CommonService.getByParentId(16);
-      setFundingSources(Array.isArray(fundingResponse?.data) ? fundingResponse.data : []);
+      setFundingSources(
+        Array.isArray(fundingResponse?.data) ? fundingResponse.data : [],
+      );
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
     }
@@ -476,7 +485,9 @@ const CourseTraineeAnnouncementsIndex = () => {
   const fetchDzongkhags = async () => {
     try {
       const dzongkhagLists = await CommonService.getAllDzongkhags();
-      setDzongkhags(Array.isArray(dzongkhagLists?.data) ? dzongkhagLists.data : []);
+      setDzongkhags(
+        Array.isArray(dzongkhagLists?.data) ? dzongkhagLists.data : [],
+      );
     } catch (error) {
       console.error("Error fetching dzongkhags:", error);
     }
@@ -551,7 +562,14 @@ const CourseTraineeAnnouncementsIndex = () => {
   }, [courseAnnouncementDetails]);
 
   const filteredApplications = useMemo(() => {
+    const wanted = serviceIds ? serviceIds.map(String) : null;
     return courseAnnouncementDetails.filter((app) => {
+      const service = String(app.service_id);
+      const matchesService = wanted
+        ? wanted.includes(service)
+        : !RPL_ONLY_SERVICE_IDS.includes(service);
+      if (!matchesService) return false;
+
       const courseStartDate = app.course_start_date?.split(" ")[0] || "";
 
       const matchesSearch =
@@ -568,7 +586,18 @@ const CourseTraineeAnnouncementsIndex = () => {
 
       return matchesSearch && matchesLocation && matchesCourseDate;
     });
-  }, [searchText, locationFilter, courseDateFilter, courseAnnouncementDetails]);
+  }, [
+    searchText,
+    locationFilter,
+    courseDateFilter,
+    courseAnnouncementDetails,
+    serviceIds,
+  ]);
+
+  // back to the first page when the service filter changes
+  useEffect(() => {
+    setAppPage(0);
+  }, [serviceIds]);
 
   const handleReset = useCallback(() => {
     setSearchText("");
@@ -584,6 +613,28 @@ const CourseTraineeAnnouncementsIndex = () => {
         announcements={movingAnnouncements}
         navigate={navigate}
       />
+
+      {/* RPL (or other service) view: what is shown + a way back to all courses */}
+      {serviceIds && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2, alignItems: "center" }}
+          action={
+            onClearServiceFilter && (
+              <Button
+                size="small"
+                color="inherit"
+                onClick={onClearServiceFilter}
+                sx={{ textTransform: "none", fontWeight: 600 }}
+              >
+                Show all courses
+              </Button>
+            )
+          }
+        >
+          Showing {serviceFilterLabel || "selected"} announcements only.
+        </Alert>
+      )}
 
       {/* Header Section with Animation */}
       <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 3 }}>
@@ -768,6 +819,7 @@ const CourseTraineeAnnouncementsIndex = () => {
               <TableCell>Application No</TableCell>
               <TableCell>Institute Name</TableCell>
               <TableCell>Course Name</TableCell>
+              <TableCell>Programme Type</TableCell>
               <TableCell>Training Location</TableCell>
               <TableCell>Certification Level</TableCell>
               <TableCell>Funding Source</TableCell>
@@ -811,6 +863,7 @@ const CourseTraineeAnnouncementsIndex = () => {
                     </TableCell>
                     <TableCell>{app.institute_name || "N/A"}</TableCell>
                     <TableCell>{app.course_name || "N/A"}</TableCell>
+                    <TableCell>{app.announcement_type || "N/A"}</TableCell>
                     <TableCell>
                       <Chip
                         label={getDzongkhagName(app.training_location_id)}
@@ -903,7 +956,7 @@ const CourseTraineeAnnouncementsIndex = () => {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={13}
+                  colSpan={14}
                   align="center"
                   sx={{ color: "error.main", fontWeight: 600, py: 4 }}
                 >
@@ -944,6 +997,14 @@ const CourseTraineeAnnouncementsIndex = () => {
       )}
     </Paper>
   );
+};
+
+CourseTraineeAnnouncementsIndex.propTypes = {
+  serviceIds: PropTypes.arrayOf(
+    PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  ),
+  serviceFilterLabel: PropTypes.string,
+  onClearServiceFilter: PropTypes.func,
 };
 
 export default CourseTraineeAnnouncementsIndex;

@@ -22,6 +22,7 @@ import {
 import BusinessIcon from "@mui/icons-material/Business";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
+import EngineeringIcon from "@mui/icons-material/Engineering";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import SaveIcon from "@mui/icons-material/Save";
@@ -38,6 +39,7 @@ import BasicInformationSection from "./self-assessment/BasicInformationSection";
 import QualityStandardsTabs from "./self-assessment/QualityStandardsTabs";
 import { loadInstituteTrainersAndCourses } from "./self-assessment/basicInfoLoader";
 import AccreditatorsSection from "./self-assessment/AccreditatorsSection";
+import RecMembersSection from "./self-assessment/RecMembersSection";
 import {
   SAR_SERVICE_ID,
   SAR_STATUS,
@@ -85,6 +87,7 @@ const ViewSelfAssessmentReport = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
+  const loggedInUserId = useSelector((state) => state.auth.userId);
 
   const roleId = Number(currentRoleId);
   const isRole23 = roleId === 23;
@@ -107,6 +110,10 @@ const ViewSelfAssessmentReport = () => {
   const [accreditorList, setAccreditorList] = useState([]);
   const [accreditors, setAccreditors] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
+
+  // REC MEMBERS tab
+  const [recList, setRecList] = useState([]);
+  const [recMembers, setRecMembers] = useState([]);
 
 
   // Draft / action state
@@ -169,6 +176,29 @@ const ViewSelfAssessmentReport = () => {
     } catch (error) {
       console.error("Error fetching accreditor users:", error);
       toast.error("Failed to load registered accreditors");
+    }
+  };
+
+  // Active REC users (same source as "Assign REC" on accredited courses)
+  const fetchRecUsers = async () => {
+    try {
+      const response =
+        await UserRoleManagementService.getActiveRecUsers(access_token);
+      const list = Array.isArray(response?.data) ? response.data : [];
+      setRecList(
+        list.map((user) => ({
+          id: user.id,
+          userId: user.user_id,
+          name: [user.first_name, user.middle_name, user.last_name]
+            .filter(Boolean)
+            .join(" "),
+          email: user.email_id,
+          mobileNo: user.mobile_no,
+        })),
+      );
+    } catch (error) {
+      console.error("Error fetching REC users:", error);
+      toast.error("Failed to load REC members");
     }
   };
 
@@ -246,6 +276,17 @@ const ViewSelfAssessmentReport = () => {
     setCoordinators(
       parseJson(data.coordinators, []).map((c) => newCoordinatorRow(c)),
     );
+    // REC members come from tbl_rec_member_task_assignment (user id + remarks;
+    // remarks set = that member has endorsed). Names are looked up from the REC user list.
+    setRecMembers(
+      parseJson(data.rec_members, [])
+        .filter((r) => r && r.userId)
+        .map((r) => ({
+          userId: String(r.userId),
+          name: "",
+          endorsed: r.remarks !== null && r.remarks !== undefined,
+        })),
+    );
     setDirty(false);
 
     fetchBasicInformation(data.registration_no, data.institute_id);
@@ -267,6 +308,7 @@ const ViewSelfAssessmentReport = () => {
     if (applicationNo) {
       fetchAllData();
       fetchAccreditorUsers();
+      fetchRecUsers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicationNo]);
@@ -296,6 +338,11 @@ const ViewSelfAssessmentReport = () => {
     setDirty(true);
   };
 
+  const handleRecMembersChange = (rows) => {
+    setRecMembers(rows);
+    setDirty(true);
+  };
+
   // ------------------------------------------------------------------
   // Payload / draft
   // ------------------------------------------------------------------
@@ -322,6 +369,7 @@ const ViewSelfAssessmentReport = () => {
       coordinators: coordinators
         .filter((c) => c.name && c.name.trim())
         .map((c) => ({ name: c.name.trim(), designation: c.designation })),
+      recMembers: recMembers.map((r) => ({ userId: r.userId })),
     }),
     [
       applicationNo,
@@ -332,6 +380,7 @@ const ViewSelfAssessmentReport = () => {
       justifications,
       accreditors,
       coordinators,
+      recMembers,
     ],
   );
 
@@ -377,7 +426,7 @@ const ViewSelfAssessmentReport = () => {
       AUTO_SAVE_INTERVAL_MS,
     );
     return () => clearTimeout(timer);
-  }, [dirty, canEdit, earnedPoints, justifications, accreditors, coordinators]);
+  }, [dirty, canEdit, earnedPoints, justifications, accreditors, coordinators, recMembers]);
 
   // ------------------------------------------------------------------
   // Workflow actions
@@ -407,6 +456,11 @@ const ViewSelfAssessmentReport = () => {
       if (coordinators.some((c) => !c.name.trim())) {
         toast.error("Please enter the programme co-ordinator name or remove the empty row");
         setTabValue(2);
+        return false;
+      }
+      if (recMembers.length === 0) {
+        toast.error("Please assign at least one REC member before verification");
+        setTabValue(3);
         return false;
       }
     }
@@ -441,11 +495,14 @@ const ViewSelfAssessmentReport = () => {
         statusId: selectedStatusId,
         assignedRoleId: roleId,
         remarks: remarks || "Application processed",
+        // REC stage: each assigned REC member endorses; the last one forwards the report
+        ...(isRole23 && { recMemberUserId: loggedInUserId }),
       };
       // Members can only be changed by editable roles
       if (!canEdit) {
         delete payload.accreditors;
         delete payload.coordinators;
+        delete payload.recMembers;
         delete payload.qualityStandards;
       }
 
@@ -456,9 +513,14 @@ const ViewSelfAssessmentReport = () => {
         );
 
       if (response.status === 200 || response.status === 201) {
-        toast.success(
-          ACTION_TEXT[selectedStatusId]?.done || "Action completed successfully",
-        );
+        // Other REC members still have to endorse -> show the backend message
+        if (response.data?.pendingRecMembers > 0) {
+          toast.info(response.data.message);
+        } else {
+          toast.success(
+            ACTION_TEXT[selectedStatusId]?.done || "Action completed successfully",
+          );
+        }
         closeDialog();
         setDirty(false);
         navigate("/tasklist/task-details-index");
@@ -486,6 +548,7 @@ const ViewSelfAssessmentReport = () => {
     { icon: <BusinessIcon />, label: "Basic Information" },
     { icon: <VerifiedIcon />, label: "Quality Standards" },
     { icon: <GroupAddIcon />, label: "Accreditators" },
+    { icon: <EngineeringIcon />, label: "REC Members" },
   ];
 
   if (loading) {
@@ -643,6 +706,16 @@ const ViewSelfAssessmentReport = () => {
             />
           )}
 
+          {/* Tab 3: REC Members */}
+          {tabValue === 3 && (
+            <RecMembersSection
+              recList={recList}
+              recMembers={recMembers}
+              onRecMembersChange={handleRecMembersChange}
+              readOnly={!canEdit}
+              showErrors={showErrors}
+            />
+          )}
         </Box>
 
         {/* Navigation and Action Buttons (visible on every tab) */}

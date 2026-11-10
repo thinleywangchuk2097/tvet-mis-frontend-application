@@ -120,6 +120,9 @@ const formatNotificationDate = (dateString) => {
   });
 };
 
+// RPL assessment (39) and RPL re-assessment (41)
+const RPL_SERVICE_IDS = [39, 41];
+
 // Public services shown under the hero (all public routes)
 const SERVICES = [
   {
@@ -131,7 +134,9 @@ const SERVICES = [
   {
     label: "RPL assessment",
     desc: "Get your existing skills certified",
-    href: "/course/apply/rpl-assessment",
+    // shows the RPL (39) and RPL re-assessment (41) announcements below
+    href: "#course-announcements",
+    rpl: true,
     icon: <WorkspacePremiumIcon />,
   },
   {
@@ -284,6 +289,9 @@ const PublicIndex = () => {
   const [courseAnnounceNotifications, setCourseAnnounceNotifications] =
     useState([]);
   const [notificationMessages, setNotificationMessages] = useState([]);
+  // "RPL assessment" links: show only RPL (39) and RPL re-assessment (41) announcements
+  const [rplOnly, setRplOnly] = useState(false);
+
 
   // Slider auto-advance (off when the user prefers reduced motion)
   const startTimer = useCallback(() => {
@@ -539,6 +547,7 @@ const PublicIndex = () => {
                 variant="contained"
                 size="large"
                 href="#course-announcements"
+                onClick={() => setRplOnly(false)}
                 sx={{
                   bgcolor: SAFFRON,
                   color: NAVY,
@@ -553,7 +562,8 @@ const PublicIndex = () => {
               <Button
                 variant="outlined"
                 size="large"
-                href="/course/apply/rpl-assessment"
+                href="#course-announcements"
+                onClick={() => setRplOnly(true)}
                 sx={{
                   color: "#fff",
                   borderColor: alpha("#fff", 0.6),
@@ -660,10 +670,14 @@ const PublicIndex = () => {
         >
           <Grid container>
             {SERVICES.map((s, i) => (
-              <Grid key={s.href} size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid key={s.label} size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box
                   component="a"
                   href={s.href}
+                  onClick={() => {
+                    // course links pick which announcements the list shows
+                    if (s.href === "#course-announcements") setRplOnly(Boolean(s.rpl));
+                  }}
                   sx={{
                     display: "flex",
                     alignItems: "center",
@@ -856,7 +870,11 @@ const PublicIndex = () => {
               },
             }}
           >
-            <CourseTraineeAnnouncementsIndex />
+            <CourseTraineeAnnouncementsIndex
+              serviceIds={rplOnly ? RPL_SERVICE_IDS : null}
+              serviceFilterLabel="RPL assessment"
+              onClearServiceFilter={() => setRplOnly(false)}
+            />
           </Surface>
         </Section>
 

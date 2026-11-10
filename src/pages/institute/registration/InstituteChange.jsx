@@ -28,7 +28,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
-import { useFormik } from "formik";
+import { useFormik, getIn } from "formik";
 import * as Yup from "yup";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -192,6 +192,7 @@ const useInstituteData = (registration_no) => {
         await InstituteRegistrationService.getInstituteChangeDetails(
           registration_no,
         );
+        console.log("Institute change details response:", response.data);
       const instituteData =
         Array.isArray(response.data) && response.data.length > 0
           ? response.data[0]
@@ -220,9 +221,7 @@ const useInstituteData = (registration_no) => {
           key_contact_name: instituteData.key_contact_name || "",
           key_contact_designation: instituteData.key_contact_designation || "",
           key_contact_mobile_no: instituteData.key_contact_mobile_no || "",
-          partners: instituteData.partnerships
-            ? JSON.parse(instituteData.partnerships)
-            : [],
+          partners: toPartnerArray(instituteData.partnerships),
         });
       }
     } catch (error) {
@@ -396,16 +395,20 @@ const FormTextField = ({
   endAdornment = null,
   ...props
 }) => {
+  // getIn reads nested names too, e.g. "partners[0].partnerCidNo"
+  const value = getIn(formik.values, name);
+  const touched = getIn(formik.touched, name);
+  const error = getIn(formik.errors, name);
   const fieldProps = {
     fullWidth: true,
     label,
     name,
     size: "small",
-    value: formik.values[name] || "",
+    value: value ?? "",
     onChange: formik.handleChange,
     onBlur: formik.handleBlur,
-    error: formik.touched[name] && Boolean(formik.errors[name]),
-    helperText: formik.touched[name] && formik.errors[name],
+    error: Boolean(touched && error),
+    helperText: touched && typeof error === "string" ? error : undefined,
     placeholder,
     slotProps: {
       input: {
@@ -521,7 +524,7 @@ const PartnerCard = ({
           <IconButton
             color="error"
             onClick={() => {
-              const updated = [...formik.values.partners];
+              const updated = [...(formik.values.partners || [])];
               updated.splice(index, 1);
               formik.setFieldValue("partners", updated);
             }}
@@ -681,6 +684,25 @@ const getValidationSchema = (entityLabel = "Institute") => {
 // ==================== MAIN COMPONENT ====================
 // entityLabel: "Institute" (default) or e.g. "SES Centre" -- only changes the wording.
 // designOnly: true = show the full flow but don't send anything to the backend yet.
+/**
+ * partnerships may come as a JSON string, an array, an object or "null":
+ * always return an array so (formik.values.partners || []).map(...) is safe.
+ */
+const toPartnerArray = (raw) => {
+  if (!raw) return [];
+  let value = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (value && typeof value === "object") return [value];
+  return [];
+};
+
 const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
   const navigate = useNavigate();
   const entityLower = entityLabel.toLowerCase();
@@ -742,8 +764,8 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
           promoterCitizenId: values.promoter_citizen_id || null,
           promoterName: values.promoter_name || null,
           partners:
-            values.partners.length > 0
-              ? values.partners.map((partner) => ({
+            (values.partners || []).length > 0
+              ? (values.partners || []).map((partner) => ({
                   partnerName: partner.partnerName || null,
                   typeOfOwner: partner.typeOfOwnerId || null,
                   citizenId: partner.partnerCidNo || null,
@@ -754,7 +776,7 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
           documents: documents,
           serviceId: 10,
           assignedRoleId: 7,
-          statusId: 115,
+          statusId: 55,
           createdBy: actionId,
         };
 
@@ -822,7 +844,7 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
       return !!formik.values.proposed_institute_name;
     } else if (formik.values.changeType === CHANGE_TYPES.OWNERSHIP) {
       return !!(
-        formik.values.ownership_type_id || formik.values.partners.length > 0
+        formik.values.ownership_type_id || (formik.values.partners || []).length > 0
       );
     }
     return false;
@@ -835,7 +857,7 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
     if (formik.values.changeType === CHANGE_TYPES.NAME) changes.push("Name");
     if (formik.values.changeType === CHANGE_TYPES.OWNERSHIP)
       changes.push("Ownership");
-    if (formik.values.partners.length > 0) changes.push("Partners");
+    if ((formik.values.partners || []).length > 0) changes.push("Partners");
     return changes;
   }, [formik.values]);
 
@@ -1129,7 +1151,7 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
                     Partner Details
                   </Typography>
 
-                  {formik.values.partners.map((partner, index) => (
+                  {(formik.values.partners || []).map((partner, index) => (
                     <PartnerCard
                       key={index}
                       partner={partner}
@@ -1147,7 +1169,7 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
                     startIcon={<AddIcon />}
                     onClick={() =>
                       formik.setFieldValue("partners", [
-                        ...formik.values.partners,
+                        ...(formik.values.partners || []),
                         {
                           typeOfOwnerId: "",
                           partnerCidNo: "",
@@ -1287,12 +1309,12 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
             )}
 
           {values.changeType === CHANGE_TYPES.OWNERSHIP &&
-            values.partners.length > 0 && (
+            (values.partners || []).length > 0 && (
               <Grid item size={{ xs: 12 }}>
                 <Typography variant="body2" color="textSecondary" gutterBottom>
                   Partners:
                 </Typography>
-                {values.partners.map((partner, index) => (
+                {(values.partners || []).map((partner, index) => (
                   <Paper
                     key={index}
                     variant="outlined"

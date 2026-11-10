@@ -96,10 +96,10 @@ class CourseEnrollmentService {
       .catch((error) => error);
   }
 
-  getFailedTraineeDetails(user_id, course_id, certification_level_id) {
+  getFailedTraineeDetails(user_id, course_id, certification_level_id, service_id) {
     return apiClient
       .get(
-        `/api/v1/public/course-enrollment-trainee/get-trainee-details/${user_id}/${course_id}/${certification_level_id}`,
+        `/api/v1/public/course-enrollment-trainee/get-trainee-details/${user_id}/${course_id}/${certification_level_id}/${service_id}`,
       )
       .then((response) => response)
       .catch((error) => error);

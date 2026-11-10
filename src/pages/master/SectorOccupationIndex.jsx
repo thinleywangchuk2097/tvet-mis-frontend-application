@@ -25,6 +25,7 @@ import {
   FormControlLabel,
   Switch,
   CircularProgress,
+  MenuItem,
   useTheme,
 } from "@mui/material";
 import {
@@ -33,12 +34,18 @@ import {
   Delete as DeleteIcon,
   Close as CloseIcon,
   Search as SearchIcon,
+  Download as DownloadIcon,
 } from "@mui/icons-material";
+import { exportToExcel } from "@/utils/exportExcel";
+
+// Sector filter value that loads every sector
+const ALL_SECTORS = "all";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import SectorOccupationService from "../../api/services/internal/master/SectorOccupationService";
+import CommonService from "../../api/services/internal/common/CommonService";
 
 // Helper component for required field indicator
 const RequiredStar = () => (
@@ -79,6 +86,63 @@ const SectorOccupationIndex = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [sectorToDelete, setSectorToDelete] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  // Sector filter is fetched from the API; occupation filters the loaded sector
+  const [sectorOptions, setSectorOptions] = useState([]);
+  const [filterSectorId, setFilterSectorId] = useState("");
+  const [filterOccupationId, setFilterOccupationId] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  // Excel: one row per occupation. With a sector selected, exports what is shown
+  // (after occupation filter / search); with no sector selected, exports all sectors.
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      let source;
+      if (filterSectorId) {
+        source = filteredSectors.map((sector) => ({
+          ...sector,
+          occupations: sector.displayOccupations ?? sector.occupations,
+        }));
+      } else {
+        const response =
+          await SectorOccupationService.getAllSectorOccupationsList(access_token);
+        source = transformApiData(response?.data);
+      }
+
+      const rows = [];
+      source.forEach((sector) => {
+        const occs = sector.occupations?.length ? sector.occupations : [null];
+        occs.forEach((occ) => {
+          rows.push({
+            "Sl No": rows.length + 1,
+            "Sector ID": sector.id,
+            "Sector Name": sector.sectorName,
+            "Sector Status": sector.isActive ? "Active" : "Inactive",
+            "Occupation ID": occ?.id ?? "",
+            "Occupation Name": occ?.occupationName ?? "",
+            "ISCO Code": occ?.iscoCode ?? "",
+          });
+        });
+      });
+
+      if (rows.length === 0) {
+        toast.info("No data to export");
+        return;
+      }
+
+      const sectorPart =
+        filterSectorId && filterSectorId !== ALL_SECTORS
+          ? (source[0]?.sectorName || "Sector").replace(/[^\w-]+/g, "_")
+          : "All_Sectors";
+      const today = new Date().toISOString().split("T")[0];
+      await exportToExcel(rows, `Sector_Occupation_${sectorPart}_${today}`);
+    } catch (error) {
+      console.error("Excel export failed:", error);
+      toast.error("Failed to export Excel");
+    } finally {
+      setExporting(false);
+    }
+  };
   const [editOccupationDialog, setEditOccupationDialog] = useState({
     open: false,
     occupation: null,
@@ -151,23 +215,41 @@ const SectorOccupationIndex = () => {
   };
 
   // Fetch data from API
-  const fetchSectorsOccupationDetails = async () => {
+  // Sector dropdown options (light list, no occupations)
+  const fetchSectorOptions = async () => {
+    try {
+      const response = await CommonService.getAllSectors();
+      setSectorOptions(Array.isArray(response?.data) ? response.data : []);
+    } catch (error) {
+      console.error("Error fetching sectors:", error);
+      setSectorOptions([]);
+    }
+  };
+
+  const fetchSectorsOccupationDetails = async (sectorId = filterSectorId) => {
+    if (!sectorId) {
+      setSectors([]);
+      setFilteredSectors([]);
+      return;
+    }
     setLoading(true);
     try {
+      // "all" = every sector with its occupations; otherwise one sector
       const response =
-        await SectorOccupationService.getAllSectorOccupationsList(access_token);
+        sectorId === ALL_SECTORS
+          ? await SectorOccupationService.getAllSectorOccupationsList(access_token)
+          : await SectorOccupationService.getSectorOccupationsBySector(
+              sectorId,
+              access_token,
+            );
       console.log("Fetched Sectors with Occupations data:", response.data);
       if (response && response.data) {
         const transformedData = transformApiData(response.data);
         setSectors(transformedData);
         setFilteredSectors(transformedData);
-        if (transformedData.length === 0) {
-          toast.info("No sector data available");
-        }
       } else {
         setSectors([]);
         setFilteredSectors([]);
-        toast.info("No sector data available");
       }
     } catch (error) {
       console.error("Error fetching Sectors with Occupations data:", error);
@@ -180,28 +262,57 @@ const SectorOccupationIndex = () => {
   };
 
   useEffect(() => {
-    fetchSectorsOccupationDetails();
+    fetchSectorOptions();
   }, []);
 
-  // Search filtering
+  // Load the selected sector whenever the sector filter changes
   useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setFilteredSectors(sectors);
-    } else {
-      const filtered = sectors.filter(
-        (sector) =>
-          sector.sectorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          sector.occupations.some((occ) =>
-            occ.occupationName.toLowerCase().includes(searchTerm.toLowerCase()),
-          ) ||
-          sector.occupations.some((occ) =>
-            occ.iscoCode.toLowerCase().includes(searchTerm.toLowerCase()),
-          ),
-      );
-      setFilteredSectors(filtered);
-    }
+    setFilterOccupationId("");
     setPage(0);
-  }, [searchTerm, sectors]);
+    fetchSectorsOccupationDetails(filterSectorId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSectorId]);
+
+  // Occupation options from the loaded sector
+  const occupationFilterOptions = sectors
+    .flatMap((sector) => sector.occupations)
+    .filter((occ) => occ.id)
+    .sort((a, b) =>
+      String(a.occupationName).localeCompare(String(b.occupationName)),
+    );
+
+  // Search + occupation filtering (displayOccupations is only for the table;
+  // sector.occupations stays complete for editing)
+  useEffect(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const has = (v) => String(v || "").toLowerCase().includes(q);
+
+    const result = sectors
+      .map((sector) => {
+        let occs = sector.occupations;
+        if (filterOccupationId) {
+          occs = occs.filter(
+            (occ) => String(occ.id) === String(filterOccupationId),
+          );
+        }
+        if (q && !has(sector.sectorName)) {
+          occs = occs.filter(
+            (occ) => has(occ.occupationName) || has(occ.iscoCode),
+          );
+        }
+        return { ...sector, displayOccupations: occs };
+      })
+      .filter((sector) => {
+        if (filterOccupationId && sector.displayOccupations.length === 0)
+          return false;
+        if (q && !has(sector.sectorName) && sector.displayOccupations.length === 0)
+          return false;
+        return true;
+      });
+
+    setFilteredSectors(result);
+    setPage(0);
+  }, [searchTerm, sectors, filterOccupationId]);
 
   // Formik form
   const formik = useFormik({
@@ -382,6 +493,7 @@ const SectorOccupationIndex = () => {
         console.log("Updated sectorData:", sectorData);
         if (response.status === 200 || response.status === 201) {
           toast.success("Sector updated successfully");
+          await fetchSectorOptions();
           await fetchSectorsOccupationDetails();
         } else {
           toast.error("Failed to update sector");
@@ -396,6 +508,7 @@ const SectorOccupationIndex = () => {
           );
         if (response.status === 200 || response.status === 201) {
           toast.success("Sector created successfully!");
+          await fetchSectorOptions();
           await fetchSectorsOccupationDetails();
         } else {
           toast.error("Failed to create sector. Please try again.");
@@ -426,7 +539,12 @@ const SectorOccupationIndex = () => {
       console.log("Delete sectorToDelete:", sectorToDelete);
       if (response.status === 200 || response.status === 204) {
         toast.success("Sector deleted successfully");
-        await fetchSectorsOccupationDetails();
+        await fetchSectorOptions();
+        if (String(sectorToDelete) === String(filterSectorId)) {
+          setFilterSectorId("");
+        } else {
+          await fetchSectorsOccupationDetails();
+        }
       } else {
         toast.error("Failed to delete sector");
       }
@@ -472,7 +590,45 @@ const SectorOccupationIndex = () => {
           <Typography variant="h6" component="h1">
             Sector & Occupation Management
           </Typography>
-          <Stack direction="row" spacing={2} alignItems="center">
+          <Stack
+            direction="row"
+            spacing={2}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+          >
+            <TextField
+              select
+              label="Sector"
+              size="small"
+              value={filterSectorId}
+              onChange={(e) => setFilterSectorId(e.target.value)}
+              sx={{ width: 220 }}
+            >
+              <MenuItem value="">-- Select Sector --</MenuItem>
+              <MenuItem value={ALL_SECTORS}>All Sectors</MenuItem>
+              {sectorOptions.map((s) => (
+                <MenuItem key={s.id} value={String(s.id)}>
+                  {s.sectorName}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="Occupation"
+              size="small"
+              value={filterOccupationId}
+              onChange={(e) => setFilterOccupationId(e.target.value)}
+              disabled={!filterSectorId || occupationFilterOptions.length === 0}
+              sx={{ width: 220 }}
+            >
+              <MenuItem value="">All Occupations</MenuItem>
+              {occupationFilterOptions.map((occ) => (
+                <MenuItem key={occ.id} value={String(occ.id)}>
+                  {occ.occupationName}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               placeholder="Search sectors or occupations..."
               variant="outlined"
@@ -490,6 +646,19 @@ const SectorOccupationIndex = () => {
               }}
               sx={{ width: 250 }}
             />
+            <Button
+              variant="outlined"
+              startIcon={
+                exporting ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />
+              }
+              onClick={handleExportExcel}
+              disabled={exporting || (Boolean(filterSectorId) && filteredSectors.length === 0)}
+              size="small"
+            >
+              {filterSectorId && filterSectorId !== ALL_SECTORS
+                ? "Export Excel"
+                : "Export All (Excel)"}
+            </Button>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -638,8 +807,12 @@ const SectorOccupationIndex = () => {
                                 },
                               }}
                             >
-                              {sector.occupations.length > 0 ? (
-                                sector.occupations.map((occ, index) => (
+                              {(sector.displayOccupations ?? sector.occupations)
+                                .length > 0 ? (
+                                (
+                                  sector.displayOccupations ??
+                                  sector.occupations
+                                ).map((occ, index) => (
                                   <Box
                                     key={occ.id || index}
                                     sx={{
@@ -755,9 +928,11 @@ const SectorOccupationIndex = () => {
                     <TableRow>
                       <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                         <Typography variant="body2" color="text.secondary">
-                          {searchTerm
-                            ? "No sectors found matching your search."
-                            : "No sectors available."}
+                          {!filterSectorId
+                            ? "Select a Sector to view its occupations."
+                            : searchTerm || filterOccupationId
+                              ? "No occupations found matching your filter."
+                              : "No sectors available."}
                         </Typography>
                       </TableCell>
                     </TableRow>

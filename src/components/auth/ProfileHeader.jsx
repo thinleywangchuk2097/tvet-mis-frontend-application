@@ -17,6 +17,7 @@ import {
   Popper,
   ClickAwayListener,
   Grow,
+  Link,
 } from "@mui/material";
 
 import {
@@ -32,6 +33,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../../features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
 import UserProfileService from "../../api/services/internal/userprofile/UserProfileService";
+import NotificationService from "../../api/services/internal/notification/NotificationService";
 
 /* ---------------- Utilities ---------------- */
 
@@ -116,31 +118,46 @@ const NotificationItem = styled(ListItem)(({ theme, read }) => ({
   },
 }));
 
-/* ---------------- Default Notifications ---------------- */
+/* ---------------- Notification helpers ---------------- */
 
-const defaultNotifications = [
-  {
-    id: 1,
-    message: "New institute registration pending",
-    time: "5 min ago",
-    read: false,
-    route: "/institute-registrations",
-  },
-  {
-    id: 2,
-    message: "Trainer certification deadline tomorrow",
-    time: "1 hour ago",
-    read: false,
-    route: "/trainer-certifications",
-  },
-  {
-    id: 3,
-    message: "Monthly report ready for review",
-    time: "3 hours ago",
-    read: true,
-    route: "/reports/monthly",
-  },
-];
+// messages longer than this show a "View more" link
+const PREVIEW_LENGTH = 100;
+
+// "5 min ago", "3 hours ago", "2 days ago", then the date
+const timeAgo = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`;
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+// read ids are remembered per user in this browser
+const readKey = (userId) => `tvet_notification_read_${userId || "guest"}`;
+const loadReadIds = (userId) => {
+  try {
+    return JSON.parse(localStorage.getItem(readKey(userId)) || "[]");
+  } catch {
+    return [];
+  }
+};
+const saveReadIds = (userId, ids) => {
+  try {
+    localStorage.setItem(readKey(userId), JSON.stringify(ids));
+  } catch {
+    /* storage unavailable: read state just isn't remembered */
+  }
+};
 
 const ProfileHeader = () => {
   const dispatch = useDispatch();
@@ -150,11 +167,13 @@ const ProfileHeader = () => {
   const role = useSelector((state) => state.userProfile.current_role_name);
   const userId = useSelector((state) => state.auth.userId);
   const token = useSelector((state) => state.auth.accessToken);
+  const userNumericId = useSelector((state) => state.auth.id); // tbl_user.id (for role matching)
 
   const [profilePic, setProfilePic] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [notificationEl, setNotificationEl] = useState(null);
-  const [notifications, setNotifications] = useState(defaultNotifications);
+  const [notifications, setNotifications] = useState([]);
+  const [expandedId, setExpandedId] = useState(null); // notification showing its full message
 
   const menuOpen = Boolean(anchorEl);
   const notificationOpen = Boolean(notificationEl);
@@ -193,6 +212,32 @@ const ProfileHeader = () => {
     return () => objectUrl && URL.revokeObjectURL(objectUrl);
   }, [userId, token]);
 
+  /* ---------------- Load Notifications ---------------- */
+
+  const loadNotifications = useCallback(async () => {
+    if (!token) return;
+    // only notifications sent to this user, or to one of this user's roles
+    const res = await NotificationService.getMyNotifications(
+      { userId, id: userNumericId },
+      token,
+    );
+    if (!res || res instanceof Error || res?.isAxiosError) return;
+    const readIds = loadReadIds(userId);
+    setNotifications(
+      (Array.isArray(res.data) ? res.data : []).map((n) => ({
+        id: n.id,
+        title: n.title,
+        message: n.textMessage || "",
+        time: timeAgo(n.updatedAt || n.createdAt),
+        read: readIds.includes(n.id),
+      })),
+    );
+  }, [token, userId, userNumericId]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
   /* ---------------- Handlers ---------------- */
 
   const handleLogout = useCallback(() => {
@@ -212,23 +257,34 @@ const ProfileHeader = () => {
 
   const handleNotificationClick = (event) => {
     setNotificationEl(event.currentTarget);
+    loadNotifications(); // refresh when the bell is opened
   };
 
   const handleNotificationClose = () => {
     setNotificationEl(null);
+    setExpandedId(null);
   };
 
-  const handleNotificationItemClick = (notification) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n)),
-    );
-
-    navigate(notification.route);
-    handleNotificationClose();
-  };
+  // clicking a notification only marks it as read (no navigation)
+  const markAsRead = (id) =>
+    setNotifications((prev) => {
+      const next = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+      saveReadIds(
+        userId,
+        next.filter((n) => n.read).map((n) => n.id),
+      );
+      return next;
+    });
 
   const markAllAsRead = () =>
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) => {
+      const next = prev.map((n) => ({ ...n, read: true }));
+      saveReadIds(
+        userId,
+        next.map((n) => n.id),
+      );
+      return next;
+    });
 
   /* ---------------- Avatar Component ---------------- */
 
@@ -269,7 +325,7 @@ const ProfileHeader = () => {
       >
         {({ TransitionProps }) => (
           <Grow {...TransitionProps}>
-            <Paper sx={{ width: 350, maxHeight: 370, ...arrowPaperStyle }}>
+            <Paper sx={{ width: 360, ...arrowPaperStyle }}>
               <ClickAwayListener onClickAway={handleNotificationClose}>
                 <Box>
                   {/* Header */}
@@ -300,17 +356,25 @@ const ProfileHeader = () => {
                   </Box>
 
                   {/* List */}
-                  <List sx={{ p: 0 }}>
+                  <List sx={{ p: 0, maxHeight: 340, overflowY: "auto" }}>
+                    {notifications.length === 0 && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ p: 2, textAlign: "center" }}
+                      >
+                        No notifications
+                      </Typography>
+                    )}
                     {notifications.map((notification) => (
                       <NotificationItem
                         key={notification.id}
                         read={notification.read}
                         divider
-                        onClick={() =>
-                          handleNotificationItemClick(notification)
-                        }
+                        onClick={() => markAsRead(notification.id)}
+                        sx={{ alignItems: "flex-start", py: 0.75 }}
                       >
-                        <ListItemIcon sx={{ minWidth: 30 }}>
+                        <ListItemIcon sx={{ minWidth: 30, mt: 1 }}>
                           <CircleIcon
                             sx={{
                               fontSize: 8,
@@ -324,15 +388,58 @@ const ProfileHeader = () => {
                           primary={
                             <Typography
                               variant="body2"
-                              fontWeight={notification.read ? 200 : 500}
+                              fontWeight={notification.read ? 500 : 700}
                             >
-                              {notification.message}
+                              {notification.title}
                             </Typography>
                           }
                           secondary={
-                            <Typography variant="caption">
-                              {notification.time}
-                            </Typography>
+                            <>
+                              <Typography
+                                component="span"
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  display: "block",
+                                  whiteSpace: "pre-line",
+                                  fontWeight: notification.read ? 300 : 400,
+                                }}
+                              >
+                                {notification.message.length > PREVIEW_LENGTH &&
+                                expandedId !== notification.id
+                                  ? `${notification.message.slice(0, PREVIEW_LENGTH)}…`
+                                  : notification.message}
+                              </Typography>
+                              {/* bulk (long) message: View more / View less */}
+                              {notification.message.length > PREVIEW_LENGTH && (
+                                <Link
+                                  component="button"
+                                  type="button"
+                                  underline="hover"
+                                  sx={{ fontSize: "0.75rem", fontWeight: 600 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markAsRead(notification.id);
+                                    setExpandedId((cur) =>
+                                      cur === notification.id
+                                        ? null
+                                        : notification.id,
+                                    );
+                                  }}
+                                >
+                                  {expandedId === notification.id
+                                    ? "View less"
+                                    : "View more"}
+                                </Link>
+                              )}
+                              <Typography
+                                component="span"
+                                variant="caption"
+                                sx={{ display: "block" }}
+                              >
+                                {notification.time}
+                              </Typography>
+                            </>
                           }
                         />
                       </NotificationItem>

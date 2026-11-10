@@ -1,4 +1,5 @@
 // src/utils/pdf/templates/accreditationTemplate.js
+import { CAMBRIA } from "../fonts/cambriaFonts";
 
 /** Draw a centered "Label: value" line, both on the same baseline. */
 const drawField = (doc, label, value, y, centerX, options = {}) => {
@@ -13,20 +14,20 @@ const drawField = (doc, label, value, y, centerX, options = {}) => {
 
   doc.setFontSize(fontSize);
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(CAMBRIA, "bold");
   const labelWidth = doc.getTextWidth(labelText);
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont(CAMBRIA, "normal");
   const valueWidth = doc.getTextWidth(valueText);
 
   const totalWidth = labelWidth + valueWidth;
   const startX = centerX - totalWidth / 2;
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(CAMBRIA, "bold");
   doc.setTextColor(...labelColor);
   doc.text(labelText, startX, y);
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont(CAMBRIA, "normal");
   doc.setTextColor(...valueColor);
   doc.text(valueText, startX + labelWidth, y);
 };
@@ -37,7 +38,7 @@ export const renderAccreditation = (doc, record) => {
 
   // ---- Title (just below the BQPA header) ----
   doc.setFontSize(20);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(CAMBRIA, "bold");
   doc.setTextColor(180, 90, 20);
   doc.text("CERTIFICATE OF ACCREDITATION", centerX, 72, {
     align: "center",

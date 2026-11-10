@@ -118,14 +118,31 @@ const Sidebar = () => {
     <Box
       sx={{
         width: 240,
-        height: "100vh",
+        // fill the space the layout gives (below the header), not the whole
+        // window, so the last menu items are not cut off and the list can scroll
+        height: "100%",
         borderRight: `1px solid ${theme.palette.divider}`,
         display: "flex",
         flexDirection: "column",
       }}
     >
       {/* Menu */}
-      <Box sx={{ flex: 1, overflowY: "auto", py: 3 }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          py: 3,
+          // thin scrollbar
+          scrollbarWidth: "thin",
+          "&::-webkit-scrollbar": { width: 6 },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "rgba(0,0,0,0.2)",
+            borderRadius: 3,
+          },
+        }}
+      >
         <List disablePadding>
           {mainMenus.map((menu) => {
             const submenus = getSubmenus(menu.id);

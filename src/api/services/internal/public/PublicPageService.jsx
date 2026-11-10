@@ -41,6 +41,41 @@ class PublicPageService {
       .then((response) => response)
       .catch((error) => error);
   }
+  // Public NCS publication list
+  getNcsPublications() {
+    return apiClient
+      .get(`/api/v1/public/data/ncs-publications`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  // Public curriculum publication list (Endorsed only)
+  getCurriculumPublications() {
+    return apiClient
+      .get(`/api/v1/public/data/curriculum-publications`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  // Public assessment result lookup by CID / reference no
+  getAssessmentResultsByCid(cidNo) {
+    return apiClient
+      .get(`/api/v1/public/data/assessment-results/${encodeURIComponent(cidNo)}`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  // Public trainer report (trainers added through AddTrainer)
+  getPublicTrainers() {
+    return apiClient
+      .get(`/api/v1/public/data/trainers`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
+  // Public "Courses Accredited" report
+  getAccreditedCourses() {
+    return apiClient
+      .get(`/api/v1/public/data/accredited-courses`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new PublicPageService();

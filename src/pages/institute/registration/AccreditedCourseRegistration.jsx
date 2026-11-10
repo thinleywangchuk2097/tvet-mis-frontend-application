@@ -42,6 +42,7 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import CurriculumIndexService from "../../../api/services/internal/course/CurriculumIndexService";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
+import NcsService from "../../../api/services/internal/ncs/NcsService";
 
 // Helper component for required field indicator
 const RequiredStar = () => (
@@ -96,6 +97,7 @@ const AccreditedCourseRegistration = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
+  const currentRoleId = useSelector((state) => state.auth.current_roleId);
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -134,6 +136,48 @@ const AccreditedCourseRegistration = () => {
   // Helper function to check if form should be read-only (only for view mode)
   const isReadOnly = () => {
     return dialogMode === "view";
+  };
+
+  // Role 12: pick the Programme Title from NCS programmes (no Curriculum Title)
+  const isRole12 = String(currentRoleId) === "12";
+  const [ncsProgrammes, setNcsProgrammes] = useState([]);
+
+  useEffect(() => {
+    if (!isRole12) return;
+    (async () => {
+      // role 12: certificate-level NCS programmes only
+      const res =
+        await NcsService.getAllCertificateLevelNcsProgrammes(access_token);
+      console.log("Fetched NCS Programmes:", res?.data);
+      setNcsProgrammes(Array.isArray(res?.data) ? res.data : []);
+    })();
+  }, [isRole12, access_token]);
+
+  // NCS programme chosen: fill programme title, sector, occupation and certificate level
+  const handleNcsProgrammeSelect = async (ncsId, formik) => {
+    // match the NCS programme by its id
+    const ncs = ncsProgrammes.find((n) => String(n.id) === String(ncsId));
+    const title = ncs?.programme_title || "";
+    setProgrammeTitle(title);
+    formik.setFieldValue("ncsId", ncs ? ncs.id : ""); // sent as ncsId in the payload
+    formik.setFieldValue("programmeTitle", title); // display / validation only
+    formik.setFieldValue("curriculumId", "");
+    formik.setFieldValue("certificateLevel", ncs?.certification_id || "");
+    formik.setFieldValue("sectorId", ncs?.sector_id || "");
+    formik.setFieldValue("courseId", ncs?.occupation_id || "");
+    formik.setFieldValue("occupationName", "");
+    if (!ncs?.sector_id) return;
+    setSelectedSectorId(ncs.sector_id);
+    const occupationsData = await fetchOccupationsBySector(ncs.sector_id);
+    const occupation = (occupationsData || []).find(
+      (occ) => String(occ.id) === String(ncs.occupation_id),
+    );
+    if (occupation) {
+      formik.setFieldValue(
+        "occupationName",
+        occupation.occupationName || occupation.name || occupation.title,
+      );
+    }
   };
 
   // Helper function to check if basic info should be read-only (view or renewal mode)
@@ -321,6 +365,9 @@ const AccreditedCourseRegistration = () => {
           proposedInstituteName: programme.proposed_institute_name,
           instituteId: programme.institute_id,
           programmeTitle: programme.programme_title,
+          ncsId: programme.ncs_id || "",
+          // NCS-based applications (role 12) keep the level here, not on a curriculum
+          certificationId: programme.certification_id || "",
           registrationDate: programme.registration_date,
           validityDate: programme.validity_date,
           feesPerTrainee: programme.fees_per_trainee || "",
@@ -679,8 +726,9 @@ const AccreditedCourseRegistration = () => {
   }, [qualitySelections, qualityData]);
 
   // Overall form progress: course details + checklist (all Yes) + documents
+  // role 12 picks an NCS programme (ncsId) instead of a curriculum
   const COURSE_FIELDS = [
-    "curriculumId",
+    isRole12 ? "ncsId" : "curriculumId",
     "sectorId",
     "courseId",
     "programmeTitle",
@@ -875,14 +923,19 @@ const AccreditedCourseRegistration = () => {
         sectorId: selectedCourse.sectorId || "",
         courseId: selectedCourse.courseId || "",
         occupationName: selectedCourse.occupationName || "",
-        programmeTitle: progTitle,
+        // no curriculum (NCS programme): use the saved title
+        programmeTitle: progTitle || selectedCourse.programmeTitle || "",
+        ncsId: selectedCourse.ncsId || "",
         feesPerTrainee: selectedCourse.feesPerTrainee || "",
         enrolmentCapacity: selectedCourse.enrolmentCapacity || "",
         totalProgramDuration: curriculumDetails.totalProgramDuration || "",
         totalTheoryDuration: curriculumDetails.totalTheoryDuration || "",
         totalPracticalDuration: curriculumDetails.totalPracticalDuration || "",
         totalOjtDuration: curriculumDetails.totalOjtDuration || "",
-        certificateLevel: curriculumDetails.certificateLevelId || "",
+        certificateLevel:
+          curriculumDetails.certificateLevelId ||
+          selectedCourse.certificationId ||
+          "",
         leadTrainerCidNo: selectedCourse.leadTrainerCidNo || "",
         leadTrainerName: selectedCourse.leadTrainerName || "",
         genderId: selectedCourse.genderId || "",
@@ -901,6 +954,7 @@ const AccreditedCourseRegistration = () => {
       courseId: "",
       occupationName: "",
       programmeTitle: "",
+      ncsId: "",
       feesPerTrainee: "",
       enrolmentCapacity: "",
       totalProgramDuration: "",
@@ -918,7 +972,10 @@ const AccreditedCourseRegistration = () => {
   };
 
   const validationSchema = Yup.object().shape({
-    curriculumId: Yup.string().required("Curriculum is required"),
+    // role 12 picks an NCS programme instead of a curriculum
+    curriculumId: isRole12
+      ? Yup.string().nullable()
+      : Yup.string().required("Curriculum is required"),
     sectorId: Yup.string().required("Sector is required"),
     courseId: Yup.string().required("Occupation is required"),
     programmeTitle: Yup.string().required("Programme Title is required"),
@@ -971,10 +1028,12 @@ const AccreditedCourseRegistration = () => {
           instituteId: values.instituteId,
           applicantName: values.instituteName,
           courseId: values.courseId,
-          programmeTitle: values.programmeTitle,
+          // role 12 sends only the NCS programme id (ncsId), not the title
+          ...(isRole12 ? {} : { programmeTitle: values.programmeTitle }),
           feesPerTrainee: values.feesPerTrainee,
           enrolmentCapacity: values.enrolmentCapacity,
-          curriculumId: values.curriculumId,
+          curriculumId: values.curriculumId || null,
+          ncsId: values.ncsId || null,
           sectorId: values.sectorId,
           certificateLevel: values.certificateLevel,
           leadTrainerCidNo: values.leadTrainerCidNo,
@@ -1025,10 +1084,12 @@ const AccreditedCourseRegistration = () => {
           instituteId: values.instituteId,
           applicantName: values.instituteName,
           courseId: values.courseId,
-          programmeTitle: values.programmeTitle,
+          // role 12 sends only the NCS programme id (ncsId), not the title
+          ...(isRole12 ? {} : { programmeTitle: values.programmeTitle }),
           feesPerTrainee: values.feesPerTrainee,
           enrolmentCapacity: values.enrolmentCapacity,
-          curriculumId: values.curriculumId,
+          curriculumId: values.curriculumId || null,
+          ncsId: values.ncsId || null,
           sectorId: values.sectorId,
           certificateLevel: values.certificateLevel,
           leadTrainerCidNo: values.leadTrainerCidNo,
@@ -1259,6 +1320,7 @@ const AccreditedCourseRegistration = () => {
               <TableCell>Application No</TableCell>
               <TableCell>Programme Title</TableCell>
               <TableCell>Sector</TableCell>
+              <TableCell>Validity Date</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Action</TableCell>
             </TableRow>
@@ -1277,6 +1339,36 @@ const AccreditedCourseRegistration = () => {
                       <TableCell>{course.applicationNo}</TableCell>
                       <TableCell>{course.programmeTitle}</TableCell>
                       <TableCell>{sectorName}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {(() => {
+                          const d = course.validityDate
+                            ? new Date(course.validityDate)
+                            : null;
+                          if (!d || Number.isNaN(d.getTime())) return "—";
+                          const days = Math.ceil((d - new Date()) / 86400000);
+                          return (
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color:
+                                  days < 0
+                                    ? "error.main"
+                                    : days <= 90
+                                      ? "warning.main"
+                                      : "inherit",
+                                fontWeight: days <= 90 ? 600 : 400,
+                              }}
+                            >
+                              {d.toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                              {days < 0 && " (Expired)"}
+                            </Typography>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell>
                         <Chip
                           label={statusName}
@@ -1347,7 +1439,7 @@ const AccreditedCourseRegistration = () => {
                 })
             ) : (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   No data available in table
                 </TableCell>
               </TableRow>
@@ -1526,6 +1618,62 @@ const AccreditedCourseRegistration = () => {
                         }}
                       />
                     </Grid>
+                    {/* Role 12: Programme Title (NCS programmes) right after Institute Name */}
+                    {isRole12 && (
+                      <>
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            select
+                            fullWidth
+                            label={
+                              <>
+                                Programme Title <RequiredStar />
+                              </>
+                            }
+                            name="programmeTitle"
+                            size="small"
+                            value={formik.values.ncsId || ""}
+                            onChange={(e) =>
+                              handleNcsProgrammeSelect(e.target.value, formik)
+                            }
+                            onBlur={formik.handleBlur}
+                            error={
+                              formik.touched.programmeTitle &&
+                              Boolean(formik.errors.programmeTitle)
+                            }
+                            helperText={
+                              formik.touched.programmeTitle &&
+                              formik.errors.programmeTitle
+                            }
+                            slotProps={{
+                              input: { readOnly: isBasicInfoReadOnly() },
+                            }}
+                          >
+                            <MenuItem value="">-select-</MenuItem>
+                            {ncsProgrammes.map((ncs) => (
+                              <MenuItem key={ncs.id} value={ncs.id}>
+                                {ncs.programme_title}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </Grid>
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            label="Certificate Level"
+                            name="certificateLevel"
+                            size="small"
+                            value={getCertificateLevelName(
+                              formik.values.certificateLevel,
+                            )}
+                            slotProps={{ input: { readOnly: true } }}
+                          />
+                        </Grid>
+                      </>
+                    )}
+
+                    {/* Curriculum Title: not used for role 12 */}
+                    {!isRole12 && (
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         select
@@ -1586,6 +1734,7 @@ const AccreditedCourseRegistration = () => {
                         </Alert>
                       )}
                     </Grid>
+                    )}
 
                     {/* Curriculum Details - All Read Only */}
                     {selectedCurriculumDetails && !curriculumDuplicateError && (
@@ -1701,7 +1850,8 @@ const AccreditedCourseRegistration = () => {
                       />
                     </Grid>
 
-                    {/* Programme Title - Read Only (Auto-filled) */}
+                    {/* Programme Title - Read Only (Auto-filled); role 12 has it after Institute Name */}
+                    {!isRole12 && (
                     <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
@@ -1721,6 +1871,7 @@ const AccreditedCourseRegistration = () => {
                         placeholder="Auto-filled from Curriculum"
                       />
                     </Grid>
+                    )}
 
                     {/* Fees per trainee - Editable */}
                     <Grid item size={{ xs: 12, md: 4 }}>
@@ -2104,7 +2255,10 @@ const AccreditedCourseRegistration = () => {
                         formik.values.files.length === 0 ||
                         !!curriculumDuplicateError ||
                         checkingCurriculum ||
-                        !formik.values.curriculumId
+                        // role 12 needs an NCS programme, others a curriculum
+                        (isRole12
+                          ? !formik.values.ncsId
+                          : !formik.values.curriculumId)
                       }
                     >
                       {loading

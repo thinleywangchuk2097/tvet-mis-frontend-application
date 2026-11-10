@@ -1,11 +1,8 @@
 // ChangeSesCentreIndex.jsx
-// Same design and flow as the institute change request (InstituteChange),
-// worded for SES centres. Design only for now: the final submit is not sent
-// to the backend until the SES centre change service is set up.
+// SES centre change request: same form, service (10) and approval flow as the
+// institute change request (role 7 verifies -> role 22 approves), worded for SES centres.
 import InstituteChange from "../../institute/registration/InstituteChange";
 
-const ChangeSesCentreIndex = () => (
-  <InstituteChange entityLabel="SES Centre" designOnly />
-);
+const ChangeSesCentreIndex = () => <InstituteChange entityLabel="SES Centre" />;
 
 export default ChangeSesCentreIndex;
