@@ -27,8 +27,6 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import EmailIcon from "@mui/icons-material/Email";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import FacebookIcon from "@mui/icons-material/Facebook";
-import XIcon from "@mui/icons-material/X";
-import LinkedInIcon from "@mui/icons-material/LinkedIn";
 import FileCopyIcon from "@mui/icons-material/FileCopy";
 import ArticleIcon from "@mui/icons-material/Article";
 import BusinessIcon from "@mui/icons-material/Business";
@@ -185,11 +183,6 @@ const NAV_MENU = [
     path: "/birms/payment-index",
   },
   {
-    label: "Feedback/Complain",
-    icon: <FeedbackIcon sx={{ fontSize: 16 }} />,
-    path: "/feedback/form",
-  },
-  {
     label: "Publication",
     icon: <PublicIcon sx={{ fontSize: 16 }} />,
     path: "/publication/publication-index",
@@ -198,6 +191,11 @@ const NAV_MENU = [
     label: "Forms",
     icon: <FileCopyIcon sx={{ fontSize: 16 }} />,
     path: "/forms/forms-index",
+  },
+  {
+    label: "Feedback/Complain",
+    icon: <FeedbackIcon sx={{ fontSize: 16 }} />,
+    path: "/feedback/form",
   },
 ];
 
@@ -479,8 +477,6 @@ const Header = () => {
                   href: "https://www.facebook.com/BQPCA",
                   label: "Facebook",
                 },
-                { Icon: XIcon, href: "#", label: "X" },
-                { Icon: LinkedInIcon, href: "#", label: "LinkedIn" },
               ].map(({ Icon, href, label }, i) => (
                 <IconButton
                   key={i}

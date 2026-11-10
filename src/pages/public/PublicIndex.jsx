@@ -31,7 +31,6 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
-import CampaignIcon from "@mui/icons-material/Campaign";
 import SchoolIcon from "@mui/icons-material/School";
 import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
@@ -40,7 +39,8 @@ import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import DescriptionIcon from "@mui/icons-material/Description";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
-import InsightsIcon from "@mui/icons-material/Insights";
+import TrackChangesIcon from "@mui/icons-material/TrackChanges";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 
 // ── Sections (content and data unchanged)
 import CourseTraineeAnnouncementsIndex from "./CourseTraineeAnnouncementsIndex";
@@ -365,30 +365,49 @@ const PublicIndex = () => {
     }
   };
 
-  // ── Track application card (in the hero)
+  // ── Track application card (in the hero): transparent "glass" panel
   const trackCard = (
-    <Paper
-      elevation={0}
+    <Box
       sx={{
-        p: { xs: 2, md: 2.5 },
-        borderRadius: 2,
-        width: { xs: "100%", md: 520 },
-        borderTop: `4px solid ${SAFFRON}`,
-        boxShadow: "0 18px 40px rgba(6, 26, 64, 0.35)",
+        p: { xs: 2.25, md: 3 },
+        borderRadius: 3,
+        width: { xs: "100%", md: 500 },
+        flexShrink: 0,
+        bgcolor: alpha("#ffffff", 0.08),
+        backdropFilter: "blur(14px)",
+        WebkitBackdropFilter: "blur(14px)",
+        border: `1px solid ${alpha("#ffffff", 0.22)}`,
+        boxShadow: "0 24px 60px rgba(3, 14, 40, 0.35)",
       }}
     >
-      <Typography
-        component="h2"
-        fontWeight={700}
-        sx={{ fontSize: "1.05rem", color: NAVY }}
-      >
-        Track your application
-      </Typography>
-      <Typography
-        sx={{ color: "text.secondary", fontSize: "0.85rem", mt: 0.25, mb: 1.5 }}
-      >
-        Enter the application number from your submission.
-      </Typography>
+      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+        <Box
+          sx={{
+            width: 42,
+            height: 42,
+            borderRadius: 2,
+            display: "grid",
+            placeItems: "center",
+            bgcolor: alpha(SAFFRON, 0.18),
+            color: SAFFRON,
+            flexShrink: 0,
+          }}
+        >
+          <TrackChangesIcon />
+        </Box>
+        <Box>
+          <Typography
+            component="h2"
+            fontWeight={700}
+            sx={{ fontSize: "1.1rem", color: "#fff", lineHeight: 1.2 }}
+          >
+            Track your application
+          </Typography>
+          <Typography sx={{ color: alpha("#fff", 0.72), fontSize: "0.85rem" }}>
+            Enter the application number from your submission.
+          </Typography>
+        </Box>
+      </Stack>
       <Box
         component="form"
         onSubmit={(e) => {
@@ -413,10 +432,23 @@ const PublicIndex = () => {
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ fontSize: 18 }} />
+                  <Search sx={{ fontSize: 18, color: alpha("#fff", 0.7) }} />
                 </InputAdornment>
               ),
             },
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              height: 44,
+              color: "#fff",
+              borderRadius: 2,
+              bgcolor: alpha("#ffffff", 0.1),
+              "& fieldset": { borderColor: alpha("#fff", 0.3) },
+              "&:hover fieldset": { borderColor: alpha("#fff", 0.6) },
+              "&.Mui-focused fieldset": { borderColor: SAFFRON },
+            },
+            "& input::placeholder": { color: alpha("#fff", 0.65), opacity: 1 },
+            "& .MuiFormHelperText-root": { color: "#ffcdd2" },
           }}
         />
         <Button
@@ -424,23 +456,26 @@ const PublicIndex = () => {
           variant="contained"
           disabled={trackLoading}
           sx={{
-            bgcolor: NAVY,
+            bgcolor: SAFFRON,
+            color: NAVY,
             textTransform: "none",
             fontWeight: 700,
-            px: 2.5,
-            height: 40,
+            px: 3,
+            height: 44,
+            borderRadius: 2,
             whiteSpace: "nowrap",
-            "&:hover": { bgcolor: BLUE },
+            boxShadow: "none",
+            "&:hover": { bgcolor: "#ffbf2e", boxShadow: "none" },
           }}
         >
           {trackLoading ? (
-            <CircularProgress size={18} sx={{ color: "#fff" }} />
+            <CircularProgress size={18} sx={{ color: NAVY }} />
           ) : (
             "Track"
           )}
         </Button>
       </Box>
-    </Paper>
+    </Box>
   );
 
   return (
@@ -458,7 +493,7 @@ const PublicIndex = () => {
         sx={{
           position: "relative",
           overflow: "hidden",
-          minHeight: { md: 460 },
+          minHeight: { md: 360 },
         }}
       >
         {sliderImages.map((img, i) => (
@@ -483,8 +518,8 @@ const PublicIndex = () => {
             position: "absolute",
             inset: 0,
             background: {
-              xs: alpha(NAVY, 0.86),
-              md: `linear-gradient(90deg, ${alpha(NAVY, 0.94)} 0%, ${alpha(NAVY, 0.82)} 42%, ${alpha(NAVY, 0.25)} 78%, ${alpha(NAVY, 0.1)} 100%)`,
+              xs: alpha("#061a40", 0.88),
+              md: `radial-gradient(900px 500px at 85% 20%, ${alpha(BLUE, 0.35)}, transparent 60%), linear-gradient(100deg, ${alpha("#061a40", 0.96)} 0%, ${alpha(NAVY, 0.86)} 45%, ${alpha(NAVY, 0.55)} 75%, ${alpha(NAVY, 0.4)} 100%)`,
             },
           }}
         />
@@ -495,8 +530,8 @@ const PublicIndex = () => {
             px: { xs: 2, md: 3, lg: 4 },
             position: "relative",
             zIndex: 1,
-            py: { xs: 4, md: 7 },
-            pb: { xs: 4, md: 11 },
+            py: { xs: 3, md: 4 },
+            pb: { xs: 3, md: 9.5 },
             display: "flex",
             flexDirection: { xs: "column", md: "row" },
             alignItems: { md: "center" },
@@ -506,33 +541,20 @@ const PublicIndex = () => {
         >
           <Box sx={{ maxWidth: 620 }}>
             <Typography
-              sx={{ color: alpha("#fff", 0.8), fontSize: "0.95rem", mb: 1.25 }}
-            >
-              Ministry of Education and Skills Development
-            </Typography>
-            <Typography
               component="h1"
               sx={{
                 color: "#fff",
-                fontWeight: 700,
-                fontSize: { xs: "2rem", md: "3rem" },
-                lineHeight: 1.08,
-                mb: 2,
+                fontWeight: 800,
+                fontSize: { xs: "2.1rem", md: "3.4rem" },
+                lineHeight: 1.06,
+                letterSpacing: "-0.5px",
+                mb: 3.5,
               }}
             >
-              Building Bhutan&apos;s skilled workforce
-            </Typography>
-            <Typography
-              sx={{
-                color: alpha("#fff", 0.88),
-                fontSize: { xs: "0.95rem", md: "1.05rem" },
-                lineHeight: 1.65,
-                maxWidth: 540,
-                mb: 3,
-              }}
-            >
-              Find accredited courses, apply online, get your skills certified
-              and follow your application, across all 20 Dzongkhags.
+              Building Bhutan&apos;s{" "}
+              <Box component="span" sx={{ color: SAFFRON }}>
+                skilled workforce
+              </Box>
             </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <Button
@@ -544,7 +566,9 @@ const PublicIndex = () => {
                   color: NAVY,
                   textTransform: "none",
                   fontWeight: 700,
-                  px: 3,
+                  px: 3.5,
+                  borderRadius: 2,
+                  boxShadow: `0 10px 24px ${alpha(SAFFRON, 0.35)}`,
                   "&:hover": { bgcolor: "#ffbf2e" },
                 }}
               >
@@ -559,7 +583,8 @@ const PublicIndex = () => {
                   borderColor: alpha("#fff", 0.6),
                   textTransform: "none",
                   fontWeight: 700,
-                  px: 3,
+                  px: 3.5,
+                  borderRadius: 2,
                   "&:hover": {
                     borderColor: "#fff",
                     bgcolor: alpha("#fff", 0.08),
@@ -583,7 +608,7 @@ const PublicIndex = () => {
             position: "absolute",
             zIndex: 2,
             right: { xs: 12, md: 24 },
-            bottom: { xs: 8, md: 72 },
+            bottom: { xs: 8, md: 66 },
             display: { xs: "none", md: "flex" },
           }}
         >
@@ -647,186 +672,116 @@ const PublicIndex = () => {
           mt: { xs: 2, md: -7 },
         }}
       >
-        <Paper
-          elevation={0}
+        <Grid
+          container
+          spacing={{ xs: 1.5, md: 2 }}
           component="nav"
           aria-label="Public services"
-          sx={{
-            borderRadius: 2,
-            border: `1px solid ${LINE}`,
-            boxShadow: { md: "0 10px 30px rgba(10, 45, 110, 0.12)" },
-            overflow: "hidden",
-          }}
         >
-          <Grid container>
-            {SERVICES.map((s, i) => (
-              <Grid key={s.href} size={{ xs: 12, sm: 6, md: 3 }}>
+          {SERVICES.map((s) => (
+            <Grid key={s.href} size={{ xs: 12, sm: 6, md: 3 }}>
+              <Box
+                component="a"
+                href={s.href}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.75,
+                  p: 2.25,
+                  height: "100%",
+                  borderRadius: 3,
+                  bgcolor: "background.paper",
+                  border: `1px solid ${LINE}`,
+                  boxShadow: "0 10px 30px rgba(10, 45, 110, 0.10)",
+                  textDecoration: "none",
+                  color: "inherit",
+                  transition: "transform .2s ease, box-shadow .2s ease, border-color .2s ease",
+                  "&:hover, &:focus-visible": {
+                    transform: "translateY(-3px)",
+                    borderColor: alpha(BLUE, 0.4),
+                    boxShadow: "0 16px 36px rgba(10, 45, 110, 0.16)",
+                  },
+                  "&:hover .svc-arrow, &:focus-visible .svc-arrow": {
+                    transform: "translateX(3px)",
+                    color: BLUE,
+                  },
+                  "&:focus-visible": {
+                    outline: `2px solid ${BLUE}`,
+                    outlineOffset: 2,
+                  },
+                }}
+              >
                 <Box
-                  component="a"
-                  href={s.href}
                   sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1.5,
-                    p: 2,
-                    height: "100%",
-                    textDecoration: "none",
-                    color: "inherit",
-                    borderLeft: { md: i === 0 ? 0 : `1px solid ${LINE}` },
-                    borderTop: { xs: i === 0 ? 0 : `1px solid ${LINE}`, md: 0 },
-                    "&:hover, &:focus-visible": { bgcolor: TINT },
-                    "&:hover .svc-label, &:focus-visible .svc-label": {
-                      color: BLUE,
-                    },
-                    "&:focus-visible": {
-                      outline: `2px solid ${BLUE}`,
-                      outlineOffset: -2,
-                    },
+                    width: 48,
+                    height: 48,
+                    flexShrink: 0,
+                    borderRadius: 2.5,
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#fff",
+                    background: `linear-gradient(135deg, ${BLUE}, ${NAVY})`,
+                    boxShadow: `0 8px 18px ${alpha(BLUE, 0.3)}`,
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: 42,
-                      height: 42,
-                      flexShrink: 0,
-                      borderRadius: 1.5,
-                      display: "grid",
-                      placeItems: "center",
-                      color: NAVY,
-                      bgcolor: alpha(BLUE, 0.08),
-                    }}
-                  >
-                    {s.icon}
-                  </Box>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography
-                      className="svc-label"
-                      fontWeight={700}
-                      sx={{ color: NAVY, fontSize: "0.98rem" }}
-                    >
-                      {s.label}
-                    </Typography>
-                    <Typography
-                      sx={{ color: "text.secondary", fontSize: "0.82rem" }}
-                    >
-                      {s.desc}
-                    </Typography>
-                  </Box>
+                  {s.icon}
                 </Box>
-              </Grid>
-            ))}
-          </Grid>
-        </Paper>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography
+                    fontWeight={700}
+                    sx={{ color: NAVY, fontSize: "1rem" }}
+                  >
+                    {s.label}
+                  </Typography>
+                  <Typography sx={{ color: "text.secondary", fontSize: "0.82rem" }}>
+                    {s.desc}
+                  </Typography>
+                </Box>
+                <ArrowForwardIcon
+                  className="svc-arrow"
+                  sx={{ fontSize: 18, color: "#9db0c9", transition: "all .2s" }}
+                />
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
       </Container>
 
-      {/* ── Announcements ticker ─────────────────────────────────────── */}
-      <Container maxWidth={false} sx={{ px: { xs: 2, md: 3, lg: 4 }, mt: 2.5 }}>
-        <Box
-          role="region"
-          aria-label="Announcements"
+      {/* ── Announcements ticker (full width) ─────────────────────────── */}
+      <Box
+        role="region"
+        aria-label="Announcements"
+        sx={{
+          mt: 2.5,
+          width: "100%",
+          overflow: "hidden",
+          bgcolor: NAVY,
+          py: 1.1,
+          "&:hover .ticker-text": { animationPlayState: "paused" },
+        }}
+      >
+        <Box component="style">{`@keyframes tvetTicker{from{transform:translateX(0)}to{transform:translateX(-100%)}}`}</Box>
+        <Typography
+          className="ticker-text"
           sx={{
-            display: "flex",
-            alignItems: "center",
-            borderRadius: 2,
-            overflow: "hidden",
-            bgcolor: NAVY,
-            "&:hover .ticker-text": { animationPlayState: "paused" },
+            display: "inline-block",
+            whiteSpace: "nowrap",
+            pl: "100%",
+            color: "#e3f2fd",
+            fontSize: "0.92rem",
+            animation: reduceMotion ? "none" : "tvetTicker 60s linear infinite",
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 0.75,
-              px: 2,
-              py: 1,
-              bgcolor: SAFFRON,
-              color: NAVY,
-              flexShrink: 0,
-              fontWeight: 700,
-              fontSize: "0.85rem",
-            }}
-          >
-            <CampaignIcon fontSize="small" />
-            Announcements
-          </Box>
-          <Box sx={{ overflow: "hidden", flex: 1, px: 2 }}>
-            <Box component="style">{`@keyframes tvetTicker{from{transform:translateX(100%)}to{transform:translateX(-100%)}}`}</Box>
-            <Typography
-              className="ticker-text"
-              sx={{
-                display: "inline-block",
-                whiteSpace: "nowrap",
-                color: "#e3f2fd",
-                fontSize: "0.9rem",
-                animation: reduceMotion
-                  ? "none"
-                  : "tvetTicker 50s linear infinite",
-              }}
-            >
-              {notificationMessages.join("     •     ")}
-            </Typography>
-          </Box>
-        </Box>
-      </Container>
+          {notificationMessages.join("     •     ")}
+        </Typography>
+      </Box>
 
       {/* ── Page body ─────────────────────────────────────────────────── */}
       <Box sx={{ flex: 1, mt: 1 }}>
         <Section
           title="TVET at a glance"
-          description="Current figures for training institutes, programmes, trainers, trainees and Dzongkhags reached."
         >
-          {/* same outer card as the "TVET Indicators Breakdown" card */}
-          <Paper
-            elevation={0}
-            sx={{
-              border: "1px solid #e3eaf4",
-              borderRadius: 3,
-              bgcolor: "#ffffff",
-              p: 2.5,
-              transition: "all 0.3s ease",
-              "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: `0 12px 28px ${alpha(BLUE, 0.12)}`,
-                borderColor: alpha(BLUE, 0.3),
-              },
-            }}
-          >
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1.2}
-              sx={{ mb: 2 }}
-            >
-              <Box
-                sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 1.5,
-                  bgcolor: alpha(BLUE, 0.12),
-                  color: BLUE,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <InsightsIcon sx={{ fontSize: 20 }} />
-              </Box>
-              <Box>
-                <Typography
-                  fontWeight={800}
-                  sx={{ fontSize: "0.95rem", color: BLUE }}
-                >
-                  TVET by the numbers
-                </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Training institutes, programmes, trainers, trainees and
-                  Dzongkhags reached
-                </Typography>
-              </Box>
-            </Stack>
-            <TvetCardsIndex />
-          </Paper>
+          <TvetCardsIndex />
         </Section>
 
         <Section

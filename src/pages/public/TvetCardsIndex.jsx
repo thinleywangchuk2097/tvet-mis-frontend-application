@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Box, Grid, Typography, alpha, keyframes } from "@mui/material";
+import { useEffect, useRef, useState } from "react";
+import PropTypes from "prop-types";
+import { Box, Typography, alpha, keyframes } from "@mui/material";
 import BusinessIcon from "@mui/icons-material/Business";
 import SchoolIcon from "@mui/icons-material/School";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -7,68 +8,15 @@ import PublicIcon from "@mui/icons-material/Public";
 import CoPresentIcon from "@mui/icons-material/CoPresent";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
 
-// ── Brand palette
-const P = "#1565c0";
-const TEAL = "#0097a7";
+// ── Palette
+const NAVY = "#0a2d6e";
+const NAVY_DEEP = "#061a45";
+const BLUE = "#1565c0";
+const W = "#ffffff";
 
-// ── Animations
-const fadeInUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
-const scaleIn = keyframes`
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-`;
-
-const countUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
-const rotateIcon = keyframes`
-  0% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(10deg);
-  }
-  75% {
-    transform: rotate(-10deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-`;
-
-const ripple = keyframes`
-  0% {
-    transform: scale(0);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
+const rise = keyframes`
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 `;
 
 // ── Headline stats (values come from /api/v1/public/data/home-stats)
@@ -76,39 +24,157 @@ const stats = [
   {
     key: "trainingInstitutes",
     label: "Training Institutes",
-    icon: <BusinessIcon sx={{ fontSize: 18 }} />,
-    color: P,
+    icon: BusinessIcon,
+    accent: "#64b5f6",
   },
   {
     key: "programsOffered",
     label: "Programs Offered",
-    icon: <SchoolIcon sx={{ fontSize: 18 }} />,
-    color: TEAL,
+    icon: SchoolIcon,
+    accent: "#4dd0e1",
   },
   {
     key: "registeredTrainers",
     label: "Registered Trainers",
-    icon: <CoPresentIcon sx={{ fontSize: 18 }} />,
-    color: "#6a1b9a",
+    icon: CoPresentIcon,
+    accent: "#b39ddb",
   },
   {
     key: "traineesEnrolled",
     label: "Trainees Enrolled",
-    icon: <GroupsIcon sx={{ fontSize: 18 }} />,
-    color: "#2e7d32",
+    icon: GroupsIcon,
+    accent: "#81c784",
   },
   {
     key: "dzongkhagsReached",
     label: "Dzongkhags Reached",
-    icon: <PublicIcon sx={{ fontSize: 18 }} />,
-    color: "#e65100",
+    icon: PublicIcon,
+    accent: "#ffb74d",
   },
 ];
 
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+// Count up from 0 to target once `start` is true
+const useCountUp = (target, start, duration = 1500) => {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    if (target === null || !start) return undefined;
+    if (prefersReducedMotion() || target === 0) {
+      setValue(target);
+      return undefined;
+    }
+    let frame;
+    const begin = performance.now();
+    const tick = (now) => {
+      const p = Math.min((now - begin) / duration, 1);
+      setValue(Math.round(target * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target, start, duration]);
+
+  return value;
+};
+
+const StatTile = ({ stat, target, start, index }) => {
+  const value = useCountUp(target, start);
+  const Icon = stat.icon;
+
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        height: "100%",
+        p: { xs: 2, md: 2.5 },
+        borderRadius: 3,
+        bgcolor: alpha(W, 0.06),
+        border: `1px solid ${alpha(W, 0.1)}`,
+        backdropFilter: "blur(6px)",
+        overflow: "hidden",
+        transition: "transform .3s ease, background-color .3s ease, border-color .3s ease",
+        animation: `${rise} .5s ease-out ${index * 0.08}s both`,
+        "&::after": {
+          content: '""',
+          position: "absolute",
+          left: 0,
+          bottom: 0,
+          height: 3,
+          width: "100%",
+          background: `linear-gradient(90deg, ${stat.accent}, ${alpha(stat.accent, 0)})`,
+          opacity: 0.7,
+        },
+        "&:hover": {
+          transform: "translateY(-4px)",
+          bgcolor: alpha(W, 0.1),
+          borderColor: alpha(stat.accent, 0.5),
+        },
+        "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+      }}
+    >
+      <Box
+        sx={{
+          width: 44,
+          height: 44,
+          borderRadius: 2.5,
+          display: "grid",
+          placeItems: "center",
+          color: stat.accent,
+          bgcolor: alpha(stat.accent, 0.14),
+          boxShadow: `inset 0 0 0 1px ${alpha(stat.accent, 0.3)}`,
+          mb: 2,
+        }}
+      >
+        <Icon sx={{ fontSize: 22 }} />
+      </Box>
+      <Typography
+        sx={{
+          color: W,
+          fontWeight: 800,
+          fontSize: { xs: "1.6rem", md: "2.1rem" },
+          lineHeight: 1,
+          letterSpacing: "-0.02em",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {target === null ? "—" : value.toLocaleString()}
+      </Typography>
+      <Typography
+        sx={{
+          mt: 0.9,
+          color: alpha(W, 0.78),
+          fontWeight: 600,
+          fontSize: { xs: "0.78rem", md: "0.85rem" },
+          letterSpacing: 0.2,
+        }}
+      >
+        {stat.label}
+      </Typography>
+    </Box>
+  );
+};
+
+StatTile.propTypes = {
+  stat: PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    icon: PropTypes.elementType.isRequired,
+    accent: PropTypes.string.isRequired,
+  }).isRequired,
+  target: PropTypes.number,
+  start: PropTypes.bool.isRequired,
+  index: PropTypes.number.isRequired,
+};
+
 const TvetCardsIndex = () => {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
   // null = not loaded / not available (shown as "—")
   const [targets, setTargets] = useState(stats.map(() => null));
-  const [animatedValues, setAnimatedValues] = useState(stats.map(() => "—"));
 
   // Load the figures
   useEffect(() => {
@@ -131,238 +197,84 @@ const TvetCardsIndex = () => {
     };
   }, []);
 
-  // Count up animation once the figures arrive
+  // Start counting when the band scrolls into view
   useEffect(() => {
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
-    const timers = targets.map((target, index) => {
-      const setAt = (val) =>
-        setAnimatedValues((prev) => {
-          const next = [...prev];
-          next[index] = val;
-          return next;
-        });
-
-      if (target === null) {
-        setAt("—");
-        return null;
-      }
-      if (reduceMotion || target === 0) {
-        setAt(target.toLocaleString());
-        return null;
-      }
-
-      const duration = 1500;
-      const stepTime = 20;
-      const increment = target / (duration / stepTime);
-      let current = 0;
-      const timer = setInterval(() => {
-        current += increment;
-        if (current >= target) {
-          setAt(target.toLocaleString());
-          clearInterval(timer);
-        } else {
-          setAt(Math.floor(current).toLocaleString());
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
         }
-      }, stepTime);
-      return timer;
-    });
-
-    return () => {
-      timers.forEach((timer) => timer && clearInterval(timer));
-    };
-  }, [targets]);
-
-  // Check if stats data is available and not empty
-  const hasData = stats && stats.length > 0;
-
-  if (!hasData) {
-    return (
-      <Box
-        sx={{
-          textAlign: "center",
-          py: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 200,
-          bgcolor: "#ffffff",
-          borderRadius: 2,
-          border: "1px solid #e3eaf4",
-        }}
-      >
-        <Typography
-          sx={{
-            color: "error.main",
-            fontWeight: 600,
-            fontSize: "0.8rem",
-          }}
-        >
-          No data available
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            color: "#666",
-            mt: 0.5,
-            display: "block",
-            fontSize: "0.7rem",
-          }}
-        >
-          No TVET statistics found
-        </Typography>
-      </Box>
+      },
+      { threshold: 0.2 },
     );
-  }
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <Grid container spacing={1.5}>
-      {stats.map((s, i) => (
-        <Grid key={i} size={{ xs: 6, sm: 4, md: 2.4 }}>
-          <Box
-            sx={{
-              bgcolor: "#ffffff",
-              border: `1px solid ${alpha(s.color, 0.18)}`,
-              borderRadius: 2,
-              p: { xs: 1.5, md: 1.8 },
-              textAlign: "center",
-              position: "relative",
-              overflow: "hidden",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              animation: `${fadeInUp} 0.5s ease-out ${i * 0.1}s both`,
-              "&::before": {
-                content: '""',
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 3,
-                background: `linear-gradient(90deg, ${s.color}, ${alpha(s.color, 0.5)})`,
-                transform: "scaleX(0)",
-                transformOrigin: "left",
-                transition: "transform 0.5s ease-out",
-              },
-              "&:hover::before": {
-                transform: "scaleX(1)",
-              },
-              "&:hover": {
-                transform: "translateY(-3px)",
-                borderColor: s.color,
-                boxShadow: `0 8px 20px ${alpha(s.color, 0.15)}`,
-              },
-              "&:hover .icon-box": {
-                animation: `${rotateIcon} 0.4s ease-in-out`,
-              },
-              "&:hover .ripple-effect": {
-                animation: `${ripple} 0.5s ease-out`,
-              },
-            }}
-          >
-            {/* Ripple effect on hover */}
-            <Box
-              className="ripple-effect"
-              sx={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                width: "100%",
-                height: "100%",
-                borderRadius: "50%",
-                backgroundColor: alpha(s.color, 0.1),
-                transform: "translate(-50%, -50%)",
-                pointerEvents: "none",
-              }}
-            />
+    <Box
+      ref={ref}
+      sx={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 4,
+        p: { xs: 1.5, md: 2.5 },
+        background: `linear-gradient(125deg, ${NAVY_DEEP} 0%, ${NAVY} 50%, ${BLUE} 100%)`,
+        boxShadow: `0 20px 44px ${alpha(NAVY, 0.25)}`,
+      }}
+    >
+      {/* Soft glows and a faint grid for depth */}
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          background: `radial-gradient(420px 220px at 12% 0%, ${alpha("#4dd0e1", 0.18)}, transparent 70%), radial-gradient(380px 240px at 95% 100%, ${alpha("#ffb74d", 0.14)}, transparent 70%)`,
+        }}
+      />
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          opacity: 0.35,
+          backgroundImage: `linear-gradient(${alpha(W, 0.05)} 1px, transparent 1px), linear-gradient(90deg, ${alpha(W, 0.05)} 1px, transparent 1px)`,
+          backgroundSize: "28px 28px",
+          maskImage: "linear-gradient(180deg, #000 0%, transparent 85%)",
+        }}
+      />
 
-            <Box
-              className="icon-box"
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                bgcolor: alpha(s.color, 0.12),
-                color: s.color,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                mx: "auto",
-                mb: 1,
-                transition: "all 0.3s ease",
-                animation: `${scaleIn} 0.4s ease-out ${i * 0.1 + 0.2}s both`,
-              }}
-            >
-              {s.icon}
-            </Box>
-
-            <Typography
-              sx={{
-                color: "#0a1929",
-                fontWeight: 800,
-                fontSize: { xs: "1.3rem", md: "1.6rem" },
-                lineHeight: 1,
-                animation: `${countUp} 0.6s ease-out ${i * 0.1 + 0.3}s both`,
-              }}
-            >
-              {animatedValues[i] ?? "—"}
-            </Typography>
-
-            <Typography
-              sx={{
-                color: s.color,
-                fontSize: "0.65rem",
-                fontWeight: 700,
-                letterSpacing: 0.5,
-                textTransform: "uppercase",
-                mt: 1,
-                position: "relative",
-                display: "inline-block",
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: -3,
-                  left: "50%",
-                  transform: "translateX(-50%) scaleX(0)",
-                  width: "30%",
-                  height: 1.5,
-                  backgroundColor: s.color,
-                  transition: "transform 0.3s ease",
-                },
-              }}
-              className="label-text"
-            >
-              {s.label}
-            </Typography>
-
-            {/* Decorative dots */}
-            <Box
-              sx={{
-                position: "absolute",
-                bottom: 6,
-                right: 6,
-                width: 3,
-                height: 3,
-                borderRadius: "50%",
-                backgroundColor: alpha(s.color, 0.3),
-              }}
-            />
-            <Box
-              sx={{
-                position: "absolute",
-                bottom: 11,
-                right: 11,
-                width: 2,
-                height: 2,
-                borderRadius: "50%",
-                backgroundColor: alpha(s.color, 0.2),
-              }}
-            />
-          </Box>
-        </Grid>
-      ))}
-    </Grid>
+      <Box
+        sx={{
+          position: "relative",
+          display: "grid",
+          gap: { xs: 1.25, md: 2 },
+          gridTemplateColumns: {
+            xs: "repeat(2, 1fr)",
+            sm: "repeat(3, 1fr)",
+            md: "repeat(5, 1fr)",
+          },
+        }}
+      >
+        {stats.map((stat, i) => (
+          <StatTile
+            key={stat.key}
+            stat={stat}
+            target={targets[i]}
+            start={visible}
+            index={i}
+          />
+        ))}
+      </Box>
+    </Box>
   );
 };
 
