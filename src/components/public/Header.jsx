@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import {
   Box,
   Button,
@@ -12,7 +12,6 @@ import {
   Fade,
   useMediaQuery,
   useTheme,
-  Badge,
   Popover,
   Tooltip,
 } from "@mui/material";
@@ -45,8 +44,6 @@ import PaymentIcon from "@mui/icons-material/Payment";
 import RuleFolderIcon from "@mui/icons-material/RuleFolder";
 import FeedbackIcon from "@mui/icons-material/Feedback";
 import PublicIcon from "@mui/icons-material/Public";
-import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
-import NotificationService from "../../api/services/internal/notification/NotificationService";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // ── Government logo
@@ -328,207 +325,6 @@ const HoverMenu = ({ item, onItemClick, navBtnSx, activeBtnSx }) => {
   );
 };
 
-// ── Public notifications bell (notificationType 0) ─────────────────────────
-// Red badge = number of public notifications. The popup uses the same card as
-// the Proposal menu.
-const NOTICE_PREVIEW = 100;
-
-// "5 min ago", "3 hours ago", "2 days ago", then the date
-const timeAgo = (value) => {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`;
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const PublicNotificationBell = ({ buttonSx }) => {
-  const [notices, setNotices] = useState([]);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
-
-  useEffect(() => {
-    (async () => {
-      const res = await NotificationService.getPublicNotifications();
-      if (res && !(res instanceof Error) && !res.isAxiosError) {
-        setNotices(Array.isArray(res.data) ? res.data : []);
-      }
-    })();
-  }, []);
-
-  const handleClose = () => {
-    setAnchorEl(null);
-    setExpandedId(null);
-  };
-
-  // the card is right-aligned to the bell, so its arrow sits half a button in from the right
-  const arrowRight = anchorEl ? Math.round(anchorEl.offsetWidth / 2) : 18;
-
-  return (
-    <>
-      <Tooltip title="Notifications">
-        <IconButton
-          onClick={(e) => setAnchorEl(e.currentTarget)}
-          aria-label="Notifications"
-          sx={buttonSx}
-        >
-          <Badge
-            badgeContent={notices.length}
-            max={99}
-            sx={{
-              "& .MuiBadge-badge": {
-                bgcolor: "#e53935",
-                color: W,
-                fontWeight: 700,
-                fontSize: "0.65rem",
-                minWidth: 17,
-                height: 17,
-              },
-            }}
-          >
-            <NotificationsActiveIcon sx={{ fontSize: 20 }} />
-          </Badge>
-        </IconButton>
-      </Tooltip>
-
-      {/* same card as the Proposal menu: teal top border + arrow, list rows with left accent */}
-      <Popover
-        open={Boolean(anchorEl)}
-        anchorEl={anchorEl}
-        onClose={handleClose}
-        slots={{ transition: Fade }}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        disableScrollLock
-        slotProps={{
-          paper: {
-            elevation: 0,
-            sx: {
-              mt: "11px", // room for the arrow
-              width: 360,
-              maxWidth: "calc(100vw - 32px)",
-              borderRadius: "0 0 10px 10px",
-              borderTop: `3px solid ${TEAL}`,
-              boxShadow: "0 10px 36px rgba(0,0,0,0.22)",
-              overflow: "visible", // let the arrow show above the card
-              // arrow pointing up to the bell
-              "&::before": {
-                content: '""',
-                position: "absolute",
-                top: -13,
-                right: arrowRight,
-                transform: "translateX(50%)",
-                borderLeft: "10px solid transparent",
-                borderRight: "10px solid transparent",
-                borderBottom: `10px solid ${TEAL}`,
-              },
-            },
-          },
-        }}
-      >
-        <Box
-          sx={{
-            maxHeight: 380,
-            overflowY: "auto",
-            borderRadius: "0 0 10px 10px",
-          }}
-        >
-          {notices.length === 0 && (
-            <Typography
-              sx={{ py: 1.5, px: 2.2, fontSize: "0.82rem", color: "text.secondary" }}
-            >
-              No notifications
-            </Typography>
-          )}
-          {notices.flatMap((n, i) => {
-            const text = n.textMessage || "";
-            const long = text.length > NOTICE_PREVIEW;
-            const isOpen = expandedId === n.id;
-            return [
-              <Box
-                key={n.id}
-                sx={{
-                  display: "flex",
-                  gap: 1.3,
-                  py: 1.1,
-                  px: 2.2,
-                  color: "#1a2740",
-                  transition: "all 0.15s",
-                  borderLeft: "3px solid transparent",
-                  "&:hover": {
-                    bgcolor: PL,
-                    borderLeftColor: P,
-                    pl: 2.6,
-                    "& .notice-title": { color: P },
-                  },
-                }}
-              >
-                <Box sx={{ color: P, display: "flex", pt: "2px" }}>
-                  <NotificationsActiveIcon sx={{ fontSize: 16 }} />
-                </Box>
-                <Box sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography
-                    className="notice-title"
-                    sx={{ fontSize: "0.82rem", fontWeight: 600, transition: "color 0.15s" }}
-                  >
-                    {n.title}
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: "0.78rem",
-                      color: "text.secondary",
-                      whiteSpace: "pre-line",
-                      mt: 0.25,
-                    }}
-                  >
-                    {long && !isOpen ? `${text.slice(0, NOTICE_PREVIEW)}…` : text}
-                  </Typography>
-                  {/* bulk (long) message: View more / View less */}
-                  {long && (
-                    <Box
-                      component="button"
-                      type="button"
-                      onClick={() => setExpandedId(isOpen ? null : n.id)}
-                      sx={{
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        cursor: "pointer",
-                        color: P,
-                        fontWeight: 600,
-                        fontSize: "0.74rem",
-                        "&:hover": { textDecoration: "underline" },
-                      }}
-                    >
-                      {isOpen ? "View less" : "View more"}
-                    </Box>
-                  )}
-                  <Typography sx={{ fontSize: "0.7rem", color: "text.disabled", mt: 0.25 }}>
-                    {timeAgo(n.updatedAt || n.createdAt)}
-                  </Typography>
-                </Box>
-              </Box>,
-              i < notices.length - 1 && (
-                <Divider key={`${n.id}-d`} sx={{ mx: 2, my: 0, borderColor: "#eef2f9" }} />
-              ),
-            ];
-          })}
-        </Box>
-      </Popover>
-    </>
-  );
-};
-
 // ═══════════════════════════════════════════════════════════════════════════
 const Header = () => {
   const navigate = useNavigate();
@@ -790,15 +586,6 @@ const Header = () => {
           {/* Right: login on desktop · hamburger on mobile */}
           {isMd ? (
             <Stack direction="row" alignItems="center" spacing={1}>
-            <PublicNotificationBell
-              buttonSx={{
-                color: W,
-                border: `1px solid ${alpha(W, 0.4)}`,
-                borderRadius: 1.5,
-                p: 0.7,
-                "&:hover": { bgcolor: alpha(W, 0.12), borderColor: W },
-              }}
-            />
             <IconButton
               onClick={() => setMobileOpen(true)}
               sx={{
@@ -922,15 +709,6 @@ const Header = () => {
                 </Button>
               );
             })}
-            {/* public notifications, next to Forms */}
-            <Box sx={{ display: "flex", alignItems: "center", px: 0.5 }}>
-              <PublicNotificationBell
-                buttonSx={{
-                  color: alpha(W, 0.9),
-                  "&:hover": { color: W, bgcolor: alpha(W, 0.1) },
-                }}
-              />
-            </Box>
           </Stack>
         </Box>
       )}

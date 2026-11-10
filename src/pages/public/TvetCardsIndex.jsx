@@ -4,7 +4,7 @@ import { Box, Typography, alpha, keyframes } from "@mui/material";
 import BusinessIcon from "@mui/icons-material/Business";
 import SchoolIcon from "@mui/icons-material/School";
 import GroupsIcon from "@mui/icons-material/Groups";
-import PublicIcon from "@mui/icons-material/Public";
+import PlaceIcon from "@mui/icons-material/Place";
 import CoPresentIcon from "@mui/icons-material/CoPresent";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
 
@@ -15,7 +15,7 @@ const BLUE = "#1565c0";
 const W = "#ffffff";
 
 const rise = keyframes`
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 `;
 
@@ -48,7 +48,7 @@ const stats = [
   {
     key: "dzongkhagsReached",
     label: "Dzongkhags Reached",
-    icon: PublicIcon,
+    icon: PlaceIcon,
     accent: "#ffb74d",
   },
 ];
@@ -88,72 +88,53 @@ const StatTile = ({ stat, target, start, index }) => {
   return (
     <Box
       sx={{
-        position: "relative",
-        height: "100%",
-        p: { xs: 2, md: 2.5 },
-        borderRadius: 3,
-        bgcolor: alpha(W, 0.06),
-        border: `1px solid ${alpha(W, 0.1)}`,
-        backdropFilter: "blur(6px)",
-        overflow: "hidden",
-        transition: "transform .3s ease, background-color .3s ease, border-color .3s ease",
-        animation: `${rise} .5s ease-out ${index * 0.08}s both`,
-        "&::after": {
-          content: '""',
-          position: "absolute",
-          left: 0,
-          bottom: 0,
-          height: 3,
-          width: "100%",
-          background: `linear-gradient(90deg, ${stat.accent}, ${alpha(stat.accent, 0)})`,
-          opacity: 0.7,
-        },
-        "&:hover": {
-          transform: "translateY(-4px)",
-          bgcolor: alpha(W, 0.1),
-          borderColor: alpha(stat.accent, 0.5),
-        },
+        display: "flex",
+        alignItems: "center",
+        gap: 1.25,
+        px: { xs: 1.5, md: 2 },
+        py: { xs: 1.25, md: 0.5 },
+        minWidth: 0,
+        animation: `${rise} .45s ease-out ${index * 0.06}s both`,
         "@media (prefers-reduced-motion: reduce)": { animation: "none" },
       }}
     >
       <Box
         sx={{
-          width: 44,
-          height: 44,
-          borderRadius: 2.5,
+          width: 36,
+          height: 36,
+          flexShrink: 0,
+          borderRadius: "50%",
           display: "grid",
           placeItems: "center",
           color: stat.accent,
-          bgcolor: alpha(stat.accent, 0.14),
-          boxShadow: `inset 0 0 0 1px ${alpha(stat.accent, 0.3)}`,
-          mb: 2,
+          bgcolor: alpha(stat.accent, 0.15),
         }}
       >
-        <Icon sx={{ fontSize: 22 }} />
+        <Icon sx={{ fontSize: 19 }} />
       </Box>
-      <Typography
-        sx={{
-          color: W,
-          fontWeight: 800,
-          fontSize: { xs: "1.6rem", md: "2.1rem" },
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {target === null ? "—" : value.toLocaleString()}
-      </Typography>
-      <Typography
-        sx={{
-          mt: 0.9,
-          color: alpha(W, 0.78),
-          fontWeight: 600,
-          fontSize: { xs: "0.78rem", md: "0.85rem" },
-          letterSpacing: 0.2,
-        }}
-      >
-        {stat.label}
-      </Typography>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography
+          sx={{
+            color: W,
+            fontWeight: 800,
+            fontSize: { xs: "1.2rem", md: "1.4rem" },
+            lineHeight: 1.1,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {target === null ? "—" : value.toLocaleString()}
+        </Typography>
+        <Typography
+          noWrap
+          sx={{
+            color: alpha(W, 0.75),
+            fontWeight: 500,
+            fontSize: { xs: "0.72rem", md: "0.78rem" },
+          }}
+        >
+          {stat.label}
+        </Typography>
+      </Box>
     </Box>
   );
 };
@@ -217,51 +198,42 @@ const TvetCardsIndex = () => {
     return () => observer.disconnect();
   }, []);
 
+  const divider = `1px solid ${alpha(W, 0.12)}`;
+
   return (
     <Box
       ref={ref}
       sx={{
         position: "relative",
         overflow: "hidden",
-        borderRadius: 4,
-        p: { xs: 1.5, md: 2.5 },
-        background: `linear-gradient(125deg, ${NAVY_DEEP} 0%, ${NAVY} 50%, ${BLUE} 100%)`,
-        boxShadow: `0 20px 44px ${alpha(NAVY, 0.25)}`,
+        borderRadius: 3,
+        py: { xs: 0.5, md: 1.75 },
+        px: { xs: 0.5, md: 1 },
+        background: `linear-gradient(110deg, ${NAVY_DEEP} 0%, ${NAVY} 55%, ${BLUE} 100%)`,
+        boxShadow: `0 10px 26px ${alpha(NAVY, 0.18)}`,
       }}
     >
-      {/* Soft glows and a faint grid for depth */}
       <Box
         aria-hidden
         sx={{
           position: "absolute",
           inset: 0,
           pointerEvents: "none",
-          background: `radial-gradient(420px 220px at 12% 0%, ${alpha("#4dd0e1", 0.18)}, transparent 70%), radial-gradient(380px 240px at 95% 100%, ${alpha("#ffb74d", 0.14)}, transparent 70%)`,
+          background: `radial-gradient(360px 160px at 90% 0%, ${alpha("#4dd0e1", 0.14)}, transparent 70%)`,
         }}
       />
-      <Box
-        aria-hidden
-        sx={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          opacity: 0.35,
-          backgroundImage: `linear-gradient(${alpha(W, 0.05)} 1px, transparent 1px), linear-gradient(90deg, ${alpha(W, 0.05)} 1px, transparent 1px)`,
-          backgroundSize: "28px 28px",
-          maskImage: "linear-gradient(180deg, #000 0%, transparent 85%)",
-        }}
-      />
-
       <Box
         sx={{
           position: "relative",
           display: "grid",
-          gap: { xs: 1.25, md: 2 },
           gridTemplateColumns: {
             xs: "repeat(2, 1fr)",
             sm: "repeat(3, 1fr)",
             md: "repeat(5, 1fr)",
           },
+          // thin dividers between items on desktop
+          "& > *": { borderLeft: { md: divider } },
+          "& > *:first-of-type": { borderLeft: { md: "none" } },
         }}
       >
         {stats.map((stat, i) => (
