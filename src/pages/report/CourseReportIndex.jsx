@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Paper,
   Typography,
@@ -27,6 +27,15 @@ import { useSelector } from "react-redux";
 import ReportService from "../../api/services/internal/report/ReportService";
 import CommonService from "../../api/services/internal/common/CommonService";
 
+// Institute type (tbl_institute_registration_dtls.institute_type_id)
+const INSTITUTE_TYPES = [
+  { id: 96, name: "DWPS Institute" },
+  { id: 97, name: "Non DWPS Institute" },
+];
+
+// Registration services listed in the Institute dropdown
+const INSTITUTE_SERVICE_IDS = [7, 4];
+
 const CourseReportIndex = () => {
   const [filters, setFilters] = useState({
     reportType: "",
@@ -34,7 +43,6 @@ const CourseReportIndex = () => {
     institute: "",
     filterYearBy: "",
     year: "",
-    financialYear: "",
     startDate: "",
     endDate: "",
     search: "",
@@ -44,14 +52,12 @@ const CourseReportIndex = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [courseTypes, setCourseTypes] = useState([]);
-  const [institutesTypes, setInstitutesTypes] = useState([]);
   const [institutes, setInstitutes] = useState([]);
   const [allCourses, setAllCourses] = useState([]);
   const [filteredCourses, setFilteredCourses] = useState([]);
 
   useEffect(() => {
     fetchCourseTypes();
-    fetchInstituteTypes();
     fetchInstitutes();
     fetchCourseData();
   }, []);
@@ -66,7 +72,6 @@ const CourseReportIndex = () => {
     filters.search,
     filters.filterYearBy,
     filters.year,
-    filters.financialYear,
     filters.startDate,
     filters.endDate,
     allCourses,
@@ -80,16 +85,6 @@ const CourseReportIndex = () => {
       console.log("Course Types:", response.data);
     } catch (error) {
       console.error("Error fetching course types:", error);
-    }
-  };
-
-  const fetchInstituteTypes = async () => {
-    try {
-      const response = await CommonService.getByParentId(23);
-      setInstitutesTypes(response.data);
-      console.log("Institute Types:", response.data);
-    } catch (error) {
-      console.error("Error fetching institute types:", error);
     }
   };
 
@@ -107,7 +102,6 @@ const CourseReportIndex = () => {
     try {
       const response = await ReportService.getcourseData(access_token);
       setAllCourses(response.data);
-      console.log("All Courses Data:", response.data);
     } catch (error) {
       console.error("Error fetching course data:", error);
     }
@@ -124,7 +118,7 @@ const CourseReportIndex = () => {
       );
       if (selectedReportType) {
         result = result.filter(
-          (course) => course.service_id === selectedReportType.id,
+          (course) => Number(course.service_id) === Number(selectedReportType.id),
         );
       }
     } else {
@@ -138,7 +132,7 @@ const CourseReportIndex = () => {
       const instituteTypeId = parseInt(filters.instituteType);
       // Get all institute IDs that match the institute type
       const instituteIds = institutes
-        .filter((inst) => inst.institute_type_id === instituteTypeId)
+        .filter((inst) => Number(inst.institute_type_id) === instituteTypeId)
         .map((inst) => inst.institute_id);
 
       result = result.filter((course) =>
@@ -162,7 +156,9 @@ const CourseReportIndex = () => {
     // Filter by Search (Course Name)
     if (filters.search) {
       result = result.filter((course) =>
-        course.course_name.toLowerCase().includes(filters.search.toLowerCase()),
+        String(course.course_name || "")
+          .toLowerCase()
+          .includes(filters.search.toLowerCase()),
       );
     }
 
@@ -174,20 +170,12 @@ const CourseReportIndex = () => {
 
         const courseDate = new Date(courseStartDate);
         const courseYear = courseDate.getFullYear();
-        const courseFinancialYear = `${courseYear}-${courseYear + 1}`;
 
         switch (filters.filterYearBy) {
           case "Date":
             if (filters.startDate && courseStartDate < filters.startDate)
               return false;
             if (filters.endDate && courseStartDate > filters.endDate)
-              return false;
-            return true;
-          case "Financial Year":
-            if (
-              filters.financialYear &&
-              courseFinancialYear !== filters.financialYear
-            )
               return false;
             return true;
           case "Year":
@@ -205,8 +193,9 @@ const CourseReportIndex = () => {
       id: course.course_id,
       name: course.course_name,
       course_name: course.course_name,
-      type: filters.reportType || getReportTypeName(course.service_id),
-      report_type: filters.reportType || getReportTypeName(course.service_id),
+      // programme type name from tbl_service_master (joined in the backend)
+      type: course.service_name || getReportTypeName(course.service_id),
+      report_type: course.service_name || getReportTypeName(course.service_id),
       service_id: course.service_id,
       institute_id: course.institute_id,
       institute: getInstituteName(course.institute_id),
@@ -229,6 +218,7 @@ const CourseReportIndex = () => {
       course_fee: course.course_fee,
       application_start_date: course.application_start_date,
       application_end_date: course.application_end_date,
+      raw: course, // full tbl_programme_announcement_dtls row (for the Excel export)
     }));
 
     setFilteredCourses(formattedReports);
@@ -252,8 +242,8 @@ const CourseReportIndex = () => {
       (inst) => inst.institute_id === parseInt(instituteId),
     );
     if (institute && institute.institute_type_id) {
-      const instituteType = institutesTypes.find(
-        (type) => type.id === institute.institute_type_id,
+      const instituteType = INSTITUTE_TYPES.find(
+        (type) => type.id === Number(institute.institute_type_id),
       );
       return instituteType ? instituteType.name : "N/A";
     }
@@ -302,14 +292,10 @@ const CourseReportIndex = () => {
     name: type.service_name,
   }));
 
-  const instituteTypesList = institutesTypes.map((type) => ({
-    id: type.id,
-    name: type.name,
-  }));
+  const instituteTypesList = INSTITUTE_TYPES;
 
   const filterYearByOptions = [
     { id: 1, name: "Date" },
-    { id: 2, name: "Financial Year" },
     { id: 3, name: "Year" },
   ];
 
@@ -318,40 +304,72 @@ const CourseReportIndex = () => {
     (_, i) => new Date().getFullYear() - i,
   );
 
-  const currentYear = new Date().getFullYear();
-  const financialYears = Array.from({ length: 7 }, (_, i) => {
-    const startYear = currentYear - 3 + i;
-    return `${startYear}-${startYear + 1}`;
-  });
 
   // Filter institutes based on selected institute type for dropdown
-  const institutesForDropdown = filters.instituteType
-    ? institutes.filter(
-        (inst) => inst.institute_type_id === parseInt(filters.instituteType),
-      )
-    : institutes;
+  // Institute dropdown: only institute registrations (service 7 and 4)
+  const institutesForDropdown = institutes.filter(
+    (inst) =>
+      INSTITUTE_SERVICE_IDS.includes(Number(inst.service_id)) &&
+      (!filters.instituteType ||
+        Number(inst.institute_type_id) === parseInt(filters.instituteType)),
+  );
 
   const today = new Date().toISOString().split("T")[0];
 
+  // Excel: every column of tbl_programme_announcement_dtls, with readable
+  // names next to the id columns, plus the report's own columns.
   const handleExcelExport = () => {
-    const data = filteredCourses.map((item, index) => ({
-      SlNo: index + 1,
-      CourseName: item.course_name,
-      ReportType: item.type,
-      InstituteType: item.institute_type,
-      Institute: item.institute,
-      Status: item.status,
-      CourseStartDate: item.courseStartDate
-        ? new Date(item.courseStartDate).toLocaleDateString()
-        : "N/A",
-      CourseEndDate: item.courseEndDate
-        ? new Date(item.courseEndDate).toLocaleDateString()
-        : "N/A",
-      Duration: item.duration,
-      ApplicationNo: item.application_no,
-      TotalTrainees: item.total_no_trainees,
-      CourseFee: item.course_fee,
-    }));
+    const DATE_COLUMNS = new Set([
+      "application_start_date",
+      "application_end_date",
+      "course_start_date",
+      "course_end_date",
+      "ca_start_date",
+      "ca_end_date",
+      "created_at",
+      "updated_at",
+    ]);
+    // shown in the leading columns instead
+    const SKIP_COLUMNS = new Set(["course_name", "service_name"]);
+
+    const header = (key) =>
+      key
+        .split("_")
+        .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+        .join(" ");
+
+    const fmt = (key, value) => {
+      if (value === null || value === undefined) return "";
+      if (DATE_COLUMNS.has(key)) {
+        if (Array.isArray(value)) {
+          const [y, m, d] = value;
+          return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        }
+        const str = String(value);
+        return /^\d{4}-\d{2}-\d{2}/.test(str) ? str.slice(0, 10) : str;
+      }
+      return typeof value === "object" ? JSON.stringify(value) : value;
+    };
+
+    const data = filteredCourses.map((item, index) => {
+      const row = {
+        "Sl No": index + 1,
+        "Course Name": item.course_name || "",
+        "Programme Type": item.type,
+        "Institute Type": item.institute_type,
+        Institute: item.institute,
+        Status: item.status,
+        Duration: item.duration,
+      };
+      Object.entries(item.raw || {}).forEach(([key, value]) => {
+        if (SKIP_COLUMNS.has(key)) return;
+        // no id columns (id, *_id, created_by / updated_by user ids)
+        if (key === "id" || key.endsWith("_id") || key === "created_by" || key === "updated_by")
+          return;
+        row[header(key)] = fmt(key, value);
+      });
+      return row;
+    });
 
     exportToExcel(data, `Course_Reports_${today}`);
   };
@@ -365,8 +383,7 @@ const CourseReportIndex = () => {
       ...(name === "instituteType" && { institute: "" }),
       ...(name === "filterYearBy" && {
         year: "",
-        financialYear: "",
-        startDate: "",
+            startDate: "",
         endDate: "",
       }),
     }));
@@ -380,8 +397,7 @@ const CourseReportIndex = () => {
       institute: "",
       filterYearBy: "",
       year: "",
-      financialYear: "",
-      startDate: "",
+        startDate: "",
       endDate: "",
       search: "",
     });
@@ -417,7 +433,7 @@ const CourseReportIndex = () => {
                 value={filters.startDate}
                 onChange={handleFilterChange}
                 size="small"
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
             </Grid>
             <Grid item size={{ xs: 12, md: 3 }}>
@@ -429,31 +445,10 @@ const CourseReportIndex = () => {
                 value={filters.endDate}
                 onChange={handleFilterChange}
                 size="small"
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
             </Grid>
           </>
-        );
-      case "Financial Year":
-        return (
-          <Grid item size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Financial Year</InputLabel>
-              <Select
-                name="financialYear"
-                value={filters.financialYear}
-                onChange={handleFilterChange}
-                label="Financial Year"
-              >
-                <MenuItem value="">Select Financial Year</MenuItem>
-                {financialYears.map((fy) => (
-                  <MenuItem key={fy} value={fy}>
-                    {fy}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
         );
       case "Year":
         return (
@@ -484,7 +479,7 @@ const CourseReportIndex = () => {
   return (
     <Paper sx={{ p: 2, mt: 1 }}>
       <Typography variant="h6" mb={3}>
-        Course Reports
+        Programme Announcement Reports
       </Typography>
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -606,12 +601,14 @@ const CourseReportIndex = () => {
             value={filters.search}
             onChange={handleFilterChange}
             disabled={!filters.reportType}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
         </Grid>

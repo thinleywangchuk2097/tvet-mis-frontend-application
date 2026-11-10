@@ -1,22 +1,29 @@
 import PropTypes from "prop-types";
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  Grid,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Chip, Grid, Paper, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import PaymentIcon from "@mui/icons-material/Payment";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ScheduleIcon from "@mui/icons-material/Schedule";
 
+// small grey label over a bold value (same style as the Programme Information card)
 const PaymentField = ({ label, value, color }) => (
-  <Grid item size={{ xs: 12, md: 3 }}>
-    <Typography variant="body2" color="textSecondary">
-      {label}:
+  <Grid item size={{ xs: 6, sm: 4, md: 2 }}>
+    <Typography
+      sx={{
+        fontSize: "0.7rem",
+        fontWeight: 600,
+        letterSpacing: 0.4,
+        textTransform: "uppercase",
+        color: "text.secondary",
+      }}
+    >
+      {label}
     </Typography>
-    <Typography variant="body1" fontWeight="bold" color={color}>
+    <Typography
+      sx={{ fontSize: "0.92rem", fontWeight: 600, mt: 0.25, wordBreak: "break-word" }}
+      color={color || "text.primary"}
+    >
       {value}
     </Typography>
   </Grid>
@@ -37,27 +44,60 @@ const PaymentStatusCard = ({
   if (!paymentStatus) return null;
 
   const paid = isPaymentCompleted();
+  const statusLabel = paymentStatus.paymentStatus
+    ? paymentStatus.paymentStatus.charAt(0).toUpperCase() +
+      paymentStatus.paymentStatus.slice(1)
+    : "Pending";
+  const amount =
+    paymentStatus.totalPayableAmount !== null &&
+    paymentStatus.totalPayableAmount !== undefined &&
+    paymentStatus.totalPayableAmount !== ""
+      ? `Nu. ${Number(paymentStatus.totalPayableAmount).toLocaleString("en-US")}`
+      : null;
 
   return (
-    <Card sx={{ mb: 3, bgcolor: paid ? "#e8f5e9" : "#fff3e0" }}>
-      <CardContent>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <Typography variant="h6" gutterBottom>
-            Payment Status
-          </Typography>
-          <Chip
-            label={paymentStatus.paymentStatus || "Pending"}
-            color={paid ? "success" : "warning"}
-            size="small"
-          />
-        </Box>
-        <Divider sx={{ mb: 2 }} />
+    <Paper
+      variant="outlined"
+      sx={{
+        mb: 3,
+        borderRadius: 2,
+        overflow: "hidden",
+        borderLeft: "4px solid",
+        borderLeftColor: paid ? "success.main" : "warning.main",
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1.25,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          flexWrap: "wrap",
+          bgcolor: (t) =>
+            alpha(paid ? t.palette.success.main : t.palette.warning.main, 0.07),
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <ReceiptLongOutlinedIcon
+          fontSize="small"
+          color={paid ? "success" : "warning"}
+        />
+        <Typography sx={{ fontWeight: 700, fontSize: "1rem" }}>
+          Payment Status
+        </Typography>
+        <Chip
+          icon={paid ? <CheckCircleIcon /> : <ScheduleIcon />}
+          label={statusLabel}
+          color={paid ? "success" : "warning"}
+          size="small"
+          sx={{ ml: "auto", height: 24, fontWeight: 600 }}
+        />
+      </Box>
+
+      <Box sx={{ p: 2 }}>
         <Grid container spacing={2}>
           {paymentStatus.paymentAdviceNo && (
             <PaymentField
@@ -68,12 +108,8 @@ const PaymentStatusCard = ({
           {paymentStatus.refNo && (
             <PaymentField label="Reference No" value={paymentStatus.refNo} />
           )}
-          {paymentStatus.totalPayableAmount && (
-            <PaymentField
-              label="Amount"
-              value={`Nu. ${paymentStatus.totalPayableAmount}`}
-              color="primary"
-            />
+          {amount && (
+            <PaymentField label="Amount" value={amount} color="primary.main" />
           )}
           {paymentStatus.paymentDueDate && (
             <PaymentField
@@ -91,21 +127,38 @@ const PaymentStatusCard = ({
             <PaymentField label="Platform" value={paymentStatus.platform} />
           )}
         </Grid>
+
         {paymentStatus.redirectUrl && !paid && (
-          <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
+          <Box
+            sx={{
+              mt: 2,
+              pt: 1.5,
+              borderTop: "1px dashed",
+              borderColor: "divider",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
+          >
+            <Typography sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
+              Payment is pending. Complete it to continue with the assessment.
+            </Typography>
             <Button
               variant="contained"
               color="primary"
               size="small"
               startIcon={<PaymentIcon />}
               onClick={() => onRedirectToPayment(paymentStatus.redirectUrl)}
+              sx={{ textTransform: "none", fontWeight: 600 }}
             >
               Proceed to Payment
             </Button>
           </Box>
         )}
-      </CardContent>
-    </Card>
+      </Box>
+    </Paper>
   );
 };
 

@@ -68,6 +68,20 @@ class ApplyAccreditedCourseService {
       .catch((error) => error);
   }
 
+  getAccreditedApprovedCertificateCourseByUserId(user_id, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/accredited-course/get-accredited-approved-certificate-course-details/${user_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getAccreditedCourseByInstituteId(institute_id, token) {
     return apiClient
       .get(

@@ -1972,348 +1972,183 @@ const ViewInstituteSesCentreAssessmentCentre = () => {
           </Grid>
         )}
 
-        {/* Generate PA Number Tab - Now for role 7 (before Assign REC) */}
-        {currentRoleId == 7 && tabValue === paNumberIndex && (
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 12 }}>
-              <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                  <AccountBalanceIcon
-                    sx={{ mr: 1, color: "primary.main", fontSize: 20 }}
-                  />
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    Generate PA Number
-                  </Typography>
-                </Box>
+        {/* Generate PA Number Tab - role 7 (before Assign REC); same design as the accredited course page */}
+        {currentRoleId == 7 && tabValue === paNumberIndex && (() => {
+          const paid =
+            String(paymentStatus?.paymentStatus || "").toLowerCase() === "paid";
+          const tone = paymentStatus ? (paid ? "success" : "warning") : "primary";
+          const amount =
+            paymentStatus?.totalPayableAmount !== null &&
+            paymentStatus?.totalPayableAmount !== undefined &&
+            paymentStatus?.totalPayableAmount !== ""
+              ? `Nu. ${Number(paymentStatus.totalPayableAmount).toLocaleString("en-US")}`
+              : "Nu. 0.00";
+          const statusLabel = paymentStatus?.paymentStatus
+            ? paymentStatus.paymentStatus.charAt(0).toUpperCase() +
+              paymentStatus.paymentStatus.slice(1)
+            : "Pending";
+          const fields = paymentStatus
+            ? [
+                { label: "Payment Advice No", value: paymentStatus.paymentAdviceNo },
+                { label: "Reference No", value: paymentStatus.refNo },
+                { label: "Tax Payer", value: paymentStatus.taxPayerName },
+                { label: "Amount", value: amount, color: "primary.main" },
+                { label: "Due Date", value: paymentStatus.paymentDueDate },
+                { label: "Platform", value: paymentStatus.platform },
+                {
+                  label: "Payment Mode",
+                  value: paymentStatus.paymentMode || "Not yet paid",
+                },
+              ]
+            : [];
+          return (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid size={{ xs: 12 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    borderLeft: "4px solid",
+                    borderLeftColor: `${tone}.main`,
+                  }}
+                >
+                  {/* Header */}
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1.25,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      flexWrap: "wrap",
+                      bgcolor: (t) => alpha(t.palette[tone].main, 0.07),
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <AccountBalanceIcon fontSize="small" color={tone} />
+                    <Typography sx={{ fontWeight: 700, fontSize: "1rem" }}>
+                      Generate PA Number
+                    </Typography>
+                    {paymentStatus && (
+                      <Chip
+                        icon={paid ? <CheckCircleIcon /> : undefined}
+                        label={statusLabel}
+                        color={tone}
+                        size="small"
+                        sx={{ ml: "auto", height: 24, fontWeight: 600 }}
+                      />
+                    )}
+                  </Box>
 
-                {paymentStatus ? (
-                  <Card variant="outlined" sx={{ p: 0 }}>
-                    <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                      {/* Compact Table-like Layout */}
-                      <Grid container spacing={0.5}>
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 100 }}
-                            >
-                              Payment Advice No:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.paymentAdviceNo || "N/A"}
-                            </Typography>
-                          </Box>
+                  <Box sx={{ p: 2 }}>
+                    {paymentStatus ? (
+                      <>
+                        {/* label over value, like the Payment Status card */}
+                        <Grid container spacing={2}>
+                          {fields.map((f) => (
+                            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={f.label}>
+                              <Typography
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  letterSpacing: 0.4,
+                                  textTransform: "uppercase",
+                                  color: "text.secondary",
+                                }}
+                              >
+                                {f.label}
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontSize: "0.92rem",
+                                  fontWeight: 600,
+                                  mt: 0.25,
+                                  wordBreak: "break-word",
+                                }}
+                                color={f.color || "text.primary"}
+                              >
+                                {f.value || "N/A"}
+                              </Typography>
+                            </Grid>
+                          ))}
                         </Grid>
 
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        {paymentStatus.redirectUrl && !paid && (
                           <Box
                             sx={{
+                              mt: 2,
+                              pt: 1.5,
+                              borderTop: "1px dashed",
+                              borderColor: "divider",
                               display: "flex",
                               alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
+                              justifyContent: "space-between",
+                              gap: 1,
+                              flexWrap: "wrap",
                             }}
                           >
                             <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
+                              sx={{ fontSize: "0.8rem", color: "text.secondary" }}
                             >
-                              Ref No:
+                              PA number already generated. Proceed to complete
+                              the payment.
                             </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.refNo || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Tax Payer:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                              noWrap
-                            >
-                              {paymentStatus.taxPayerName || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 60 }}
-                            >
-                              Status:
-                            </Typography>
-                            <Chip
-                              label={paymentStatus.paymentStatus || "N/A"}
-                              color={
-                                paymentStatus.paymentStatus === "paid"
-                                  ? "success"
-                                  : "warning"
-                              }
-                              size="small"
-                              sx={{
-                                height: 20,
-                                fontSize: "0.65rem",
-                                "& .MuiChip-label": { px: 1 },
-                              }}
-                            />
-                          </Box>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Due Date:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.paymentDueDate || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 60 }}
-                            >
-                              Platform:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.platform || "N/A"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Amount:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={600}
+                            <Button
+                              variant="contained"
                               color="primary"
-                              sx={{ fontSize: "0.8rem" }}
+                              size="small"
+                              startIcon={<PaymentIcon />}
+                              onClick={() =>
+                                handleRedirectToPayment(paymentStatus.redirectUrl)
+                              }
+                              sx={{ textTransform: "none", fontWeight: 600 }}
                             >
-                              Nu. {paymentStatus.totalPayableAmount || "0.00"}
-                            </Typography>
+                              Proceed to Payment
+                            </Button>
                           </Box>
-                        </Grid>
-
-                        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                              py: 0.25,
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ minWidth: 70 }}
-                            >
-                              Payment Mode:
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              fontWeight={500}
-                              sx={{ fontSize: "0.75rem" }}
-                            >
-                              {paymentStatus.paymentMode || "Not yet paid"}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      </Grid>
-
-                      {paymentStatus.redirectUrl && (
-                        <Box
-                          sx={{
-                            mt: 1.5,
-                            display: "flex",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            size="small"
-                            startIcon={<PaymentIcon sx={{ fontSize: 18 }} />}
-                            onClick={() =>
-                              handleRedirectToPayment(paymentStatus.redirectUrl)
-                            }
-                            sx={{
-                              px: 2.5,
-                              py: 0.5,
-                              fontWeight: 600,
-                              textTransform: "none",
-                              fontSize: "0.75rem",
-                            }}
-                          >
-                            Proceed to Payment
-                          </Button>
-                        </Box>
-                      )}
-
-                      <Alert
-                        severity="info"
-                        sx={{
-                          mt: 1,
-                          py: 0.25,
-                          "& .MuiAlert-message": {
-                            fontSize: "0.7rem",
-                            py: 0.25,
-                          },
-                        }}
-                      >
-                        PA number already generated. Click above to proceed with
-                        payment.
-                      </Alert>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                      <Typography
-                        variant="body2"
-                        gutterBottom
-                        sx={{ fontSize: "0.8rem" }}
-                      >
-                        Click the button below to generate a PA number and
-                        proceed to payment.
-                      </Typography>
-
+                        )}
+                      </>
+                    ) : (
                       <Box
                         sx={{
-                          mt: 1.5,
                           display: "flex",
-                          justifyContent: "center",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 2,
+                          flexWrap: "wrap",
                         }}
                       >
+                        <Box sx={{ minWidth: 240, flex: 1 }}>
+                          <Typography sx={{ fontSize: "0.9rem", fontWeight: 600 }}>
+                            No PA number yet
+                          </Typography>
+                          <Typography
+                            sx={{ fontSize: "0.8rem", color: "text.secondary" }}
+                          >
+                            Generating a PA number creates the payment request
+                            and takes you to the payment portal.
+                          </Typography>
+                        </Box>
                         <Button
                           variant="contained"
                           color="primary"
                           size="small"
-                          startIcon={
-                            <SettingsSuggestIcon sx={{ fontSize: 18 }} />
-                          }
+                          startIcon={<SettingsSuggestIcon />}
                           onClick={handleGeneratePANumber}
-                          sx={{
-                            px: 3,
-                            py: 0.5,
-                            fontWeight: 600,
-                            textTransform: "none",
-                            fontSize: "0.75rem",
-                          }}
+                          sx={{ textTransform: "none", fontWeight: 600, px: 2.5 }}
                         >
                           Generate PA Number
                         </Button>
                       </Box>
-
-                      <Alert
-                        severity="info"
-                        sx={{
-                          mt: 1.5,
-                          py: 0.25,
-                          "& .MuiAlert-message": {
-                            fontSize: "0.7rem",
-                            py: 0.25,
-                          },
-                        }}
-                      >
-                        <strong>Note:</strong> This will create a payment
-                        request and redirect you to the payment portal.
-                      </Alert>
-                    </CardContent>
-                  </Card>
-                )}
-              </Paper>
+                    )}
+                  </Box>
+                </Paper>
+              </Grid>
             </Grid>
-          </Grid>
-        )}
+          );
+        })()}
 
         {/* Add Accreditors Tab - Only show if no "No" in quality standards */}
         {showAccreditorTab && !hasQualityNo && tabValue === accreditorIndex && (

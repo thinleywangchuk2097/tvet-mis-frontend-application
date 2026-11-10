@@ -187,7 +187,7 @@ const useCourseData = (registration_no, access_token) => {
     async (values, resetForm) => {
       setLoading(true);
       try {
-        const documents = await Promise.all(values.files.map(fileToBase64));
+        const documents = await Promise.all((values.files || []).map(fileToBase64));
 
         const selectedCourse = values.approvedCourses?.find(
           (course) => course.id === values.programmeId,
@@ -764,7 +764,8 @@ const NonAccreditedCourse = () => {
     fundingSourceId: Yup.string().required("Funding Source is required"),
     trainingLocationId: Yup.string().required("Training Location is required"),
     courseDescription: Yup.string().required("Course Description is required"),
-    files: Yup.array().min(1, "Please upload required documents"),
+    // documents are optional
+    files: Yup.array().max(5, "Maximum 5 files allowed"),
   });
 
   // Handle form submission
@@ -1061,7 +1062,7 @@ const NonAccreditedCourse = () => {
                       {!formik.touched.files &&
                         formik.values.files.length === 0 && (
                           <Typography variant="caption" color="textSecondary">
-                            Please upload required documents (PDF, DOC, etc.)
+                            Supporting documents are optional (PDF, DOC, etc.)
                           </Typography>
                         )}
                     </Grid>

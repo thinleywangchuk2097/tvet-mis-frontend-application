@@ -96,13 +96,35 @@ const fileToDocumentDto = async (file) => {
 
 // ==================== EXTRACTED HELPER FUNCTIONS ====================
 
-// Validate files against size limit
-const validateFiles = (files, maxSizeMB, maxFiles, currentCount) => {
+/**
+ * Does the file match the accept string ("image/*,.pdf,application/pdf", ...)?
+ * The input's accept attribute only filters the picker; drag & drop needs this check.
+ */
+const isAcceptedType = (file, acceptedFileTypes) => {
+  if (!acceptedFileTypes) return true;
+  const name = (file.name || "").toLowerCase();
+  const type = (file.type || "").toLowerCase();
+  return acceptedFileTypes
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean)
+    .some((rule) => {
+      if (rule.startsWith(".")) return name.endsWith(rule);
+      if (rule.endsWith("/*")) return type.startsWith(rule.slice(0, -1));
+      return type === rule;
+    });
+};
+
+// Validate files against type and size limit
+const validateFiles = (files, maxSizeMB, maxFiles, currentCount, acceptedFileTypes) => {
   const validFiles = [];
   const invalidFiles = [];
+  const wrongTypeFiles = [];
 
   files.forEach((file) => {
-    if (file.size / 1024 / 1024 <= maxSizeMB) {
+    if (!isAcceptedType(file, acceptedFileTypes)) {
+      wrongTypeFiles.push(file.name);
+    } else if (file.size / 1024 / 1024 <= maxSizeMB) {
       validFiles.push(file);
     } else {
       invalidFiles.push(file.name);
@@ -114,6 +136,7 @@ const validateFiles = (files, maxSizeMB, maxFiles, currentCount) => {
   return {
     validFiles,
     invalidFiles,
+    wrongTypeFiles,
     exceedsMaxFiles,
   };
 };
@@ -927,6 +950,8 @@ const FileUpload = ({
   maxSizeMB = MAX_FILE_SIZE_MB,
   maxFiles = MAX_FILES,
   acceptedFileTypes = "image/*,.pdf,.doc,.docx,.xls,.xlsx",
+  // e.g. "Only PDF files are allowed." — shown in the error for rejected file types
+  typesLabel = "",
   description = "Drag and drop files here",
   required = false,
   error = false,
@@ -1072,25 +1097,34 @@ const FileUpload = ({
   const handleFiles = (selectedFiles) => {
     if (!selectedFiles.length) return;
 
-    const { validFiles, invalidFiles, exceedsMaxFiles } = validateFiles(
-      selectedFiles,
-      maxSizeMB,
-      maxFiles,
-      files.length,
-    );
+    const { validFiles, invalidFiles, wrongTypeFiles, exceedsMaxFiles } =
+      validateFiles(
+        selectedFiles,
+        maxSizeMB,
+        maxFiles,
+        files.length,
+        acceptedFileTypes,
+      );
 
     if (exceedsMaxFiles) {
       setErrorMessage(`You can only upload up to ${maxFiles} files`);
       return;
     }
 
+    const messages = [];
+    if (wrongTypeFiles.length) {
+      messages.push(
+        typesLabel
+          ? `${typesLabel} Not accepted: ${wrongTypeFiles.join(", ")}`
+          : `File type not allowed: ${wrongTypeFiles.join(", ")}`,
+      );
+    }
     if (invalidFiles.length) {
-      setErrorMessage(
+      messages.push(
         `The following files exceed ${maxSizeMB}MB: ${invalidFiles.join(", ")}`,
       );
-    } else {
-      setErrorMessage("");
     }
+    setErrorMessage(messages.join(". "));
 
     if (validFiles.length) {
       onFilesChange([...files, ...validFiles]);
@@ -1222,6 +1256,7 @@ FileUpload.propTypes = {
   maxSizeMB: PropTypes.number,
   maxFiles: PropTypes.number,
   acceptedFileTypes: PropTypes.string,
+  typesLabel: PropTypes.string,
   description: PropTypes.string,
   required: PropTypes.bool,
   error: PropTypes.bool,

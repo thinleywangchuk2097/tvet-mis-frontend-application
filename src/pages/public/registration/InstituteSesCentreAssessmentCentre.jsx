@@ -436,11 +436,15 @@ const InstituteSesCentreAssessmentCentre = () => {
       if (citizen && (citizen.firstName || citizen.lastName)) {
         let genderValue = "";
 
-        // Match gender directly (response has "Male", "Female", etc.)
-        const genderOption = genderOptions.find(
-          (opt) =>
-            opt.label.toLowerCase() === (citizen.gender || "").toLowerCase(),
-        );
+        // Datahub sends "M" / "F": match by full name or by first letter
+        const g = String(citizen.gender || "").trim().toLowerCase();
+        const genderOption = g
+          ? genderOptions.find(
+              (opt) =>
+                opt.label.trim().toLowerCase() === g ||
+                opt.label.trim().toLowerCase().charAt(0) === g.charAt(0),
+            )
+          : null;
         genderValue = genderOption?.value || "";
 
         const fullName =

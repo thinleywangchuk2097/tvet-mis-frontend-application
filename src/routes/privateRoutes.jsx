@@ -27,7 +27,6 @@ import StaffManagement from "../pages/institute/resource-management/StaffManagem
 import AnnualBudget from "../pages/institute/resource-management/AnnualBudget";
 import AnnualExpenditure from "../pages/institute/resource-management/AnnualExpenditure";
 import MonitoringReport from "../pages/institute/resource-management/MonitoringReport";
-import Notification from "../pages/institute/resource-management/Notification";
 //track application
 import TrackApplicationStatusIndex from "../pages/track/TrackApplicationStatusIndex";
 
@@ -39,6 +38,8 @@ import ViewNonAccreditedCourseRegistration from "../pages/institute/registration
 import InstituteChange from "../pages/institute/registration/InstituteChange";
 import SelfAssessmentReport from "../pages/institute/registration/SelfAssessmentReport";
 import ViewSelfAssessmentReport from "../pages/institute/registration/ViewSelfAssessmentReport";
+//publications & forms (TVET QC)
+import ManageDocumentsIndex from "../pages/tvetqc/documents/ManageDocumentsIndex";
 
 //curriculum
 import CurriculumIndex from "../pages/curriculum/CurriculumIndex";
@@ -65,12 +66,14 @@ import ApplyTrainerToTProgram from "../pages/dwps/tot/ApplyTrainerToTProgram";
 import ViewApplyTrainerToTProgram from "../pages/dwps/tot/ViewApplyTrainerToTProgram";
 import GenerateToTCertificate from "../pages/dwps/tot/GenerateToTCertificate";
 
+//notification
+import NotificationIndex from "../pages/notification/NotificationIndex";
+
 //Certificate
-//import Assessment from "../pages/certificate/Assessment";
 import TraineeCertificateIndex from "../pages/certificate/TraineeCertificateIndex";
 import RegistrationCertificateIndex from "../pages/certificate/RegistrationCertificateIndex";
 import AccreditationBQFProgrammeIndex from "../pages/certificate/AccreditationBQFProgrammeIndex";
-
+import CertificatePrintingIndex from "../pages/certificate/CertificatePrintingIndex";
 //birms
 import BirmsAgencyPaymentIndex from "../pages/birms/private/BirmsAgencyPaymentIndex";
 import BirmsInstitutePaymentIndex from "../pages/birms/private/BirmsInstitutePaymentIndex";
@@ -84,6 +87,10 @@ import QualityStandardCheckListIndex from "../pages/master/QualityStandardCheckL
 import InstituteReportIndex from "../pages/report/InstituteReportIndex";
 import CourseReportIndex from "../pages/report/CourseReportIndex";
 import TraineeReportIndex from "../pages/report/TraineeReportIndex";
+import TrainerReportListIndex from "../pages/report/TrainerReportListIndex";
+import AssessmentReportIndex from "../pages/report/AssessmentReportIndex";
+import AssessorAccreditorAuditorReport from "../pages/report/AssessorAccreditorAuditorReport";
+import BQFRPLNonBQFProgrammesReport from "../pages/report/BQFRPLNonBQFProgrammesReport";
 
 //BQPCA routes
 import MonitoringAssessmentIndex from "../pages/bqpca/monitoring/MonitoringAssessmentIndex";
@@ -194,6 +201,8 @@ export const privateRoutes = [
       {
         path: "view-cmfg-monitoring-index/:applicationNo",
         element: <ViewCmfgMonitoringIndex />,
+      },
+      {
         path: "view-self-assessment-report/:applicationNo",
         element: <ViewSelfAssessmentReport />,
       },
@@ -305,6 +314,10 @@ export const privateRoutes = [
     ],
   },
   {
+    path: "tvetqc",
+    children: [{ path: "documents", element: <ManageDocumentsIndex /> }],
+  },
+  {
     path: "announcement",
     children: [
       { path: "accredited-course", element: <AccreditatedCourse /> },
@@ -332,7 +345,6 @@ export const privateRoutes = [
       { path: "annual-budget", element: <AnnualBudget /> },
       { path: "annual-expenditure", element: <AnnualExpenditure /> },
       { path: "monitoring-report", element: <MonitoringReport /> },
-      { path: "notification", element: <Notification /> },
     ],
   },
   {
@@ -352,6 +364,10 @@ export const privateRoutes = [
     children: [
       { path: "cmfg-monitoring-index", element: <CmfgMonitoringIndex /> },
     ],
+  },
+  {
+    path: "notification",
+    children: [{ path: "notification-index", element: <NotificationIndex /> }],
   },
   {
     path: "monitor-bqpca",
@@ -388,6 +404,10 @@ export const privateRoutes = [
       { path: "institute-report-index", element: <InstituteReportIndex /> },
       { path: "course-report-index", element: <CourseReportIndex /> },
       { path: "trainee-report-index", element: <TraineeReportIndex /> },
+      { path: "trainer-report-index", element: <TrainerReportListIndex /> },
+      { path: "assessment-report-index", element: <AssessmentReportIndex /> },
+       { path: "assessor-accreditor-auditor-report", element: <AssessorAccreditorAuditorReport /> },
+       { path: "bqf-rpl-nonbqf-programmes-report", element: <BQFRPLNonBQFProgrammesReport /> }
     ],
   },
   {
@@ -413,7 +433,6 @@ export const privateRoutes = [
   {
     path: "certificate",
     children: [
-      //   { path: "assessment", element: <Assessment /> },
       { path: "bqf-certificate", element: <TraineeCertificateIndex /> },
       {
         path: "registration-certificate",
@@ -423,6 +442,7 @@ export const privateRoutes = [
         path: "programme-accreditation-certificate",
         element: <AccreditationBQFProgrammeIndex />,
       },
+      { path: "certificate-printing-index", element: <CertificatePrintingIndex /> }
     ],
   },
   //without children

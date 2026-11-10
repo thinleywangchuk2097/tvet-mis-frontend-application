@@ -29,6 +29,21 @@ class NcsService {
       });
   }
 
+  // NCS list for one sector (includes occupation_name)
+  getNcsDetailsBySector(sectorId, token) {
+    return apiClient
+      .get(`/api/v1/user/management/ncs/get-ncs-details-by-sector/${sectorId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => {
+        console.error("Error in getNcsDetailsBySector:", error);
+        return error;
+      });
+  }
+
   getNcsDetails(token) {
     return apiClient
       .get(`/api/v1/user/management/ncs/get-ncs-details`, {
@@ -77,6 +92,20 @@ class NcsService {
    getAllNcsProgrammes(token) {
     return apiClient
       .get(`/api/v1/user/management/ncs/get-ncs-programmes`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => {
+        console.error("Error in all ncs programmes:", error);
+        return error;
+      });
+  }
+
+   getAllCertificateLevelNcsProgrammes(token) {
+    return apiClient
+      .get(`/api/v1/user/management/ncs/get-ncs-certificate-level-programmes`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

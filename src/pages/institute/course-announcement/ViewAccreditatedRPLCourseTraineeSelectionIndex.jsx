@@ -61,8 +61,20 @@ import PaymentStatusCard from "./shared/components/PaymentStatusCard";
 import AssessorAssignmentCard from "./shared/components/AssessorAssignmentCard";
 import DeleteAssessorDialog from "./shared/components/DeleteAssessorDialog";
 import ActionConfirmDialog from "./shared/components/ActionConfirmDialog";
-import SectionCard from "./shared/components/SectionCard";
+import ProgrammeInfoCard from "./shared/components/ProgrammeInfoCard";
 import GeneratePaymentButton from "./shared/components/GeneratePaymentButton";
+
+// Internal / Theory / Practical assessment fields: fill the column, values centred
+const ASSESS_TEXT_SX = {
+  width: "100%",
+  minWidth: 100,
+  "& input": { textAlign: "center" },
+};
+const ASSESS_SELECT_SX = {
+  width: "100%",
+  minWidth: 140,
+  "& .MuiSelect-select": { textAlign: "center" },
+};
 
 const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const { applicationNo } = useParams();
@@ -92,7 +104,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const [academicQualifications, setAcademicQualifications] = useState([]);
   const [qualificationMap, setQualificationMap] = useState({});
   const [academicCompetency, setAcademicCompetency] = useState([]);
-  const [competencyMap, setCompetencyMap] = useState({});
 
   // Assessments
   const [traineeTheoryAssessments, setTraineeTheoryAssessments] = useState({});
@@ -137,6 +148,31 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   const isServiceId39 = courseDetails?.service_id === "39";
 
+  // remark saved on the trainee (API); old rows may hold the text "null"
+  const savedRemark = (trainee) => {
+    const r = trainee?.remarks;
+    if (r === null || r === undefined) return "";
+    const text = String(r).trim();
+    return text.toLowerCase() === "null" ? "" : text;
+  };
+
+  // Delete is allowed when the Internal Assessment is 0 (mark) or 93 (competency).
+  // The API returns the value as text ("0", "93"), so compare as numbers.
+  const canDeleteTrainee = (trainee) => {
+    const raw = trainee?.internal_assessment;
+    if (raw === null || raw === undefined || String(raw).trim() === "")
+      return false;
+    const value = Number(raw);
+    return value === 0 || value === 93;
+  };
+
+  // Assessment columns (Viva / Practical) open once there are CA marks;
+  // service 39 has no CA step, so every selected trainee can be assessed (editable after payment)
+  const assessmentsEnabled = hasInternalAssessmentForCourse || isServiceId39;
+  const traineeCanBeAssessed = (trainee) =>
+    isServiceId39 ||
+    (trainee.internal_assessment !== null && trainee.internal_assessment !== "");
+
   const isNumericCertificationLevel = () => {
     const levelId = courseDetails?.certification_level_id;
     return levelId === "111" || levelId === "112";
@@ -175,21 +211,18 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     paymentStatus && paymentStatus.paymentStatus === "paid";
 
   const areCADatesValid = () => {
-    if (hasCADatesInCourse) return true;
+    // service 39 has no Competency Assessment (CA) schedule
+    if (hasCADatesInCourse || isServiceId39) return true;
     return (
       caStartDate && caEndDate && new Date(caEndDate) >= new Date(caStartDate)
     );
   };
 
   const allTraineesHaveAssessments = () => {
-    if (!hasInternalAssessmentForCourse) return true;
+    if (!assessmentsEnabled) return true;
 
     return selectedTrainees.every((trainee) => {
-      const hasInternalAssessment =
-        trainee.internal_assessment !== null &&
-        trainee.internal_assessment !== "";
-
-      if (!hasInternalAssessment) return true;
+      if (!traineeCanBeAssessed(trainee)) return true;
 
       if (isServiceId39) {
         const vivaValue =
@@ -223,15 +256,20 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     });
   };
 
+  // service 39 has no CA step, so the steps that wait for CA marks are open for it
+  const caStepDone = isServiceId39 || allCAmarksExist;
+
   const areAssessorsAssigned = () =>
-    allCAmarksExist &&
+    caStepDone &&
     (assignedAssessors.length > 0 || listAssignedAssessors.length > 0);
 
-  const isGeneratePAEnabled = () => allCAmarksExist;
+  const isGeneratePAEnabled = () => caStepDone;
 
   const isSubmitEnabled = () => areCADatesValid();
 
-  const shouldShowSubmitButton = () => !allCAmarksExist && currentRoleId == 9;
+  // "Set CA Date" button: not for service 39 (no CA schedule)
+  const shouldShowSubmitButton = () =>
+    !isServiceId39 && !allCAmarksExist && currentRoleId == 9;
 
   const shouldShowApproveButton = () =>
     isPaymentCompleted() && currentRoleId == 9;
@@ -364,12 +402,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       const response = await CommonService.getByParentId(22);
       const competencies = response.data;
       setAcademicCompetency(competencies);
-
-      const map = {};
-      competencies.forEach((comp) => {
-        map[comp.id] = comp.name;
-      });
-      setCompetencyMap(map);
     } catch (error) {
       console.error("Error fetching academic competencies:", error);
     }
@@ -507,7 +539,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           initialVivaPractical[trainee.id] =
             trainee.viva_practical_assessment || "";
         }
-        initialRemarks[trainee.id] = trainee.remarks || "";
+        initialRemarks[trainee.id] = savedRemark(trainee);
       });
 
       setTraineeTheoryAssessments(initialTheory);
@@ -773,11 +805,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
     return qualificationMap[qualificationId] || qualificationId;
   };
 
-  const getCompetencyName = (competencyId) => {
-    if (!competencyId) return "N/A";
-    return competencyMap[competencyId] || competencyId;
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -827,7 +854,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       return;
     }
 
-    if (isDiplomaCertificationLevel() && hasInternalAssessmentForCourse) {
+    if (isDiplomaCertificationLevel() && assessmentsEnabled) {
       if (isServiceId39) {
         const invalidViva = selectedTrainees.some((trainee) => {
           const value = traineeVivaAssessments[trainee.id];
@@ -927,13 +954,9 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
           payload.traineeMarks = traineeMarksList;
       }
 
-      if (isServiceId39 && hasInternalAssessmentForCourse) {
+      if (isServiceId39) {
         const traineeVivaList = selectedTrainees
-          .filter(
-            (trainee) =>
-              trainee.internal_assessment !== null &&
-              trainee.internal_assessment !== "",
-          )
+          .filter(traineeCanBeAssessed)
           .map((trainee) => ({
             traineeId: parseInt(trainee.id),
             internalAssessment: parseInternalAssessment(trainee),
@@ -1064,7 +1087,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
   const getTableColSpan = () => {
     let cols = 6;
     if (hasCADatesInCourse) cols++;
-    if (hasInternalAssessmentForCourse) {
+    if (assessmentsEnabled) {
       if (isServiceId39) {
         cols += 2;
       } else {
@@ -1209,84 +1232,15 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
         formatDate={formatDate}
       />
 
-      {/* Programme Information Card */}
-      {courseDetails && (
-        <SectionCard title="Programme Information">
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 2 }}>
-              <Typography variant="body2" color="textSecondary">
-                Application No:
-              </Typography>
-              <Typography variant="body1" fontWeight="bold">
-                {courseDetails.application_no}
-              </Typography>
-            </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
-              <Typography variant="body2" color="textSecondary">
-                Programme Name:
-              </Typography>
-              <Typography variant="body1" fontWeight="bold">
-                {courseDetails.course_name}
-              </Typography>
-            </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
-              <Typography variant="body2" color="textSecondary">
-                Total Seats:
-              </Typography>
-              <Typography variant="body1" fontWeight="bold">
-                {courseDetails.enrollment_capacity}
-              </Typography>
-            </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
-              <Typography variant="body2" color="textSecondary">
-                Selected Count:
-              </Typography>
-              <Typography variant="body1" fontWeight="bold" color="green">
-                {selectedTrainees.length}
-              </Typography>
-            </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
-              <Typography variant="body2" color="textSecondary">
-                Fees Per Trainee
-              </Typography>
-              <Typography variant="body1" fontWeight="bold">
-                Nu. {courseDetails.fees_per_trainee}
-              </Typography>
-            </Grid>
-            {courseDetails.ca_start_date && (
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  CA Start Date:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold" color="primary">
-                  {formatDate(courseDetails.ca_start_date)}
-                </Typography>
-              </Grid>
-            )}
-            {courseDetails.ca_end_date && (
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Typography variant="body2" color="textSecondary">
-                  CA End Date:
-                </Typography>
-                <Typography variant="body1" fontWeight="bold" color="primary">
-                  {formatDate(courseDetails.ca_end_date)}
-                </Typography>
-              </Grid>
-            )}
-            <Grid size={{ xs: 12, md: 2 }}>
-              <Typography variant="body2" color="textSecondary">
-                Certification Level:
-              </Typography>
-              <Typography variant="body1" fontWeight="bold">
-                {courseDetails.certification_name}
-              </Typography>
-            </Grid>
-          </Grid>
-        </SectionCard>
-      )}
+      {/* Programme Information Card (same shared card as the trainee selection page) */}
+      <ProgrammeInfoCard
+        title="Programme Information"
+        details={courseDetails}
+        selectedCount={selectedTrainees.length}
+      />
 
-      {/* CA Dates Section — only when not in courseDetails */}
-      {!hasCADatesInCourse && (
+      {/* CA Dates Section — only when not in courseDetails; none for service 39 */}
+      {!hasCADatesInCourse && !isServiceId39 && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -1336,7 +1290,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
       )}
 
       {/* Assessor Assignment Section */}
-      {allCAmarksExist && !isActionDisabled() && (
+      {caStepDone && !isActionDisabled() && (
         <AssessorAssignmentCard
           canEdit={currentRoleId == 9}
           assignedAssessors={assignedAssessors}
@@ -1391,7 +1345,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                   {hasCADatesInCourse && (
                     <TableCell>Internal Assessment</TableCell>
                   )}
-                  {hasInternalAssessmentForCourse && (
+                  {assessmentsEnabled && (
                     <>
                       <TableCell>
                         {isServiceId39
@@ -1416,8 +1370,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((trainee, index) => {
                       const hasInternalAssessment =
-                        trainee.internal_assessment !== null &&
-                        trainee.internal_assessment !== "";
+                        traineeCanBeAssessed(trainee);
 
                       const readOnly = isAssessmentReadOnly();
 
@@ -1445,13 +1398,6 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                           return "Payment must be completed to edit assessment";
                         }
                         return "";
-                      };
-
-                      const getCompetencyColor = (value) => {
-                        if (value === "91") return "success";
-                        if (value === "92") return "warning";
-                        if (value === "93") return "error";
-                        return "info";
                       };
 
                       const theoryAssessmentValue =
@@ -1492,30 +1438,59 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                               trainee.academic_qualification_id,
                             )}
                           </TableCell>
+                          {/* Internal Assessment: same control as Theory / Practical
+                              (text box for marks, dropdown for competency), always read-only */}
                           {hasCADatesInCourse && (
                             <TableCell>
-                              {isNumericCertificationLevel() ? (
-                                <Chip
-                                  label={trainee.internal_assessment || "N/A"}
-                                  size="small"
-                                  color="info"
-                                />
-                              ) : (
-                                <Chip
-                                  label={
-                                    getCompetencyName(
-                                      trainee.internal_assessment,
-                                    ) || "N/A"
-                                  }
-                                  size="small"
-                                  color={getCompetencyColor(
-                                    trainee.internal_assessment,
-                                  )}
-                                />
-                              )}
+                              <Tooltip
+                                title="Internal Assessment is set in the CA step and can't be changed here"
+                                arrow
+                              >
+                                {isNumericCertificationLevel() ? (
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    value={trainee.internal_assessment ?? ""}
+                                    fullWidth
+                                    slotProps={{ input: { readOnly: true } }}
+                                    sx={{ ...ASSESS_TEXT_SX, backgroundColor: "#f5f5f5" }}
+                                  />
+                                ) : (
+                                  <FormControl
+                                    size="small"
+                                    fullWidth
+                                    sx={ASSESS_SELECT_SX}
+                                  >
+                                    <Select
+                                      value={
+                                        academicCompetency.find(
+                                          (c) =>
+                                            String(c.id) ===
+                                            String(trainee.internal_assessment),
+                                        )?.id ?? ""
+                                      }
+                                      displayEmpty
+                                      readOnly
+                                      sx={{ backgroundColor: "#f5f5f5" }}
+                                    >
+                                      <MenuItem value="" disabled>
+                                        <em>Select Competency</em>
+                                      </MenuItem>
+                                      {academicCompetency.map((competency) => (
+                                        <MenuItem
+                                          key={competency.id}
+                                          value={competency.id}
+                                        >
+                                          {competency.name}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  </FormControl>
+                                )}
+                              </Tooltip>
                             </TableCell>
                           )}
-                          {hasInternalAssessmentForCourse && (
+                          {assessmentsEnabled && (
                             <>
                               {/* Theory/Viva Assessment */}
                               <TableCell>
@@ -1553,7 +1528,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                             },
                                           }}
                                           sx={{
-                                            minWidth: 100,
+                                            ...ASSESS_TEXT_SX,
                                             backgroundColor: readOnly
                                               ? "#f5f5f5"
                                               : "transparent",
@@ -1592,7 +1567,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                             },
                                           }}
                                           sx={{
-                                            minWidth: 100,
+                                            ...ASSESS_TEXT_SX,
                                             backgroundColor: readOnly
                                               ? "#f5f5f5"
                                               : "transparent",
@@ -1605,7 +1580,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                       <FormControl
                                         size="small"
                                         fullWidth
-                                        sx={{ minWidth: 130 }}
+                                        sx={ASSESS_SELECT_SX}
                                       >
                                         <Select
                                           value={
@@ -1698,7 +1673,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                             },
                                           }}
                                           sx={{
-                                            minWidth: 100,
+                                            ...ASSESS_TEXT_SX,
                                             backgroundColor: readOnly
                                               ? "#f5f5f5"
                                               : "transparent",
@@ -1737,7 +1712,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                             },
                                           }}
                                           sx={{
-                                            minWidth: 100,
+                                            ...ASSESS_TEXT_SX,
                                             backgroundColor: readOnly
                                               ? "#f5f5f5"
                                               : "transparent",
@@ -1750,7 +1725,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                       <FormControl
                                         size="small"
                                         fullWidth
-                                        sx={{ minWidth: 130 }}
+                                        sx={ASSESS_SELECT_SX}
                                       >
                                         <Select
                                           value={
@@ -1829,41 +1804,53 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                   </TableCell>
                                 )}
 
-                              {/* Remarks */}
+                              {/* Remarks: the Endorser (22) sees the saved remark from the API */}
                               <TableCell>
-                                <Tooltip
-                                  title={
-                                    currentRoleId == 22
-                                      ? "Remarks are read-only for Endorser role"
-                                      : ""
-                                  }
-                                  arrow
-                                >
-                                  <TextField
-                                    size="small"
-                                    fullWidth
-                                    multiline
-                                    rows={1}
-                                    value={traineeRemarks[trainee.id] || ""}
-                                    onChange={(e) =>
-                                      handleRemarksChange(
-                                        trainee.id,
-                                        e.target.value,
-                                      )
+                                {currentRoleId == 22 ? (
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ whiteSpace: "pre-line", minWidth: 120 }}
+                                    color={
+                                      savedRemark(trainee) ? "text.primary" : "text.secondary"
                                     }
-                                    placeholder="Add remarks..."
-                                    sx={{
-                                      minWidth: 120,
-                                      backgroundColor:
-                                        currentRoleId == 22
-                                          ? "#f5f5f5"
-                                          : "transparent",
-                                    }}
-                                    disabled={
-                                      currentRoleId == 22 || isActionDisabled()
+                                  >
+                                    {savedRemark(trainee) || "—"}
+                                  </Typography>
+                                ) : (
+                                  <Tooltip
+                                    title={
+                                      currentRoleId == 22
+                                        ? "Remarks are read-only for Endorser role"
+                                        : ""
                                     }
-                                  />
-                                </Tooltip>
+                                    arrow
+                                  >
+                                    <TextField
+                                      size="small"
+                                      fullWidth
+                                      multiline
+                                      rows={1}
+                                      value={traineeRemarks[trainee.id] || ""}
+                                      onChange={(e) =>
+                                        handleRemarksChange(
+                                          trainee.id,
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder="Add remarks..."
+                                      sx={{
+                                        minWidth: 120,
+                                        backgroundColor:
+                                          currentRoleId == 22
+                                            ? "#f5f5f5"
+                                            : "transparent",
+                                      }}
+                                      disabled={
+                                        currentRoleId == 22 || isActionDisabled()
+                                      }
+                                    />
+                                  </Tooltip>
+                                )}
                               </TableCell>
                             </>
                           )}
@@ -1871,8 +1858,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                             <TableCell align="center">
                               <Tooltip
                                 title={
-                                  trainee.internal_assessment === 0 ||
-                                  trainee.internal_assessment === 93
+                                  canDeleteTrainee(trainee)
                                     ? "Remove this trainee from the selected list"
                                     : "Trainee can only be deleted when Internal Assessment is 0 or 93"
                                 }
@@ -1885,12 +1871,7 @@ const ViewAccreditatedRPLCourseTraineeSelectionIndex = () => {
                                     onClick={() =>
                                       openDeleteTraineeDialog(trainee)
                                     }
-                                    disabled={
-                                      !(
-                                        trainee.internal_assessment === 0 ||
-                                        trainee.internal_assessment === 93
-                                      )
-                                    }
+                                    disabled={!canDeleteTrainee(trainee)}
                                     sx={{
                                       "&:hover": {
                                         backgroundColor:

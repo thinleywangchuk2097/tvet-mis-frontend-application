@@ -373,167 +373,115 @@ const CommonBirmsPayment = () => {
     return null;
   };
 
+  // label-over-value row used in the Application Information card
+  const infoFields = [
+    { label: "Application No", value: paymentParams.applicationNo, icon: <Receipt /> },
+    { label: "Service Code", value: paymentParams.serviceCode, icon: <Receipt /> },
+    { label: "Tax Payer", value: paymentParams.taxPayerName, icon: <Person /> },
+    { label: "Tax Payer No", value: paymentParams.taxPayerNo, icon: <Person /> },
+    { label: "Email", value: paymentParams.taxPayerEmail, icon: <Email /> },
+    { label: "Mobile", value: paymentParams.taxPayerMobileNo, icon: <Phone /> },
+  ];
+
   return (
-    <Paper elevation={3} sx={{ p: 3, m: 2 }}>
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-        BIRMS Payment
-      </Typography>
-      <Typography
-        variant="body2"
-        color="textSecondary"
-        gutterBottom
-        sx={{ mb: 3 }}
-      >
-        Complete your payment process securely
-      </Typography>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* Application Information Card */}
-      <Paper
-        elevation={1}
+    <Paper
+      variant="outlined"
+      sx={{ m: 2, borderRadius: 2, overflow: "hidden" }}
+    >
+      {/* Header */}
+      <Box
         sx={{
-          p: 2,
-          mb: 3,
-          bgcolor: theme.palette.mode === "dark" ? "grey.900" : "#f8f9fa",
-          border: `1px solid ${theme.palette.divider}`,
+          px: 3,
+          py: 2,
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          flexWrap: "wrap",
+          bgcolor: alpha(theme.palette.primary.main, 0.06),
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Typography
-          variant="subtitle1"
-          fontWeight={600}
-          gutterBottom
-          sx={{ color: theme.palette.text.primary }}
+        <Avatar
+          variant="rounded"
+          sx={{ bgcolor: "primary.main", width: 40, height: 40 }}
         >
-          Application Information
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item size={{ xs: 12, md: 6 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <Receipt
-                fontSize="small"
-                sx={{ color: theme.palette.text.secondary }}
-              />
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                Application No:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="bold"
-                sx={{ color: theme.palette.text.primary }}
-              >
-                {paymentParams.applicationNo}
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <Receipt
-                fontSize="small"
-                sx={{ color: theme.palette.text.secondary }}
-              />
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                Service Code:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="bold"
-                sx={{ color: theme.palette.text.primary }}
-              >
-                {paymentParams.serviceCode}
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <Person
-                fontSize="small"
-                sx={{ color: theme.palette.text.secondary }}
-              />
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                Tax Payer:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="bold"
-                sx={{ color: theme.palette.text.primary }}
-              >
-                {paymentParams.taxPayerName}
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <Email
-                fontSize="small"
-                sx={{ color: theme.palette.text.secondary }}
-              />
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                Email:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="bold"
-                sx={{ color: theme.palette.text.primary }}
-              >
-                {paymentParams.taxPayerEmail}
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <Phone
-                fontSize="small"
-                sx={{ color: theme.palette.text.secondary }}
-              />
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                Mobile:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="bold"
-                sx={{ color: theme.palette.text.primary }}
-              >
-                {paymentParams.taxPayerMobileNo}
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <Person
-                fontSize="small"
-                sx={{ color: theme.palette.text.secondary }}
-              />
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                Tax Payer No:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="bold"
-                sx={{ color: theme.palette.text.primary }}
-              >
-                {paymentParams.taxPayerNo}
-              </Typography>
-            </Box>
-          </Grid>
+          <PaymentIcon />
+        </Avatar>
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: "1.2rem", lineHeight: 1.2 }}>
+            BIRMS Payment
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Complete your payment process securely
+          </Typography>
+        </Box>
+        <Chip
+          icon={<Verified />}
+          label="Secure payment"
+          size="small"
+          color="success"
+          variant="outlined"
+          sx={{ fontWeight: 600 }}
+        />
+      </Box>
+
+      <Box sx={{ p: 3 }}>
+      {/* Application Information Card */}
+      <Paper
+        variant="outlined"
+        sx={{ mb: 3, borderRadius: 2, overflow: "hidden" }}
+      >
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            bgcolor: theme.palette.mode === "dark" ? "grey.900" : "#f8f9fa",
+            borderBottom: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          <Typography sx={{ fontWeight: 700, fontSize: "0.92rem" }}>
+            Application Information
+          </Typography>
+        </Box>
+        <Grid container spacing={2} sx={{ p: 2 }}>
+          {infoFields.map((f) => (
+            <Grid item size={{ xs: 12, sm: 6, md: 4 }} key={f.label}>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                <Box
+                  sx={{
+                    color: "primary.main",
+                    display: "flex",
+                    mt: "2px",
+                    "& svg": { fontSize: 18 },
+                  }}
+                >
+                  {f.icon}
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    sx={{
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                      letterSpacing: 0.4,
+                      textTransform: "uppercase",
+                      color: "text.secondary",
+                    }}
+                  >
+                    {f.label}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: "0.9rem",
+                      fontWeight: 600,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {f.value || "—"}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          ))}
         </Grid>
       </Paper>
 
@@ -626,196 +574,87 @@ const CommonBirmsPayment = () => {
             )}
 
             {activeStep === 1 && (
-              <Card
-                sx={{
-                  bgcolor:
-                    theme.palette.mode === "dark" ? "grey.900" : "#f8f9fa",
-                  border: `1px solid ${theme.palette.divider}`,
-                  p: 0,
-                }}
+              <Paper
+                variant="outlined"
+                sx={{ borderRadius: 2, overflow: "hidden" }}
               >
-                <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                  <Typography
-                    variant="subtitle2"
-                    gutterBottom
-                    sx={{
-                      fontWeight: 600,
-                      color: theme.palette.text.primary,
-                      fontSize: "0.875rem",
-                    }}
-                  >
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    bgcolor:
+                      theme.palette.mode === "dark" ? "grey.900" : "#f8f9fa",
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                  }}
+                >
+                  <Typography sx={{ fontWeight: 700, fontSize: "0.92rem" }}>
                     Review Payment Details
                   </Typography>
+                </Box>
 
-                  {/* Ultra Compact Grid Layout */}
+                <Box sx={{ p: 2 }}>
+                  {/* label over value, same as Application Information */}
+                  <Grid container spacing={2}>
+                    {[
+                      { label: "Application No", value: paymentParams.applicationNo },
+                      { label: "Service Code", value: paymentParams.serviceCode },
+                      { label: "Tax Payer", value: paymentParams.taxPayerName },
+                      {
+                        label: "Due Date",
+                        value: formatDate(formik.values.paymentDueDate),
+                      },
+                    ].map((f) => (
+                      <Grid item size={{ xs: 12, sm: 6, md: 3 }} key={f.label}>
+                        <Typography
+                          sx={{
+                            fontSize: "0.7rem",
+                            fontWeight: 600,
+                            letterSpacing: 0.4,
+                            textTransform: "uppercase",
+                            color: "text.secondary",
+                          }}
+                        >
+                          {f.label}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: "0.9rem",
+                            fontWeight: 600,
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {f.value || "—"}
+                        </Typography>
+                      </Grid>
+                    ))}
+                  </Grid>
+
+                  {/* Total Amount */}
                   <Box
                     sx={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 0.5,
-                      mt: 0.5,
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        py: 0.25,
-                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: theme.palette.text.secondary,
-                          fontWeight: 500,
-                          fontSize: "0.65rem",
-                        }}
-                      >
-                        App No:
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="600"
-                        sx={{
-                          color: theme.palette.text.primary,
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        {paymentParams.applicationNo}
-                      </Typography>
-                    </Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        py: 0.25,
-                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: theme.palette.text.secondary,
-                          fontWeight: 500,
-                          fontSize: "0.65rem",
-                        }}
-                      >
-                        Service:
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="600"
-                        sx={{
-                          color: theme.palette.text.primary,
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        {paymentParams.serviceCode}
-                      </Typography>
-                    </Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        py: 0.25,
-                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: theme.palette.text.secondary,
-                          fontWeight: 500,
-                          fontSize: "0.65rem",
-                        }}
-                      >
-                        Tax Payer:
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="600"
-                        sx={{
-                          color: theme.palette.text.primary,
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        {paymentParams.taxPayerName}
-                      </Typography>
-                    </Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        py: 0.25,
-                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: theme.palette.text.secondary,
-                          fontWeight: 500,
-                          fontSize: "0.65rem",
-                        }}
-                      >
-                        Due Date:
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="600"
-                        sx={{
-                          color: theme.palette.text.primary,
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        {formatDate(formik.values.paymentDueDate)}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {/* Total Amount - Compact Highlighted */}
-                  <Box
-                    sx={{
-                      mt: 1,
-                      bgcolor:
-                        theme.palette.mode === "dark"
-                          ? "primary.dark"
-                          : "primary.50",
-                      px: 1.5,
-                      py: 0.75,
-                      borderRadius: 1,
+                      mt: 2,
+                      px: 2,
+                      py: 1.25,
+                      borderRadius: 1.5,
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                      bgcolor: alpha(theme.palette.primary.main, 0.06),
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
                     }}
                   >
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: theme.palette.text.secondary,
-                        fontWeight: 500,
-                        fontSize: "0.7rem",
-                      }}
-                    >
+                    <Typography sx={{ fontWeight: 600, fontSize: "0.9rem" }}>
                       Total Amount
                     </Typography>
                     <Typography
-                      variant="subtitle1"
                       color="primary"
-                      fontWeight="bold"
-                      sx={{ fontSize: "0.9rem" }}
+                      sx={{ fontWeight: 700, fontSize: "1.1rem" }}
                     >
                       {formatCurrency(formik.values.totalPayableAmount)}
                     </Typography>
                   </Box>
-                </CardContent>
-              </Card>
+                </Box>
+              </Paper>
             )}
 
             {activeStep === 2 && (
@@ -1380,6 +1219,7 @@ const CommonBirmsPayment = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      </Box>
     </Paper>
   );
 };

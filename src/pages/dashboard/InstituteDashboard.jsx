@@ -270,9 +270,20 @@ const InstituteDashboard = () => {
   }, [data, programmeTab]);
   const applications = data?.recentApplications || [];
 
-  const renewalDate = inst.institute_renewal_date
-    ? new Date(inst.institute_renewal_date)
-    : null;
+  // Renewal is due when the registration expires (validity_date, set by SAR grade on renewal);
+  // older records without it: one year after the last renewal
+  const renewalDate = inst.validity_date
+    ? new Date(inst.validity_date)
+    : inst.institute_renewal_date
+      ? (() => {
+          const d = new Date(inst.institute_renewal_date);
+          d.setFullYear(d.getFullYear() + 1);
+          return d;
+        })()
+      : null;
+  // latest APPROVED Self Assessment Report (null until one is approved)
+  const sar = data?.sar || null;
+  const SAR_GRADE_COLOR = { "A+": "success", A: "success", B: "primary", C: "warning" };
   const daysToRenewal = renewalDate
     ? Math.ceil((renewalDate - new Date()) / 86400000)
     : null;
@@ -432,6 +443,35 @@ const InstituteDashboard = () => {
             )}
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {sar?.grade && (
+              <Box
+                sx={{
+                  px: 1.5,
+                  py: 1,
+                  borderRadius: 2,
+                  bgcolor: "background.paper",
+                  border: "1px solid",
+                  borderColor: "divider",
+                  textAlign: "center",
+                  minWidth: 96,
+                }}
+              >
+                <Typography variant="caption" color="text.secondary" component="div">
+                  SAR grade
+                </Typography>
+                <Chip
+                  label={sar.grade}
+                  color={SAR_GRADE_COLOR[sar.grade] || "default"}
+                  size="small"
+                  sx={{ fontWeight: 700, my: 0.25 }}
+                />
+                {sar.total_score !== null && sar.total_score !== undefined && (
+                  <Typography variant="caption" color="text.secondary" component="div">
+                    Score {Number(sar.total_score).toLocaleString("en-US")}
+                  </Typography>
+                )}
+              </Box>
+            )}
             {renewalDate && (
               <Box
                 sx={{
@@ -830,7 +870,7 @@ const InstituteDashboard = () => {
         {/* ---------------- Recent applications ---------------- */}
         <Grid item size={{ xs: 12, lg: 5 }}>
           <Card
-            title="Recent applications"
+            title="Recent applications (last 3 days)"
             sx={{ p: 0, "& > div:first-of-type": { px: 2, pt: 2 } }}
             action={
               <Chip size="small" variant="outlined" label={`${applications.length}`} />
@@ -857,7 +897,7 @@ const InstituteDashboard = () => {
                   ) : applications.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={3} align="center" sx={{ py: 4, color: "text.secondary" }}>
-                        No applications yet
+                        No application activity in the last 3 days
                       </TableCell>
                     </TableRow>
                   ) : (

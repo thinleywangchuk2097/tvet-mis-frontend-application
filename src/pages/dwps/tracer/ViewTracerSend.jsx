@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useFormik } from "formik";
 import { toast } from "react-toastify";
@@ -9,7 +9,6 @@ import {
   Box,
   CircularProgress,
   Alert,
-  Divider,
   Radio,
   RadioGroup,
   FormControlLabel,
@@ -29,10 +28,11 @@ import {
   Stack,
   Input,
   FormHelperText,
+  LinearProgress,
 } from "@mui/material";
 import StarIcon from "@mui/icons-material/Star";
-import DescriptionIcon from "@mui/icons-material/Description";
 import PublicTracerService from "../../../api/services/internal/tracer/PublicTracerService";
+import tracerLogo from "../../../assets/logo/tracer_logo.jpeg";
 
 /* ================= PropTypes ================= */
 const optionShape = PropTypes.shape({
@@ -223,6 +223,9 @@ const buildTransformedSurvey = (
   const safeTracerDetails = Array.isArray(tracerDetails) ? tracerDetails : [];
   return {
     applicationNo: surveyData?.data?.applicationNo,
+    // intro text written for this tracer (tbl_tracer_question_dtls.tracer_title)
+    tracerTitle:
+      safeTracerDetails.find((item) => item.tracer_title)?.tracer_title || "",
     parentTracerTypeName: surveyData?.data?.applicationName,
     subTracerTypeName: "",
     questions: safeTracerDetails.map((item) => {
@@ -744,6 +747,9 @@ const ViewTracerSend = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [multiSelectValues, setMultiSelectValues] = useState({});
   const [multipleTextValues, setMultipleTextValues] = useState({});
+  // one submission per survey link
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const submitLock = useRef(false);
 
   /* ---------- Fetching ---------- */
   const fetchTracerQuestionDropdownType = useCallback(async () => {
@@ -779,6 +785,13 @@ const ViewTracerSend = () => {
     try {
       const response = await PublicTracerService.getSurveyByUniqueId(uniqueId);
       setSurveyData(response.data);
+
+      // link already used: show the "already submitted" page, don't load questions
+      if (response.data?.submitted || response.data?.data?.statusId === 55) {
+        setAlreadySubmitted(true);
+        setError(null);
+        return;
+      }
 
       if (response.data.data?.questionApplicationNo) {
         await fetchTracerDetails(response.data.data.questionApplicationNo);
@@ -932,6 +945,9 @@ const ViewTracerSend = () => {
     async (values, formikInstance) => {
       const resetForm = formikInstance?.resetForm;
 
+      // block double clicks / a second submit of the same link
+      if (submitLock.current || alreadySubmitted) return;
+
       const errors = validateForm(values);
       if (Object.keys(errors).length > 0) {
         setValidationErrors(errors);
@@ -940,6 +956,7 @@ const ViewTracerSend = () => {
       }
 
       setValidationErrors({});
+      submitLock.current = true;
       setSubmitting(true);
 
       try {
@@ -980,13 +997,15 @@ const ViewTracerSend = () => {
           response?.data?.message ||
             "Survey submitted successfully! Thank you for your feedback.",
         );
-        setTimeout(() => navigate("/"), 1000);
+        setAlreadySubmitted(true); // lock stays on after a successful submit
+        setTimeout(() => navigate("/"), 1500);
         if (resetForm) resetForm();
         setMultiSelectValues({});
         setMultipleTextValues({});
         setValidationErrors({});
       } catch (err) {
         console.error("Error submitting survey:", err);
+        submitLock.current = false;
 
         const status = err.response?.status;
         const serverMsg =
@@ -995,6 +1014,8 @@ const ViewTracerSend = () => {
           "Failed to submit survey";
 
         if (status === 409) {
+          setAlreadySubmitted(true);
+          submitLock.current = true;
           toast.error(serverMsg || "You have already submitted this survey.");
         } else if (status === 404) {
           toast.error(serverMsg || "Survey link is invalid or expired.");
@@ -1011,7 +1032,14 @@ const ViewTracerSend = () => {
         setSubmitting(false);
       }
     },
-    [uniqueId, surveyData, validateForm, formatResponses, navigate],
+    [
+      uniqueId,
+      surveyData,
+      validateForm,
+      formatResponses,
+      navigate,
+      alreadySubmitted,
+    ],
   );
 
   /* ---------- Change handlers ---------- */
@@ -1220,59 +1248,209 @@ const ViewTracerSend = () => {
     );
   }
 
-  return (
-    <Box sx={{ width: "100%", py: 3, px: { xs: 2, md: 4 } }}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSubmit(formik.values, formik);
-        }}
-      >
+  /* ---------- Progress (visible questions that have an answer) ---------- */
+  const hasAnswer = (v) => {
+    if (Array.isArray(v)) return v.length > 0;
+    if (v && typeof v === "object")
+      return Object.values(v).some((x) => x !== "" && x != null);
+    return v !== "" && v != null && v !== 0;
+  };
+  const visibleQuestions = (transformedSurvey?.questions || []).filter(
+    (q) =>
+      (visibleMap[q.id] ?? true) &&
+      (q.questionType || (q.subQuestions || []).length > 0),
+  );
+  const answeredCount = visibleQuestions.filter((q) => {
+    const subs = (q.subQuestions || []).filter(
+      (sub) => visibleMap[`sub_${sub.id}`] ?? true,
+    );
+    if (subs.length > 0)
+      return subs.some((sub) => hasAnswer(formik.values[`sub_${sub.id}`]));
+    return hasAnswer(formik.values[q.id]);
+  }).length;
+  const progress = visibleQuestions.length
+    ? Math.round((answeredCount / visibleQuestions.length) * 100)
+    : 0;
+
+  const PRIMARY = "#1a3a6b";
+  const LINE = "#d9dee7";
+
+  if (alreadySubmitted) {
+    return (
+      <Box sx={{ bgcolor: "#e9ecf1", py: { xs: 3, md: 6 }, px: 1 }}>
         <Paper
-          sx={{ p: 0, overflow: "hidden", borderRadius: 2, width: "100%" }}
+          elevation={0}
+          sx={{
+            maxWidth: 560,
+            mx: "auto",
+            p: { xs: 3, md: 5 },
+            textAlign: "center",
+            borderRadius: 0,
+            borderTop: `4px solid ${PRIMARY}`,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+          }}
         >
           <Box
-            sx={{ bgcolor: "#f5f5f5", p: 3, borderBottom: "1px solid #e0e0e0" }}
+            component="img"
+            src={tracerLogo}
+            alt="Royal Government of Bhutan - Ministry of Education and Skills Development"
+            sx={{ display: "block", width: "100%", height: "auto", mb: 2.5 }}
+          />
+          <Typography
+            sx={{ fontWeight: 700, color: PRIMARY, fontSize: "1.15rem" }}
           >
+            Survey Submitted
+          </Typography>
+          <Typography sx={{ mt: 1, fontSize: "0.9rem" }} color="text.secondary">
+            This survey has already been submitted. Each survey link can be
+            submitted only once. Thank you for your response.
+          </Typography>
+          {surveyData?.data?.applicationName && (
             <Typography
-              variant="h5"
-              fontWeight={600}
-              color="primary"
-              gutterBottom
+              sx={{ mt: 2, fontSize: "0.8rem" }}
+              color="text.secondary"
             >
-              Tracer Survey
+              {surveyData.data.applicationName}
+              {surveyData.data.applicationNo
+                ? ` · ${surveyData.data.applicationNo}`
+                : ""}
             </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Please complete the survey by answering all questions below
-            </Typography>
-          </Box>
+          )}
+        </Paper>
+      </Box>
+    );
+  }
 
-          <Box
-            sx={{ p: 3, bgcolor: "#fafafa", borderBottom: "1px solid #e0e0e0" }}
+  return (
+    <Box
+      sx={{ bgcolor: "#e9ecf1", py: { xs: 2, md: 4 }, px: { xs: 1, md: 2 } }}
+    >
+      {/* Progress (sticky, sits above the sheet) */}
+      {visibleQuestions.length > 0 && (
+        <Box
+          sx={{
+            position: "sticky",
+            top: 8,
+            zIndex: 2,
+            maxWidth: "260mm",
+            mx: "auto",
+            mb: 1.5,
+            px: 2,
+            py: 1,
+            bgcolor: "#fff",
+            borderRadius: 1,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+          }}
+        >
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            sx={{ mb: 0.5 }}
           >
-            <Grid container spacing={2}>
-              <Grid item size={{ xs: 12, md: 6 }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <DescriptionIcon fontSize="small" color="action" />
-                  <Typography variant="body2">
-                    <strong>Application Number:</strong>{" "}
-                    {transformedSurvey?.applicationNo || "N/A"}
-                  </Typography>
-                </Stack>
-              </Grid>
-              <Grid item size={{ xs: 12, md: 6 }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <DescriptionIcon fontSize="small" color="action" />
-                  <Typography variant="body2">
-                    <strong>Applicant Name:</strong>{" "}
-                    {surveyData?.data?.applicationName || "N/A"}
-                  </Typography>
-                </Stack>
-              </Grid>
-            </Grid>
-          </Box>
+            <Typography sx={{ fontSize: "0.75rem", fontWeight: 600 }}>
+              Progress
+            </Typography>
+            <Typography sx={{ fontSize: "0.75rem" }} color="text.secondary">
+              {answeredCount} of {visibleQuestions.length} answered · {progress}
+              %
+            </Typography>
+          </Stack>
+          <LinearProgress
+            variant="determinate"
+            value={progress}
+            sx={{
+              height: 5,
+              borderRadius: 3,
+              bgcolor: "#e4e9f2",
+              "& .MuiLinearProgress-bar": {
+                bgcolor: progress === 100 ? "#2e7d32" : PRIMARY,
+                borderRadius: 3,
+              },
+            }}
+          />
+        </Box>
+      )}
 
-          <Box sx={{ p: 3 }}>
+      {/* ===== A4 sheet ===== */}
+      <Paper
+        elevation={0}
+        sx={{
+          width: "100%",
+          maxWidth: "260mm",
+          minHeight: { md: "297mm" },
+          mx: "auto",
+          bgcolor: "#fff",
+          borderRadius: 0,
+          boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+          px: { xs: 2.5, md: "20mm" },
+          py: { xs: 3, md: "18mm" },
+          boxSizing: "border-box",
+        }}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit(formik.values, formik);
+          }}
+        >
+          {/* Letterhead (tracer_logo already has the emblem, names and rule) */}
+          <Box
+            component="img"
+            src={tracerLogo}
+            alt="Royal Government of Bhutan - Ministry of Education and Skills Development"
+            sx={{ display: "block", width: "100%", height: "auto" }}
+          />
+
+          {/* Title */}
+          <Typography
+            sx={{
+              mt: 3,
+              textAlign: "center",
+              fontWeight: 700,
+              fontSize: "1.2rem",
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              color: PRIMARY,
+            }}
+          >
+            Tracer Survey
+          </Typography>
+
+          {/* Letter: text comes from tracer_title (line breaks kept) */}
+          {transformedSurvey?.tracerTitle && (
+            <Typography
+              sx={{
+                mt: 3,
+                fontSize: "0.9rem",
+                lineHeight: 1.7,
+                textAlign: "justify",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {transformedSurvey.tracerTitle}
+            </Typography>
+          )}
+          {/* Application details (plain lines, under the intro text) */}
+          <Box sx={{ mt: 2, fontSize: "0.88rem", lineHeight: 1.8 }}>
+            <Typography sx={{ fontSize: "inherit" }}>
+              <strong>Application Number:</strong>{" "}
+              {transformedSurvey?.applicationNo || "N/A"}
+            </Typography>
+            <Typography sx={{ fontSize: "inherit" }}>
+              <strong>Applicant Name:</strong>{" "}
+              {surveyData?.data?.applicationName || "N/A"}
+            </Typography>
+          </Box>
+          <Typography
+            sx={{ mt: 1, fontSize: "0.75rem", fontStyle: "italic" }}
+            color="text.secondary"
+          >
+            Questions marked with <span style={{ color: "#d32f2f" }}>*</span>{" "}
+            are required.
+          </Typography>
+
+          {/* Questions */}
+          <Box sx={{ mt: 3, borderTop: `1px solid ${LINE}` }}>
             {transformedSurvey?.questions?.length > 0 ? (
               transformedSurvey.questions.map((question, index) => {
                 const parentVisible = visibleMap[question.id] ?? true;
@@ -1282,49 +1460,54 @@ const ViewTracerSend = () => {
                   (question.subQuestions || []).length > 0;
                 if (!question.questionType && !hasSubQuestions) return null;
 
+                const hasError = Boolean(formik.errors?.[question.id]);
+
                 return (
-                  <Box key={question.id} sx={{ mb: 3 }}>
-                    <Typography variant="body1" gutterBottom fontWeight={500}>
+                  <Box
+                    key={question.id}
+                    sx={{
+                      py: 2,
+                      borderBottom: `1px solid ${LINE}`,
+                      bgcolor: hasError ? "#fff6f6" : "transparent",
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 600, fontSize: "0.9rem" }}>
                       {index + 1}.{" "}
                       {question.questionText || "Untitled Question"}
                       {question.required && (
-                        <span style={{ color: "red", marginLeft: "4px" }}>
+                        <span style={{ color: "#d32f2f", marginLeft: 4 }}>
                           *
                         </span>
                       )}
                     </Typography>
 
                     {question.questionType && (
-                      <Box sx={{ ml: 2, mt: 1, mb: 2 }}>
+                      <Box sx={{ mt: 1, pl: 2.5 }}>
                         {renderFormField(question)}
                       </Box>
                     )}
 
                     {hasSubQuestions && (
-                      <Box sx={{ ml: 2, borderRadius: 1 }}>
+                      <Box sx={{ mt: 1, pl: 2.5 }}>
                         {question.subQuestions.map((sub, subIndex) => {
                           const key = `sub_${sub.id}`;
                           const isVisible = visibleMap[key] ?? true;
                           if (!isVisible) return null;
 
                           return (
-                            <Box key={sub.id} sx={{ mb: 2 }}>
-                              <Typography variant="body2" gutterBottom>
+                            <Box key={sub.id} sx={{ mb: 1.5 }}>
+                              <Typography sx={{ fontSize: "0.86rem" }}>
                                 {index + 1}.{subIndex + 1}{" "}
                                 {sub.questionText || "Untitled Sub-question"}
                                 {sub.isRequired && (
                                   <span
-                                    style={{
-                                      color: "red",
-                                      marginLeft: "4px",
-                                      fontWeight: "bold",
-                                    }}
+                                    style={{ color: "#d32f2f", marginLeft: 4 }}
                                   >
                                     *
                                   </span>
                                 )}
                               </Typography>
-                              <Box sx={{ ml: 2, mt: 1 }}>
+                              <Box sx={{ mt: 0.75, pl: 2 }}>
                                 {renderFormField(sub, true)}
                               </Box>
                             </Box>
@@ -1332,44 +1515,61 @@ const ViewTracerSend = () => {
                         })}
                       </Box>
                     )}
-
-                    {index < transformedSurvey.questions.length - 1 && (
-                      <Divider sx={{ my: 2 }} />
-                    )}
                   </Box>
                 );
               })
             ) : (
-              <Typography color="textSecondary" align="center" sx={{ py: 3 }}>
+              <Typography color="text.secondary" align="center" sx={{ py: 3 }}>
                 No questions have been added to this survey yet.
               </Typography>
             )}
           </Box>
 
-          <Box
-            sx={{
-              p: 2,
-              bgcolor: "#f5f5f5",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              borderTop: "1px solid #e0e0e0",
-            }}
-          >
-            <Typography variant="caption" color="textSecondary">
-              Please answer all required questions marked with *
-            </Typography>
+          {/* Submit */}
+          <Box sx={{ mt: 4, textAlign: "center" }}>
             <Button
               type="submit"
               variant="contained"
-              color="primary"
-              disabled={submitting}
+              disabled={submitting || alreadySubmitted}
+              sx={{
+                bgcolor: PRIMARY,
+                px: 5,
+                fontWeight: 600,
+                textTransform: "none",
+                "&:hover": { bgcolor: "#132c52" },
+              }}
             >
-              {submitting ? <CircularProgress size={24} /> : "Submit Survey"}
+              {submitting ? (
+                <CircularProgress size={22} color="inherit" />
+              ) : (
+                "Submit Survey"
+              )}
             </Button>
           </Box>
-        </Paper>
-      </form>
+
+          {/* Footer */}
+          <Box
+            sx={{
+              mt: 5,
+              pt: 1.5,
+              borderTop: `1px solid ${LINE}`,
+              textAlign: "center",
+            }}
+          >
+            <Typography sx={{ fontSize: "0.72rem" }} color="text.secondary">
+              Thank you for your time. Your responses are confidential and used
+              only for TVET planning and improvement.
+            </Typography>
+            <Typography
+              sx={{ fontSize: "0.7rem", mt: 0.5 }}
+              color="text.secondary"
+            >
+              © Ministry of Education and Skills Development, Royal Government
+              of Bhutan
+            </Typography>
+          </Box>
+        </form>
+      </Paper>
     </Box>
   );
 };

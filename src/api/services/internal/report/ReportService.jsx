@@ -109,6 +109,33 @@ class ReportService {
       .catch((error) => error);
   }
 
+  // assessment report (marks / result) of the logged-in institute's trainees
+  getInstituteAssessmentReport(registration_no, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/report/get-institute-assessment-report/${registration_no}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  // Certificate printing: competent trainees of all institutes
+  getAllTraineesDetailsForCertificate(token) {
+    return apiClient
+      .get(`/api/v1/user/management/report/get-all-trainee-certificate-details`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getTraineesDetailsForCertificate(registration_no, application_no, token) {
     return apiClient
       .get(
@@ -133,6 +160,30 @@ class ReportService {
           },
         },
       )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  // Assessor / Accreditor / QMS Auditor registrations report
+  getAssessorAccreditorAuditorReport(token) {
+    return apiClient
+      .get(`/api/v1/user/management/report/get-assessor-accreditor-auditor-report`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  // BQF / RPL / Non-BQF programmes report
+  getProgrammesReport(token) {
+    return apiClient
+      .get(`/api/v1/user/management/report/get-programmes-report`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
       .then((response) => response)
       .catch((error) => error);
   }

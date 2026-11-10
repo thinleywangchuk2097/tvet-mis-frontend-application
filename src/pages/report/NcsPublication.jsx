@@ -12,12 +12,7 @@ import {
   TableCell,
   TableBody,
   TableContainer,
-  InputAdornment,
   MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  Button,
   Box,
   Divider,
   TablePagination,
@@ -25,24 +20,26 @@ import {
   IconButton,
   Tooltip,
   Stack,
+  CircularProgress,
 } from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
 import DownloadIcon from "@mui/icons-material/Download";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ImageIcon from "@mui/icons-material/Image";
 import DescriptionIcon from "@mui/icons-material/Description";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import { toast } from "react-toastify";
+import PublicPageService from "../../api/services/internal/public/PublicPageService";
+import CommonService from "../../api/services/internal/common/CommonService";
+import {
+  PAPER_PROPS,
+  TABLE_SX,
+  INPUT_SX,
+  SELECT_SX,
+  ROWS_PER_PAGE_OPTIONS,
+} from "../public/reports/reportStyles";
 
 // ==================== CONSTANTS ====================
-const TABLE_STYLE = {
-  border: "1px solid #ddd",
-  "& th, & td": {
-    border: "1px solid #ddd",
-    padding: "10px 12px",
-  },
-};
-
 const FILE_ICON_MAP = {
   pdf: { icon: PictureAsPdfIcon, color: "error" },
   jpg: { icon: ImageIcon, color: "primary" },
@@ -57,151 +54,40 @@ const FILE_ICON_MAP = {
   xlsx: { icon: DescriptionIcon, color: "success" },
 };
 
-const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
-// ==================== SAMPLE DATA ====================
-const SAMPLE_DATA = [
-  {
-    id: 1,
-    sector: "Construction",
-    occupationTitle: "Mason",
-    ncsCode: "BQF-2024-001",
-    qualificationLevel: "Certificate Level I",
-    validity: "2027-03-25",
-    courseTitle: "Masonry Course",
-    units: [
-      { unitCode: "BQF-2024-001", unitTitle: "Basic Masonry Techniques" },
-      { unitCode: "BQF-2024-002", unitTitle: "Advanced Masonry Techniques" },
-    ],
-    documents: [
-      {
-        name: "Masonry_NCS.pdf",
-        documentId: 1,
-        contentType: "application/pdf",
-      },
-    ],
-  },
-  {
-    id: 2,
-    sector: "Construction",
-    occupationTitle: "Plumber",
-    ncsCode: "BQF-2026-001",
-    qualificationLevel: "Certificate Level I",
-    validity: "2027-03-25",
-    courseTitle: "Plumbing Course",
-    units: [
-      { unitCode: "BQF-2026-001", unitTitle: "Basic Plumbing Systems" },
-      { unitCode: "BQF-2026-002", unitTitle: "Advanced Plumbing Systems" },
-      { unitCode: "BQF-2026-003", unitTitle: "Pipe Fitting Techniques" },
-    ],
-    documents: [
-      {
-        name: "Plumbing_NCS.pdf",
-        documentId: 2,
-        contentType: "application/pdf",
-      },
-    ],
-  },
-  {
-    id: 3,
-    sector: "Construction",
-    occupationTitle: "Carpenter",
-    ncsCode: "BQF-2025-001",
-    qualificationLevel: "Certificate Level II",
-    validity: "2027-06-30",
-    courseTitle: "Carpentry Course",
-    units: [
-      { unitCode: "BQF-2025-001", unitTitle: "Basic Carpentry Skills" },
-      { unitCode: "BQF-2025-002", unitTitle: "Advanced Woodworking" },
-    ],
-    documents: [
-      {
-        name: "Carpentry_NCS.pdf",
-        documentId: 3,
-        contentType: "application/pdf",
-      },
-    ],
-  },
-  {
-    id: 4,
-    sector: "Information Technology",
-    occupationTitle: "Software Developer",
-    ncsCode: "BQF-2023-001",
-    qualificationLevel: "Diploma",
-    validity: "2027-12-31",
-    courseTitle: "Full Stack Development",
-    units: [
-      { unitCode: "BQF-2023-001", unitTitle: "Frontend Development" },
-      { unitCode: "BQF-2023-002", unitTitle: "Backend Development" },
-      { unitCode: "BQF-2023-003", unitTitle: "Database Management" },
-      { unitCode: "BQF-2023-004", unitTitle: "DevOps Fundamentals" },
-    ],
-    documents: [
-      {
-        name: "Software_Developer_NCS.pdf",
-        documentId: 4,
-        contentType: "application/pdf",
-      },
-    ],
-  },
-  {
-    id: 5,
-    sector: "Manufacturing",
-    occupationTitle: "Welder",
-    ncsCode: "BQF-2022-001",
-    qualificationLevel: "Certificate Level II",
-    validity: "2026-12-31",
-    courseTitle: "Welding Course",
-    units: [
-      { unitCode: "BQF-2022-001", unitTitle: "Basic Welding" },
-      { unitCode: "BQF-2022-002", unitTitle: "Advanced Welding" },
-    ],
-    documents: [
-      {
-        name: "Welding_NCS.pdf",
-        documentId: 5,
-        contentType: "application/pdf",
-      },
-    ],
-  },
-  {
-    id: 6,
-    sector: "Healthcare",
-    occupationTitle: "Nurse",
-    ncsCode: "BQF-2021-001",
-    qualificationLevel: "Certificate Level III",
-    validity: "2028-06-30",
-    courseTitle: "Nursing Course",
-    units: [
-      { unitCode: "BQF-2021-001", unitTitle: "Basic Nursing" },
-      { unitCode: "BQF-2021-002", unitTitle: "Advanced Nursing" },
-    ],
-    documents: [
-      {
-        name: "Nursing_NCS.pdf",
-        documentId: 6,
-        contentType: "application/pdf",
-      },
-    ],
-  },
-  {
-    id: 7,
-    sector: "Agriculture",
-    occupationTitle: "Farmer",
-    ncsCode: "BQF-2020-001",
-    qualificationLevel: "Certificate Level I",
-    validity: "2029-12-31",
-    courseTitle: "Farming Course",
-    units: [{ unitCode: "BQF-2020-001", unitTitle: "Basic Farming" }],
-    documents: [
-      {
-        name: "Farming_NCS.pdf",
-        documentId: 7,
-        contentType: "application/pdf",
-      },
-    ],
-  },
-];
+// ==================== DATA HELPERS ====================
+/** Parse a JSON column that may arrive as a string or an array. */
+const parseJsonArray = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+/** Map an API row to the shape this page renders (same fields as the NCS create page). */
+const transformNcs = (item) => ({
+  id: item.id,
+  applicationNo: item.application_no || "",
+  sector: item.sector_name || "N/A",
+  occupation: item.occupation_name || "N/A",
+  bqfLevel: item.certification_level || "N/A",
+  validityDate: item.validity_date
+    ? String(item.validity_date).split("T")[0]
+    : "N/A",
+  programmeTitle: item.programme_title || "N/A",
+  units: parseJsonArray(item.units).filter((u) => u && (u.unitCode || u.unitTitle)),
+  documents: parseJsonArray(item.documents)
+    .filter((d) => d && (d.id || d.url))
+    .map((d) => ({
+      id: d.id,
+      name: d.documentName || d.name || "Unnamed file",
+      url: d.url || null,
+    })),
+});
 
 // ==================== PROPTYPES ====================
 
@@ -212,9 +98,6 @@ const filterBarPropTypes = {
     search: PropTypes.string,
   }).isRequired,
   onFilterChange: PropTypes.func.isRequired,
-  onClearFilters: PropTypes.func.isRequired,
-  rowsPerPage: PropTypes.number.isRequired,
-  onRowsPerPageChange: PropTypes.func.isRequired,
 };
 
 const unitCodesPropTypes = {
@@ -238,15 +121,14 @@ const unitTitlesPropTypes = {
 const fileAttachmentsPropTypes = {
   documents: PropTypes.arrayOf(
     PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
       name: PropTypes.string,
-      documentId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-      contentType: PropTypes.string,
       url: PropTypes.string,
-      content: PropTypes.string,
     }),
   ),
   onView: PropTypes.func.isRequired,
   onDownload: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
 };
 
 const dataTablePropTypes = {
@@ -262,14 +144,8 @@ const dataTablePropTypes = {
   page: PropTypes.number.isRequired,
   rowsPerPage: PropTypes.number.isRequired,
   emptyMessage: PropTypes.string,
-};
-
-const paginationFooterPropTypes = {
-  count: PropTypes.number.isRequired,
-  rowsPerPage: PropTypes.number.isRequired,
-  page: PropTypes.number.isRequired,
-  onPageChange: PropTypes.func.isRequired,
-  onRowsPerPageChange: PropTypes.func.isRequired,
+  loading: PropTypes.bool,
+  footer: PropTypes.node,
 };
 
 // ==================== UTILITY FUNCTIONS ====================
@@ -308,17 +184,14 @@ const useFilters = (data) => {
 
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
+      const has = (v) => String(v || "").toLowerCase().includes(searchLower);
       result = result.filter(
         (item) =>
-          item.occupationTitle.toLowerCase().includes(searchLower) ||
-          item.ncsCode.toLowerCase().includes(searchLower) ||
-          item.sector.toLowerCase().includes(searchLower) ||
-          item.courseTitle.toLowerCase().includes(searchLower) ||
-          item.units.some(
-            (unit) =>
-              unit.unitCode.toLowerCase().includes(searchLower) ||
-              unit.unitTitle.toLowerCase().includes(searchLower),
-          ),
+          has(item.sector) ||
+          has(item.occupation) ||
+          has(item.bqfLevel) ||
+          has(item.programmeTitle) ||
+          item.units.some((unit) => has(unit.unitCode) || has(unit.unitTitle)),
       );
     }
 
@@ -366,69 +239,43 @@ const usePagination = (data) => {
 };
 
 // ==================== REUSABLE COMPONENTS ====================
-const FilterBar = ({
-  sectors,
-  filters,
-  onFilterChange,
-  onClearFilters,
-  rowsPerPage,
-  onRowsPerPageChange,
-}) => (
-  <Grid container spacing={2} sx={{ mb: 3, mt: 1 }}>
+const FilterBar = ({ sectors, filters, onFilterChange }) => (
+  <Grid
+    container
+    spacing={1}
+    alignItems="center"
+    sx={{ justifyContent: "flex-end", mb: 2 }}
+  >
     <Grid item size={{ xs: 12, md: 3 }}>
-      <FormControl fullWidth size="small">
-        <InputLabel>Sector</InputLabel>
-        <Select
-          name="sector"
-          value={filters.sector}
-          onChange={onFilterChange}
-          label="Sector"
-        >
-          {sectors.map((sector) => (
-            <MenuItem key={sector} value={sector}>
-              {sector}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <TextField
+        select
+        label="Sector"
+        name="sector"
+        size="small"
+        fullWidth
+        value={filters.sector}
+        onChange={onFilterChange}
+        sx={SELECT_SX}
+      >
+        {sectors.map((sector) => (
+          <MenuItem key={sector} value={sector}>
+            {sector}
+          </MenuItem>
+        ))}
+      </TextField>
     </Grid>
-
-    <Grid item size={{ xs: 12, md: 3 }}>
-      <FormControl fullWidth size="small">
-        <InputLabel>Show</InputLabel>
-        <Select value={rowsPerPage} onChange={onRowsPerPageChange} label="Show">
-          {ROWS_PER_PAGE_OPTIONS.map((value) => (
-            <MenuItem key={value} value={value}>
-              {value} entries
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    </Grid>
-
-    <Grid item size={{ xs: 12, md: 6 }}>
-      <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-        <TextField
-          size="small"
-          placeholder="Search by Occupation, NCS Code, Course Title..."
-          name="search"
-          value={filters.search}
-          onChange={onFilterChange}
-          sx={{ flex: 1, maxWidth: 300 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-        <Button variant="contained" color="secondary" onClick={onClearFilters}>
-          Clear
-        </Button>
-      </Box>
+    <Grid item size={{ xs: 12, md: 4 }}>
+      <TextField
+        label="Search NCS"
+        name="search"
+        variant="outlined"
+        size="small"
+        fullWidth
+        value={filters.search}
+        onChange={onFilterChange}
+        placeholder="Search by Occupation, Programme Title or Unit"
+        sx={INPUT_SX}
+      />
     </Grid>
   </Grid>
 );
@@ -468,7 +315,7 @@ const UnitTitles = ({ units }) => {
 
 UnitTitles.propTypes = unitTitlesPropTypes;
 
-const FileAttachments = ({ documents, onView, onDownload }) => {
+const FileAttachments = ({ documents, onView, onDownload, disabled }) => {
   if (!documents || documents.length === 0) {
     return (
       <Typography variant="caption" color="textSecondary">
@@ -500,6 +347,7 @@ const FileAttachments = ({ documents, onView, onDownload }) => {
             <IconButton
               size="small"
               onClick={() => onView(file)}
+              disabled={disabled || !file.url}
               sx={{ p: 0.3 }}
             >
               <VisibilityIcon fontSize="small" />
@@ -509,6 +357,7 @@ const FileAttachments = ({ documents, onView, onDownload }) => {
             <IconButton
               size="small"
               onClick={() => onDownload(file)}
+              disabled={disabled || !file.url}
               sx={{ p: 0.3 }}
             >
               <DownloadIcon fontSize="small" />
@@ -527,7 +376,9 @@ const DataTable = ({
   data,
   page,
   rowsPerPage,
-  emptyMessage = "No data available",
+  emptyMessage = "No data available in table",
+  loading = false,
+  footer = null,
 }) => {
   const paginatedData = data.slice(
     page * rowsPerPage,
@@ -535,22 +386,26 @@ const DataTable = ({
   );
 
   return (
-    <TableContainer>
-      <Table size="small" sx={TABLE_STYLE}>
+    <TableContainer component={Paper} elevation={1}>
+      <Table size="small" sx={TABLE_SX}>
         <TableHead>
-          <TableRow sx={{ background: "#f5f7fa" }}>
-            <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
+          <TableRow>
+            <TableCell>#</TableCell>
             {columns.map((col) => (
-              <TableCell key={col.id} sx={{ fontWeight: 600 }}>
-                {col.label}
-              </TableCell>
+              <TableCell key={col.id}>{col.label}</TableCell>
             ))}
           </TableRow>
         </TableHead>
         <TableBody>
-          {paginatedData.length > 0 ? (
+          {loading ? (
+            <TableRow>
+              <TableCell colSpan={columns.length + 1} align="center">
+                <CircularProgress size={30} />
+              </TableCell>
+            </TableRow>
+          ) : paginatedData.length > 0 ? (
             paginatedData.map((item, index) => (
-              <TableRow key={item.id} hover>
+              <TableRow key={item.id}>
                 <TableCell>{page * rowsPerPage + index + 1}</TableCell>
                 {columns.map((col) => (
                   <TableCell key={col.id}>
@@ -561,160 +416,127 @@ const DataTable = ({
             ))
           ) : (
             <TableRow>
-              <TableCell
-                colSpan={columns.length + 1}
-                align="center"
-                sx={{ py: 4 }}
-              >
-                <Typography color="text.secondary">{emptyMessage}</Typography>
+              <TableCell colSpan={columns.length + 1} align="center">
+                {emptyMessage}
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
+      {footer}
     </TableContainer>
   );
 };
 
 DataTable.propTypes = dataTablePropTypes;
 
-const PaginationFooter = ({
-  count,
-  rowsPerPage,
-  page,
-  onPageChange,
-  onRowsPerPageChange,
-}) => (
-  <Box
-    sx={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 1,
-    }}
-  >
-    <Typography variant="caption" color="text.secondary">
-      Showing {Math.min((page + 1) * rowsPerPage, count)} of {count} entries
-    </Typography>
-    <TablePagination
-      rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
-      component="div"
-      count={count}
-      rowsPerPage={rowsPerPage}
-      page={page}
-      onPageChange={onPageChange}
-      onRowsPerPageChange={onRowsPerPageChange}
-    />
-  </Box>
-);
-
-PaginationFooter.propTypes = paginationFooterPropTypes;
-
 // ==================== MAIN COMPONENT ====================
 const NcsPublication = () => {
   const [allStandards, setAllStandards] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const filters = useFilters(allStandards);
   const pagination = usePagination(filters.filteredData);
 
-  // Load data on mount
+  // Load NCS data from the backend
   useEffect(() => {
-    setAllStandards(SAMPLE_DATA);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await PublicPageService.getNcsPublications();
+        if (res instanceof Error || res?.isAxiosError) throw res;
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        setAllStandards(rows.map(transformNcs));
+      } catch (error) {
+        console.error("Error fetching NCS publications:", error);
+        toast.error("Failed to load National Competency Standards");
+        setAllStandards([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   // Reset page when filters change
   useEffect(() => {
     pagination.handleChangePage(null, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.filteredData.length]);
 
   const sectors = useMemo(() => getUniqueSectors(allStandards), [allStandards]);
 
-  const handleFileView = useCallback((file) => {
-    if (file.documentId) {
-      window.open(
-        `/api/v1/user/management/ncs/download-file/${file.documentId}`,
-        "_blank",
-      );
-    } else if (file.url) {
-      window.open(file.url, "_blank");
-    } else if (file.content) {
-      const fileUrl = `data:${file.contentType || "application/octet-stream"};base64,${file.content}`;
-      window.open(fileUrl, "_blank");
-    } else {
-      alert("File URL not available");
+  /** Fetch a stored document as a blob URL (same API as the NCS create page). */
+  const fetchBlobUrl = async (file) => {
+    const response = await CommonService.fetchDocument(file.name, file.url);
+    const blob = new Blob([response.data], {
+      type: response.headers?.["content-type"] || "application/octet-stream",
+    });
+    return window.URL.createObjectURL(blob);
+  };
+
+  const handleFileView = useCallback(async (file) => {
+    if (!file?.url) {
+      toast.error("File not available");
+      return;
+    }
+    try {
+      setDownloading(true);
+      const url = await fetchBlobUrl(file);
+      window.open(url, "_blank");
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      console.error("Error viewing file:", error);
+      toast.error("Failed to open file");
+    } finally {
+      setDownloading(false);
     }
   }, []);
 
-  const handleFileDownload = useCallback((file) => {
-    const downloadFile = (url, filename) => {
+  const handleFileDownload = useCallback(async (file) => {
+    if (!file?.url) {
+      toast.error("File not available");
+      return;
+    }
+    try {
+      setDownloading(true);
+      const url = await fetchBlobUrl(file);
       const link = document.createElement("a");
       link.href = url;
-      link.download = filename || "download";
+      link.download = file.name || "download";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-    };
-
-    if (file.documentId) {
-      downloadFile(
-        `/api/v1/user/management/ncs/download-file/${file.documentId}`,
-        file.name,
-      );
-    } else if (file.url) {
-      downloadFile(file.url, file.name);
-    } else if (file.content) {
-      const fileUrl = `data:${file.contentType || "application/octet-stream"};base64,${file.content}`;
-      downloadFile(fileUrl, file.name);
-    } else {
-      alert("File content not available");
+      link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      toast.error("Failed to download file");
+    } finally {
+      setDownloading(false);
     }
   }, []);
 
   // Table columns configuration
   const columns = [
+    { id: "sector", label: "Sector", render: (item) => item.sector },
+    { id: "occupation", label: "Occupation", render: (item) => item.occupation },
     {
-      id: "sector",
-      label: "Sector",
-      render: (item) => item.sector,
-    },
-    {
-      id: "occupationTitle",
-      label: "Occupation Title",
-      render: (item) => item.occupationTitle,
-    },
-    {
-      id: "ncsCode",
-      label: "NCS Code",
+      id: "bqfLevel",
+      label: "BQF Certificate Level",
       render: (item) => (
         <Chip
-          label={item.ncsCode}
+          label={item.bqfLevel}
           size="small"
           color="primary"
           variant="outlined"
         />
       ),
     },
+    { id: "validityDate", label: "Validity Date", render: (item) => item.validityDate },
     {
-      id: "qualificationLevel",
-      label: "BQF Level",
-      render: (item) => (
-        <Chip
-          label={item.qualificationLevel}
-          size="small"
-          color="secondary"
-          variant="outlined"
-        />
-      ),
-    },
-    {
-      id: "courseTitle",
-      label: "Course Title",
-      render: (item) => item.courseTitle,
-    },
-    {
-      id: "validity",
-      label: "Validity",
-      render: (item) => item.validity,
+      id: "programmeTitle",
+      label: "Programme Title",
+      render: (item) => item.programmeTitle,
     },
     {
       id: "unitCode",
@@ -734,48 +556,53 @@ const NcsPublication = () => {
           documents={item.documents}
           onView={handleFileView}
           onDownload={handleFileDownload}
+          disabled={downloading}
         />
       ),
     },
   ];
 
   return (
-    <Paper sx={{ p: 3, mt: 2 }}>
-      <Typography variant="h5" gutterBottom fontWeight={600}>
+    <Paper {...PAPER_PROPS}>
+      <Typography variant="h5" gutterBottom>
         National Competency Standards (NCS)
       </Typography>
+
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="body2" color="text.secondary">
+          Published National Competency Standards with their units and
+          attachments.
+        </Typography>
+      </Box>
 
       <FilterBar
         sectors={sectors}
         filters={filters.filters}
         onFilterChange={filters.handleFilterChange}
-        onClearFilters={filters.handleClearFilters}
-        rowsPerPage={pagination.rowsPerPage}
-        onRowsPerPageChange={pagination.handleChangeRowsPerPage}
       />
-
-      <Divider sx={{ my: 2 }} />
 
       <DataTable
         columns={columns}
         data={filters.filteredData}
         page={pagination.page}
         rowsPerPage={pagination.rowsPerPage}
+        loading={loading}
         emptyMessage={
           filters.filters.search || filters.filters.sector !== "All"
-            ? "No records found matching your filters"
-            : "No data available"
+            ? "No records match your filters"
+            : "No data available in table"
         }
-      />
-
-      <Divider sx={{ my: 2 }} />
-
-      <PaginationFooter
-        count={filters.filteredData.length}
-        rowsPerPage={pagination.rowsPerPage}
-        page={pagination.page}
-        onPageChange={pagination.handleChangePage}
-        onRowsPerPageChange={pagination.handleChangeRowsPerPage}
+        footer={
+          <TablePagination
+            rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
+            component="div"
+            count={filters.filteredData.length}
+            rowsPerPage={pagination.rowsPerPage}
+            page={pagination.page}
+            onPageChange={pagination.handleChangePage}
+            onRowsPerPageChange={pagination.handleChangeRowsPerPage}
+          />
+        }
       />
     </Paper>
   );

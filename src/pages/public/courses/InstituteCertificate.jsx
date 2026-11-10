@@ -6,4 +6,4 @@ const InstituteCertificate = () => {
   )
 }
 
-export default InstituteCertificate
+export default InstituteCertificate;

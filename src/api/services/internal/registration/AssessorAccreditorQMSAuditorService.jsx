@@ -49,6 +49,14 @@ class AssessorAccreditorQMSAuditorService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  // Public report: approved registrations (32 Assessor, 5 Accreditor, 3 QMS Auditor)
+  getRegisteredByServiceId(serviceId) {
+    return apiClient
+      .get(`/api/v1/public/register/get-registered/${serviceId}`)
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new AssessorAccreditorQMSAuditorService();

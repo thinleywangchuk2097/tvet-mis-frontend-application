@@ -34,6 +34,35 @@ import {
 } from "@mui/material";
 
 import AddIcon from "@mui/icons-material/Add";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import { exportToExcel } from "@/utils/exportExcel";
+
+// Sector filter value that loads every NCS
+const ALL_SECTORS = "all";
+
+// NCS due for renewal: expiring within this many days is flagged red
+const EXPIRY_WARNING_DAYS = 90; // 3 months
+
+/** Validity state of an NCS: expired / soon (within 3 months) / valid / none. */
+const getValidityInfo = (validityDate) => {
+  if (!validityDate || validityDate === "N/A") return { state: "none", days: null };
+  const d = new Date(validityDate);
+  if (Number.isNaN(d.getTime())) return { state: "none", days: null };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  const days = Math.round((d - today) / 86400000);
+  if (days < 0) return { state: "expired", days };
+  if (days <= EXPIRY_WARNING_DAYS) return { state: "soon", days };
+  return { state: "valid", days };
+};
+
+const VALIDITY_FILTERS = [
+  { value: "", label: "All" },
+  { value: "soon", label: "Expiring within 3 months" },
+  { value: "expired", label: "Expired" },
+  { value: "valid", label: "Valid" },
+];
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
@@ -281,15 +310,19 @@ const CreateNcsIndex = () => {
   const [sectors, setSectors] = useState([]);
   const [certificationLevels, setCertificationLevels] = useState([]);
   const [occupations, setOccupations] = useState([]);
-  const [allOccupations, setAllOccupations] = useState([]);
   const [selectedSectorId, setSelectedSectorId] = useState("");
+
+  // List filters: sector is fetched from the API, occupation filters the loaded rows
+  const [filterSectorId, setFilterSectorId] = useState("");
+  const [filterOccupationId, setFilterOccupationId] = useState("");
+  const [loadingList, setLoadingList] = useState(false);
+  const [validityFilter, setValidityFilter] = useState("");
 
   // ==================== REFS ====================
 
   const sectorsRef = useRef([]);
   const certificationsRef = useRef([]);
   const occupationsRef = useRef([]);
-  const allOccupationsRef = useRef([]);
 
   // ==================== NCS DATA ====================
 
@@ -331,41 +364,6 @@ const CreateNcsIndex = () => {
     } catch (error) {
       console.error("Error fetching certification levels:", error);
       toast.error("Failed to fetch certification levels");
-      return [];
-    }
-  };
-
-  const fetchAllOccupations = async () => {
-    try {
-      const sectorsResponse = await CommonService.getAllSectors();
-      const sectorsData = sectorsResponse.data || [];
-      let allOccs = [];
-      for (const sector of sectorsData) {
-        try {
-          const occResponse = await CommonService.getOccupationsBySectorId(
-            sector.id,
-          );
-          const occData = occResponse.data || [];
-          allOccs = [...allOccs, ...occData];
-        } catch (error) {
-          console.error(
-            `Error fetching occupations for sector ${sector.id}:`,
-            error,
-          );
-        }
-      }
-
-      const uniqueOccs = allOccs.filter(
-        (occ, index, self) =>
-          index === self.findIndex((item) => item.id === occ.id),
-      );
-
-      setAllOccupations(uniqueOccs);
-      allOccupationsRef.current = uniqueOccs;
-
-      return uniqueOccs;
-    } catch (error) {
-      console.error("Error fetching all occupations:", error);
       return [];
     }
   };
@@ -442,19 +440,6 @@ const CreateNcsIndex = () => {
 
   const getOccupationName = (occupationId) => {
     if (!occupationId) return "N/A";
-    const allData =
-      allOccupationsRef.current.length > 0
-        ? allOccupationsRef.current
-        : allOccupations;
-
-    if (allData && allData.length > 0) {
-      const occupation = allData.find(
-        (item) => Number(item.id) === Number(occupationId),
-      );
-      if (occupation) {
-        return occupation.occupationName;
-      }
-    }
 
     const dataToUse =
       occupationsRef.current.length > 0 ? occupationsRef.current : occupations;
@@ -615,9 +600,19 @@ const CreateNcsIndex = () => {
 
   // ==================== DATA FETCHING ====================
 
-  const fetchNcsData = async () => {
+  const fetchNcsData = async (sectorId = filterSectorId) => {
+    if (!sectorId) {
+      setData([]);
+      return;
+    }
+
+    setLoadingList(true);
     try {
-      const response = await NcsService.getNcsDetails(access_token);
+      // "all" = every NCS; otherwise one sector
+      const response =
+        sectorId === ALL_SECTORS
+          ? await NcsService.getNcsDetails(access_token)
+          : await NcsService.getNcsDetailsBySector(sectorId, access_token);
 
       console.log("Fetched NCS data:", response.data);
 
@@ -647,7 +642,7 @@ const CreateNcsIndex = () => {
           id: item.id || item.publicationId,
           applicationNo: item.application_no || "",
           sector: getSectorName(sectorId),
-          occupation: getOccupationName(occupationId),
+          occupation: item.occupation_name || getOccupationName(occupationId),
           bqfLevel: getCertificationName(certificationId),
           validityDate: item.validity_date || item.validityDate || "N/A",
           programmeTitle: item.programme_title || item.programmeTitle || "N/A",
@@ -664,6 +659,8 @@ const CreateNcsIndex = () => {
       console.error("Error fetching NCS data:", error);
 
       toast.error("Failed to fetch NCS data");
+    } finally {
+      setLoadingList(false);
     }
   };
 
@@ -753,11 +750,22 @@ const CreateNcsIndex = () => {
           editingId ? "NCS updated successfully!" : "NCS created successfully!",
         );
 
+        const savedSectorId = String(values.sectorId || "");
+
         resetForm();
 
         setOpenDialog(false);
 
-        await fetchNcsData();
+        // show the sector that was just saved
+        if (
+          savedSectorId &&
+          filterSectorId !== ALL_SECTORS &&
+          savedSectorId !== String(filterSectorId)
+        ) {
+          setFilterSectorId(savedSectorId);
+        } else {
+          await fetchNcsData();
+        }
       }
     } catch (error) {
       console.error("Error submitting NCS:", error);
@@ -785,8 +793,6 @@ const CreateNcsIndex = () => {
           fetchCertificationLevels(),
         ]);
 
-        await fetchAllOccupations();
-
         if (sectorsData?.length > 0) {
           const defaultSector =
             sectorsData.find((sector) => Number(sector.id) === 1) ||
@@ -796,8 +802,6 @@ const CreateNcsIndex = () => {
             await fetchOccupationsBySector(defaultSector.id);
           }
         }
-
-        await fetchNcsData();
       } catch (error) {
         console.error("Error loading data:", error);
 
@@ -809,6 +813,14 @@ const CreateNcsIndex = () => {
 
     loadAllData();
   }, []);
+
+  // Load the list whenever the sector filter changes
+  useEffect(() => {
+    setFilterOccupationId("");
+    setPage(0);
+    fetchNcsData(filterSectorId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSectorId]);
 
   useEffect(() => {
     if (selectedSectorId) {
@@ -1049,13 +1061,81 @@ const CreateNcsIndex = () => {
 
   // ==================== FILTERED DATA ====================
 
+  // Occupation options come from the rows already loaded for the sector
+  const occupationFilterOptions = Array.from(
+    new Map(
+      data
+        .filter((item) => item.occupationId)
+        .map((item) => [String(item.occupationId), item.occupation]),
+    ),
+  ).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+
   const filteredData = data.filter(
     (item) =>
-      item.sector?.toLowerCase().includes(search.toLowerCase()) ||
+      (!validityFilter || getValidityInfo(item.validityDate).state === validityFilter) &&
+      (!filterOccupationId ||
+        String(item.occupationId) === String(filterOccupationId)) &&
+      (item.sector?.toLowerCase().includes(search.toLowerCase()) ||
       item.occupation?.toLowerCase().includes(search.toLowerCase()) ||
       getAllUnitCodes(item).toLowerCase().includes(search.toLowerCase()) ||
-      getAllUnitTitles(item).toLowerCase().includes(search.toLowerCase()),
+        getAllUnitTitles(item).toLowerCase().includes(search.toLowerCase())),
   );
+
+  // Validity summary over the loaded sector(s)
+  const validityCounts = data.reduce(
+    (acc, item) => {
+      const st = getValidityInfo(item.validityDate).state;
+      acc[st] = (acc[st] || 0) + 1;
+      return acc;
+    },
+    { expired: 0, soon: 0, valid: 0, none: 0 },
+  );
+
+  // Excel: one row per unit (NCS details repeated), for what is shown in the table
+  const handleExportExcel = async () => {
+    const rows = [];
+    filteredData.forEach((item, idx) => {
+      const base = {
+        "Sl No": idx + 1,
+        Sector: item.sector,
+        Occupation: item.occupation,
+        "BQF Certificate Level": item.bqfLevel,
+        "Validity Date": item.validityDate,
+        "Validity Status": (() => {
+          const v = getValidityInfo(item.validityDate);
+          if (v.state === "expired") return `Expired (${Math.abs(v.days)} days ago)`;
+          if (v.state === "soon") return `Expires in ${v.days} days`;
+          if (v.state === "valid") return "Valid";
+          return "";
+        })(),
+        "Programme Title": item.programmeTitle,
+      };
+      const units = item.units?.length ? item.units : [null];
+      units.forEach((u) =>
+        rows.push({
+          ...base,
+          "Unit Code": u?.unitCode ?? "",
+          "Unit Title": u?.unitTitle ?? "",
+          Attachments: (item.documents || []).map((d) => d.name).join(", "),
+        }),
+      );
+    });
+    if (rows.length === 0) {
+      toast.info("No data to export");
+      return;
+    }
+    const sectorName =
+      filterSectorId === ALL_SECTORS
+        ? "All_Sectors"
+        : getSectorName(filterSectorId).replace(/[^\w-]+/g, "_");
+    const today = new Date().toISOString().split("T")[0];
+    try {
+      await exportToExcel(rows, `NCS_${sectorName}_${today}`);
+    } catch (error) {
+      console.error("Excel export failed:", error);
+      toast.error("Failed to export Excel");
+    }
+  };
 
   const tableStyle = {
     border: "1px solid",
@@ -1140,7 +1220,48 @@ const CreateNcsIndex = () => {
           mb: 2,
         }}
       >
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 3 }}>
+          <TextField
+            select
+            label="Sector"
+            size="small"
+            fullWidth
+            value={filterSectorId}
+            onChange={(e) => setFilterSectorId(e.target.value)}
+          >
+            <MenuItem value="">-- Select Sector --</MenuItem>
+            <MenuItem value={ALL_SECTORS}>All Sectors</MenuItem>
+            {sectors.map((sector) => (
+              <MenuItem key={sector.id} value={String(sector.id)}>
+                {sector.sectorName}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 3 }}>
+          <TextField
+            select
+            label="Occupation"
+            size="small"
+            fullWidth
+            value={filterOccupationId}
+            onChange={(e) => {
+              setFilterOccupationId(e.target.value);
+              setPage(0);
+            }}
+            disabled={!filterSectorId || occupationFilterOptions.length === 0}
+          >
+            <MenuItem value="">All Occupations</MenuItem>
+            {occupationFilterOptions.map(([id, name]) => (
+              <MenuItem key={id} value={id}>
+                {name}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 3 }}>
           <TextField
             label="Search by Sector, Occupation, Unit Code or Title"
             variant="outlined"
@@ -1160,7 +1281,18 @@ const CreateNcsIndex = () => {
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 2 }}>
+        <Grid size={{ xs: 12, md: 3 }} sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
+            color="primary"
+            size="small"
+            startIcon={<FileDownloadIcon />}
+            onClick={handleExportExcel}
+            disabled={loadingList || filteredData.length === 0}
+            sx={{ height: "36px", whiteSpace: "nowrap" }}
+          >
+            Export Excel
+          </Button>
           <Button
             variant="contained"
             color="primary"
@@ -1173,6 +1305,47 @@ const CreateNcsIndex = () => {
           </Button>
         </Grid>
       </Grid>
+
+      {/* Validity: red = expired or expiring within 3 months */}
+      {data.length > 0 && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+            mb: 1.5,
+          }}
+        >
+          <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>
+            Validity:
+          </Typography>
+          {VALIDITY_FILTERS.map((f) => {
+            const count =
+              f.value === "" ? data.length : validityCounts[f.value] || 0;
+            const color =
+              f.value === "expired" || f.value === "soon"
+                ? "error"
+                : f.value === "valid"
+                  ? "success"
+                  : "default";
+            return (
+              <Chip
+                key={f.value || "all"}
+                size="small"
+                label={`${f.label} (${count})`}
+                color={color}
+                variant={validityFilter === f.value ? "filled" : "outlined"}
+                onClick={() => {
+                  setValidityFilter(f.value);
+                  setPage(0);
+                }}
+                sx={{ fontWeight: validityFilter === f.value ? 600 : 400 }}
+              />
+            );
+          })}
+        </Box>
+      )}
 
       {/* Table */}
 
@@ -1194,11 +1367,24 @@ const CreateNcsIndex = () => {
           </TableHead>
 
           <TableBody>
-            {filteredData.length > 0 ? (
+            {loadingList ? (
+              <TableRow>
+                <TableCell colSpan={10} align="center" sx={{ py: 3 }}>
+                  <CircularProgress size={24} />
+                </TableCell>
+              </TableRow>
+            ) : filteredData.length > 0 ? (
               filteredData
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((item, index) => (
-                  <TableRow key={item.id}>
+                .map((item, index) => {
+                  const validity = getValidityInfo(item.validityDate);
+                  const dueSoon =
+                    validity.state === "expired" || validity.state === "soon";
+                  return (
+                  <TableRow
+                    key={item.id}
+                    sx={dueSoon ? { bgcolor: "rgba(211, 47, 47, 0.06)" } : undefined}
+                  >
                     <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
 
                     <TableCell>{item.sector}</TableCell>
@@ -1214,7 +1400,36 @@ const CreateNcsIndex = () => {
                       />
                     </TableCell>
 
-                    <TableCell>{item.validityDate}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      <Typography
+                        variant="body2"
+                        color={dueSoon ? "error.main" : "text.primary"}
+                        fontWeight={dueSoon ? 600 : 400}
+                      >
+                        {item.validityDate}
+                      </Typography>
+                      {validity.state === "expired" && (
+                        <Chip
+                          size="small"
+                          color="error"
+                          label={`Expired ${Math.abs(validity.days)} day(s) ago`}
+                          sx={{ height: 20, fontSize: "0.7rem", mt: 0.5 }}
+                        />
+                      )}
+                      {validity.state === "soon" && (
+                        <Chip
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                          label={
+                            validity.days === 0
+                              ? "Expires today"
+                              : `Expires in ${validity.days} day(s)`
+                          }
+                          sx={{ height: 20, fontSize: "0.7rem", mt: 0.5 }}
+                        />
+                      )}
+                    </TableCell>
 
                     <TableCell>{item.programmeTitle}</TableCell>
 
@@ -1248,11 +1463,14 @@ const CreateNcsIndex = () => {
                       </Stack>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
             ) : (
               <TableRow>
                 <TableCell colSpan={10} align="center">
-                  No data available in table
+                  {filterSectorId
+                    ? "No data available in table"
+                    : "Select a Sector to view NCS"}
                 </TableCell>
               </TableRow>
             )}
@@ -1686,6 +1904,9 @@ const CreateNcsIndex = () => {
                                       <TextField
                                         size="small"
                                         placeholder="Unit Title"
+                                        multiline
+                                        minRows={2}
+                                        maxRows={6}
                                         name={`units.${index}.unitTitle`}
                                         value={unit.unitTitle}
                                         onChange={formik.handleChange}
@@ -1725,6 +1946,9 @@ const CreateNcsIndex = () => {
                                       <TextField
                                         size="small"
                                         placeholder="Unit Code"
+                                        multiline
+                                        minRows={2}
+                                        maxRows={6}
                                         name={`units.${index}.unitCode`}
                                         value={unit.unitCode}
                                         onChange={formik.handleChange}
@@ -1902,6 +2126,10 @@ const CreateNcsIndex = () => {
                               formik.setFieldValue("documents", files)
                             }
                             disabled={isFormDisabled()}
+                            // NCS supporting documents: PDF only
+                            acceptedFileTypes=".pdf,application/pdf"
+                            typesLabel="Only PDF files are allowed."
+                            description="Drag and drop PDF files here (PDF only)"
                           />
                         </Box>
 

@@ -27,6 +27,19 @@ class BirmsPaymentService {
       .catch((error) => error);
   }
 
+  // Institute payment page search (own payments, by Payment Advice No / Application No)
+  searchInstitutePayments({ instituteId, query }, token) {
+    return apiClient
+      .get(`/api/v1/private/birms/payment/search-institute-payments`, {
+        params: { instituteId, query: query || "" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getAllPaymentDetails(token) {
     return apiClient
       .get(`/api/v1/private/birms/payment/get-all-payment-details`, {

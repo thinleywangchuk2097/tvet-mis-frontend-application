@@ -6,7 +6,6 @@ import InstituteSesCentreAssessmentCentreProposal from "../pages/public/proposal
 import InstituteSesCentreAssessmentCentre from "../pages/public/registration/InstituteSesCentreAssessmentCentre";
 import AssessorAccreditorQMSAuditor from "../pages/public/registration/AssessorAccreditorQMSAuditor";
 import AssessorAccreditorQMSAuditorRenewal from "../pages/renewal/AssessorAccreditorQMSAuditorRenewal";
-import RPLAssessment from "../pages/public/courses/RPLAssessment";
 
 // assessment result path
 import AssessmentResult from "../pages/public/assessment/AssessmentResult";
@@ -30,7 +29,7 @@ import CurriculumPublication from "../pages/report/CurriculumPublication";
 import FeedbackForm from "../pages/public/FeedbackForm";
 import ViewTracerSend from "../pages/dwps/tracer/ViewTracerSend";
 import PublicationIndex from "../pages/public/publication/PublicationIndex";
-import UploadFormIndex from "../pages/public/forms/UploadFormIndex";
+import FormsIndex from "../pages/public/forms/FormsIndex";
 
 //public routes ..
 export const publicRoutes = [
@@ -109,7 +108,6 @@ export const publicRoutes = [
   {
     path: "course",
     children: [
-      { path: "apply/rpl-assessment", element: <RPLAssessment /> },
       { path: "apply-course/:applicationNo", element: <ApplyCourse /> },
     ],
   },
@@ -123,7 +121,7 @@ export const publicRoutes = [
   },
   {
     path: "forms",
-    children: [{ path: "forms-index", element: <UploadFormIndex /> }],
+    children: [{ path: "forms-index", element: <FormsIndex /> }],
   },
   {
     path: "tracer",

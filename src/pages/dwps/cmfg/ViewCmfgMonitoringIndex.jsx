@@ -52,7 +52,6 @@ const ViewCmfgMonitoringIndex = () => {
   const actionId = useSelector((state) => state.auth.id);
   const userId = useSelector((state) => state.auth.userId);
   const currentRoleId = useSelector((state) => state.auth.current_roleId);
-  console.log("currentRoleId", currentRoleId);
   const [standards, setStandards] = useState([]);
   const [summary, setSummary] = useState(null);
   const [answers, setAnswers] = useState({});

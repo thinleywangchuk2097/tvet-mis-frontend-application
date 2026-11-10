@@ -49,6 +49,21 @@ import TuitionAnnouncementService from "../../api/services/internal/ses-center/T
 import { Empty, Kpi, Panel } from "./DashboardParts";
 import { fmtNum, headCellSx } from "./dashboardUtils";
 
+// Registration validity (validity_date): date and days left, as on the institute dashboard
+const validityInfo = (raw) => {
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    label: date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+    days: Math.ceil((date - new Date()) / 86400000),
+  };
+};
+
 // Status ids used by the ses-centre pages
 const STUDENT_STATUS = { 1: "Active", 2: "Inactive", 3: "Graduated", 4: "Suspended" };
 const TUTOR_ACTIVE = 1;
@@ -395,13 +410,52 @@ const SESCentreDashboard = () => {
               </>
             )}
           </Box>
-          <MuiTooltip title="Refresh">
-            <span>
-              <IconButton onClick={load} disabled={loading} size="small">
-                <RefreshIcon />
-              </IconButton>
-            </span>
-          </MuiTooltip>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {validityInfo(centre?.validity_date) && (() => {
+              const v = validityInfo(centre.validity_date);
+              return (
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 1,
+                    borderRadius: 2,
+                    bgcolor: "background.paper",
+                    border: "1px solid",
+                    borderColor: v.days < 60 ? "warning.main" : "divider",
+                    textAlign: "right",
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    Renewal due
+                  </Typography>
+                  <Typography fontWeight={600} fontSize="0.9rem">
+                    {v.label}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color={
+                      v.days < 0
+                        ? "error.main"
+                        : v.days < 60
+                          ? "warning.main"
+                          : "text.secondary"
+                    }
+                  >
+                    {v.days < 0
+                      ? `${Math.abs(v.days)} days overdue`
+                      : `in ${v.days} days`}
+                  </Typography>
+                </Box>
+              );
+            })()}
+            <MuiTooltip title="Refresh">
+              <span>
+                <IconButton onClick={load} disabled={loading} size="small">
+                  <RefreshIcon />
+                </IconButton>
+              </span>
+            </MuiTooltip>
+          </Box>
         </Box>
 
         {/* Quick actions */}
