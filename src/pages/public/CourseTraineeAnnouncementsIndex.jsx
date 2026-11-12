@@ -9,7 +9,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Grid,
   TextField,
   MenuItem,
   Tooltip,
@@ -126,14 +125,22 @@ const Pill = ({ label, color }) => (
 );
 Pill.propTypes = { label: PropTypes.node, color: PropTypes.string };
 
-// Style for TextField
-const textFieldStyle = {
+// compact filter controls (search + dropdowns)
+const filterSx = {
   "& .MuiOutlinedInput-root": {
-    "&:hover fieldset": {
-      borderColor: "rgba(0, 0, 0, 0.23)",
-    },
+    height: 34,
+    fontSize: "0.8rem",
+    borderRadius: 2,
+    bgcolor: "#fff",
+    "& fieldset": { borderColor: LINE },
+    "&:hover fieldset": { borderColor: "#b9c8dc" },
+    "&.Mui-focused fieldset": { borderColor: "#1565c0", borderWidth: 1 },
   },
+  "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" },
+  "& input::placeholder": { fontSize: "0.8rem", opacity: 0.7 },
 };
+
+const menuItemSx = { fontSize: "0.8rem", minHeight: 32 };
 
 // ── OPTIMIZED MOVING BANNER COMPONENT ──
 const MovingAnnouncementBanner = ({ announcements, navigate }) => {
@@ -568,85 +575,72 @@ const CourseTraineeAnnouncementsIndex = ({
         </Alert>
       )}
 
-      {/* Filters */}
-      <Grid container spacing={1.5} sx={{ mb: 2 }} alignItems="center">
-        <Grid size={{ xs: 12, md: 4 }}>
-          <TextField
-            placeholder="Search by application no, course or training provider"
-            size="small"
-            fullWidth
-            value={searchText}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              setAppPage(0);
-            }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <SearchIcon sx={{ color: "#90a4ae", fontSize: 18, mr: 0.75 }} />
-                ),
-              },
-            }}
-            sx={textFieldStyle}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            select
-            label="Location"
-            size="small"
-            fullWidth
-            value={locationFilter}
-            onChange={(e) => {
-              setLocationFilter(e.target.value);
-              setAppPage(0);
-            }}
-            sx={textFieldStyle}
-          >
-            <MenuItem value="">All locations</MenuItem>
-            {dzongkhags.map((dzongkhag) => (
-              <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
-                {dzongkhag.dzonkhagName}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            select
-            label="Course start date"
-            size="small"
-            fullWidth
-            value={courseDateFilter}
-            onChange={(e) => {
-              setCourseDateFilter(e.target.value);
-              setAppPage(0);
-            }}
-            sx={textFieldStyle}
-          >
-            <MenuItem value="">All dates</MenuItem>
-            {courseDates.map((date) => (
-              <MenuItem key={date} value={date}>
-                {fmtDate(date)}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-        <Grid
-          size={{ xs: 12, md: 2 }}
-          sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: { md: "flex-end" } }}
+      {/* Filters: one compact row */}
+      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, mb: 1.5 }}>
+        <TextField
+          placeholder="Search application no, course, provider"
+          size="small"
+          value={searchText}
+          onChange={(e) => {
+            setSearchText(e.target.value);
+            setAppPage(0);
+          }}
+          slotProps={{
+            input: {
+              startAdornment: <SearchIcon sx={{ color: "#90a4ae", fontSize: 17, mr: 0.75 }} />,
+            },
+          }}
+          sx={{ ...filterSx, flex: { xs: "1 1 100%", sm: "0 1 320px" } }}
+        />
+        <TextField
+          select
+          size="small"
+          value={locationFilter}
+          onChange={(e) => {
+            setLocationFilter(e.target.value);
+            setAppPage(0);
+          }}
+          slotProps={{ select: { displayEmpty: true, MenuProps: { PaperProps: { sx: { maxHeight: 320 } } } } }}
+          sx={{ ...filterSx, width: { xs: "100%", sm: 190 } }}
         >
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<RestartAltIcon />}
-            onClick={handleReset}
-            sx={{ height: 40, textTransform: "none", fontWeight: 600, flex: { xs: 1, md: "none" } }}
-          >
-            Reset
-          </Button>
-        </Grid>
-      </Grid>
+          <MenuItem value="" sx={menuItemSx}>
+            All locations
+          </MenuItem>
+          {dzongkhags.map((x) => (
+            <MenuItem key={x.id} value={x.id} sx={menuItemSx}>
+              {x.dzonkhagName}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          select
+          size="small"
+          value={courseDateFilter}
+          onChange={(e) => {
+            setCourseDateFilter(e.target.value);
+            setAppPage(0);
+          }}
+          slotProps={{ select: { displayEmpty: true, MenuProps: { PaperProps: { sx: { maxHeight: 320 } } } } }}
+          sx={{ ...filterSx, width: { xs: "100%", sm: 190 } }}
+        >
+          <MenuItem value="" sx={menuItemSx}>
+            All course start dates
+          </MenuItem>
+          {courseDates.map((d) => ({ id: d })).map((x) => (
+            <MenuItem key={x.id} value={x.id} sx={menuItemSx}>
+              {fmtDate(x.id)}
+            </MenuItem>
+          ))}
+        </TextField>
+        <Button
+          size="small"
+          startIcon={<RestartAltIcon sx={{ fontSize: "16px !important" }} />}
+          onClick={handleReset}
+          sx={{ height: 34, px: 1.25, textTransform: "none", fontWeight: 600, fontSize: "0.78rem", color: "text.secondary", "&:hover": { color: "#1565c0", bgcolor: "transparent" } }}
+        >
+          Reset
+        </Button>
+      </Box>
 
       <Typography sx={{ fontSize: "0.78rem", color: "text.secondary", mb: 1 }}>
         {filteredApplications.length} course

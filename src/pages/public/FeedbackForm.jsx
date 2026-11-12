@@ -1,688 +1,746 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import PropTypes from "prop-types";
+import { useNavigate } from "react-router-dom";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  FormControlLabel,
+  Grid,
+  IconButton,
+  MenuItem,
+  Paper,
+  Rating,
+  Stack,
+  Switch,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+  alpha,
+} from "@mui/material";
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
+import ReportGmailerrorredOutlinedIcon from "@mui/icons-material/ReportGmailerrorredOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
+import FeedbackComplaintService from "../../api/services/internal/public/FeedbackComplaintService";
+import {
+  CP_CATEGORIES,
+  FB_CATEGORIES,
+  FILE_TYPES,
+  MAX_FILE_MB,
+  MAX_TOTAL_MB,
+  formatSize,
+  RATING_LABELS,
+  ROLES,
+  URGENCY,
+} from "./feedbackOptions";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const FB_CATEGORIES = [
-    { id: "training", label: "Training Quality", icon: "◈" },
-    { id: "institute", label: "Institute Facilities", icon: "◉" },
-    { id: "assessor", label: "Assessor Performance", icon: "◎" },
-    { id: "support", label: "Admin & Support", icon: "◇" },
-    { id: "other", label: "Other", icon: "◌" },
-];
+const NAVY = "#0a2d6e";
+const COMPLAINT_RED = "#b71c1c";
 
-const CP_CATEGORIES = [
-    { id: "misconduct", label: "Staff Misconduct", icon: "⚑" },
-    { id: "negligence", label: "Negligence", icon: "◬" },
-    { id: "corruption", label: "Corruption / Bribery", icon: "⊘" },
-    { id: "harassment", label: "Harassment", icon: "◭" },
-    { id: "process", label: "Process Failure", icon: "⊛" },
-    { id: "other", label: "Other", icon: "◌" },
-];
-
-const URGENCY = [
-    { id: "low", label: "Low", desc: "General concern", color: "#1A6B4A" },
-    { id: "medium", label: "Medium", desc: "Needs attention", color: "#C9A84C" },
-    { id: "high", label: "High", desc: "Urgent resolution", color: "#C05621" },
-    { id: "critical", label: "Critical", desc: "Immediate action needed", color: "#8B1A1A" },
-];
-
-const RATINGS = [
-    { value: 1, label: "Poor" },
-    { value: 2, label: "Fair" },
-    { value: 3, label: "Good" },
-    { value: 4, label: "Very Good" },
-    { value: 5, label: "Excellent" },
-];
-
-const ROLES = ["Trainee", "Trainer", "Assessor", "Institute Staff", "Employer", "Other"];
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const EMPTY_FORM = {
-    name: "", email: "", contactNo: "", role: "",
-    // feedback
-    fbCategory: "", rating: 0, experience: "", suggestions: "", recommend: null,
-    // complaint
-    cpCategory: "", incidentDate: "", against: "", institution: "",
-    urgency: "", incidentDetails: "", desiredResolution: "", anonymous: false,
+const EMPTY = {
+  anonymous: false,
+  name: "",
+  email: "",
+  contactNo: "",
+  submitterRole: "",
+  category: "",
+  // feedback
+  rating: 0,
+  experience: "",
+  suggestions: "",
+  recommend: null,
+  // complaint
+  urgency: "",
+  incidentDate: "",
+  againstPerson: "",
+  institution: "",
+  incidentDetails: "",
+  desiredResolution: "",
 };
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+const today = () => new Date().toISOString().slice(0, 10);
+
+const extOf = (name) => (name.includes(".") ? name.split(".").pop().toLowerCase() : "");
+
+// File -> Documentdto (base64), the shape the backend uses everywhere
+const toDocumentDto = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) =>
+      resolve({
+        content: String(e.target.result).split(",")[1],
+        name: file.name,
+        originalFilename: file.name,
+        contentType: file.type || "application/octet-stream",
+        path: null,
+      });
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+
+// numbered section heading inside the form
+const Section = ({ n, title, hint, children }) => (
+  <Box sx={{ mb: 3.5 }}>
+    <Stack direction="row" spacing={1.25} alignItems="baseline" sx={{ mb: 1.75 }}>
+      <Typography sx={{ fontWeight: 800, color: "#f9a825", fontSize: "0.85rem" }}>{n}</Typography>
+      <Box>
+        <Typography sx={{ fontWeight: 700, color: NAVY, fontSize: "1rem" }}>{title}</Typography>
+        {hint && <Typography sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{hint}</Typography>}
+      </Box>
+    </Stack>
+    {children}
+  </Box>
+);
+Section.propTypes = { n: PropTypes.string, title: PropTypes.string, hint: PropTypes.string, children: PropTypes.node };
+
+// pick-one chips (categories)
+const ChoiceChips = ({ options, value, onChange, color, error }) => (
+  <Box>
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+      {options.map((o) => {
+        const on = value === o.id;
+        return (
+          <Box
+            key={o.id}
+            component="button"
+            type="button"
+            onClick={() => onChange(o.id)}
+            aria-pressed={on}
+            sx={{
+              px: 1.75,
+              py: 0.9,
+              borderRadius: 2,
+              border: `1px solid ${on ? color : "#d6dfeb"}`,
+              bgcolor: on ? alpha(color, 0.08) : "#fff",
+              color: on ? color : "#33415c",
+              fontFamily: "inherit",
+              fontSize: "0.85rem",
+              fontWeight: on ? 700 : 500,
+              cursor: "pointer",
+              transition: "all .15s ease",
+              "&:hover": { borderColor: color },
+              "&:focus-visible": { outline: `2px solid ${color}`, outlineOffset: 2 },
+            }}
+          >
+            {o.label}
+          </Box>
+        );
+      })}
+    </Box>
+    {error && <Typography sx={{ color: "error.main", fontSize: "0.75rem", mt: 0.75 }}>{error}</Typography>}
+  </Box>
+);
+ChoiceChips.propTypes = {
+  options: PropTypes.array.isRequired,
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  color: PropTypes.string.isRequired,
+  error: PropTypes.string,
+};
+
+/** Public Feedback / Complaint form (menu: Feedback/Complain). Saved to the backend with a reference number. */
 export default function FeedbackForm() {
-    const [mode, setMode] = useState(null); // null | 'feedback' | 'complaint'
-    const [step, setStep] = useState(1);
-    const [submitted, setSubmitted] = useState(false);
-    const [form, setForm] = useState(EMPTY_FORM);
-    const [errors, setErrors] = useState({});
-    const [hoveredRating, setHoveredRating] = useState(0);
-    const [hoveredRecommend, setHoveredRecommend] = useState(null);
+  const navigate = useNavigate();
+  const [mode, setMode] = useState("feedback"); // feedback | complaint
+  const [form, setForm] = useState(EMPTY);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [done, setDone] = useState(null); // { referenceNo, type }
+  const [copied, setCopied] = useState(false);
+  const [files, setFiles] = useState([]); // complaint attachments (File objects)
+  const [fileError, setFileError] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileInput = useRef(null);
 
-    const set = (key, val) => {
-        setForm((f) => ({ ...f, [key]: val }));
-        setErrors((e) => ({ ...e, [key]: undefined }));
-    };
+  const isComplaint = mode === "complaint";
+  const accent = isComplaint ? COMPLAINT_RED : NAVY;
 
-    const totalSteps = mode === "feedback" ? 3 : 3;
+  const set = (key, value) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setErrors((e) => ({ ...e, [key]: undefined }));
+  };
 
-    const validateStep = () => {
-        const errs = {};
-        if (step === 1) {
-            if (!form.anonymous) {
-                if (!form.name.trim()) errs.name = "Name is required";
-                if (!form.email.trim()) errs.email = "Email is required";
-                else if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = "Enter a valid email";
-            }
-            if (!form.role) errs.role = "Please select your role";
-        }
-        if (step === 2) {
-            if (mode === "feedback") {
-                if (!form.fbCategory) errs.fbCategory = "Please select a category";
-                if (!form.rating) errs.rating = "Please provide a rating";
-            } else {
-                if (!form.cpCategory) errs.cpCategory = "Please select a category";
-                if (!form.urgency) errs.urgency = "Please select urgency level";
-            }
-        }
-        if (step === 3) {
-            if (mode === "feedback") {
-                if (!form.experience.trim()) errs.experience = "Please share your experience";
-                if (form.recommend === null) errs.recommend = "Please answer this question";
-            } else {
-                if (!form.incidentDetails.trim()) errs.incidentDetails = "Please describe the incident";
-            }
-        }
-        setErrors(errs);
-        return Object.keys(errs).length === 0;
-    };
+  const switchMode = (next) => {
+    if (!next || next === mode) return;
+    setMode(next);
+    setForm((f) => ({ ...EMPTY, name: f.name, email: f.email, contactNo: f.contactNo, submitterRole: f.submitterRole }));
+    setErrors({});
+    setServerError("");
+    setFiles([]);
+    setFileError("");
+  };
 
-    const next = () => { if (validateStep()) setStep((s) => s + 1); };
-    const back = () => setStep((s) => s - 1);
-    const submit = () => { if (validateStep()) setSubmitted(true); };
-
-    const reset = () => {
-        setForm(EMPTY_FORM); setStep(1);
-        setSubmitted(false); setMode(null);
-        setErrors({});
-    };
-
-    const isFeedback = mode === "feedback";
-    const isComplaint = mode === "complaint";
-    const accentColor = isComplaint ? "#8B1A1A" : "#1B3A6B";
-    const accentLight = isComplaint ? "#C0392B" : "#2C5282";
-    const accentGold = isComplaint ? "#C05621" : "#C9A84C";
-    const progress = ((step - 1) / totalSteps) * 100;
-    const stepLabels = mode === "feedback"
-        ? ["Your Details", "Assessment", "Your Thoughts"]
-        : ["Your Details", "Incident Info", "Full Account"];
-
-    // ── Mode Selection ───────────────────────────────────────────────────────────
-    if (!mode) {
-        return (
-            <div style={styles.page}>
-                <div style={{ ...styles.card, maxWidth: 680 }}>
-                    <div style={{ ...styles.accentBar, background: "linear-gradient(90deg,#1B3A6B,#8B1A1A)" }} />
-                    <div style={{ ...styles.header, background: "linear-gradient(135deg,#1B3A6B 0%,#16305A 100%)", textAlign: "center", padding: "44px 40px 36px" }}>
-                        <div style={{ ...styles.logoMark, margin: "0 auto 20px" }}>
-                            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                                <rect x="1" y="1" width="20" height="20" rx="4" stroke="#fff" strokeWidth="1.5" />
-                                <path d="M6 11h10M11 6v10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                        </div>
-                        <h1 style={{ ...styles.title, fontSize: "1.7rem" }}>How can we help?</h1>
-                        <p style={styles.subtitle}>Choose the type of submission you'd like to make.</p>
-                    </div>
-                    <div style={{ padding: "32px 40px 40px", display: "flex", flexDirection: "column", gap: 16 }}>
-                        {/* Feedback option */}
-                        <button style={styles.modeBtn} onClick={() => setMode("feedback")}>
-                            <div style={{ ...styles.modeBtnIcon, backgroundColor: "rgba(27,58,107,0.08)", color: "#1B3A6B" }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                    <path d="M8 10h8M8 14h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                </svg>
-                            </div>
-                            <div style={styles.modeBtnText}>
-                                <div style={{ ...styles.modeBtnTitle, color: "#1B3A6B" }}>Submit Feedback</div>
-                                <div style={styles.modeBtnDesc}>Share your experience, rate a course, institute or assessor, and suggest improvements.</div>
-                            </div>
-                            <div style={{ ...styles.modeBtnArrow, color: "#1B3A6B" }}>→</div>
-                        </button>
-
-                        {/* Complaint option */}
-                        <button style={styles.modeBtn} onClick={() => setMode("complaint")}>
-                            <div style={{ ...styles.modeBtnIcon, backgroundColor: "rgba(139,26,26,0.08)", color: "#8B1A1A" }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" />
-                                    <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                </svg>
-                            </div>
-                            <div style={styles.modeBtnText}>
-                                <div style={{ ...styles.modeBtnTitle, color: "#8B1A1A" }}>Lodge a Complaint</div>
-                                <div style={styles.modeBtnDesc}>Report misconduct, negligence, corruption, harassment or a process failure. You may remain anonymous.</div>
-                            </div>
-                            <div style={{ ...styles.modeBtnArrow, color: "#8B1A1A" }}>→</div>
-                        </button>
-
-                        <p style={{ textAlign: "center", fontSize: "0.78rem", color: "#A0AEC0", marginTop: 4 }}>
-                            All submissions are treated with strict confidentiality.
-                        </p>
-                    </div>
-                </div>
-                <style>{keyframes}</style>
-            </div>
-        );
+  // add chosen / dropped files, checking count, type and size
+  const addFiles = (list) => {
+    const incoming = Array.from(list || []);
+    if (!incoming.length) return;
+    const problems = [];
+    const next = [...files];
+    let total = next.reduce((s, f) => s + f.size, 0);
+    for (const f of incoming) {
+      if (!FILE_TYPES.includes(extOf(f.name))) {
+        problems.push(`${f.name}: file type not allowed.`);
+        continue;
+      }
+      if (f.size > MAX_FILE_MB * 1024 * 1024) {
+        problems.push(`${f.name} is larger than ${MAX_FILE_MB} MB.`);
+        continue;
+      }
+      if (next.some((x) => x.name === f.name && x.size === f.size)) continue; // same file twice
+      if (total + f.size > MAX_TOTAL_MB * 1024 * 1024) {
+        problems.push(`${f.name}: attachments together must be ${MAX_TOTAL_MB} MB or less.`);
+        continue;
+      }
+      total += f.size;
+      next.push(f);
     }
+    setFiles(next);
+    setFileError(problems.join(" "));
+  };
 
-    // ── Success Screen ───────────────────────────────────────────────────────────
-    if (submitted) {
-        return (
-            <div style={styles.page}>
-                <div style={{ ...styles.card, maxWidth: 680 }}>
-                    <div style={{ ...styles.accentBar, background: `linear-gradient(90deg,${accentColor},${accentGold})` }} />
-                    <div style={styles.successInner}>
-                        <div style={{ marginBottom: 20 }}>
-                            <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-                                <circle cx="28" cy="28" r="27" stroke={accentColor} strokeWidth="2" />
-                                <path d="M17 28l8 8 14-14" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </div>
-                        <div style={{ ...styles.successTag, marginBottom: 16, backgroundColor: isComplaint ? "rgba(139,26,26,0.08)" : "rgba(27,58,107,0.07)", color: accentColor }}>
-                            {isFeedback ? "✦ Feedback Received" : "⚑ Complaint Lodged"}
-                        </div>
-                        <h2 style={styles.successTitle}>
-                            {form.anonymous ? "Submission received." : `Thank you, ${form.name.split(" ")[0]}.`}
-                        </h2>
-                        <p style={styles.successText}>
-                            {isFeedback
-                                ? "Your feedback has been received and will help us improve vocational training standards across Bhutan."
-                                : "Your complaint has been securely recorded. Our team will review it and take appropriate action within 5–7 working days."}
-                        </p>
-                        {isFeedback && form.fbCategory && (
-                            <div style={styles.successMeta}>
-                                <span style={{ ...styles.successTag, color: "#1B3A6B", backgroundColor: "rgba(27,58,107,0.07)" }}>
-                                    {FB_CATEGORIES.find(c => c.id === form.fbCategory)?.label}
-                                </span>
-                                {form.rating > 0 && (
-                                    <span style={{ ...styles.successTag, color: "#7A600A", backgroundColor: "rgba(201,168,76,0.1)" }}>
-                                        {"★".repeat(form.rating)}{"☆".repeat(5 - form.rating)} · {RATINGS.find(r => r.value === form.rating)?.label}
-                                    </span>
-                                )}
-                            </div>
-                        )}
-                        {isComplaint && form.cpCategory && (
-                            <div style={styles.successMeta}>
-                                <span style={{ ...styles.successTag, color: "#8B1A1A", backgroundColor: "rgba(139,26,26,0.08)" }}>
-                                    {CP_CATEGORIES.find(c => c.id === form.cpCategory)?.label}
-                                </span>
-                                {form.urgency && (
-                                    <span style={{ ...styles.successTag, color: URGENCY.find(u => u.id === form.urgency)?.color, backgroundColor: "rgba(0,0,0,0.04)" }}>
-                                        {URGENCY.find(u => u.id === form.urgency)?.label} Priority
-                                    </span>
-                                )}
-                            </div>
-                        )}
-                        <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                            <button style={styles.restartBtn} onClick={reset}>← Back to Home</button>
-                            <button style={{ ...styles.restartBtn, backgroundColor: accentColor, borderColor: accentColor, color: "#fff" }}
-                                onClick={() => { setForm(EMPTY_FORM); setStep(1); setSubmitted(false); }}>
-                                Submit Another
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <style>{keyframes}</style>
-            </div>
-        );
+  const removeFile = (i) => {
+    setFiles((list) => list.filter((_, idx) => idx !== i));
+    setFileError("");
+  };
+
+  const validate = () => {
+    const e = {};
+    const anonymous = isComplaint && form.anonymous;
+    if (!anonymous) {
+      if (!form.name.trim()) e.name = "Name is required";
+      if (!form.email.trim()) e.email = "Email is required";
+      else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) e.email = "Enter a valid email";
     }
+    if (!form.submitterRole) e.submitterRole = "Select your role";
+    if (!form.category) e.category = "Choose a category";
+    if (isComplaint) {
+      if (!form.urgency) e.urgency = "Choose how urgent this is";
+      if (!form.incidentDetails.trim()) e.incidentDetails = "Describe what happened";
+    } else {
+      if (!form.rating) e.rating = "Give a rating";
+      if (!form.experience.trim()) e.experience = "Share your experience";
+      if (form.recommend === null) e.recommend = "Please answer";
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
-    // ── Form ─────────────────────────────────────────────────────────────────────
+  const submit = async (ev) => {
+    ev.preventDefault();
+    setServerError("");
+    if (!validate()) return;
+    setSaving(true);
+    const anonymous = isComplaint && form.anonymous;
+    let attachments = [];
+    if (isComplaint && files.length) {
+      try {
+        attachments = await Promise.all(files.map(toDocumentDto));
+      } catch (err) {
+        setSaving(false);
+        setServerError(err.message);
+        return;
+      }
+    }
+    const payload = {
+      type: isComplaint ? "COMPLAINT" : "FEEDBACK",
+      anonymous,
+      name: anonymous ? null : form.name.trim(),
+      email: anonymous ? null : form.email.trim(),
+      contactNo: anonymous ? null : form.contactNo.trim() || null,
+      submitterRole: form.submitterRole,
+      category: form.category,
+      ...(isComplaint
+        ? {
+            urgency: form.urgency,
+            incidentDate: form.incidentDate || null,
+            againstPerson: form.againstPerson.trim() || null,
+            institution: form.institution.trim() || null,
+            incidentDetails: form.incidentDetails.trim(),
+            desiredResolution: form.desiredResolution.trim() || null,
+            attachments,
+          }
+        : {
+            rating: form.rating,
+            experience: form.experience.trim(),
+            suggestions: form.suggestions.trim() || null,
+            recommend: form.recommend,
+          }),
+    };
+    const res = await FeedbackComplaintService.submit(payload);
+    setSaving(false);
+    if (!res || res instanceof Error || res.isAxiosError || !res.data?.referenceNo) {
+      setServerError(res?.response?.data?.message || "We could not submit this right now. Please try again.");
+      return;
+    }
+    setDone(res.data);
+  };
+
+  const copyRef = async () => {
+    try {
+      await navigator.clipboard.writeText(done.referenceNo);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard not available */
+    }
+  };
+
+  // ── Thank-you screen ────────────────────────────────────────────────
+  if (done) {
+    const complaint = done.type === "COMPLAINT";
     return (
-        <div style={styles.page}>
-            <div style={styles.card}>
-                <div style={{ ...styles.accentBar, background: `linear-gradient(90deg,${accentColor},${accentGold})` }} />
-
-                {/* Header */}
-                <div style={{ ...styles.header, background: `linear-gradient(135deg,${accentColor} 0%,${accentLight} 100%)` }}>
-                    <div style={styles.headerTop}>
-                        <button style={styles.modeBackBtn} onClick={() => { setMode(null); setStep(1); setErrors({}); }}>
-                            ← Back
-                        </button>
-                        <span style={{ ...styles.headerLabel, marginLeft: "auto" }}>
-                            {isFeedback ? "Feedback Portal" : "Complaints Portal"}
-                        </span>
-                    </div>
-                    <h1 style={styles.title}>
-                        {isFeedback ? "Share Your Experience" : "Lodge a Complaint"}
-                    </h1>
-                    <p style={styles.subtitle}>
-                        {isFeedback
-                            ? "Help us raise standards in vocational education and training."
-                            : "All complaints are handled with strict confidentiality and impartiality."}
-                    </p>
-                </div>
-
-                {/* Progress */}
-                <div style={styles.progressWrap}>
-                    <div style={styles.progressTrack}>
-                        <div style={{ ...styles.progressFill, width: `${progress}%`, background: `linear-gradient(90deg,${accentColor},${accentGold})` }} />
-                    </div>
-                    <div style={styles.stepLabels}>
-                        {stepLabels.map((label, i) => (
-                            <div key={i} style={{ ...styles.stepLabel, ...(step > i + 1 ? styles.stepDone : step === i + 1 ? styles.stepActive : {}) }}>
-                                <div style={{ ...styles.stepDot, ...(step > i + 1 ? { ...styles.stepDotDone, backgroundColor: accentColor, borderColor: accentColor } : step === i + 1 ? { ...styles.stepDotActive, borderColor: accentColor, color: accentColor, backgroundColor: `${accentColor}15` } : {}) }}>
-                                    {step > i + 1 ? "✓" : i + 1}
-                                </div>
-                                <span style={styles.stepText}>{label}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Body */}
-                <div style={styles.body}>
-
-                    {/* ── STEP 1: Identity (shared) ── */}
-                    {step === 1 && (
-                        <div style={styles.stepContent}>
-                            <div style={styles.sectionLabel}>
-                                <span style={{ ...styles.sectionNum, color: accentGold }}>01</span>
-                                {isComplaint ? "Your Identity" : "Who are you?"}
-                            </div>
-
-                            {/* Anonymous toggle — complaint only */}
-                            {isComplaint && (
-                                <div style={styles.anonToggleWrap}>
-                                    <div>
-                                        <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "#2D3748" }}>Submit Anonymously</div>
-                                        <div style={{ fontSize: "0.78rem", color: "#718096", marginTop: 2 }}>Your identity will not be recorded or shared.</div>
-                                    </div>
-                                    <button
-                                        style={{ ...styles.toggle, ...(form.anonymous ? { ...styles.toggleOn, backgroundColor: accentColor } : {}) }}
-                                        onClick={() => set("anonymous", !form.anonymous)}
-                                    >
-                                        <div style={{ ...styles.toggleKnob, ...(form.anonymous ? styles.toggleKnobOn : {}) }} />
-                                    </button>
-                                </div>
-                            )}
-
-                            {!form.anonymous && (
-                                <>
-                                    <div style={styles.fieldRow}>
-                                        <div style={styles.field}>
-                                            <label style={styles.label}>Full Name <span style={styles.req}>*</span></label>
-                                            <input style={{ ...styles.input, ...(errors.name ? styles.inputError : {}) }}
-                                                placeholder="e.g. Pema Dorji" value={form.name}
-                                                onChange={(e) => set("name", e.target.value)} />
-                                            {errors.name && <span style={styles.error}>{errors.name}</span>}
-                                        </div>
-                                        <div style={styles.field}>
-                                            <label style={styles.label}>Email Address <span style={styles.req}>*</span></label>
-                                            <input style={{ ...styles.input, ...(errors.email ? styles.inputError : {}) }}
-                                                placeholder="e.g. pema@example.bt" value={form.email}
-                                                onChange={(e) => set("email", e.target.value)} />
-                                            {errors.email && <span style={styles.error}>{errors.email}</span>}
-                                        </div>
-                                    </div>
-                                    <div style={{ ...styles.field, marginBottom: 20 }}>
-                                        <label style={styles.label}>Contact Number <span style={{ ...styles.req, color: "#A0AEC0", fontWeight: 400 }}>(optional)</span></label>
-                                        <input style={styles.input} placeholder="e.g. 77123456" value={form.contactNo}
-                                            onChange={(e) => set("contactNo", e.target.value)} />
-                                    </div>
-                                </>
-                            )}
-
-                            <div style={styles.field}>
-                                <label style={styles.label}>Your Role <span style={styles.req}>*</span></label>
-                                <div style={styles.roleGrid}>
-                                    {ROLES.map((r) => (
-                                        <button key={r}
-                                            style={{ ...styles.roleBtn, ...(form.role === r ? { ...styles.roleBtnActive, backgroundColor: accentColor, borderColor: accentColor } : {}) }}
-                                            onClick={() => set("role", r)}>{r}</button>
-                                    ))}
-                                </div>
-                                {errors.role && <span style={styles.error}>{errors.role}</span>}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── STEP 2: Feedback — Category + Rating ── */}
-                    {step === 2 && isFeedback && (
-                        <div style={styles.stepContent}>
-                            <div style={styles.sectionLabel}>
-                                <span style={{ ...styles.sectionNum, color: accentGold }}>02</span> What are you rating?
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Feedback Category <span style={styles.req}>*</span></label>
-                                <div style={styles.categoryGrid}>
-                                    {FB_CATEGORIES.map((cat) => (
-                                        <button key={cat.id}
-                                            style={{ ...styles.catBtn, ...(form.fbCategory === cat.id ? { ...styles.catBtnActive, backgroundColor: accentColor, borderColor: accentColor } : {}) }}
-                                            onClick={() => set("fbCategory", cat.id)}>
-                                            <span style={styles.catIcon}>{cat.icon}</span>
-                                            <span style={styles.catLabel}>{cat.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                {errors.fbCategory && <span style={styles.error}>{errors.fbCategory}</span>}
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Overall Rating <span style={styles.req}>*</span></label>
-                                <div style={styles.ratingRow}>
-                                    {RATINGS.map((r) => (
-                                        <button key={r.value}
-                                            style={{ ...styles.starBtn, color: (hoveredRating || form.rating) >= r.value ? "#C9A84C" : "#CBD5E0", transform: hoveredRating === r.value ? "scale(1.25)" : "scale(1)" }}
-                                            onMouseEnter={() => setHoveredRating(r.value)}
-                                            onMouseLeave={() => setHoveredRating(0)}
-                                            onClick={() => set("rating", r.value)}>★</button>
-                                    ))}
-                                    <span style={styles.ratingLabel}>
-                                        {hoveredRating ? RATINGS.find(r => r.value === hoveredRating)?.label
-                                            : form.rating ? RATINGS.find(r => r.value === form.rating)?.label
-                                                : "Select a rating"}
-                                    </span>
-                                </div>
-                                {errors.rating && <span style={styles.error}>{errors.rating}</span>}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── STEP 2: Complaint — Category + Urgency ── */}
-                    {step === 2 && isComplaint && (
-                        <div style={styles.stepContent}>
-                            <div style={styles.sectionLabel}>
-                                <span style={{ ...styles.sectionNum, color: accentGold }}>02</span> Incident Information
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Complaint Category <span style={styles.req}>*</span></label>
-                                <div style={{ ...styles.categoryGrid, gridTemplateColumns: "repeat(3, 1fr)" }}>
-                                    {CP_CATEGORIES.map((cat) => (
-                                        <button key={cat.id}
-                                            style={{ ...styles.catBtn, ...(form.cpCategory === cat.id ? { ...styles.catBtnActive, backgroundColor: accentColor, borderColor: accentColor } : {}) }}
-                                            onClick={() => set("cpCategory", cat.id)}>
-                                            <span style={styles.catIcon}>{cat.icon}</span>
-                                            <span style={styles.catLabel}>{cat.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                {errors.cpCategory && <span style={styles.error}>{errors.cpCategory}</span>}
-                            </div>
-
-                            <div style={styles.fieldRow}>
-                                <div style={styles.field}>
-                                    <label style={styles.label}>Complaint Against <span style={{ ...styles.req, color: "#A0AEC0", fontWeight: 400 }}>(optional)</span></label>
-                                    <input style={styles.input} placeholder="Name or designation"
-                                        value={form.against} onChange={(e) => set("against", e.target.value)} />
-                                </div>
-                                <div style={styles.field}>
-                                    <label style={styles.label}>Institution / Organisation <span style={{ ...styles.req, color: "#A0AEC0", fontWeight: 400 }}>(optional)</span></label>
-                                    <input style={styles.input} placeholder="e.g. Paro VTC"
-                                        value={form.institution} onChange={(e) => set("institution", e.target.value)} />
-                                </div>
-                            </div>
-
-                            <div style={styles.fieldRow}>
-                                <div style={styles.field}>
-                                    <label style={styles.label}>Date of Incident <span style={{ ...styles.req, color: "#A0AEC0", fontWeight: 400 }}>(optional)</span></label>
-                                    <input type="date" style={styles.input} value={form.incidentDate}
-                                        onChange={(e) => set("incidentDate", e.target.value)} />
-                                </div>
-                                <div style={styles.field}>
-                                    <label style={styles.label}>Urgency Level <span style={styles.req}>*</span></label>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                        {URGENCY.map((u) => (
-                                            <button key={u.id}
-                                                style={{
-                                                    ...styles.urgencyBtn,
-                                                    ...(form.urgency === u.id ? { backgroundColor: u.color, borderColor: u.color, color: "#fff", boxShadow: `0 4px 12px ${u.color}40` } : {}),
-                                                }}
-                                                onClick={() => set("urgency", u.id)}>
-                                                {u.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    {errors.urgency && <span style={styles.error}>{errors.urgency}</span>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── STEP 3: Feedback — Thoughts ── */}
-                    {step === 3 && isFeedback && (
-                        <div style={styles.stepContent}>
-                            <div style={styles.sectionLabel}>
-                                <span style={{ ...styles.sectionNum, color: accentGold }}>03</span> Tell us more
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Describe your experience <span style={styles.req}>*</span></label>
-                                <textarea style={{ ...styles.textarea, ...(errors.experience ? styles.inputError : {}) }}
-                                    placeholder="What went well? What could be improved? Be as specific as possible…"
-                                    rows={4} value={form.experience}
-                                    onChange={(e) => set("experience", e.target.value)} />
-                                <span style={styles.charCount}>{form.experience.length} characters</span>
-                                {errors.experience && <span style={styles.error}>{errors.experience}</span>}
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Suggestions for improvement <span style={{ color: "#A0AEC0", fontWeight: 400, fontSize: "0.78rem" }}>(optional)</span></label>
-                                <textarea style={styles.textarea} placeholder="Any specific recommendations or ideas…"
-                                    rows={3} value={form.suggestions}
-                                    onChange={(e) => set("suggestions", e.target.value)} />
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Would you recommend this programme? <span style={styles.req}>*</span></label>
-                                <div style={styles.recommendRow}>
-                                    {[{ val: true, label: "Yes, definitely", icon: "👍" }, { val: false, label: "No, not yet", icon: "👎" }].map(({ val, label, icon }) => (
-                                        <button key={String(val)}
-                                            style={{ ...styles.recommendBtn, ...(form.recommend === val ? (val ? styles.recommendYes : styles.recommendNo) : {}), ...(hoveredRecommend === val && form.recommend !== val ? styles.recommendHover : {}) }}
-                                            onMouseEnter={() => setHoveredRecommend(val)}
-                                            onMouseLeave={() => setHoveredRecommend(null)}
-                                            onClick={() => set("recommend", val)}>
-                                            <span style={{ fontSize: 22 }}>{icon}</span>
-                                            <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                {errors.recommend && <span style={styles.error}>{errors.recommend}</span>}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── STEP 3: Complaint — Full Account ── */}
-                    {step === 3 && isComplaint && (
-                        <div style={styles.stepContent}>
-                            <div style={styles.sectionLabel}>
-                                <span style={{ ...styles.sectionNum, color: accentGold }}>03</span> Full Account
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Describe the incident in detail <span style={styles.req}>*</span></label>
-                                <textarea style={{ ...styles.textarea, ...(errors.incidentDetails ? styles.inputError : {}) }}
-                                    placeholder="Describe what happened, when, where, and who was involved. Include any evidence or witnesses if applicable…"
-                                    rows={5} value={form.incidentDetails}
-                                    onChange={(e) => set("incidentDetails", e.target.value)} />
-                                <span style={styles.charCount}>{form.incidentDetails.length} characters</span>
-                                {errors.incidentDetails && <span style={styles.error}>{errors.incidentDetails}</span>}
-                            </div>
-                            <div style={styles.field}>
-                                <label style={styles.label}>Desired Resolution <span style={{ color: "#A0AEC0", fontWeight: 400, fontSize: "0.78rem" }}>(optional)</span></label>
-                                <textarea style={styles.textarea}
-                                    placeholder="What outcome are you hoping for? e.g. apology, investigation, disciplinary action…"
-                                    rows={3} value={form.desiredResolution}
-                                    onChange={(e) => set("desiredResolution", e.target.value)} />
-                            </div>
-                            {/* Complaint notice */}
-                            <div style={styles.noticeBox}>
-                                <div style={styles.noticeIcon}>ℹ</div>
-                                <p style={styles.noticeText}>
-                                    Your complaint will be reviewed by a designated officer within <strong>5–7 working days</strong>.
-                                    False or malicious complaints may result in disciplinary action.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div style={styles.footer}>
-                    {step > 1 ? (
-                        <button style={styles.backBtn} onClick={back}>← Back</button>
-                    ) : (
-                        <button style={styles.backBtn} onClick={() => { setMode(null); setErrors({}); }}>← Home</button>
-                    )}
-                    <div style={{ flex: 1 }} />
-                    {step < totalSteps ? (
-                        <button style={{ ...styles.nextBtn, background: `linear-gradient(135deg,${accentColor} 0%,${accentLight} 100%)`, boxShadow: `0 4px 16px ${accentColor}40` }} onClick={next}>
-                            Continue →
-                        </button>
-                    ) : (
-                        <button style={{ ...styles.submitBtn, background: `linear-gradient(135deg,${accentColor} 0%,${accentGold} 160%)`, boxShadow: `0 4px 20px ${accentColor}40` }} onClick={submit}>
-                            {isFeedback ? "Submit Feedback ✦" : "Lodge Complaint ⚑"}
-                        </button>
-                    )}
-                </div>
-            </div>
-            <style>{keyframes}</style>
-        </div>
+      <Container maxWidth="sm" sx={{ py: { xs: 4, md: 7 } }}>
+        <Paper variant="outlined" sx={{ p: { xs: 3, md: 4.5 }, borderRadius: 3, textAlign: "center" }}>
+          <CheckCircleOutlineIcon sx={{ fontSize: 56, color: complaint ? COMPLAINT_RED : "#2e7d32" }} />
+          <Typography variant="h5" sx={{ fontWeight: 800, color: NAVY, mt: 1 }}>
+            {complaint ? "Complaint lodged" : "Thank you for your feedback"}
+          </Typography>
+          <Typography sx={{ color: "text.secondary", mt: 1, fontSize: "0.92rem" }}>
+            {complaint
+              ? "Your complaint has been recorded. TVET QC will review it and take appropriate action within 5–7 working days."
+              : "Your feedback helps us raise the standard of technical and vocational training in Bhutan."}
+          </Typography>
+          <Box sx={{ mt: 3, p: 2, borderRadius: 2, bgcolor: alpha(NAVY, 0.04), border: `1px dashed ${alpha(NAVY, 0.25)}` }}>
+            <Typography sx={{ fontSize: "0.75rem", color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.6 }}>
+              Your reference number
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ mt: 0.5 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: "1.35rem", color: NAVY, letterSpacing: 0.5 }}>
+                {done.referenceNo}
+              </Typography>
+              <Button size="small" onClick={copyRef} startIcon={<ContentCopyIcon sx={{ fontSize: "16px !important" }} />} sx={{ textTransform: "none" }}>
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </Stack>
+            <Typography sx={{ fontSize: "0.75rem", color: "text.secondary", mt: 0.5 }}>
+              Keep it for any follow-up with BQPCA.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ mt: 3 }}>
+            <Button variant="outlined" onClick={() => navigate("/")} sx={{ textTransform: "none" }}>
+              Back to home
+            </Button>
+            <Button
+              variant="contained"
+              disableElevation
+              onClick={() => {
+                setDone(null);
+                setForm(EMPTY);
+                setFiles([]);
+              }}
+              sx={{ textTransform: "none", bgcolor: NAVY }}
+            >
+              Submit another
+            </Button>
+          </Stack>
+        </Paper>
+      </Container>
     );
+  }
+
+  // ── Form ────────────────────────────────────────────────────────────
+  const anonymous = isComplaint && form.anonymous;
+  return (
+    <Container maxWidth="md" sx={{ py: { xs: 3, md: 5 } }}>
+      {/* page heading */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ width: 28, height: 3, bgcolor: "#f9a825", borderRadius: 2, mb: 1.25 }} />
+        <Typography component="h1" sx={{ fontWeight: 800, fontSize: { xs: "1.5rem", md: "1.8rem" }, color: NAVY }}>
+          Feedback &amp; Complaints
+        </Typography>
+        <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
+          Tell us about your experience with TVET services, or report a problem for action.
+        </Typography>
+      </Box>
+
+      {/* choose feedback or complaint */}
+      <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+        {[
+          {
+            id: "feedback",
+            title: "Give feedback",
+            text: "Rate a course, institute or service and suggest improvements.",
+            Icon: RateReviewOutlinedIcon,
+            color: NAVY,
+          },
+          {
+            id: "complaint",
+            title: "Lodge a complaint",
+            text: "Report misconduct, negligence or a failed process. Can be anonymous.",
+            Icon: ReportGmailerrorredOutlinedIcon,
+            color: COMPLAINT_RED,
+          },
+        ].map((m) => {
+          const on = mode === m.id;
+          return (
+            <Grid key={m.id} size={{ xs: 12, sm: 6 }}>
+              <Box
+                component="button"
+                type="button"
+                onClick={() => switchMode(m.id)}
+                aria-pressed={on}
+                sx={{
+                  width: "100%",
+                  height: "100%",
+                  textAlign: "left",
+                  display: "flex",
+                  gap: 1.5,
+                  p: 2,
+                  borderRadius: 2.5,
+                  border: `1.5px solid ${on ? m.color : "#dbe3ee"}`,
+                  bgcolor: on ? alpha(m.color, 0.05) : "#fff",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  transition: "all .15s ease",
+                  "&:hover": { borderColor: m.color },
+                  "&:focus-visible": { outline: `2px solid ${m.color}`, outlineOffset: 2 },
+                }}
+              >
+                <Box sx={{ width: 40, height: 40, flexShrink: 0, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(m.color, 0.1), color: m.color }}>
+                  <m.Icon />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontWeight: 700, color: on ? m.color : NAVY }}>{m.title}</Typography>
+                  <Typography sx={{ fontSize: "0.8rem", color: "text.secondary" }}>{m.text}</Typography>
+                </Box>
+              </Box>
+            </Grid>
+          );
+        })}
+      </Grid>
+
+      <Paper
+        component="form"
+        noValidate
+        onSubmit={submit}
+        variant="outlined"
+        sx={{ borderRadius: 3, overflow: "hidden", borderTop: `4px solid ${accent}` }}
+      >
+        <Box sx={{ p: { xs: 2.5, md: 4 } }}>
+          {/* 01 · who */}
+          <Section n="01" title="Your details" hint={isComplaint ? "You may submit anonymously." : undefined}>
+            {isComplaint && (
+              <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, bgcolor: alpha(COMPLAINT_RED, 0.04), border: `1px solid ${alpha(COMPLAINT_RED, 0.15)}` }}>
+                <FormControlLabel
+                  control={<Switch checked={form.anonymous} onChange={(e) => set("anonymous", e.target.checked)} color="error" />}
+                  label={
+                    <Box>
+                      <Typography sx={{ fontWeight: 600, fontSize: "0.9rem" }}>Submit anonymously</Typography>
+                      <Typography sx={{ fontSize: "0.78rem", color: "text.secondary", display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <LockOutlinedIcon sx={{ fontSize: 14 }} /> Your name, email and phone will not be recorded.
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+            )}
+            <Grid container spacing={2}>
+              {!anonymous && (
+                <>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField label="Full name" required fullWidth size="small" value={form.name}
+                      onChange={(e) => set("name", e.target.value)} error={!!errors.name} helperText={errors.name}
+                      slotProps={{ htmlInput: { maxLength: 200 } }} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField label="Email" type="email" required fullWidth size="small" value={form.email}
+                      onChange={(e) => set("email", e.target.value)} error={!!errors.email} helperText={errors.email}
+                      slotProps={{ htmlInput: { maxLength: 200 } }} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField label="Contact number (optional)" fullWidth size="small" value={form.contactNo}
+                      onChange={(e) => set("contactNo", e.target.value)} slotProps={{ htmlInput: { maxLength: 30 } }} />
+                  </Grid>
+                </>
+              )}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField select label="You are a" required fullWidth size="small" value={form.submitterRole}
+                  onChange={(e) => set("submitterRole", e.target.value)} error={!!errors.submitterRole} helperText={errors.submitterRole}>
+                  {ROLES.map((r) => (
+                    <MenuItem key={r} value={r}>{r}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            </Grid>
+          </Section>
+
+          {/* 02 · what */}
+          <Section n="02" title={isComplaint ? "About the complaint" : "Your rating"}>
+            <Typography sx={{ fontSize: "0.85rem", fontWeight: 600, mb: 1 }}>
+              Category <Box component="span" sx={{ color: "error.main" }}>*</Box>
+            </Typography>
+            <ChoiceChips
+              options={isComplaint ? CP_CATEGORIES : FB_CATEGORIES}
+              value={form.category}
+              onChange={(v) => set("category", v)}
+              color={accent}
+              error={errors.category}
+            />
+
+            {isComplaint ? (
+              <>
+                <Typography sx={{ fontSize: "0.85rem", fontWeight: 600, mt: 2.5, mb: 1 }}>
+                  How urgent is it? <Box component="span" sx={{ color: "error.main" }}>*</Box>
+                </Typography>
+                <ToggleButtonGroup
+                  exclusive
+                  value={form.urgency}
+                  onChange={(_, v) => v && set("urgency", v)}
+                  sx={{ flexWrap: "wrap", gap: 1, "& .MuiToggleButtonGroup-grouped": { border: "1px solid #d6dfeb !important", borderRadius: "8px !important", m: 0 } }}
+                >
+                  {URGENCY.map((u) => (
+                    <ToggleButton
+                      key={u.id}
+                      value={u.id}
+                      sx={{
+                        textTransform: "none",
+                        px: 1.75,
+                        py: 0.75,
+                        display: "block",
+                        textAlign: "left",
+                        "&.Mui-selected": { bgcolor: alpha(u.color, 0.1), borderColor: `${u.color} !important`, color: u.color },
+                      }}
+                    >
+                      <Box sx={{ fontWeight: 700, fontSize: "0.85rem", lineHeight: 1.2 }}>{u.label}</Box>
+                      <Box sx={{ fontSize: "0.72rem", color: "text.secondary" }}>{u.desc}</Box>
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+                {errors.urgency && <Typography sx={{ color: "error.main", fontSize: "0.75rem", mt: 0.75 }}>{errors.urgency}</Typography>}
+
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField label="Date of incident" type="date" fullWidth size="small" value={form.incidentDate}
+                      onChange={(e) => set("incidentDate", e.target.value)}
+                      slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: today() } }} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField label="Against (person / office)" fullWidth size="small" value={form.againstPerson}
+                      onChange={(e) => set("againstPerson", e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField label="Institute / organisation" fullWidth size="small" value={form.institution}
+                      onChange={(e) => set("institution", e.target.value)} slotProps={{ htmlInput: { maxLength: 300 } }} />
+                  </Grid>
+                </Grid>
+              </>
+            ) : (
+              <>
+                <Typography sx={{ fontSize: "0.85rem", fontWeight: 600, mt: 2.5, mb: 0.5 }}>
+                  Overall rating <Box component="span" sx={{ color: "error.main" }}>*</Box>
+                </Typography>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Rating
+                    value={form.rating}
+                    onChange={(_, v) => set("rating", v || 0)}
+                    size="large"
+                    sx={{ color: "#f9a825" }}
+                  />
+                  <Typography sx={{ fontSize: "0.85rem", color: "text.secondary" }}>
+                    {form.rating ? RATING_LABELS[form.rating] : "Select 1–5 stars"}
+                  </Typography>
+                </Stack>
+                {errors.rating && <Typography sx={{ color: "error.main", fontSize: "0.75rem" }}>{errors.rating}</Typography>}
+              </>
+            )}
+          </Section>
+
+          {/* 03 · details */}
+          <Section n="03" title={isComplaint ? "What happened" : "Your thoughts"}>
+            <Stack spacing={2}>
+              {isComplaint ? (
+                <>
+                  <TextField label="Describe the incident" required fullWidth multiline minRows={4} value={form.incidentDetails}
+                    onChange={(e) => set("incidentDetails", e.target.value)} error={!!errors.incidentDetails}
+                    helperText={errors.incidentDetails || "Include what happened, where, and who was involved."}
+                    slotProps={{ htmlInput: { maxLength: 5000 } }} />
+                  <TextField label="What outcome are you seeking? (optional)" fullWidth multiline minRows={2}
+                    value={form.desiredResolution} onChange={(e) => set("desiredResolution", e.target.value)}
+                    slotProps={{ htmlInput: { maxLength: 3000 } }} />
+
+                  {/* supporting documents */}
+                  <Box>
+                    <Typography sx={{ fontSize: "0.85rem", fontWeight: 600, mb: 1 }}>
+                      Supporting documents <Box component="span" sx={{ fontWeight: 400, color: "text.secondary" }}>(optional)</Box>
+                    </Typography>
+                    <input
+                      ref={fileInput}
+                      type="file"
+                      multiple
+                      hidden
+                      accept={FILE_TYPES.map((x) => `.${x}`).join(",")}
+                      onChange={(e) => {
+                        addFiles(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                    <Box
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => fileInput.current?.click()}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fileInput.current?.click()}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOver(true);
+                      }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                        addFiles(e.dataTransfer.files);
+                      }}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        textAlign: "center",
+                        border: `1.5px dashed ${dragOver ? COMPLAINT_RED : "#c9d4e3"}`,
+                        bgcolor: dragOver ? alpha(COMPLAINT_RED, 0.04) : "#fafbfd",
+                        cursor: "pointer",
+                        display: files.length ? "none" : "block",
+                        transition: "all .15s ease",
+                        "&:hover": { borderColor: COMPLAINT_RED },
+                        "&:focus-visible": { outline: `2px solid ${COMPLAINT_RED}`, outlineOffset: 2 },
+                      }}
+                    >
+                      <AttachFileIcon sx={{ color: "#8a9ab0" }} />
+                      <Typography sx={{ fontSize: "0.85rem", fontWeight: 600, color: "#33415c" }}>
+                        Click to choose files, or drag them here
+                      </Typography>
+                      <Typography sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
+                        PDF, Word, Excel, JPG or PNG · {MAX_FILE_MB} MB each · add as many as you need
+                      </Typography>
+                    </Box>
+                    {fileError && <Typography sx={{ color: "error.main", fontSize: "0.75rem", mt: 0.75 }}>{fileError}</Typography>}
+                    {files.length > 0 && (
+                      <Stack spacing={0.75} sx={{ mt: 1.25 }}>
+                        {files.map((f, i) => (
+                          <Stack
+                            key={`${f.name}-${f.size}`}
+                            direction="row"
+                            alignItems="center"
+                            spacing={1}
+                            sx={{ px: 1.25, py: 0.75, borderRadius: 1.5, border: "1px solid #e3eaf4", bgcolor: "#fff" }}
+                          >
+                            <InsertDriveFileOutlinedIcon sx={{ fontSize: 18, color: COMPLAINT_RED }} />
+                            <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem" }} noWrap title={f.name}>
+                              {f.name}
+                            </Typography>
+                            <Typography sx={{ fontSize: "0.75rem", color: "text.secondary" }}>{formatSize(f.size)}</Typography>
+                            <IconButton size="small" aria-label={`Remove ${f.name}`} onClick={() => removeFile(i)}>
+                              <CloseIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Stack>
+                        ))}
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDragOver(true);
+                          }}
+                          onDragLeave={() => setDragOver(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setDragOver(false);
+                            addFiles(e.dataTransfer.files);
+                          }}
+                          sx={{
+                            px: 1,
+                            py: 0.5,
+                            borderRadius: 1.5,
+                            border: `1px dashed ${dragOver ? COMPLAINT_RED : "transparent"}`,
+                          }}
+                        >
+                          <Button
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => fileInput.current?.click()}
+                            sx={{ textTransform: "none", fontWeight: 600, color: COMPLAINT_RED }}
+                          >
+                            Add more files
+                          </Button>
+                          <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
+                            {files.length} file{files.length > 1 ? "s" : ""} ·{" "}
+                            {formatSize(files.reduce((s, f) => s + f.size, 0))} of {MAX_TOTAL_MB} MB
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                    )}
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <TextField label="Describe your experience" required fullWidth multiline minRows={4} value={form.experience}
+                    onChange={(e) => set("experience", e.target.value)} error={!!errors.experience} helperText={errors.experience}
+                    slotProps={{ htmlInput: { maxLength: 5000 } }} />
+                  <TextField label="Suggestions for improvement (optional)" fullWidth multiline minRows={2}
+                    value={form.suggestions} onChange={(e) => set("suggestions", e.target.value)}
+                    slotProps={{ htmlInput: { maxLength: 3000 } }} />
+                  <Box>
+                    <Typography sx={{ fontSize: "0.85rem", fontWeight: 600, mb: 1 }}>
+                      Would you recommend this programme or service to others? <Box component="span" sx={{ color: "error.main" }}>*</Box>
+                    </Typography>
+                    <ToggleButtonGroup
+                      exclusive
+                      size="small"
+                      value={form.recommend}
+                      onChange={(_, v) => v !== null && set("recommend", v)}
+                    >
+                      <ToggleButton value={true} sx={{ textTransform: "none", px: 3 }}>Yes</ToggleButton>
+                      <ToggleButton value={false} sx={{ textTransform: "none", px: 3 }}>No</ToggleButton>
+                    </ToggleButtonGroup>
+                    {errors.recommend && <Typography sx={{ color: "error.main", fontSize: "0.75rem", mt: 0.5 }}>{errors.recommend}</Typography>}
+                  </Box>
+                </>
+              )}
+            </Stack>
+          </Section>
+
+          {serverError && <Alert severity="error" sx={{ mb: 2 }}>{serverError}</Alert>}
+        </Box>
+
+        {/* footer */}
+        <Box
+          sx={{
+            px: { xs: 2.5, md: 4 },
+            py: 2,
+            bgcolor: "#f7f9fc",
+            borderTop: "1px solid #e3eaf4",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Typography sx={{ fontSize: "0.78rem", color: "text.secondary", display: "flex", alignItems: "center", gap: 0.5 }}>
+            <LockOutlinedIcon sx={{ fontSize: 15 }} />
+            {isComplaint ? "Complaints are seen only by TVET QC." : "Your email and phone number are never shown publicly."}
+          </Typography>
+          <Button
+            type="submit"
+            variant="contained"
+            disableElevation
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
+            sx={{ textTransform: "none", fontWeight: 700, px: 3, bgcolor: accent, "&:hover": { bgcolor: accent, filter: "brightness(0.92)" } }}
+          >
+            {isComplaint ? "Lodge complaint" : "Submit feedback"}
+          </Button>
+        </Box>
+      </Paper>
+
+    </Container>
+  );
 }
-
-// ── Keyframes ─────────────────────────────────────────────────────────────────
-const keyframes = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes checkPop {
-    0%   { transform: scale(0.5); opacity: 0; }
-    70%  { transform: scale(1.15); }
-    100% { transform: scale(1);   opacity: 1; }
-  }
-  input:focus, textarea:focus { outline: none !important; box-shadow: 0 0 0 3px rgba(27,58,107,0.1) !important; }
-  input[type=date] { font-family: 'DM Sans', sans-serif; }
-  input::placeholder, textarea::placeholder { color: #A0AEC0; }
-  button:focus { outline: none; }
-`;
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-const styles = {
-    page: {
-        minHeight: "100vh",
-        backgroundColor: "#F0F4FA",
-        display: "flex", alignItems: "flex-start", justifyContent: "center",
-        padding: "12px 16px 20px",
-        fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-        backgroundImage: "radial-gradient(circle at 20% 20%, rgba(27,58,107,0.07) 0%, transparent 60%), radial-gradient(circle at 80% 80%, rgba(201,168,76,0.07) 0%, transparent 60%)",
-    },
-    card: {
-        width: "100%", maxWidth: 860,
-        backgroundColor: "#fff",
-        borderRadius: 20,
-        boxShadow: "0 20px 60px rgba(27,58,107,0.12), 0 4px 16px rgba(0,0,0,0.06)",
-        overflow: "hidden",
-        position: "relative",
-        animation: "fadeUp 0.45s ease both",
-    },
-    accentBar: { position: "absolute", top: 0, left: 0, width: "100%", height: 4 },
-    header: { padding: "20px 40px 16px", color: "#fff" },
-    headerTop: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 },
-    logoMark: {
-        width: 36, height: 36, borderRadius: 8,
-        border: "1.5px solid rgba(255,255,255,0.3)",
-        display: "flex", alignItems: "flex-start", justifyContent: "center",
-        backgroundColor: "rgba(255,255,255,0.08)",
-    },
-    headerLabel: { fontSize: "0.75rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)" },
-    modeBackBtn: {
-        background: "none", border: "1.5px solid rgba(255,255,255,0.3)", borderRadius: 8,
-        color: "rgba(255,255,255,0.85)", fontSize: "0.8rem", fontWeight: 600,
-        padding: "5px 12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-    },
-    title: { fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.55rem", fontWeight: 700, color: "#fff", lineHeight: 1.2, marginBottom: 8 },
-    subtitle: { fontSize: "0.9rem", color: "rgba(255,255,255,0.65)", fontWeight: 400, lineHeight: 1.5 },
-    progressWrap: { padding: "14px 40px 0" },
-    progressTrack: { height: 3, backgroundColor: "#EDF2F7", borderRadius: 4, overflow: "hidden", marginBottom: 16 },
-    progressFill: { height: "100%", borderRadius: 4, transition: "width 0.4s cubic-bezier(0.4,0,0.2,1)" },
-    stepLabels: { display: "flex", justifyContent: "space-between" },
-    stepLabel: { display: "flex", alignItems: "center", gap: 8, opacity: 0.4 },
-    stepActive: { opacity: 1 },
-    stepDone: { opacity: 0.7 },
-    stepDot: { width: 24, height: 24, borderRadius: "50%", border: "2px solid #CBD5E0", display: "flex", alignItems: "flex-start", justifyContent: "center", fontSize: "0.7rem", fontWeight: 700, color: "#A0AEC0", flexShrink: 0 },
-    stepDotActive: { borderColor: "#1B3A6B", color: "#1B3A6B", backgroundColor: "rgba(27,58,107,0.08)" },
-    stepDotDone: { borderColor: "#1B3A6B", backgroundColor: "#1B3A6B", color: "#fff" },
-    stepText: { fontSize: "0.78rem", fontWeight: 600, color: "#4A5568", letterSpacing: "0.01em" },
-    body: { padding: "18px 40px 4px" },
-    stepContent: { animation: "fadeUp 0.3s ease both" },
-    sectionLabel: { display: "flex", alignItems: "baseline", gap: 10, marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #EDF2F7" },
-    sectionNum: { fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700, letterSpacing: "0.04em" },
-    anonToggleWrap: {
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 18px", borderRadius: 12, border: "1.5px solid #EDF2F7",
-        backgroundColor: "#FAFBFC", marginBottom: 20,
-    },
-    toggle: {
-        width: 44, height: 24, borderRadius: 12, border: "none",
-        backgroundColor: "#E2E8F0", cursor: "pointer", position: "relative",
-        transition: "background-color 0.2s", padding: 0, flexShrink: 0,
-    },
-    toggleOn: { backgroundColor: "#8B1A1A" },
-    toggleKnob: {
-        position: "absolute", top: 3, left: 3,
-        width: 18, height: 18, borderRadius: "50%",
-        backgroundColor: "#fff", transition: "left 0.2s",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-    },
-    toggleKnobOn: { left: 23 },
-    fieldRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 },
-    field: { display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 },
-    label: { fontSize: "0.83rem", fontWeight: 600, color: "#2D3748", letterSpacing: "0.01em" },
-    req: { color: "#E53E3E", marginLeft: 2 },
-    input: {
-        height: 44, borderRadius: 10, border: "1.5px solid #E2E8F0",
-        padding: "0 14px", fontSize: "0.9rem", color: "#1A2540",
-        backgroundColor: "#FAFBFC", transition: "border-color 0.15s, box-shadow 0.15s", width: "100%",
-    },
-    inputError: { borderColor: "#FC8181", backgroundColor: "#FFF5F5" },
-    textarea: {
-        borderRadius: 10, border: "1.5px solid #E2E8F0",
-        padding: "12px 14px", fontSize: "0.9rem", color: "#1A2540",
-        backgroundColor: "#FAFBFC", resize: "vertical", lineHeight: 1.6,
-        fontFamily: "'DM Sans', sans-serif", transition: "border-color 0.15s, box-shadow 0.15s", width: "100%",
-    },
-    charCount: { fontSize: "0.72rem", color: "#A0AEC0", textAlign: "right", marginTop: -2 },
-    error: { fontSize: "0.78rem", color: "#E53E3E", fontWeight: 500, marginTop: -2 },
-    roleGrid: { display: "flex", flexWrap: "wrap", gap: 8 },
-    roleBtn: { padding: "8px 16px", borderRadius: 8, border: "1.5px solid #E2E8F0", backgroundColor: "#FAFBFC", fontSize: "0.85rem", fontWeight: 500, color: "#4A5568", cursor: "pointer", transition: "all 0.15s", fontFamily: "'DM Sans', sans-serif" },
-    roleBtnActive: { backgroundColor: "#1B3A6B", borderColor: "#1B3A6B", color: "#fff", boxShadow: "0 4px 12px rgba(27,58,107,0.2)" },
-    categoryGrid: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 },
-    catBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "14px 8px", borderRadius: 12, border: "1.5px solid #E2E8F0", backgroundColor: "#FAFBFC", cursor: "pointer", transition: "all 0.18s", fontFamily: "'DM Sans', sans-serif", color: "#4A5568" },
-    catBtnActive: { backgroundColor: "#1B3A6B", borderColor: "#1B3A6B", color: "#fff", boxShadow: "0 4px 14px rgba(27,58,107,0.22)", transform: "translateY(-2px)" },
-    catIcon: { fontSize: "1.3rem", lineHeight: 1 },
-    catLabel: { fontSize: "0.72rem", fontWeight: 600, textAlign: "center", lineHeight: 1.3, color: "inherit" },
-    urgencyBtn: { flex: 1, padding: "8px 6px", borderRadius: 8, border: "1.5px solid #E2E8F0", backgroundColor: "#FAFBFC", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", transition: "all 0.15s", fontFamily: "'DM Sans', sans-serif", color: "#4A5568" },
-    ratingRow: { display: "flex", alignItems: "center", gap: 4 },
-    starBtn: { fontSize: "2.2rem", background: "none", border: "none", cursor: "pointer", lineHeight: 1, transition: "transform 0.12s, color 0.12s", padding: "2px" },
-    ratingLabel: { marginLeft: 12, fontSize: "0.85rem", fontWeight: 600, color: "#718096", minWidth: 80 },
-    recommendRow: { display: "flex", gap: 12 },
-    recommendBtn: { flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 10, padding: "14px 20px", borderRadius: 12, border: "1.5px solid #E2E8F0", backgroundColor: "#FAFBFC", cursor: "pointer", transition: "all 0.18s", fontFamily: "'DM Sans', sans-serif", color: "#4A5568" },
-    recommendHover: { borderColor: "#CBD5E0", backgroundColor: "#F7FAFC", transform: "translateY(-1px)" },
-    recommendYes: { backgroundColor: "rgba(26,107,74,0.08)", borderColor: "rgba(26,107,74,0.4)", color: "#1A6B4A", boxShadow: "0 4px 14px rgba(26,107,74,0.12)" },
-    recommendNo: { backgroundColor: "rgba(139,26,26,0.07)", borderColor: "rgba(139,26,26,0.3)", color: "#8B1A1A", boxShadow: "0 4px 14px rgba(139,26,26,0.1)" },
-    noticeBox: { display: "flex", gap: 12, padding: "14px 18px", borderRadius: 10, backgroundColor: "rgba(139,26,26,0.05)", border: "1px solid rgba(139,26,26,0.15)", marginBottom: 4 },
-    noticeIcon: { fontSize: "1rem", color: "#8B1A1A", flexShrink: 0, marginTop: 1 },
-    noticeText: { fontSize: "0.8rem", color: "#5A3030", lineHeight: 1.6 },
-    footer: { display: "flex", alignItems: "center", padding: "12px 40px 20px", gap: 12 },
-    backBtn: { height: 44, padding: "0 20px", borderRadius: 10, border: "1.5px solid #E2E8F0", backgroundColor: "transparent", fontSize: "0.875rem", fontWeight: 600, color: "#718096", cursor: "pointer", transition: "all 0.15s", fontFamily: "'DM Sans', sans-serif" },
-    nextBtn: { height: 44, padding: "0 28px", borderRadius: 10, border: "none", color: "#fff", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.01em" },
-    submitBtn: { height: 44, padding: "0 28px", borderRadius: 10, border: "none", color: "#fff", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.02em" },
-    // Mode selection
-    modeBtn: { display: "flex", alignItems: "center", gap: 16, padding: "20px 22px", borderRadius: 14, border: "1.5px solid #E2E8F0", backgroundColor: "#FAFBFC", cursor: "pointer", textAlign: "left", transition: "all 0.18s", fontFamily: "'DM Sans', sans-serif", width: "100%" },
-    modeBtnIcon: { width: 48, height: 48, borderRadius: 12, display: "flex", alignItems: "flex-start", justifyContent: "center", flexShrink: 0 },
-    modeBtnText: { flex: 1 },
-    modeBtnTitle: { fontSize: "1rem", fontWeight: 700, marginBottom: 4 },
-    modeBtnDesc: { fontSize: "0.82rem", color: "#718096", lineHeight: 1.5 },
-    modeBtnArrow: { fontSize: "1.2rem", fontWeight: 700, flexShrink: 0, opacity: 0.5 },
-    // Success
-    successInner: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "56px 48px", animation: "checkPop 0.5s ease both" },
-    successTitle: { fontFamily: "'Playfair Display', serif", fontSize: "1.9rem", fontWeight: 700, color: "#1A2540", marginBottom: 12 },
-    successText: { fontSize: "0.95rem", color: "#5A6A85", lineHeight: 1.7, maxWidth: 420, marginBottom: 24 },
-    successMeta: { display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginBottom: 28 },
-    successTag: { padding: "6px 14px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 600 },
-    restartBtn: { height: 44, padding: "0 22px", borderRadius: 10, border: "1.5px solid #E2E8F0", backgroundColor: "transparent", fontSize: "0.875rem", fontWeight: 600, color: "#4A5568", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-};
