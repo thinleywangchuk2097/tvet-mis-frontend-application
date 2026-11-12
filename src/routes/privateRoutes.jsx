@@ -38,6 +38,8 @@ import ViewNonAccreditedCourseRegistration from "../pages/institute/registration
 import InstituteChange from "../pages/institute/registration/InstituteChange";
 import SelfAssessmentReport from "../pages/institute/registration/SelfAssessmentReport";
 import ViewSelfAssessmentReport from "../pages/institute/registration/ViewSelfAssessmentReport";
+//publications & forms (TVET QC)
+import ManageDocumentsIndex from "../pages/tvetqc/documents/ManageDocumentsIndex";
 
 //curriculum
 import CurriculumIndex from "../pages/curriculum/CurriculumIndex";
@@ -310,6 +312,10 @@ export const privateRoutes = [
       { path: "institute-change", element: <InstituteChange /> },
       { path: "self-assessment-report", element: <SelfAssessmentReport /> },
     ],
+  },
+  {
+    path: "tvetqc",
+    children: [{ path: "documents", element: <ManageDocumentsIndex /> }],
   },
   {
     path: "announcement",

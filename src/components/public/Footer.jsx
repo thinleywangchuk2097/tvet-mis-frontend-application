@@ -13,10 +13,6 @@ import {
   Button,
 } from "@mui/material";
 import FacebookIcon from "@mui/icons-material/Facebook";
-import LinkedInIcon from "@mui/icons-material/LinkedIn";
-import InstagramIcon from "@mui/icons-material/Instagram";
-import XIcon from "@mui/icons-material/X";
-import YouTubeIcon from "@mui/icons-material/YouTube";
 import PhoneIcon from "@mui/icons-material/Phone";
 import EmailIcon from "@mui/icons-material/Email";
 import FaxIcon from "@mui/icons-material/Fax";
@@ -582,10 +578,6 @@ const Footer = () => {
                     target: "_blank",
                     href: "https://www.facebook.com/BQPCA",
                   },
-                  { Icon: XIcon, label: "X", href: "#" },
-                  { Icon: LinkedInIcon, label: "LinkedIn", href: "#" },
-                  { Icon: InstagramIcon, label: "Instagram", href: "#" },
-                  { Icon: YouTubeIcon, label: "YouTube", href: "#" },
                 ].map(({ Icon, label, href }, i) => (
                   <IconButton
                     key={i}
