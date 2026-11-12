@@ -67,6 +67,17 @@ const getTodayDate = () => {
 
 // ==================== MAIN COMPONENT ====================
 
+// Course accreditation has expired when its validity_date is before today (no date = not expired)
+const isCourseExpired = (validityDate) => {
+  if (!validityDate) return false;
+  const d = new Date(validityDate);
+  if (Number.isNaN(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return d < today;
+};
+
 const AccreditatedCourse = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -598,11 +609,18 @@ const AccreditatedCourse = () => {
                         }
                       >
                         <MenuItem value="">-select-</MenuItem>
-                        {approvedCourses.map((course) => (
-                          <MenuItem key={course.id} value={course.id}>
-                            {course.programme_title}
-                          </MenuItem>
-                        ))}
+                        {approvedCourses
+                          .filter(
+                            (course) =>
+                              !isCourseExpired(course.validity_date) ||
+                              String(course.id) ===
+                                String(formik.values.programmeId),
+                          )
+                          .map((course) => (
+                            <MenuItem key={course.id} value={course.id}>
+                              {course.programme_title}
+                            </MenuItem>
+                          ))}
                       </TextField>
                     </Grid>
 
