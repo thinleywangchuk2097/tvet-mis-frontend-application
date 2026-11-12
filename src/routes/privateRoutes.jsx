@@ -38,6 +38,7 @@ import ViewNonAccreditedCourseRegistration from "../pages/institute/registration
 import InstituteChange from "../pages/institute/registration/InstituteChange";
 import SelfAssessmentReport from "../pages/institute/registration/SelfAssessmentReport";
 import ViewSelfAssessmentReport from "../pages/institute/registration/ViewSelfAssessmentReport";
+
 //publications & forms (TVET QC)
 import ManageDocumentsIndex from "../pages/tvetqc/documents/ManageDocumentsIndex";
 
@@ -103,10 +104,10 @@ import ViewProgramMonitoringIndex from "../pages/bqpca/monitoring/ViewProgramMon
 import ChangeSesCentreIndex from "../pages/ses-centre/registration/ChangeSesCentreIndex";
 import SubjectIndex from "../pages/ses-centre/registration/SubjectIndex";
 import TutorIndex from "../pages/ses-centre/registration/TutorIndex";
-import TuitionAnnouncementIndex from "../pages/ses-centre/announcement/TuitionAnnouncementIndex";
-import AddStudentIndex from "../pages/ses-centre/announcement/AddStudentIndex";
-import StudentDetailsReport from "../pages/ses-centre/report/StudentDetailsReport";
 import TutorsDetailsReport from "../pages/ses-centre/report/TutorsDetailsReport";
+import StudentEnrollmentIndex from "../pages/ses-centre/registration/StudentEnrollmentIndex";
+import ViewSubjectIndex from "../pages/ses-centre/registration/ViewSubjectIndex";
+import ViewTutorIndex from "../pages/ses-centre/registration/ViewTutorIndex";
 //assessment-centre
 import ChangeAssessmentCentre from "../pages/assessment-centre/registration/ChangeAssessmentCentre";
 import ProgramRegistration from "../pages/assessment-centre/registration/ProgramRegistration";
@@ -234,6 +235,8 @@ export const privateRoutes = [
         path: "view-institute-change/:applicationNo",
         element: <ViewInstituteChange />,
       },
+      { path: "view-subject-index/:applicationNo", element: <ViewSubjectIndex /> },
+      { path: "view-tutor-index/:applicationNo", element: <ViewTutorIndex /> }
     ],
   },
   {
@@ -251,9 +254,6 @@ export const privateRoutes = [
       { path: "change-ses-centre", element: <ChangeSesCentreIndex /> },
       { path: "subject-index", element: <SubjectIndex /> },
       { path: "tutor-index", element: <TutorIndex /> },
-      { path: "tuition-announcement", element: <TuitionAnnouncementIndex /> },
-      { path: "add-student", element: <AddStudentIndex /> },
-      { path: "student-details-report", element: <StudentDetailsReport /> },
       { path: "tutors-details-report", element: <TutorsDetailsReport /> },
     ],
   },
@@ -311,6 +311,7 @@ export const privateRoutes = [
       { path: "add-trainer", element: <AddTrainerIndex /> },
       { path: "institute-change", element: <InstituteChange /> },
       { path: "self-assessment-report", element: <SelfAssessmentReport /> },
+      { path: "student-enrollment", element: <StudentEnrollmentIndex /> },
     ],
   },
   {

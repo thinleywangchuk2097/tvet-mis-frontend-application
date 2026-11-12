@@ -32,10 +32,9 @@ import {
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import SchoolIcon from "@mui/icons-material/School";
-import PeopleIcon from "@mui/icons-material/People";
 import PersonIcon from "@mui/icons-material/Person";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
-import CampaignIcon from "@mui/icons-material/Campaign";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import EmailIcon from "@mui/icons-material/Email";
@@ -44,8 +43,7 @@ import BadgeIcon from "@mui/icons-material/Badge";
 import InstituteRegistrationService from "../../api/services/internal/registration/InstituteRegistrationService";
 import TutorService from "../../api/services/internal/ses-center/TutorService";
 import SubjectService from "../../api/services/internal/ses-center/SubjectService";
-import StudentService from "../../api/services/internal/ses-center/StudentService";
-import TuitionAnnouncementService from "../../api/services/internal/ses-center/TuitionAnnouncementService";
+import CommonService from "../../api/services/internal/common/CommonService";
 import { Empty, Kpi, Panel } from "./DashboardParts";
 import { fmtNum, headCellSx } from "./dashboardUtils";
 
@@ -65,18 +63,19 @@ const validityInfo = (raw) => {
 };
 
 // Status ids used by the ses-centre pages
-const STUDENT_STATUS = { 1: "Active", 2: "Inactive", 3: "Graduated", 4: "Suspended" };
 const TUTOR_ACTIVE = 1;
-const ANNOUNCEMENT_STATUS = {
-  1: { label: "Draft", color: "warning" },
-  2: { label: "Published", color: "success" },
-  3: { label: "Closed", color: "error" },
-  4: { label: "Cancelled", color: "default" },
+// Add Subject workflow (service 56); no status = added before the workflow
+const SUBJECT_STATUS = {
+  55: { label: "Submitted", color: "info" },
+  56: { label: "Verified", color: "primary" },
+  57: { label: "Approved", color: "success" },
+  58: { label: "Rejected", color: "error" },
 };
+const isApprovedSubject = (s) =>
+  !s.application_status_id || Number(s.application_status_id) === 57;
 
 const isError = (res) => res instanceof Error || res?.isAxiosError;
 const listOf = (res) => (!isError(res) && Array.isArray(res?.data) ? res.data : []);
-const num = (v) => (v === null || v === undefined || v === "" ? null : Number(v));
 
 const fmtDate = (d) => {
   if (!d) return "—";
@@ -90,19 +89,10 @@ const fmtDate = (d) => {
 };
 
 const personName = (p) =>
-  [p.first_name, p.middle_name, p.last_name].filter(Boolean).join(" ") ||
   p.name ||
+  [p.first_name, p.middle_name, p.last_name].filter(Boolean).join(" ") ||
   "—";
 
-const parseSubjects = (raw) => {
-  if (!raw) return [];
-  try {
-    const list = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-};
 
 const BORDERED_TABLE = {
   borderCollapse: "collapse",
@@ -176,8 +166,7 @@ const SESCentreDashboard = () => {
   const [centre, setCentre] = useState(null);
   const [tutors, setTutors] = useState([]);
   const [subjects, setSubjects] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [announcements, setAnnouncements] = useState([]);
+  const [classLevels, setClassLevels] = useState([]);
   const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
@@ -196,19 +185,14 @@ const SESCentreDashboard = () => {
         return;
       }
 
-      const [tutorRes, subjectRes, studentRes, annRes] = await Promise.all([
+      const [tutorRes, subjectRes, levelRes] = await Promise.all([
         TutorService.getAllTutors(instituteId, accessToken),
         SubjectService.getAllSubjects(instituteId, accessToken),
-        StudentService.getAllStudents(instituteId, accessToken),
-        TuitionAnnouncementService.getAllTuitionAnnouncement(
-          instituteId,
-          accessToken,
-        ),
+        CommonService.getByParentId(18), // Academic Qualification = class level
       ]);
       setTutors(listOf(tutorRes));
       setSubjects(listOf(subjectRes));
-      setStudents(listOf(studentRes));
-      setAnnouncements(listOf(annRes));
+      setClassLevels(listOf(levelRes));
     } catch (e) {
       console.error("SES dashboard load failed:", e);
       setLoadError("Could not load the dashboard data.");
@@ -230,95 +214,74 @@ const SESCentreDashboard = () => {
     return (id) => map[String(id)] || "—";
   }, [subjects]);
 
-  const tutorName = useMemo(() => {
-    const map = {};
-    tutors.forEach((t) => {
-      map[String(t.id)] = personName(t);
-    });
-    return (id) => map[String(id)] || "—";
-  }, [tutors]);
+  const classLevelName = (id) =>
+    classLevels.find((c) => String(c.id) === String(id))?.name || "Not set";
+
+  const tutorSubjectIds = (t) =>
+    t.subject_ids
+      ? String(t.subject_ids)
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean)
+      : [];
 
   const stats = useMemo(() => {
-    const activeStudents = students.filter(
-      (s) => Number(s.status_id ?? 1) === 1,
-    ).length;
     const activeTutors = tutors.filter(
       (t) => Number(t.status_id ?? TUTOR_ACTIVE) === TUTOR_ACTIVE,
     ).length;
-    const published = announcements.filter(
-      (a) => Number(a.status_id) === 2,
+    const approved = subjects.filter(isApprovedSubject).length;
+    const pending = subjects.filter((s) =>
+      [55, 56].includes(Number(s.application_status_id)),
     ).length;
-    const seatsMax = announcements.reduce(
-      (n, a) => n + (num(a.max_students) || 0),
-      0,
-    );
-    const seatsUsed = announcements.reduce(
-      (n, a) => n + (num(a.current_enrollments) || 0),
-      0,
-    );
-    return { activeStudents, activeTutors, published, seatsMax, seatsUsed };
-  }, [students, tutors, announcements]);
+    const rejected = subjects.filter(
+      (s) => Number(s.application_status_id) === 58,
+    ).length;
+    return { activeTutors, approved, pending, rejected };
+  }, [tutors, subjects]);
 
-  const studentsByClass = useMemo(() => {
+  const subjectsByClassLevel = useMemo(() => {
     const counts = {};
-    students.forEach((s) => {
-      const c = s.current_class || s.currentClass || "Not set";
-      counts[c] = (counts[c] || 0) + 1;
+    subjects.filter(isApprovedSubject).forEach((s) => {
+      const label = classLevelName(s.class_level_id);
+      counts[label] = (counts[label] || 0) + 1;
     });
     return Object.entries(counts)
-      .map(([label, value]) => ({ label: String(label), value }))
+      .map(([label, value]) => ({ label, value }))
       .sort((a, b) =>
         a.label.localeCompare(b.label, undefined, { numeric: true }),
       );
-  }, [students]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjects, classLevels]);
 
-  const studentsBySubject = useMemo(() => {
+  const tutorsBySubject = useMemo(() => {
     const counts = {};
-    students.forEach((s) => {
-      parseSubjects(s.subjects).forEach((sub) => {
-        const id = sub.subjectId ?? sub.subject_id;
-        if (id === undefined || id === null) return;
+    tutors.forEach((t) =>
+      tutorSubjectIds(t).forEach((id) => {
         counts[id] = (counts[id] || 0) + 1;
-      });
-    });
+      }),
+    );
     return Object.entries(counts)
       .map(([id, value]) => ({ label: subjectName(id), value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
-  }, [students, subjectName]);
+  }, [tutors, subjectName]);
 
-  const studentStatusChips = useMemo(() => {
-    const counts = {};
-    students.forEach((s) => {
-      const k = Number(s.status_id ?? 1);
-      counts[k] = (counts[k] || 0) + 1;
-    });
-    return Object.entries(counts).map(([id, n]) => ({
-      label: STUDENT_STATUS[id] || `Status ${id}`,
-      n,
-    }));
-  }, [students]);
-
-  const recentStudents = useMemo(
+  const sortedSubjects = useMemo(
     () =>
-      [...students]
-        .sort(
-          (a, b) =>
-            new Date(b.enrollment_date || b.created_at || 0) -
-            new Date(a.enrollment_date || a.created_at || 0),
-        )
-        .slice(0, 6),
-    [students],
+      [...subjects].sort(
+        (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+      ),
+    [subjects],
   );
 
-  const sortedAnnouncements = useMemo(
+  const recentTutors = useMemo(
     () =>
-      [...announcements].sort(
-        (a, b) =>
-          new Date(b.start_date || b.created_at || 0) -
-          new Date(a.start_date || a.created_at || 0),
-      ),
-    [announcements],
+      [...tutors]
+        .sort(
+          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+        )
+        .slice(0, 6),
+    [tutors],
   );
 
   const busy = loading && !centre;
@@ -463,12 +426,6 @@ const SESCentreDashboard = () => {
           {[
             { label: "Tutors", to: "/ses-centre/tutor-index", icon: <PersonIcon /> },
             { label: "Subjects", to: "/ses-centre/subject-index", icon: <MenuBookIcon /> },
-            { label: "Students", to: "/ses-centre/add-student", icon: <PeopleIcon /> },
-            {
-              label: "Tuition announcements",
-              to: "/ses-centre/tuition-announcement",
-              icon: <CampaignIcon />,
-            },
           ].map((a) => (
             <Button
               key={a.to}
@@ -493,17 +450,7 @@ const SESCentreDashboard = () => {
 
       {/* ---------------- KPIs ---------------- */}
       <Grid container spacing={1.5} sx={{ mb: 2 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Kpi
-            title="Students"
-            value={fmtNum(students.length)}
-            sub={`${fmtNum(stats.activeStudents)} active`}
-            icon={<PeopleIcon />}
-            color="primary"
-            loading={loading}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <Kpi
             title="Tutors"
             value={fmtNum(tutors.length)}
@@ -513,26 +460,23 @@ const SESCentreDashboard = () => {
             loading={loading}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <Kpi
-            title="Subjects offered"
-            value={fmtNum(subjects.length)}
+            title="Approved subjects"
+            value={fmtNum(stats.approved)}
+            sub={`${fmtNum(subjects.length)} in total`}
             icon={<MenuBookIcon />}
             color="info"
             loading={loading}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <Kpi
-            title="Published announcements"
-            value={fmtNum(stats.published)}
-            sub={
-              stats.seatsMax
-                ? `${fmtNum(stats.seatsUsed)}/${fmtNum(stats.seatsMax)} seats filled`
-                : `${fmtNum(announcements.length)} in total`
-            }
-            icon={<CampaignIcon />}
-            color="success"
+            title="Subjects awaiting approval"
+            value={fmtNum(stats.pending)}
+            sub={stats.rejected ? `${fmtNum(stats.rejected)} rejected` : undefined}
+            icon={<PendingActionsIcon />}
+            color="warning"
             loading={loading}
           />
         </Grid>
@@ -541,51 +485,36 @@ const SESCentreDashboard = () => {
       {/* ---------------- Charts ---------------- */}
       <Grid container spacing={1.5} sx={{ mb: 2 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <Panel
-            title="Students by class"
-            action={
-              <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                {studentStatusChips.map((c) => (
-                  <Chip
-                    key={c.label}
-                    size="small"
-                    variant="outlined"
-                    label={`${c.label} ${c.n}`}
-                    sx={{ height: 20, fontSize: "0.7rem" }}
-                  />
-                ))}
-              </Box>
-            }
-          >
+          <Panel title="Approved subjects by class level">
             <Box sx={{ height: 240 }}>
               {loading ? (
                 <Skeleton variant="rounded" height="100%" />
-              ) : studentsByClass.length ? (
+              ) : subjectsByClassLevel.length ? (
                 <CountBarChart
-                  data={studentsByClass}
-                  name="Students"
+                  data={subjectsByClassLevel}
+                  name="Subjects"
                   color={theme.palette.primary.main}
                 />
               ) : (
-                <Empty text="No students added yet" />
+                <Empty text="No approved subjects yet" />
               )}
             </Box>
           </Panel>
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <Panel title="Students per subject (top 8)">
+          <Panel title="Tutors per subject (top 8)">
             <Box sx={{ height: 240 }}>
               {loading ? (
                 <Skeleton variant="rounded" height="100%" />
-              ) : studentsBySubject.length ? (
+              ) : tutorsBySubject.length ? (
                 <CountBarChart
-                  data={studentsBySubject}
-                  name="Students"
+                  data={tutorsBySubject}
+                  name="Tutors"
                   color={theme.palette.primary.main}
                   horizontal
                 />
               ) : (
-                <Empty text="No subject enrolments yet" />
+                <Empty text="No subjects assigned to tutors yet" />
               )}
             </Box>
           </Panel>
@@ -596,11 +525,11 @@ const SESCentreDashboard = () => {
       <Grid container spacing={1.5}>
         <Grid size={{ xs: 12, lg: 7 }}>
           <Panel
-            title="Tuition announcements"
+            title="Subjects"
             action={
               <Button
                 size="small"
-                onClick={() => navigate("/ses-centre/tuition-announcement")}
+                onClick={() => navigate("/ses-centre/subject-index")}
                 sx={{ textTransform: "none" }}
               >
                 Manage
@@ -609,66 +538,42 @@ const SESCentreDashboard = () => {
           >
             {loading ? (
               <Skeleton variant="rounded" height={160} />
-            ) : sortedAnnouncements.length ? (
+            ) : sortedSubjects.length ? (
               <TableContainer sx={{ maxHeight: 320 }}>
                 <Table size="small" stickyHeader sx={BORDERED_TABLE}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Title</TableCell>
-                      <TableCell>Subject / tutor</TableCell>
-                      <TableCell>Period</TableCell>
-                      <TableCell sx={{ width: 120 }}>Seats</TableCell>
+                      <TableCell>Subject</TableCell>
+                      <TableCell>Class level</TableCell>
+                      <TableCell align="center">Hours</TableCell>
                       <TableCell>Status</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {sortedAnnouncements.map((a) => {
-                      const max = num(a.max_students);
-                      const used = num(a.current_enrollments) || 0;
-                      const pct = max ? Math.min(100, (used / max) * 100) : 0;
-                      const st = ANNOUNCEMENT_STATUS[Number(a.status_id)] || {
-                        label: a.status || "—",
-                        color: "default",
-                      };
+                    {sortedSubjects.map((sub) => {
+                      const st = SUBJECT_STATUS[
+                        Number(sub.application_status_id)
+                      ] || { label: "Approved", color: "success" };
                       return (
-                        <TableRow key={a.id} hover>
+                        <TableRow key={sub.id} hover>
                           <TableCell>
                             <Typography fontSize="0.8rem" fontWeight={600}>
-                              {a.title || "—"}
+                              {sub.subject_name || "—"}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography fontSize="0.8rem">
-                              {subjectName(a.subject_id)}
-                            </Typography>
-                            <Typography fontSize="0.72rem" color="text.secondary">
-                              {tutorName(a.tutor_id)}
-                            </Typography>
+                            {sub.class_level_id
+                              ? classLevelName(sub.class_level_id)
+                              : "—"}
                           </TableCell>
-                          <TableCell sx={{ whiteSpace: "nowrap" }}>
-                            {fmtDate(a.start_date)} – {fmtDate(a.end_date)}
-                          </TableCell>
-                          <TableCell>
-                            {max ? (
-                              <>
-                                <Typography fontSize="0.72rem">
-                                  {used}/{max}
-                                </Typography>
-                                <LinearProgress
-                                  variant="determinate"
-                                  value={pct}
-                                  color={pct >= 100 ? "error" : "primary"}
-                                  sx={{ height: 5, borderRadius: 3 }}
-                                />
-                              </>
-                            ) : (
-                              "—"
-                            )}
+                          <TableCell align="center">
+                            {sub.total_duration_hours || "—"}
                           </TableCell>
                           <TableCell>
                             <Chip
                               size="small"
                               color={st.color}
+                              variant="outlined"
                               label={st.label}
                               sx={{ height: 20, fontSize: "0.7rem" }}
                             />
@@ -681,7 +586,7 @@ const SESCentreDashboard = () => {
               </TableContainer>
             ) : (
               <Box sx={{ height: 120 }}>
-                <Empty text="No tuition announcements yet" />
+                <Empty text="No subjects added yet" />
               </Box>
             )}
           </Panel>
@@ -689,11 +594,11 @@ const SESCentreDashboard = () => {
 
         <Grid size={{ xs: 12, lg: 5 }}>
           <Panel
-            title="Recently enrolled students"
+            title="Recently added tutors"
             action={
               <Button
                 size="small"
-                onClick={() => navigate("/ses-centre/add-student")}
+                onClick={() => navigate("/ses-centre/tutor-index")}
                 sx={{ textTransform: "none" }}
               >
                 View all
@@ -702,32 +607,33 @@ const SESCentreDashboard = () => {
           >
             {loading ? (
               <Skeleton variant="rounded" height={160} />
-            ) : recentStudents.length ? (
+            ) : recentTutors.length ? (
               <TableContainer>
                 <Table size="small" sx={BORDERED_TABLE}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Student</TableCell>
-                      <TableCell>Class</TableCell>
-                      <TableCell>Enrolled</TableCell>
+                      <TableCell>Tutor</TableCell>
+                      <TableCell>Subjects</TableCell>
+                      <TableCell>Added</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {recentStudents.map((s) => (
-                      <TableRow key={s.id} hover>
+                    {recentTutors.map((t) => (
+                      <TableRow key={t.id} hover>
                         <TableCell>
                           <Typography fontSize="0.8rem" fontWeight={600}>
-                            {personName(s)}
+                            {personName(t)}
                           </Typography>
                           <Typography fontSize="0.72rem" color="text.secondary">
-                            {[s.student_code, s.school_name]
-                              .filter(Boolean)
-                              .join(" · ") || "—"}
+                            {t.citizen_id || "—"}
                           </Typography>
                         </TableCell>
-                        <TableCell>{s.current_class || "—"}</TableCell>
+                        <TableCell>
+                          {tutorSubjectIds(t).map(subjectName).join(", ") ||
+                            "—"}
+                        </TableCell>
                         <TableCell sx={{ whiteSpace: "nowrap" }}>
-                          {fmtDate(s.enrollment_date || s.created_at)}
+                          {fmtDate(t.created_at)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -736,7 +642,7 @@ const SESCentreDashboard = () => {
               </TableContainer>
             ) : (
               <Box sx={{ height: 120 }}>
-                <Empty text="No students added yet" />
+                <Empty text="No tutors added yet" />
               </Box>
             )}
           </Panel>

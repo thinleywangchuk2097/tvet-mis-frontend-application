@@ -50,6 +50,32 @@ class SubjectService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  // Add Subject workflow (service 56)
+  getSubjectByApplicationNo(applicationNo, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/subject/get-subject-by-application-no/${applicationNo}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  verifySubject(data, token) {
+    return apiClient
+      .post(`/api/v1/user/management/subject/verify-subject`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new SubjectService();

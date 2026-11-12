@@ -23,10 +23,8 @@ import {
   Chip,
   CircularProgress,
   Box,
-  Avatar,
-  FormControlLabel,
-  Switch,
   Tooltip,
+  Checkbox,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -34,8 +32,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import EmailIcon from "@mui/icons-material/Email";
-import PhoneIcon from "@mui/icons-material/Phone";
 import SchoolIcon from "@mui/icons-material/School";
 import CloseIcon from "@mui/icons-material/Close";
 import { Formik, Form } from "formik";
@@ -45,6 +41,10 @@ import { toast } from "react-toastify";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import TutorService from "../../../api/services/internal/ses-center/TutorService";
 import CommonService from "../../../api/services/internal/common/CommonService";
+import SubjectService from "../../../api/services/internal/ses-center/SubjectService";
+
+const GENDER_PARENT_ID = 8;
+const ACADEMIC_QUALIFICATION_PARENT_ID = 18;
 
 // Table style constant
 const TABLE_STYLE = {
@@ -77,12 +77,6 @@ RequiredLabel.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
-// Status list constant
-const STATUS_LIST = [
-  { id: 1, name: "Active" },
-  { id: 2, name: "Inactive" },
-];
-
 const TutorIndex = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -99,6 +93,9 @@ const TutorIndex = () => {
   const [instituteId, setInstituteId] = useState(null);
   const [isInstituteLoaded, setIsInstituteLoaded] = useState(false);
   const [academicQualifications, setAcademicQualifications] = useState([]);
+  const [genders, setGenders] = useState([]);
+  // approved subjects of this SES centre (multi-select)
+  const [subjects, setSubjects] = useState([]);
 
   // Delete confirmation dialog state
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -108,6 +105,11 @@ const TutorIndex = () => {
   useEffect(() => {
     fetchInstituteDetails();
     fetchAcademicQualification();
+    CommonService.getByParentId(GENDER_PARENT_ID).then((res) => {
+      if (!(res instanceof Error) && !res?.isAxiosError) {
+        setGenders(Array.isArray(res?.data) ? res.data : []);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -115,6 +117,7 @@ const TutorIndex = () => {
   useEffect(() => {
     if (instituteId) {
       fetchTutors();
+      fetchApprovedSubjects();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instituteId]);
@@ -139,7 +142,9 @@ const TutorIndex = () => {
 
   const fetchAcademicQualification = async () => {
     try {
-      const AcademicQualification = await CommonService.getByParentId(18);
+      const AcademicQualification = await CommonService.getByParentId(
+        ACADEMIC_QUALIFICATION_PARENT_ID,
+      );
       setAcademicQualifications(AcademicQualification.data);
     } catch (error) {
       console.error("Error fetching Academic Qualification:", error);
@@ -153,28 +158,45 @@ const TutorIndex = () => {
     }
   };
 
+  // Only approved subjects (57) can be assigned; no status = added before the subject workflow
+  const fetchApprovedSubjects = async () => {
+    const res = await SubjectService.getAllSubjects(instituteId, access_token);
+    if (res instanceof Error || res?.isAxiosError) return;
+    const list = Array.isArray(res?.data) ? res.data : [];
+    setSubjects(
+      list
+        .filter(
+          (s) =>
+            !s.application_status_id || Number(s.application_status_id) === 57,
+        )
+        .map((s) => ({ id: Number(s.id), name: s.subject_name })),
+    );
+  };
+
   // Helper function to map snake_case to camelCase
   const mapTutorData = (tutor) => ({
     id: tutor.id,
     citizenId: tutor.citizen_id,
-    firstName: tutor.first_name,
-    middleName: tutor.middle_name || "",
-    lastName: tutor.last_name,
-    email: tutor.email,
-    phone: tutor.mobile_no,
+    // older tutors were saved with first / middle / last name
+    name:
+      tutor.name ||
+      [tutor.first_name, tutor.middle_name, tutor.last_name]
+        .filter(Boolean)
+        .join(" "),
+    genderId: tutor.gender_id ? parseInt(tutor.gender_id) : "",
     qualificationId: tutor.qualification_id
       ? parseInt(tutor.qualification_id)
       : null,
-    specialization: tutor.specialization,
-    experienceYears: tutor.experience_years
-      ? parseInt(tutor.experience_years)
-      : 0,
-    hourlyRate: tutor.hourly_rate,
+    subjectIds: tutor.subject_ids
+      ? String(tutor.subject_ids)
+          .split(",")
+          .map((id) => Number(id))
+          .filter((id) => !Number.isNaN(id))
+      : [],
+    email: tutor.email,
+    phone: tutor.mobile_no,
     statusId: tutor.status_id ? parseInt(tutor.status_id) : 1,
-    joiningDate: tutor.joining_date,
-    description: tutor.description || "",
     instituteId: tutor.institute_id,
-    profileImage: tutor.profile_image,
     createdBy: tutor.created_by,
     createdAt: tutor.created_at,
     updatedBy: tutor.updated_by,
@@ -225,21 +247,14 @@ const TutorIndex = () => {
     return qualification ? qualification.name : "N/A";
   };
 
-  const getStatusName = (statusId) => {
-    const status = STATUS_LIST.find((s) => s.id === statusId);
-    return status ? status.name : statusId === 1 ? "Active" : "Inactive";
-  };
+  const getGenderName = (genderId) =>
+    genders.find((g) => String(g.id) === String(genderId))?.name || "—";
 
-  const getStatusColor = (statusId) => {
-    switch (statusId) {
-      case 1:
-        return "#4caf50";
-      case 2:
-        return "#f44336";
-      default:
-        return "#9e9e9e";
-    }
-  };
+  const getSubjectNames = (ids) =>
+    (ids || [])
+      .map((id) => subjects.find((s) => s.id === Number(id))?.name)
+      .filter(Boolean)
+      .join(", ") || "—";
 
   const handleChangePage = (event, newPage) => setPage(newPage);
 
@@ -250,12 +265,12 @@ const TutorIndex = () => {
 
   const filteredTutors = tutors.filter(
     (t) =>
-      (t.firstName?.toLowerCase() || "").includes(search.toLowerCase()) ||
-      (t.middleName?.toLowerCase() || "").includes(search.toLowerCase()) ||
-      (t.lastName?.toLowerCase() || "").includes(search.toLowerCase()) ||
+      (t.name?.toLowerCase() || "").includes(search.toLowerCase()) ||
       (t.citizenId?.toLowerCase() || "").includes(search.toLowerCase()) ||
       (t.email?.toLowerCase() || "").includes(search.toLowerCase()) ||
-      (t.specialization?.toLowerCase() || "").includes(search.toLowerCase()),
+      getSubjectNames(t.subjectIds)
+        .toLowerCase()
+        .includes(search.toLowerCase()),
   );
 
   const handleView = (tutor) => {
@@ -324,76 +339,43 @@ const TutorIndex = () => {
     if ((dialogMode === "edit" || dialogMode === "view") && selectedTutor) {
       return {
         id: selectedTutor.id || "",
+        name: selectedTutor.name || "",
         citizenId: selectedTutor.citizenId || "",
-        firstName: selectedTutor.firstName || "",
-        middleName: selectedTutor.middleName || "",
-        lastName: selectedTutor.lastName || "",
+        genderId: selectedTutor.genderId || "",
+        qualificationId: selectedTutor.qualificationId || "",
+        subjectIds: selectedTutor.subjectIds || [],
         email: selectedTutor.email || "",
         phone: selectedTutor.phone || "",
-        qualificationId: selectedTutor.qualificationId || "",
-        specialization: selectedTutor.specialization || "",
-        experienceYears: selectedTutor.experienceYears || "",
-        hourlyRate: selectedTutor.hourlyRate || "",
-        statusId: selectedTutor.statusId || 1,
-        joiningDate: selectedTutor.joiningDate || "",
-        description: selectedTutor.description || "",
       };
     }
     return {
       id: "",
+      name: "",
       citizenId: "",
-      firstName: "",
-      middleName: "",
-      lastName: "",
+      genderId: "",
+      qualificationId: "",
+      subjectIds: [],
       email: "",
       phone: "",
-      qualificationId: "",
-      specialization: "",
-      experienceYears: "",
-      hourlyRate: "",
-      statusId: 1,
-      joiningDate: new Date().toISOString().split("T")[0],
-      description: "",
     };
   };
 
   const validationSchema = Yup.object().shape({
+    name: Yup.string()
+      .required("Name is required")
+      .max(100, "Name must be at most 100 characters"),
     citizenId: Yup.string()
-      .required("Citizen ID is required")
-      .max(20, "Citizen ID must be at most 20 characters"),
-    firstName: Yup.string()
-      .required("First Name is required")
-      .max(50, "First Name must be at most 50 characters"),
-    middleName: Yup.string().max(
-      50,
-      "Middle Name must be at most 50 characters",
-    ),
-    lastName: Yup.string()
-      .required("Last Name is required")
-      .max(50, "Last Name must be at most 50 characters"),
+      .required("CID is required")
+      .matches(/^\d{11}$/, "CID must be 11 digits"),
+    genderId: Yup.string().required("Gender is required"),
+    qualificationId: Yup.string().required("Qualification Level is required"),
+    subjectIds: Yup.array().min(1, "Select at least one subject"),
     email: Yup.string()
       .required("Email is required")
       .email("Invalid email format"),
     phone: Yup.string()
       .required("Phone number is required")
-      .matches(/^[0-9+\s-]+$/, "Invalid phone number format"),
-    qualificationId: Yup.string().required("Qualification is required"),
-    specialization: Yup.string()
-      .required("Specialization is required")
-      .max(100, "Specialization must be at most 100 characters"),
-    experienceYears: Yup.number()
-      .required("Experience Years is required")
-      .min(0, "Experience cannot be negative")
-      .max(50, "Experience cannot exceed 50 years")
-      .typeError("Experience must be a valid number"),
-    hourlyRate: Yup.number()
-      .required("Hourly Rate is required")
-      .positive("Hourly Rate must be positive")
-      .typeError("Hourly Rate must be a valid number"),
-    description: Yup.string().max(
-      500,
-      "Description must be at most 500 characters",
-    ),
+      .matches(/^[0-9]{8}$/, "Phone number must be 8 digits"),
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
@@ -407,18 +389,12 @@ const TutorIndex = () => {
       const payload = {
         id: dialogMode === "edit" ? values.id : null,
         citizenId: values.citizenId,
-        firstName: values.firstName,
-        middleName: values.middleName || "",
-        lastName: values.lastName,
+        name: values.name.trim(),
+        genderId: parseInt(values.genderId),
+        qualificationId: parseInt(values.qualificationId),
+        subjectIds: values.subjectIds.map(Number),
         email: values.email,
         mobileNo: values.phone,
-        qualificationId: parseInt(values.qualificationId),
-        specialization: values.specialization,
-        experienceYears: parseInt(values.experienceYears),
-        hourlyRate: values.hourlyRate.toString(),
-        statusId: parseInt(values.statusId),
-        joiningDate: values.joiningDate,
-        description: values.description || "",
         instituteId: instituteId,
         createdBy: actionId,
         updatedBy: actionId,
@@ -492,13 +468,6 @@ const TutorIndex = () => {
     toast.info("Form has been reset");
   };
 
-  const getFullName = (firstName, middleName, lastName) => {
-    if (middleName && middleName.trim()) {
-      return `${firstName} ${middleName} ${lastName}`;
-    }
-    return `${firstName} ${lastName}`;
-  };
-
   // Show loading while fetching institute details
   if (!isInstituteLoaded) {
     return (
@@ -563,15 +532,13 @@ const TutorIndex = () => {
           <TableHead>
             <TableRow>
               <TableCell width={50}>#</TableCell>
-              <TableCell>Citizen ID</TableCell>
               <TableCell>Name</TableCell>
+              <TableCell>CID</TableCell>
+              <TableCell>Gender</TableCell>
+              <TableCell>Qualification Level</TableCell>
+              <TableCell>Subjects</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Phone</TableCell>
-              <TableCell>Qualification</TableCell>
-              <TableCell>Specialization</TableCell>
-              <TableCell align="center">Experience</TableCell>
-              <TableCell align="center">Hourly Rate</TableCell>
-              <TableCell align="center">Status</TableCell>
               <TableCell align="center" width={130}>
                 Action
               </TableCell>
@@ -582,94 +549,20 @@ const TutorIndex = () => {
               filteredTutors
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((tutor, index) => {
-                  const statusName = getStatusName(tutor.statusId);
-                  const statusColor = getStatusColor(tutor.statusId);
-                  const qualificationName = getQualificationName(
-                    tutor.qualificationId,
-                  );
-
                   return (
                     <TableRow key={tutor.id}>
                       <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
+                      <TableCell>{tutor.name}</TableCell>
+                      <TableCell>{tutor.citizenId}</TableCell>
+                      <TableCell>{getGenderName(tutor.genderId)}</TableCell>
                       <TableCell>
-                        <Chip
-                          label={tutor.citizenId}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
-                        />
+                        {getQualificationName(tutor.qualificationId)}
                       </TableCell>
-                      <TableCell>
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <Avatar
-                            sx={{ width: 24, height: 24, fontSize: "0.75rem" }}
-                          >
-                            {tutor.firstName?.charAt(0) || ""}
-                            {tutor.lastName?.charAt(0) || ""}
-                          </Avatar>
-                          <Typography variant="body2">
-                            {getFullName(
-                              tutor.firstName,
-                              tutor.middleName,
-                              tutor.lastName,
-                            )}
-                          </Typography>
-                        </Box>
+                      <TableCell sx={{ maxWidth: 260 }}>
+                        {getSubjectNames(tutor.subjectIds)}
                       </TableCell>
-                      <TableCell>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.5,
-                          }}
-                        >
-                          <EmailIcon
-                            sx={{ fontSize: 12, color: "text.secondary" }}
-                          />
-                          <Typography variant="body2">{tutor.email}</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.5,
-                          }}
-                        >
-                          <PhoneIcon
-                            sx={{ fontSize: 12, color: "text.secondary" }}
-                          />
-                          <Typography variant="body2">{tutor.phone}</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>{qualificationName}</TableCell>
-                      <TableCell>{tutor.specialization}</TableCell>
-                      <TableCell align="center">
-                        {tutor.experienceYears} yrs
-                      </TableCell>
-                      <TableCell align="center">
-                        Nu. {tutor.hourlyRate}/hr
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={statusName}
-                          size="small"
-                          sx={{
-                            backgroundColor: statusColor,
-                            color: "white",
-                            fontWeight: "medium",
-                            minWidth: "70px",
-                            "& .MuiChip-label": {
-                              px: 1.5,
-                              py: 0.5,
-                            },
-                          }}
-                        />
-                      </TableCell>
+                      <TableCell>{tutor.email}</TableCell>
+                      <TableCell>{tutor.phone}</TableCell>
                       <TableCell align="center">
                         <Tooltip title="View Details">
                           <IconButton
@@ -704,7 +597,7 @@ const TutorIndex = () => {
                 })
             ) : (
               <TableRow>
-                <TableCell colSpan={11} align="center">
+                <TableCell colSpan={9} align="center">
                   {loading ? (
                     <CircularProgress size={24} />
                   ) : (
@@ -776,14 +669,32 @@ const TutorIndex = () => {
                   }}
                 >
                   <Typography fontWeight={600} gutterBottom>
-                    Personal Information
+                    Tutor Information
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Grid container spacing={2}>
                     <Grid item size={{ xs: 12, md: 6 }}>
                       <TextField
                         fullWidth
-                        label={<RequiredLabel>Citizen ID</RequiredLabel>}
+                        label={<RequiredLabel>Name</RequiredLabel>}
+                        name="name"
+                        size="small"
+                        value={formik.values.name}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.name && Boolean(formik.errors.name)
+                        }
+                        helperText={formik.touched.name && formik.errors.name}
+                        slotProps={{
+                          input: { readOnly: dialogMode === "view" },
+                        }}
+                      />
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        fullWidth
+                        label={<RequiredLabel>CID</RequiredLabel>}
                         name="citizenId"
                         size="small"
                         value={formik.values.citizenId}
@@ -797,80 +708,143 @@ const TutorIndex = () => {
                           formik.touched.citizenId && formik.errors.citizenId
                         }
                         slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
+                          input: { readOnly: dialogMode === "view" },
+                          htmlInput: { maxLength: 11, inputMode: "numeric" },
                         }}
                       />
                     </Grid>
                     <Grid item size={{ xs: 12, md: 6 }}>
                       <TextField
+                        select
                         fullWidth
-                        label={<RequiredLabel>First Name</RequiredLabel>}
-                        name="firstName"
+                        label={<RequiredLabel>Gender</RequiredLabel>}
+                        name="genderId"
                         size="small"
-                        value={formik.values.firstName}
+                        value={formik.values.genderId}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.firstName &&
-                          Boolean(formik.errors.firstName)
+                          formik.touched.genderId &&
+                          Boolean(formik.errors.genderId)
                         }
                         helperText={
-                          formik.touched.firstName && formik.errors.firstName
+                          formik.touched.genderId && formik.errors.genderId
                         }
                         slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
+                          input: { readOnly: dialogMode === "view" },
                         }}
-                      />
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {genders.map((o) => (
+                          <MenuItem key={o.id} value={o.id}>
+                            {o.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
                     </Grid>
                     <Grid item size={{ xs: 12, md: 6 }}>
                       <TextField
+                        select
                         fullWidth
-                        label="Middle Name (Optional)"
-                        name="middleName"
+                        label={
+                          <RequiredLabel>Qualification Level</RequiredLabel>
+                        }
+                        name="qualificationId"
                         size="small"
-                        value={formik.values.middleName}
+                        value={formik.values.qualificationId}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.middleName &&
-                          Boolean(formik.errors.middleName)
+                          formik.touched.qualificationId &&
+                          Boolean(formik.errors.qualificationId)
                         }
                         helperText={
-                          formik.touched.middleName && formik.errors.middleName
+                          formik.touched.qualificationId &&
+                          formik.errors.qualificationId
                         }
                         slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
+                          input: { readOnly: dialogMode === "view" },
                         }}
-                      />
+                      >
+                        <MenuItem value="">-select-</MenuItem>
+                        {academicQualifications.map((o) => (
+                          <MenuItem key={o.id} value={o.id}>
+                            {o.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
                     </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
+                    <Grid item size={{ xs: 12 }}>
                       <TextField
+                        select
                         fullWidth
-                        label={<RequiredLabel>Last Name</RequiredLabel>}
-                        name="lastName"
+                        label={<RequiredLabel>Subjects</RequiredLabel>}
+                        name="subjectIds"
                         size="small"
-                        value={formik.values.lastName}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
+                        value={formik.values.subjectIds}
+                        onChange={(e) =>
+                          formik.setFieldValue(
+                            "subjectIds",
+                            typeof e.target.value === "string"
+                              ? e.target.value.split(",").map(Number)
+                              : e.target.value,
+                          )
+                        }
+                        onBlur={() =>
+                          formik.setFieldTouched("subjectIds", true)
+                        }
                         error={
-                          formik.touched.lastName &&
-                          Boolean(formik.errors.lastName)
+                          formik.touched.subjectIds &&
+                          Boolean(formik.errors.subjectIds)
                         }
                         helperText={
-                          formik.touched.lastName && formik.errors.lastName
+                          (formik.touched.subjectIds &&
+                            formik.errors.subjectIds) ||
+                          (subjects.length === 0
+                            ? "No approved subjects yet. Subjects must be approved before they can be assigned."
+                            : "")
                         }
                         slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
+                          input: { readOnly: dialogMode === "view" },
+                          select: {
+                            multiple: true,
+                            renderValue: (selected) => (
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: 0.5,
+                                }}
+                              >
+                                {selected.map((id) => (
+                                  <Chip
+                                    key={id}
+                                    size="small"
+                                    label={
+                                      subjects.find((s) => s.id === Number(id))
+                                        ?.name || `Subject ${id}`
+                                    }
+                                    sx={{ height: 22 }}
+                                  />
+                                ))}
+                              </Box>
+                            ),
                           },
                         }}
-                      />
+                      >
+                        {subjects.map((sub) => (
+                          <MenuItem key={sub.id} value={sub.id}>
+                            <Checkbox
+                              size="small"
+                              checked={formik.values.subjectIds.includes(
+                                sub.id,
+                              )}
+                              sx={{ p: 0.5, mr: 1 }}
+                            />
+                            {sub.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
                     </Grid>
                     <Grid item size={{ xs: 12, md: 6 }}>
                       <TextField
@@ -887,9 +861,7 @@ const TutorIndex = () => {
                         }
                         helperText={formik.touched.email && formik.errors.email}
                         slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
+                          input: { readOnly: dialogMode === "view" },
                         }}
                       />
                     </Grid>
@@ -907,213 +879,8 @@ const TutorIndex = () => {
                         }
                         helperText={formik.touched.phone && formik.errors.phone}
                         slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      />
-                    </Grid>
-                  </Grid>
-
-                  <Typography fontWeight={600} gutterBottom sx={{ mt: 3 }}>
-                    Professional Information
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Grid container spacing={2}>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={<RequiredLabel>Qualification</RequiredLabel>}
-                        name="qualificationId"
-                        size="small"
-                        value={formik.values.qualificationId}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.qualificationId &&
-                          Boolean(formik.errors.qualificationId)
-                        }
-                        helperText={
-                          formik.touched.qualificationId &&
-                          formik.errors.qualificationId
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      >
-                        <MenuItem value="">-select-</MenuItem>
-                        {academicQualifications.map((qual) => (
-                          <MenuItem key={qual.id} value={qual.id}>
-                            {qual.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Specialization</RequiredLabel>}
-                        name="specialization"
-                        size="small"
-                        value={formik.values.specialization}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.specialization &&
-                          Boolean(formik.errors.specialization)
-                        }
-                        helperText={
-                          formik.touched.specialization &&
-                          formik.errors.specialization
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        placeholder="e.g., Mathematics, Computer Science, Physics"
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={
-                          <RequiredLabel>Experience (Years)</RequiredLabel>
-                        }
-                        name="experienceYears"
-                        type="number"
-                        size="small"
-                        value={formik.values.experienceYears}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.experienceYears &&
-                          Boolean(formik.errors.experienceYears)
-                        }
-                        helperText={
-                          formik.touched.experienceYears &&
-                          formik.errors.experienceYears
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        inputProps={{ min: 0, step: 1 }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Hourly Rate (Nu.)</RequiredLabel>}
-                        name="hourlyRate"
-                        type="number"
-                        size="small"
-                        value={formik.values.hourlyRate}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.hourlyRate &&
-                          Boolean(formik.errors.hourlyRate)
-                        }
-                        helperText={
-                          formik.touched.hourlyRate && formik.errors.hourlyRate
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        inputProps={{ min: 0, step: 50 }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label="Joining Date"
-                        name="joiningDate"
-                        type="date"
-                        size="small"
-                        value={formik.values.joiningDate}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.joiningDate &&
-                          Boolean(formik.errors.joiningDate)
-                        }
-                        helperText={
-                          formik.touched.joiningDate &&
-                          formik.errors.joiningDate
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                    {dialogMode !== "view" && (
-                      <Grid item size={{ xs: 12, md: 12 }}>
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={formik.values.statusId === 1}
-                              onChange={(e) =>
-                                formik.setFieldValue(
-                                  "statusId",
-                                  e.target.checked ? 1 : 2,
-                                )
-                              }
-                              color="primary"
-                            />
-                          }
-                          label={
-                            formik.values.statusId === 1 ? "Active" : "Inactive"
-                          }
-                        />
-                      </Grid>
-                    )}
-                    {dialogMode === "view" && (
-                      <Grid item size={{ xs: 12, md: 12 }}>
-                        <Chip
-                          label={`Status: ${getStatusName(formik.values.statusId)}`}
-                          size="small"
-                          sx={{
-                            backgroundColor: getStatusColor(
-                              formik.values.statusId,
-                            ),
-                            color: "white",
-                          }}
-                        />
-                      </Grid>
-                    )}
-                    <Grid item size={{ xs: 12 }}>
-                      <TextField
-                        fullWidth
-                        label="Description"
-                        name="description"
-                        size="small"
-                        multiline
-                        rows={3}
-                        value={formik.values.description}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.description &&
-                          Boolean(formik.errors.description)
-                        }
-                        helperText={
-                          formik.touched.description &&
-                          formik.errors.description
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
+                          input: { readOnly: dialogMode === "view" },
+                          htmlInput: { maxLength: 8, inputMode: "numeric" },
                         }}
                       />
                     </Grid>
@@ -1174,12 +941,7 @@ const TutorIndex = () => {
         <DialogContent>
           <Typography>
             Are you sure you want to delete &quot;
-            {tutorToDelete &&
-              getFullName(
-                tutorToDelete.firstName,
-                tutorToDelete.middleName,
-                tutorToDelete.lastName,
-              )}
+            {tutorToDelete?.name}
             &quot;?
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

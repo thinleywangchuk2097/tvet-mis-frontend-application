@@ -37,6 +37,18 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import SubjectService from "../../../api/services/internal/ses-center/SubjectService";
+import CommonService from "../../../api/services/internal/common/CommonService";
+
+// Class Level options = Academic Qualification master (dropdown parent 18)
+const ACADEMIC_QUALIFICATION_PARENT_ID = 18;
+
+// Add Subject workflow status (service 56); no status = added before the workflow
+const APPLICATION_STATUS = {
+  55: { label: "Submitted", color: "info" },
+  56: { label: "Verified", color: "primary" },
+  57: { label: "Approved", color: "success" },
+  58: { label: "Rejected", color: "error" },
+};
 
 // Table style constant
 const TABLE_STYLE = {
@@ -75,12 +87,6 @@ const RequiredLabel = ({ children }) => (
 
 RequiredLabel.propTypes = requiredLabelPropTypes;
 
-// Status list constant
-const STATUS_LIST = [
-  { id: 1, name: "Active" },
-  { id: 0, name: "Inactive" },
-];
-
 const SubjectIndex = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -95,6 +101,7 @@ const SubjectIndex = () => {
   const [loading, setLoading] = useState(false);
   const [instituteId, setInstituteId] = useState(null);
   const [isInstituteLoaded, setIsInstituteLoaded] = useState(false);
+  const [classLevels, setClassLevels] = useState([]);
 
   // Delete confirmation dialog state
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -103,7 +110,17 @@ const SubjectIndex = () => {
   // Fetch institute details on component mount
   useEffect(() => {
     fetchInstituteDetails();
+    CommonService.getByParentId(ACADEMIC_QUALIFICATION_PARENT_ID).then(
+      (res) => {
+        if (!(res instanceof Error) && !res?.isAxiosError) {
+          setClassLevels(Array.isArray(res?.data) ? res.data : []);
+        }
+      },
+    );
   }, []);
+
+  const getClassLevelName = (id) =>
+    classLevels.find((c) => String(c.id) === String(id))?.name || "—";
 
   // Fetch subjects when instituteId is available
   useEffect(() => {
@@ -134,11 +151,13 @@ const SubjectIndex = () => {
   // Helper function to map snake_case to camelCase
   const mapSubjectData = (subject) => ({
     id: subject.id,
-    subjectCode: subject.subject_code,
+    applicationNo: subject.application_no,
+    applicationStatusId: subject.application_status_id
+      ? Number(subject.application_status_id)
+      : null,
     subjectName: subject.subject_name,
-    creditHours: subject.credit_hours,
-    theoryHours: subject.theory_hours,
-    practicalHours: subject.practical_hours,
+    classLevelId: subject.class_level_id ?? "",
+    totalDurationHours: subject.total_duration_hours ?? "",
     statusId: subject.status_id ? parseInt(subject.status_id) : 1,
     description: subject.description,
     instituteId: subject.institute_id,
@@ -187,28 +206,6 @@ const SubjectIndex = () => {
     }
   };
 
-  const getStatusName = (statusId) => {
-    const status = STATUS_LIST.find((s) => s.id === statusId);
-    return status
-      ? status.name
-      : statusId === 1
-        ? "Active"
-        : statusId === 0
-          ? "Inactive"
-          : "Unknown";
-  };
-
-  const getStatusColor = (statusId) => {
-    switch (statusId) {
-      case 1:
-        return "#4caf50"; // Active - Green
-      case 0:
-        return "#f44336"; // Inactive - Red
-      default:
-        return "#9e9e9e"; // Grey
-    }
-  };
-
   const handleChangePage = (event, newPage) => setPage(newPage);
 
   const handleChangeRowsPerPage = (event) => {
@@ -219,7 +216,9 @@ const SubjectIndex = () => {
   const filteredSubjects = subjects.filter(
     (s) =>
       (s.subjectName?.toLowerCase() || "").includes(search.toLowerCase()) ||
-      (s.subjectCode?.toLowerCase() || "").includes(search.toLowerCase()),
+      getClassLevelName(s.classLevelId)
+        .toLowerCase()
+        .includes(search.toLowerCase()),
   );
 
   const handleView = (subject) => {
@@ -292,48 +291,31 @@ const SubjectIndex = () => {
     if ((dialogMode === "edit" || dialogMode === "view") && selectedSubject) {
       return {
         id: selectedSubject.id || "",
-        subjectCode: selectedSubject.subjectCode || "",
         subjectName: selectedSubject.subjectName || "",
-        creditHours: selectedSubject.creditHours || "",
-        theoryHours: selectedSubject.theoryHours || "",
-        practicalHours: selectedSubject.practicalHours || "",
-        statusId:
-          selectedSubject.statusId !== undefined ? selectedSubject.statusId : 1,
+        classLevelId: selectedSubject.classLevelId ?? "",
+        totalDurationHours: selectedSubject.totalDurationHours ?? "",
         description: selectedSubject.description || "",
       };
     }
     return {
       id: "",
-      subjectCode: "",
       subjectName: "",
-      creditHours: "",
-      theoryHours: "",
-      practicalHours: "",
-      statusId: 1,
+      classLevelId: "",
+      totalDurationHours: "",
       description: "",
     };
   };
 
   const validationSchema = Yup.object().shape({
-    subjectCode: Yup.string()
-      .required("Subject Code is required")
-      .max(20, "Subject Code must be at most 20 characters"),
     subjectName: Yup.string()
       .required("Subject Name is required")
       .max(100, "Subject Name must be at most 100 characters"),
-    creditHours: Yup.number()
-      .required("Credit Hours is required")
-      .positive("Credit Hours must be a positive number")
-      .max(10, "Credit Hours cannot exceed 10")
-      .typeError("Credit Hours must be a valid number"),
-    theoryHours: Yup.number()
-      .required("Theory Hours is required")
-      .min(0, "Theory Hours cannot be negative")
-      .typeError("Theory Hours must be a valid number"),
-    practicalHours: Yup.number()
-      .required("Practical Hours is required")
-      .min(0, "Practical Hours cannot be negative")
-      .typeError("Practical Hours must be a valid number"),
+    classLevelId: Yup.string().required("Class Level is required"),
+    totalDurationHours: Yup.number()
+      .required("Total Duration is required")
+      .integer("Total Duration must be whole hours")
+      .positive("Total Duration must be greater than 0")
+      .typeError("Total Duration must be a valid number"),
     description: Yup.string().max(
       500,
       "Description must be at most 500 characters",
@@ -351,12 +333,10 @@ const SubjectIndex = () => {
       // Prepare data for API with camelCase field names (the backend will handle mapping)
       const payload = {
         id: dialogMode === "edit" ? values.id : null,
-        subjectCode: values.subjectCode,
         subjectName: values.subjectName,
-        creditHours: values.creditHours.toString(),
-        theoryHours: values.theoryHours.toString(),
-        practicalHours: values.practicalHours.toString(),
-        statusId: parseInt(values.statusId),
+        classLevelId: Number(values.classLevelId),
+        totalDurationHours: Number(values.totalDurationHours),
+        statusId: 1,
         description: values.description || "",
         instituteId: instituteId,
         createdBy: actionId,
@@ -472,7 +452,7 @@ const SubjectIndex = () => {
             variant="outlined"
             size="small"
             fullWidth
-            placeholder="Search by Subject Name or Code"
+            placeholder="Search by Subject Name or Class Level"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             sx={{
@@ -503,11 +483,10 @@ const SubjectIndex = () => {
           <TableHead>
             <TableRow>
               <TableCell width={60}>#</TableCell>
-              <TableCell>Subject Code</TableCell>
               <TableCell>Subject Name</TableCell>
-              <TableCell align="center">Credit Hours</TableCell>
-              <TableCell align="center">Theory Hours</TableCell>
-              <TableCell align="center">Practical Hours</TableCell>
+              <TableCell>Class Level</TableCell>
+              <TableCell align="center">Total Duration (Hours)</TableCell>
+              <TableCell>Description</TableCell>
               <TableCell align="center">Status</TableCell>
               <TableCell align="center" width={120}>
                 Action
@@ -519,45 +498,43 @@ const SubjectIndex = () => {
               filteredSubjects
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((subject, index) => {
-                  const statusName = getStatusName(subject.statusId);
-                  const statusColor = getStatusColor(subject.statusId);
-
                   return (
                     <TableRow key={subject.id}>
                       <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={subject.subjectCode}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
-                        />
-                      </TableCell>
                       <TableCell>{subject.subjectName}</TableCell>
-                      <TableCell align="center">
-                        {subject.creditHours}
+                      <TableCell>
+                        {getClassLevelName(subject.classLevelId)}
                       </TableCell>
                       <TableCell align="center">
-                        {subject.theoryHours}
+                        {subject.totalDurationHours || "—"}
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          maxWidth: 320,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={subject.description || ""}
+                      >
+                        {subject.description || "—"}
                       </TableCell>
                       <TableCell align="center">
-                        {subject.practicalHours}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={statusName}
-                          size="small"
-                          sx={{
-                            backgroundColor: statusColor,
-                            color: "white",
-                            fontWeight: "medium",
-                            minWidth: "70px",
-                            "& .MuiChip-label": {
-                              px: 1.5,
-                              py: 0.5,
-                            },
-                          }}
-                        />
+                        {(() => {
+                          const st =
+                            APPLICATION_STATUS[subject.applicationStatusId];
+                          return st ? (
+                            <Chip
+                              size="small"
+                              label={st.label}
+                              color={st.color}
+                              variant="outlined"
+                              sx={{ height: 20, fontSize: "0.72rem" }}
+                            />
+                          ) : (
+                            "—"
+                          );
+                        })()}
                       </TableCell>
                       <TableCell align="center">
                         <Tooltip title="View Details">
@@ -593,7 +570,7 @@ const SubjectIndex = () => {
                 })
             ) : (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={7} align="center">
                   {loading ? (
                     <CircularProgress size={24} />
                   ) : (
@@ -658,31 +635,7 @@ const SubjectIndex = () => {
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Grid container spacing={2}>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Subject Code</RequiredLabel>}
-                        name="subjectCode"
-                        size="small"
-                        value={formik.values.subjectCode}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.subjectCode &&
-                          Boolean(formik.errors.subjectCode)
-                        }
-                        helperText={
-                          formik.touched.subjectCode &&
-                          formik.errors.subjectCode
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         fullWidth
                         label={<RequiredLabel>Subject Name</RequiredLabel>}
@@ -706,100 +659,23 @@ const SubjectIndex = () => {
                         }}
                       />
                     </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Credit Hours</RequiredLabel>}
-                        name="creditHours"
-                        type="number"
-                        size="small"
-                        value={formik.values.creditHours}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.creditHours &&
-                          Boolean(formik.errors.creditHours)
-                        }
-                        helperText={
-                          formik.touched.creditHours &&
-                          formik.errors.creditHours
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        inputProps={{ min: 0, step: 0.5 }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Theory Hours</RequiredLabel>}
-                        name="theoryHours"
-                        type="number"
-                        size="small"
-                        value={formik.values.theoryHours}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.theoryHours &&
-                          Boolean(formik.errors.theoryHours)
-                        }
-                        helperText={
-                          formik.touched.theoryHours &&
-                          formik.errors.theoryHours
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        inputProps={{ min: 0 }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Practical Hours</RequiredLabel>}
-                        name="practicalHours"
-                        type="number"
-                        size="small"
-                        value={formik.values.practicalHours}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.practicalHours &&
-                          Boolean(formik.errors.practicalHours)
-                        }
-                        helperText={
-                          formik.touched.practicalHours &&
-                          formik.errors.practicalHours
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        inputProps={{ min: 0 }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
                       <TextField
                         select
                         fullWidth
-                        label="Status"
-                        name="statusId"
+                        label={<RequiredLabel>Class Level</RequiredLabel>}
+                        name="classLevelId"
                         size="small"
-                        value={formik.values.statusId}
+                        value={formik.values.classLevelId}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.statusId &&
-                          Boolean(formik.errors.statusId)
+                          formik.touched.classLevelId &&
+                          Boolean(formik.errors.classLevelId)
                         }
                         helperText={
-                          formik.touched.statusId && formik.errors.statusId
+                          formik.touched.classLevelId &&
+                          formik.errors.classLevelId
                         }
                         slotProps={{
                           input: {
@@ -807,12 +683,41 @@ const SubjectIndex = () => {
                           },
                         }}
                       >
-                        {STATUS_LIST.map((status) => (
-                          <MenuItem key={status.id} value={status.id}>
-                            {status.name}
+                        <MenuItem value="">-select-</MenuItem>
+                        {classLevels.map((c) => (
+                          <MenuItem key={c.id} value={c.id}>
+                            {c.name}
                           </MenuItem>
                         ))}
                       </TextField>
+                    </Grid>
+                    <Grid item size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        label={
+                          <RequiredLabel>Total Duration (Hours)</RequiredLabel>
+                        }
+                        name="totalDurationHours"
+                        type="number"
+                        size="small"
+                        value={formik.values.totalDurationHours}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        error={
+                          formik.touched.totalDurationHours &&
+                          Boolean(formik.errors.totalDurationHours)
+                        }
+                        helperText={
+                          formik.touched.totalDurationHours &&
+                          formik.errors.totalDurationHours
+                        }
+                        slotProps={{
+                          input: {
+                            readOnly: dialogMode === "view",
+                          },
+                          htmlInput: { min: 1, step: 1 },
+                        }}
+                      />
                     </Grid>
                     <Grid item size={{ xs: 12 }}>
                       <TextField
