@@ -40,7 +40,9 @@ import SelfAssessmentReport from "../pages/institute/registration/SelfAssessment
 import ViewSelfAssessmentReport from "../pages/institute/registration/ViewSelfAssessmentReport";
 
 //publications & forms (TVET QC)
-import ManageDocumentsIndex from "../pages/tvetqc/documents/ManageDocumentsIndex";
+import PublicationFormsIndex from "../pages/publication-forms/PublicationFormsIndex";
+import PublicNoticesIndex from "../pages/public-notices/PublicNoticesIndex";
+import FeedbackComplaintsIndex from "../pages/feedback-complaints/FeedbackComplaintsIndex";
 
 //curriculum
 import CurriculumIndex from "../pages/curriculum/CurriculumIndex";
@@ -314,10 +316,9 @@ export const privateRoutes = [
       { path: "student-enrollment", element: <StudentEnrollmentIndex /> },
     ],
   },
-  {
-    path: "tvetqc",
-    children: [{ path: "documents", element: <ManageDocumentsIndex /> }],
-  },
+  { path: "publication-forms", element: <PublicationFormsIndex /> },
+  { path: "public-notices", element: <PublicNoticesIndex /> },
+  { path: "feedback-complaints", element: <FeedbackComplaintsIndex /> },
   {
     path: "announcement",
     children: [

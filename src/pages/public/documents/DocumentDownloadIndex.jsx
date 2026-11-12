@@ -20,7 +20,6 @@ import {
   TableRow,
   TableSortLabel,
   TextField,
-  Tooltip,
   Typography,
   alpha,
   useMediaQuery,
@@ -30,7 +29,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import DownloadIcon from "@mui/icons-material/Download";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
-import TvetDocumentService from "../../../api/services/internal/public/TvetDocumentService";
+import PublicationFormService from "../../../api/services/internal/public/PublicationFormService";
 import { fileTypeMeta, formatDate, formatFileSize } from "./documentUtils";
 
 const NAVY = "#0a2d6e";
@@ -82,7 +81,7 @@ const DocumentDownloadIndex = ({ category, title, subtitle, noun }) => {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    TvetDocumentService.getPublicDocuments(category).then((res) => {
+    PublicationFormService.getPublicDocuments(category).then((res) => {
       if (!alive) return;
       const ok = res && !(res instanceof Error) && Array.isArray(res.data);
       setRows(ok ? res.data : []);
@@ -125,7 +124,7 @@ const DocumentDownloadIndex = ({ category, title, subtitle, noun }) => {
     row.hasFile ? (
       <Button
         component="a"
-        href={TvetDocumentService.getDownloadUrl(row.id)}
+        href={PublicationFormService.getDownloadUrl(row.id)}
         download={row.fileName}
         size="small"
         variant={full ? "contained" : "outlined"}
@@ -255,6 +254,7 @@ const DocumentDownloadIndex = ({ category, title, subtitle, noun }) => {
                     Title
                   </TableSortLabel>
                 </TableCell>
+                <TableCell sx={{ width: "32%" }}>Remarks</TableCell>
                 <TableCell width={140}>
                   <TableSortLabel active={orderBy === "publishedDate"} direction={orderBy === "publishedDate" ? order : "asc"} onClick={() => sortBy("publishedDate")}>
                     Published
@@ -269,7 +269,7 @@ const DocumentDownloadIndex = ({ category, title, subtitle, noun }) => {
             <TableBody>
               {paged.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5}>{empty}</TableCell>
+                  <TableCell colSpan={6}>{empty}</TableCell>
                 </TableRow>
               ) : (
                 paged.map((row, i) => (
@@ -281,17 +281,11 @@ const DocumentDownloadIndex = ({ category, title, subtitle, noun }) => {
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {row.title}
                       </Typography>
-                      {row.remarks && (
-                        <Tooltip title={row.remarks} placement="bottom-start">
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", maxWidth: 640, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                          >
-                            {row.remarks}
-                          </Typography>
-                        </Tooltip>
-                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.8rem" }}>
+                        {row.remarks || "—"}
+                      </Typography>
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {formatDate(row.publishedDate)}
