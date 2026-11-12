@@ -29,7 +29,7 @@ import CurriculumPublication from "../pages/report/CurriculumPublication";
 import FeedbackForm from "../pages/public/FeedbackForm";
 import ViewTracerSend from "../pages/dwps/tracer/ViewTracerSend";
 import PublicationIndex from "../pages/public/publication/PublicationIndex";
-import UploadFormIndex from "../pages/public/forms/UploadFormIndex";
+import FormsIndex from "../pages/public/forms/FormsIndex";
 
 //public routes ..
 export const publicRoutes = [
@@ -121,7 +121,7 @@ export const publicRoutes = [
   },
   {
     path: "forms",
-    children: [{ path: "forms-index", element: <UploadFormIndex /> }],
+    children: [{ path: "forms-index", element: <FormsIndex /> }],
   },
   {
     path: "tracer",
