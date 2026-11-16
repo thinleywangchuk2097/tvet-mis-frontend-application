@@ -96,7 +96,6 @@ const validationSchema = Yup.object({
     .matches(/^\d{8}$/, "Mobile No must be exactly 8 digits"),
   email: Yup.string().email("Invalid email").required("Email is required"),
   sectorId: Yup.string().required("Field of Training is required"),
-  courseId: Yup.string().required("Course is required"),
   activityLevelId: Yup.string().required("Activity Level is required"),
   files: Yup.array().min(1, "Please upload at least one supporting document"),
 
@@ -135,11 +134,11 @@ const validationSchema = Yup.object({
 // Supplementary Education Service (SES) Centre proposal
 const SES_SERVICE_ID = 34;
 
-// SES (34): course, activity level and supporting documents are optional
+// SES (34): activity level and supporting documents are optional
+// (no course is asked for any proposal)
 const getValidationSchema = (serviceId) =>
   Number(serviceId) === SES_SERVICE_ID
     ? validationSchema.shape({
-        courseId: Yup.string().nullable(),
         activityLevelId: Yup.string().nullable(),
         files: Yup.array(),
       })
@@ -197,8 +196,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
   const [otherOwnershipTypes, setOtherOwnershipTypes] = useState([]);
   const [activityLevels, setActivityLevels] = useState([]);
   const [typeOfOwners, setTypeOfOwners] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [loadingCourses, setLoadingCourses] = useState(false);
   const [declaration, setDeclaration] = useState([]);
 
   const navigate = useNavigate();
@@ -313,25 +310,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
     }
   };
 
-  const fetchCoursesBySector = async (sectorId) => {
-    if (!sectorId) {
-      setCourses([]);
-      return;
-    }
-
-    setLoadingCourses(true);
-    try {
-      const response = await CommonService.getOccupationsBySectorId(sectorId);
-      setCourses(response.data);
-    } catch (error) {
-      console.error("Error fetching courses:", error);
-      toast.error("Failed to load courses for selected sector");
-      setCourses([]);
-    } finally {
-      setLoadingCourses(false);
-    }
-  };
-
   const fetchServiceName = async () => {
     try {
       const response = await CommonService.getServiceName(serviceId);
@@ -427,7 +405,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       promoterCitizenId: "",
       promoterName: "",
       sectorId: "",
-      courseId: "",
       activityLevelId: "",
       files: [],
       declarationAccepted: false,
@@ -459,7 +436,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
           promoterCitizenId: values.promoterCitizenId || null,
           promoterName: values.promoterName || null,
           sectorId: values.sectorId || null,
-          courseId: values.courseId || null,
           activityLevelId: values.activityLevelId || null,
           serviceId: serviceId,
           assignedRoleId: 7,
@@ -1200,8 +1176,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                   value={formik.values.sectorId}
                   onChange={(e) => {
                     formik.handleChange(e);
-                    formik.setFieldValue("courseId", "");
-                    fetchCoursesBySector(e.target.value);
                   }}
                   onBlur={formik.handleBlur}
                   error={
@@ -1218,46 +1192,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                     ))}
                 </TextField>
               </Grid>
-
-              {/* not shown for SES (34) */}
-              {!isSES && (
-                <Grid item size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    select
-                    fullWidth
-                    label={requiredLabel("Course")}
-                    name="courseId"
-                    size="small"
-                    value={formik.values.courseId}
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    error={
-                      formik.touched.courseId && Boolean(formik.errors.courseId)
-                    }
-                    helperText={
-                      formik.touched.courseId && formik.errors.courseId
-                    }
-                    disabled={!formik.values.sectorId || loadingCourses}
-                    slotProps={{
-                      input: {
-                        endAdornment: loadingCourses && (
-                          <CircularProgress size={20} />
-                        ),
-                      },
-                    }}
-                  >
-                    <MenuItem value="">
-                      {loadingCourses ? "Loading courses..." : "Select Course"}
-                    </MenuItem>
-                    {Array.isArray(courses) &&
-                      courses.map((course) => (
-                        <MenuItem key={course.id} value={course.id.toString()}>
-                          {course.occupationName || course.name}
-                        </MenuItem>
-                      ))}
-                  </TextField>
-                </Grid>
-              )}
 
               {/* not shown for SES (34) */}
               {!isSES && (

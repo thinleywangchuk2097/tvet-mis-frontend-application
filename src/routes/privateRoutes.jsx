@@ -106,6 +106,7 @@ import ViewProgramMonitoringIndex from "../pages/bqpca/monitoring/ViewProgramMon
 import ChangeSesCentreIndex from "../pages/ses-centre/registration/ChangeSesCentreIndex";
 import SubjectIndex from "../pages/ses-centre/registration/SubjectIndex";
 import TutorIndex from "../pages/ses-centre/registration/TutorIndex";
+import StudentDetailsReport from "../pages/ses-centre/report/StudentDetailsReport";
 import TutorsDetailsReport from "../pages/ses-centre/report/TutorsDetailsReport";
 import StudentEnrollmentIndex from "../pages/ses-centre/registration/StudentEnrollmentIndex";
 import ViewSubjectIndex from "../pages/ses-centre/registration/ViewSubjectIndex";
@@ -256,6 +257,7 @@ export const privateRoutes = [
       { path: "change-ses-centre", element: <ChangeSesCentreIndex /> },
       { path: "subject-index", element: <SubjectIndex /> },
       { path: "tutor-index", element: <TutorIndex /> },
+      { path: "student-details-report", element: <StudentDetailsReport /> },
       { path: "tutors-details-report", element: <TutorsDetailsReport /> },
     ],
   },

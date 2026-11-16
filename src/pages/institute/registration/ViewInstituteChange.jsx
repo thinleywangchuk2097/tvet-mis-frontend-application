@@ -176,32 +176,26 @@ const ViewInstituteChange = () => {
 
         setChangeRequestData(data);
 
-        // If we have institute ID, fetch current institute details
-        if (data.institute_id || data.instituteId) {
-          const instituteId = data.institute_id || data.instituteId;
-          const instituteResponse =
-            await CommonService.getInstituteNameByInstituteId(instituteId);
-          if (instituteResponse.data) {
-            const instituteData =
-              Array.isArray(instituteResponse.data) &&
-              instituteResponse.data.length > 0
-                ? instituteResponse.data[0]
-                : instituteResponse.data;
-
-            setCurrentInstituteData({
-              // For display
-              registration_no: instituteData.registration_no || "",
-              instituteName: instituteData.institute_name || "",
-              dzongkhag_id: instituteData.dzongkhag_id || "",
-              exact_location: instituteData.exact_location || "",
-              // For payment
-              instituteId: instituteData.institute_id || "",
-              taxPayerNo: instituteData.registration_no || "",
-              taxPayerEmail: instituteData.email_id || "",
-              taxPayerMobileNo: instituteData.mobile_no || "",
-              taxPayerName: instituteData.institute_name || "",
-            });
-          }
+        // Current institute details come with the change request
+        // (tbl_institute_change_dtls.institute_id -> tbl_institute_registration_dtls)
+        const instituteId = data.institute_id || data.instituteId;
+        setCurrentInstituteData({
+          // For display
+          registration_no: data.current_registration_no || "",
+          instituteName: data.institute_name || "",
+          dzongkhag_id: data.current_dzongkhag_id || "",
+          exact_location: data.current_exact_location || "",
+          // For payment
+          instituteId: instituteId || "",
+          taxPayerNo: data.current_registration_no || "",
+          taxPayerEmail: data.current_email_id || "",
+          taxPayerMobileNo: data.current_mobile_no || "",
+          taxPayerName: data.institute_name || "",
+        });
+        if (!data.current_registration_no) {
+          toast.warning(
+            `No registered institute found for institute ID ${instituteId}`,
+          );
         }
       }
     } catch (error) {
@@ -343,7 +337,8 @@ const ViewInstituteChange = () => {
         await InstituteRegistrationService.verifyInstituteChange(payload);
       if (response instanceof Error || response?.isAxiosError) {
         throw new Error(
-          response?.response?.data?.message || "Failed to verify change request",
+          response?.response?.data?.message ||
+            "Failed to verify change request",
         );
       }
 
@@ -388,7 +383,8 @@ const ViewInstituteChange = () => {
         await InstituteRegistrationService.rejectInstituteChange(payload);
       if (response instanceof Error || response?.isAxiosError) {
         throw new Error(
-          response?.response?.data?.message || "Failed to reject change request",
+          response?.response?.data?.message ||
+            "Failed to reject change request",
         );
       }
 
@@ -519,7 +515,9 @@ const ViewInstituteChange = () => {
           <br />
           <strong>Application No: {applicationNo}</strong>
           <br />
-          <strong>Institute: {changeRequestData?.institute_name || "N/A"}</strong>
+          <strong>
+            Institute: {changeRequestData?.institute_name || "N/A"}
+          </strong>
         </DialogContentText>
         <TextField
           autoFocus
@@ -618,7 +616,14 @@ const ViewInstituteChange = () => {
               Submitted on {formatDate(changeRequestData.created_at)}
             </Typography>
           </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
+          >
             <Chip
               label={changeRequestData.application_no || applicationNo}
               size="small"
@@ -626,7 +631,8 @@ const ViewInstituteChange = () => {
               color="primary"
               sx={{ fontWeight: 600 }}
             />
-            {changeRequestData.status_id && getStatusBadge(changeRequestData.status_id)}
+            {changeRequestData.status_id &&
+              getStatusBadge(changeRequestData.status_id)}
           </Box>
         </Box>
 
@@ -641,14 +647,22 @@ const ViewInstituteChange = () => {
           <Divider sx={{ mb: 2 }} />
           <Grid container spacing={2}>
             {[
-              ["Registration No", currentInstituteData?.registration_no || "N/A"],
+              [
+                "Registration No",
+                currentInstituteData?.registration_no || "N/A",
+              ],
               ["Institute Name", currentInstituteData?.instituteName || "N/A"],
-              ["Dzongkhag", getDzongkhagName(currentInstituteData?.dzongkhag_id)],
+              [
+                "Dzongkhag",
+                getDzongkhagName(currentInstituteData?.dzongkhag_id),
+              ],
               ["Exact Location", currentInstituteData?.exact_location || "N/A"],
             ].map(([label, value]) => (
               <Grid item key={label} size={{ xs: 12, sm: 6, md: 3 }}>
                 <Typography sx={FIELD_LABEL_SX}>{label}</Typography>
-                <Typography sx={{ fontSize: "0.92rem", fontWeight: 600, mt: 0.25 }}>
+                <Typography
+                  sx={{ fontSize: "0.92rem", fontWeight: 600, mt: 0.25 }}
+                >
                   {value}
                 </Typography>
               </Grid>
@@ -1316,7 +1330,11 @@ const ViewInstituteChange = () => {
         >
           {/* no action for this role at the current status: say why */}
           {!isPending && (
-            <Typography variant="body2" color="text.secondary" sx={{ mr: "auto" }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mr: "auto" }}
+            >
               {statusIdNum === STATUS_VERIFY
                 ? "Verified — waiting for approval (role 22)."
                 : statusIdNum === STATUS_APPROVE
@@ -1357,27 +1375,27 @@ const ViewInstituteChange = () => {
                   </Button>
                 </span>
               </Tooltip>
-{/* Reject: only for the verifier (role 7); role 22 only approves */}
+              {/* Reject: only for the verifier (role 7); role 22 only approves */}
               {!isApprover && (
-                            <Tooltip title="Reject this change request" arrow>
-                <span>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    startIcon={<CancelIcon />}
-                    onClick={openRejectDialog}
-                    sx={{
-                      px: 3,
-                      py: 0.5,
-                      fontWeight: 600,
-                      textTransform: "none",
-                    }}
-                  >
-                    Reject
-                  </Button>
-                </span>
-              </Tooltip>
+                <Tooltip title="Reject this change request" arrow>
+                  <span>
+                    <Button
+                      variant="contained"
+                      color="error"
+                      size="small"
+                      startIcon={<CancelIcon />}
+                      onClick={openRejectDialog}
+                      sx={{
+                        px: 3,
+                        py: 0.5,
+                        fontWeight: 600,
+                        textTransform: "none",
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  </span>
+                </Tooltip>
               )}
             </>
           )}

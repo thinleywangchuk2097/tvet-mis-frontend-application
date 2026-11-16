@@ -44,6 +44,14 @@ import CommonService from "../../../api/services/internal/common/CommonService";
 import SubjectService from "../../../api/services/internal/ses-center/SubjectService";
 
 const GENDER_PARENT_ID = 8;
+
+// Add Tutor workflow status (service 57); no status = added before the workflow
+const APPLICATION_STATUS = {
+  55: { label: "Submitted", color: "info" },
+  56: { label: "Verified", color: "primary" },
+  57: { label: "Approved", color: "success" },
+  58: { label: "Rejected", color: "error" },
+};
 const ACADEMIC_QUALIFICATION_PARENT_ID = 18;
 
 // Table style constant
@@ -176,6 +184,10 @@ const TutorIndex = () => {
   // Helper function to map snake_case to camelCase
   const mapTutorData = (tutor) => ({
     id: tutor.id,
+    applicationNo: tutor.application_no,
+    applicationStatusId: tutor.application_status_id
+      ? Number(tutor.application_status_id)
+      : null,
     citizenId: tutor.citizen_id,
     // older tutors were saved with first / middle / last name
     name:
@@ -539,6 +551,7 @@ const TutorIndex = () => {
               <TableCell>Subjects</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Phone</TableCell>
+              <TableCell align="center">Status</TableCell>
               <TableCell align="center" width={130}>
                 Action
               </TableCell>
@@ -563,6 +576,25 @@ const TutorIndex = () => {
                       </TableCell>
                       <TableCell>{tutor.email}</TableCell>
                       <TableCell>{tutor.phone}</TableCell>
+                      <TableCell align="center">
+                        {APPLICATION_STATUS[tutor.applicationStatusId] ? (
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={
+                              APPLICATION_STATUS[tutor.applicationStatusId]
+                                .label
+                            }
+                            color={
+                              APPLICATION_STATUS[tutor.applicationStatusId]
+                                .color
+                            }
+                            sx={{ height: 20, fontSize: "0.72rem" }}
+                          />
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
                       <TableCell align="center">
                         <Tooltip title="View Details">
                           <IconButton
@@ -597,7 +629,7 @@ const TutorIndex = () => {
                 })
             ) : (
               <TableRow>
-                <TableCell colSpan={9} align="center">
+                <TableCell colSpan={10} align="center">
                   {loading ? (
                     <CircularProgress size={24} />
                   ) : (

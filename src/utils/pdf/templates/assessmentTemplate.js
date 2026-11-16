@@ -14,7 +14,7 @@ const FONT = "Cambria";
 const BODY_SIZE = 14; // running text
 const VALUE_SIZE = 16; // name, CID, programme title
 const RESULT_SIZE = 18; // COMPETENT
-const FOOTER_SIZE = 10; // Certificate No / Issued in / Assessment Venue (fits left of the signature)
+const FOOTER_SIZE = 10; // Certificate No / Issued in / Assessment Venue (above the seal and signature)
 const MARKS_SIZE = 13; // Statement of Marks
 
 const LEFT_X = 25.4; // page-2 text margin
@@ -186,10 +186,10 @@ export const renderAssessmentPage1 = (doc, record) => {
   }
 
   // ---- Certificate No / Issued in / Assessment Venue ----
-  // Level with the Director's signature (y ≈ 247–262mm) and kept left of it
-  // (signature starts at x ≈ 80mm); long values break onto new lines.
-  let footerY = 248;
-  const footerWidth = 55; // 23.3mm → 78.3mm
+  // As in the BQPCA sample: below the result, above the seal (seal top ≈ 220mm)
+  // and the Director's signature; long values break onto new lines.
+  let footerY = 196;
+  const footerWidth = 115; // 23.3mm → 138.3mm, stays left of the seal
   if (record.certificate_no) {
     footerY = drawLabelValue(
       doc,

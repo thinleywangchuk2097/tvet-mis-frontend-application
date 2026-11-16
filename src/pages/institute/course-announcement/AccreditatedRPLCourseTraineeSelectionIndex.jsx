@@ -184,6 +184,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   // ---------- Helper: tooltip text for assessment inputs ----------
 
   const getInternalAssessmentTooltip = (traineeId) => {
+    if (isApplicationEndorsed()) {
+      return "Internal Assessment cannot be changed after endorsement";
+    }
     const hasValue =
       traineeInternalAssessments[traineeId] &&
       traineeInternalAssessments[traineeId] !== "";
@@ -199,6 +202,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   // the competency stays editable after it is chosen
   const getCompetencyTooltip = (traineeId) => {
+    if (isApplicationEndorsed()) {
+      return "Internal Assessment cannot be changed after endorsement";
+    }
     const hasValue =
       traineeInternalAssessments[traineeId] &&
       traineeInternalAssessments[traineeId] !== "";
@@ -483,6 +489,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   };
 
   const handleInternalAssessmentChange = (traineeId, value) => {
+    // Internal Assessment is locked once the application is endorsed (59)
+    if (isApplicationEndorsed()) return;
     setTraineeInternalAssessments((prev) => ({
       ...prev,
       [traineeId]: value,
@@ -1322,7 +1330,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                                             ? 20
                                             : 100,
                                         },
-                                        readOnly: false,
+                                        readOnly: isApplicationEndorsed(),
                                       },
                                     }}
                                     sx={{
@@ -1366,6 +1374,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                                           e.target.value,
                                         )
                                       }
+                                      readOnly={isApplicationEndorsed()}
                                       displayEmpty
                                     >
                                       <MenuItem value="" disabled>

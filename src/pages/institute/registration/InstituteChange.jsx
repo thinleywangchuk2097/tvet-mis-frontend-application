@@ -166,6 +166,19 @@ const useInstituteData = (registration_no) => {
   const [instituteDetails, setInstituteDetails] = useState(null);
   const [currentInstituteData, setCurrentInstituteData] = useState(null);
   const [loading, setLoading] = useState(true);
+  // institute_id from tbl_institute_registration_dtls (registration_no = logged-in user id)
+  const [registeredInstituteId, setRegisteredInstituteId] = useState(null);
+
+  useEffect(() => {
+    if (!registration_no) return;
+    InstituteRegistrationService.getInstituteDetails(registration_no).then(
+      (res) => {
+        if (res instanceof Error || res?.isAxiosError) return;
+        const row = Array.isArray(res?.data) ? res.data[0] : res?.data;
+        if (row?.institute_id) setRegisteredInstituteId(row.institute_id);
+      },
+    );
+  }, [registration_no]);
 
   const getOwnershipTypeName = useCallback(
     (id, ownershipTypes, otherOwnershipTypes) => {
@@ -239,6 +252,7 @@ const useInstituteData = (registration_no) => {
 
   return {
     instituteDetails,
+    registeredInstituteId,
     currentInstituteData,
     loading,
     getOwnershipTypeName,
@@ -737,6 +751,13 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
     initialValues: formValues,
     validationSchema: getValidationSchema(entityLabel),
     onSubmit: async (values) => {
+      // institute_id must come from tbl_institute_registration_dtls
+      if (!instituteData.registeredInstituteId) {
+        toast.error(
+          "Registered institute not found for this account. Please refresh and try again.",
+        );
+        return;
+      }
       setSubmitting(true);
       try {
         const documents =
@@ -745,9 +766,8 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
             : [];
 
         const payload = {
-          instituteId:
-            instituteData.instituteDetails?.id ||
-            instituteData.instituteDetails?.institute_id,
+          // institute_id from tbl_institute_registration_dtls (never the proposal id)
+          instituteId: instituteData.registeredInstituteId,
           reasonForChange: values.reasonForChange,
           changeType: values.changeType,
           dzongkhagId: values.dzongkhag_id

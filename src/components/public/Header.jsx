@@ -65,7 +65,7 @@ const NAV_MENU = [
     icon: <ArticleIcon sx={{ fontSize: 16 }} />,
     sub: [
       {
-        label: "Institute ",
+        label: "TVET Provider ",
         icon: <BusinessIcon sx={{ fontSize: 16 }} />,
         path: "/proposal/institute/6",
       },
@@ -86,7 +86,7 @@ const NAV_MENU = [
     icon: <HowToRegIcon sx={{ fontSize: 16 }} />,
     sub: [
       {
-        label: "Institute ",
+        label: "TVET Provider ",
         icon: <BusinessIcon sx={{ fontSize: 16 }} />,
         path: "/register/institute/7",
       },

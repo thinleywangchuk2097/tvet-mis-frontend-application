@@ -155,7 +155,6 @@ const ViewSubjectIndex = () => {
         applicationNo,
         statusId: selectedStatusId,
         assignedRoleId: currentRoleId,
-        userId,
         updatedBy: actionId,
         remarks: remarks.trim(),
       },

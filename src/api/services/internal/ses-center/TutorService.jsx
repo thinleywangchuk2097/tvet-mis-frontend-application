@@ -46,6 +46,32 @@ class TutorService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  // Add Tutor workflow (service 57)
+  getTutorByApplicationNo(applicationNo, token) {
+    return apiClient
+      .get(
+        `/api/v1/user/management/tutor/get-tutor-by-application-no/${applicationNo}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
+  verifyTutor(data, token) {
+    return apiClient
+      .post(`/api/v1/user/management/tutor/verify-tutor`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new TutorService();
