@@ -65,6 +65,63 @@ const generatePAValidationSchema = Yup.object({
   taxPayerName: Yup.string().required("Tax Payer Name is required"),
 });
 
+// spinner while busy, otherwise the normal icon
+const busyIcon = (busy, icon, spinner) => (busy ? spinner : icon);
+
+// BIRMS payment status -> workflow status (paid 56, pending 55, otherwise 57)
+const paymentStatusId = (paymentStatus) => {
+  if (paymentStatus === "paid") return 56;
+  return paymentStatus === "pending" ? 55 : 57;
+};
+
+const hasPdf = (data) =>
+  Boolean(data.base64pdf) && data.base64pdf !== "null";
+
+// starts a browser download of a data: / blob: URL
+const downloadFile = (href, fileName) => {
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+// "no payment" / "not found" -> warning (and the details, when the reply has any); otherwise info
+const handleReceiptMessage = (data, showReceiptDetails) => {
+  const msg = data.message.toLowerCase();
+  if (!msg.includes("no payment") && !msg.includes("not found")) {
+    toast.info(data.message);
+    return;
+  }
+  toast.warning(data.message);
+  if (data.paymentDetails || data.data) showReceiptDetails();
+};
+
+const receiptStatusToast = (data) => {
+  if (data.status === "success" && !data.base64pdf) {
+    toast.info("Receipt request successful but no PDF available");
+  } else if (data.status === "error" || data.status === "failed") {
+    toast.error(data.message || "Failed to retrieve receipt");
+  } else {
+    toast.info(data.message || "Receipt data received");
+  }
+};
+
+const receiptErrorMessage = (error) => {
+  if (error.response) {
+    return (
+      error.response.data?.message ||
+      error.response.data?.error ||
+      `Server error: ${error.response.status}`
+    );
+  }
+  if (error.request) {
+    return "No response from server. Please check your connection.";
+  }
+  return error.message;
+};
+
 // instituteView = true: the logged-in institute's own payments only
 // (no institute filter/column, no Generate PA, no cancel; Pay + receipt download stay).
 const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
@@ -208,12 +265,7 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
         payment_method_id: null,
         bank_name_id: null,
         transaction_ref: item.ref_no || "N/A",
-        status_id:
-          item.payment_status === "paid"
-            ? 56
-            : item.payment_status === "pending"
-              ? 55
-              : 57,
+        status_id: paymentStatusId(item.payment_status),
         description: item.description || "Course Fee",
         created_at: item.created_at,
         institute_id: parseInt(item.institute_id) || null,
@@ -488,91 +540,36 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
         return;
       }
 
-      if (
-        data.base64pdf &&
-        data.base64pdf !== "null" &&
-        data.base64pdf !== null
-      ) {
-        try {
-          const pdfContent = data.base64pdf;
-          const link = document.createElement("a");
-          link.href = `data:application/pdf;base64,${pdfContent}`;
-          link.download = `receipt-${receiptNo}.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          toast.success("Receipt downloaded successfully!");
-        } catch (pdfError) {
-          console.error("Error creating PDF:", pdfError);
-          toast.error("Failed to create PDF file");
-        }
+      const showReceiptDetails = () => {
+        setSelectedPayment({ ...selectedPayment, receiptDetails: data });
+        setOpenReceiptDialog(true);
+      };
+
+      if (hasPdf(data)) {
+        downloadFile(
+          `data:application/pdf;base64,${data.base64pdf}`,
+          `receipt-${receiptNo}.pdf`,
+        );
+        toast.success("Receipt downloaded successfully!");
       } else if (data.redirect_url) {
         window.open(data.redirect_url, "_blank");
         toast.success("Receipt opened in new tab");
       } else if (data.message) {
-        if (
-          data.message.toLowerCase().includes("no payment") ||
-          data.message.toLowerCase().includes("not found")
-        ) {
-          toast.warning(data.message);
-
-          if (data.paymentDetails || data.data) {
-            setSelectedPayment({
-              ...selectedPayment,
-              receiptDetails: data,
-            });
-            setOpenReceiptDialog(true);
-          }
-        } else {
-          toast.info(data.message);
-        }
+        handleReceiptMessage(data, showReceiptDetails);
       } else if (data.status) {
-        if (data.status === "success" && !data.base64pdf) {
-          toast.info("Receipt request successful but no PDF available");
-        } else if (data.status === "error" || data.status === "failed") {
-          toast.error(data.message || "Failed to retrieve receipt");
-        } else {
-          toast.info(data.message || "Receipt data received");
-        }
+        receiptStatusToast(data);
       } else if (response.data instanceof Blob) {
-        try {
-          const url = window.URL.createObjectURL(response.data);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `receipt-${receiptNo}.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-          toast.success("Receipt downloaded successfully!");
-        } catch (blobError) {
-          console.error("Error handling blob:", blobError);
-          toast.error("Failed to download receipt");
-        }
+        const url = window.URL.createObjectURL(response.data);
+        downloadFile(url, `receipt-${receiptNo}.pdf`);
+        window.URL.revokeObjectURL(url);
+        toast.success("Receipt downloaded successfully!");
       } else {
-        setSelectedPayment({
-          ...selectedPayment,
-          receiptDetails: data,
-        });
-        setOpenReceiptDialog(true);
+        showReceiptDetails();
         toast.success("Receipt details loaded");
       }
     } catch (error) {
       console.error("Error downloading receipt:", error);
-
-      let errorMessage = "Failed to download receipt";
-      if (error.response) {
-        errorMessage =
-          error.response.data?.message ||
-          error.response.data?.error ||
-          `Server error: ${error.response.status}`;
-      } else if (error.request) {
-        errorMessage = "No response from server. Please check your connection.";
-      } else {
-        errorMessage = error.message;
-      }
-
-      toast.error(errorMessage);
+      toast.error(receiptErrorMessage(error));
     } finally {
       setDownloadingReceipts((prev) => ({ ...prev, [paymentId]: false }));
     }
@@ -878,13 +875,11 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
               color="primary"
               onClick={handleInstituteSearch}
               disabled={loading}
-              startIcon={
-                loading ? (
-                  <CircularProgress size={18} color="inherit" />
-                ) : (
-                  <SearchIcon />
-                )
-              }
+              startIcon={busyIcon(
+                loading,
+                <SearchIcon />,
+                <CircularProgress size={18} color="inherit" />,
+              )}
               sx={{ textTransform: "none", height: 40 }}
             >
               Search
@@ -1387,13 +1382,11 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
             variant="contained"
             color="primary"
             onClick={generatePAFormik.handleSubmit}
-            startIcon={
-              submitting ? (
-                <CircularProgress size={20} sx={{ color: "#fff" }} />
-              ) : (
-                <SettingsSuggestIcon />
-              )
-            }
+            startIcon={busyIcon(
+              submitting,
+              <SettingsSuggestIcon />,
+              <CircularProgress size={20} sx={{ color: "#fff" }} />,
+            )}
             sx={{ textTransform: "none" }}
             disabled={submitting}
           >
@@ -1512,9 +1505,11 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
             onClick={handleConfirmCancel}
             disabled={loading || !cancelReason.trim()}
             sx={{ textTransform: "none" }}
-            startIcon={
-              loading ? <CircularProgress size={20} /> : <CancelIcon />
-            }
+            startIcon={busyIcon(
+              loading,
+              <CancelIcon />,
+              <CircularProgress size={20} />,
+            )}
           >
             {loading ? "Cancelling..." : "Cancel Payment"}
           </Button>
@@ -1557,10 +1552,10 @@ const BirmsAgencyPaymentIndex = ({ instituteView = false }) => {
                 disabled={downloadingReceipts[selectedPayment?.id]}
                 className="no-print"
               >
-                {downloadingReceipts[selectedPayment?.id] ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  <DownloadIcon />
+                {busyIcon(
+                  downloadingReceipts[selectedPayment?.id],
+                  <DownloadIcon />,
+                  <CircularProgress size={24} />,
                 )}
               </IconButton>
             </Box>

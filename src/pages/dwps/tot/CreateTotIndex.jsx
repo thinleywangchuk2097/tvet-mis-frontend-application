@@ -77,6 +77,78 @@ const moduleManagementDialogPropTypes = {
 };
 
 // ==================== MODULE MANAGEMENT DIALOG ====================
+// ==================== MODULE / COURSE CONTENT HELPERS ====================
+const isFilled = (v) => v !== "" && v !== null && v !== undefined;
+
+// rowId: stable React key for a course content row (not sent to the server)
+let contentRowSeq = 0;
+const newContentRow = (row = { courseContent: "", fullMark: "" }) => {
+  contentRowSeq += 1;
+  return { ...row, rowId: row.rowId ?? `cc-${contentRowSeq}` };
+};
+
+// module being edited, with at least one course content row and row ids
+const withContentRows = (module) => ({
+  weightage: "",
+  ...module,
+  courseContents:
+    Array.isArray(module.courseContents) && module.courseContents.length > 0
+      ? module.courseContents.map((row) => newContentRow(row))
+      : [newContentRow()],
+});
+
+// Weightage is optional; when given it must be a percentage 0-100
+const weightageError = (weightage) => {
+  if (!isFilled(weightage)) return null;
+  const num = Number(weightage);
+  return Number.isNaN(num) || num < 0 || num > 100
+    ? "Weightage must be a number between 0 and 100"
+    : null;
+};
+
+// rows with neither content nor mark are ignored; otherwise content is required
+// and the full mark (when given) must be a non-negative number
+const courseContentError = (rows) => {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const hasContent = isFilled(row.courseContent);
+    const hasMark = isFilled(row.fullMark);
+    if (hasMark || hasContent) {
+      if (!hasContent) return `Course Content #${i + 1}: Content is required`;
+      const markNum = Number(row.fullMark);
+      if (hasMark && (Number.isNaN(markNum) || markNum < 0)) {
+        return `Course Content #${i + 1}: Full Mark must be a non-negative number`;
+      }
+    }
+  }
+  return null;
+};
+
+const cleanCourseContents = (rows) =>
+  rows
+    .filter((row) => isFilled(row.courseContent) || isFilled(row.fullMark))
+    .map((row) => ({
+      courseContent: row.courseContent || "",
+      fullMark: isFilled(row.fullMark) ? Number(row.fullMark) : null,
+    }));
+
+// program status chip: 122 active (green), 123 deleted (red)
+const programStatusColor = (statusId) => {
+  if (statusId === 122) return "success";
+  return statusId === 123 ? "error" : "default";
+};
+
+// submit button: spinner + busy text while saving, otherwise the action text
+const submitButtonContent = (busy, busyText, idleText) =>
+  busy ? (
+    <>
+      <CircularProgress size={20} sx={{ mr: 1 }} />
+      {busyText}
+    </>
+  ) : (
+    idleText
+  );
+
 const ModuleManagementDialog = ({
   open,
   onClose,
@@ -93,26 +165,15 @@ const ModuleManagementDialog = ({
     learningOutcomes: "",
     weightage: "",
     order: (formik?.values?.modules?.length || 0) + 1,
-    courseContents: [{ courseContent: "", fullMark: "" }],
+    courseContents: [newContentRow()],
   });
 
-  const [moduleData, setModuleData] = useState(initialData || getEmptyModule());
+  const [moduleData, setModuleData] = useState(() =>
+    initialData ? withContentRows(initialData) : getEmptyModule(),
+  );
 
   useEffect(() => {
-    if (initialData) {
-      setModuleData({
-        weightage: "",
-        courseContents: [{ courseContent: "", fullMark: "" }],
-        ...initialData,
-        courseContents:
-          Array.isArray(initialData.courseContents) &&
-          initialData.courseContents.length > 0
-            ? initialData.courseContents
-            : [{ courseContent: "", fullMark: "" }],
-      });
-    } else {
-      setModuleData(getEmptyModule());
-    }
+    setModuleData(initialData ? withContentRows(initialData) : getEmptyModule());
   }, [initialData, formik?.values?.modules?.length]);
 
   const handleModuleChange = (field, value) => {
@@ -131,7 +192,7 @@ const ModuleManagementDialog = ({
       ...moduleData,
       courseContents: [
         ...(moduleData.courseContents || []),
-        { courseContent: "", fullMark: "" },
+        newContentRow(),
       ],
     });
   };
@@ -142,8 +203,7 @@ const ModuleManagementDialog = ({
     );
     setModuleData({
       ...moduleData,
-      courseContents:
-        updated.length > 0 ? updated : [{ courseContent: "", fullMark: "" }],
+      courseContents: updated.length > 0 ? updated : [newContentRow()],
     });
   };
 
@@ -153,69 +213,17 @@ const ModuleManagementDialog = ({
       return;
     }
 
-    // Weightage validation (percentage 0-100)
-    if (
-      moduleData.weightage !== "" &&
-      moduleData.weightage !== null &&
-      moduleData.weightage !== undefined
-    ) {
-      const weightageNum = Number(moduleData.weightage);
-      if (isNaN(weightageNum) || weightageNum < 0 || weightageNum > 100) {
-        toast.error("Weightage must be a number between 0 and 100");
-        return;
-      }
+    const error =
+      weightageError(moduleData.weightage) ||
+      courseContentError(moduleData.courseContents || []);
+    if (error) {
+      toast.error(error);
+      return;
     }
 
-    // Course Contents validation
-    const courseContents = moduleData.courseContents || [];
-    for (let i = 0; i < courseContents.length; i++) {
-      const row = courseContents[i];
-      const hasContent =
-        row.courseContent !== "" &&
-        row.courseContent !== null &&
-        row.courseContent !== undefined;
-      const hasMark =
-        row.fullMark !== "" &&
-        row.fullMark !== null &&
-        row.fullMark !== undefined;
-
-      if (!hasContent && !hasMark) continue;
-
-      if (!hasContent) {
-        toast.error(`Course Content #${i + 1}: Content is required`);
-        return;
-      }
-
-      if (hasMark) {
-        const markNum = Number(row.fullMark);
-        if (isNaN(markNum) || markNum < 0) {
-          toast.error(
-            `Course Content #${i + 1}: Full Mark must be a non-negative number`,
-          );
-          return;
-        }
-      }
-    }
-
-    const cleanedCourseContents = courseContents
-      .filter(
-        (row) =>
-          (row.courseContent !== "" &&
-            row.courseContent !== null &&
-            row.courseContent !== undefined) ||
-          (row.fullMark !== "" &&
-            row.fullMark !== null &&
-            row.fullMark !== undefined),
-      )
-      .map((row) => ({
-        courseContent: row.courseContent || "",
-        fullMark:
-          row.fullMark === "" ||
-          row.fullMark === null ||
-          row.fullMark === undefined
-            ? null
-            : Number(row.fullMark),
-      }));
+    const cleanedCourseContents = cleanCourseContents(
+      moduleData.courseContents || [],
+    );
 
     onSave({ ...moduleData, courseContents: cleanedCourseContents });
     onClose();
@@ -359,7 +367,7 @@ const ModuleManagementDialog = ({
                 container
                 spacing={1}
                 alignItems="center"
-                key={index}
+                key={row.rowId}
                 sx={{ mb: 1 }}
               >
                 <Grid item size={{ xs: 12, md: 7 }}>
@@ -889,10 +897,7 @@ const CreateTotIndex = () => {
         "Single Module programs can only have one module",
         (modules, context) => {
           const programTypeId = context.parent.programTypeId;
-          if (programTypeId === 120 && modules && modules.length > 1) {
-            return false;
-          }
-          return true;
+          return programTypeId !== 120 || !modules || modules.length <= 1;
         },
       ),
   });
@@ -1193,13 +1198,14 @@ const CreateTotIndex = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {loading ? (
+                {loading && (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
                       <CircularProgress size={30} />
                     </TableCell>
                   </TableRow>
-                ) : filteredPrograms.length > 0 ? (
+                )}
+                {!loading && filteredPrograms.length > 0 && (
                   filteredPrograms
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((program, index) => (
@@ -1242,13 +1248,7 @@ const CreateTotIndex = () => {
                         <TableCell>
                           <Chip
                             label={getStatusName(program.statusId)}
-                            color={
-                              program.statusId === 122
-                                ? "success"
-                                : program.statusId === 123
-                                  ? "error"
-                                  : "default"
-                            }
+                            color={programStatusColor(program.statusId)}
                             size="small"
                             icon={
                               program.statusId === 122 ? (
@@ -1293,7 +1293,8 @@ const CreateTotIndex = () => {
                         </TableCell>
                       </TableRow>
                     ))
-                ) : (
+                )}
+                {!loading && !(filteredPrograms.length > 0) && (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
                       No TOT programs available. Click &quot;Create
@@ -1851,15 +1852,10 @@ const CreateTotIndex = () => {
                   color="primary"
                   disabled={loading || submitting || !formik.isValid}
                 >
-                  {loading || submitting ? (
-                    <>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      {editingId ? "Updating..." : "Submitting..."}
-                    </>
-                  ) : editingId ? (
-                    "Update"
-                  ) : (
-                    "Submit"
+                  {submitButtonContent(
+                    loading || submitting,
+                    editingId ? "Updating..." : "Submitting...",
+                    editingId ? "Update" : "Submit",
                   )}
                 </Button>
               </DialogActions>
@@ -2086,7 +2082,9 @@ const CreateTotIndex = () => {
                           </TableHead>
                           <TableBody>
                             {formik.values.modules.map((module, index) => (
-                              <TableRow key={index}>
+                              <TableRow
+                                key={module.id ?? `${module.moduleCode}-${module.order}`}
+                              >
                                 <TableCell>
                                   {module.order || index + 1}
                                 </TableCell>
@@ -2121,9 +2119,9 @@ const CreateTotIndex = () => {
                                 <TableCell>
                                   {(module.courseContents || []).length > 0 ? (
                                     <Box>
-                                      {module.courseContents.map((cc, i) => (
+                                      {module.courseContents.map((cc) => (
                                         <Typography
-                                          key={i}
+                                          key={cc.id ?? `${cc.courseContent}|${cc.fullMark}`}
                                           variant="caption"
                                           display="block"
                                         >
@@ -2221,15 +2219,10 @@ const CreateTotIndex = () => {
                   color="primary"
                   disabled={loading || submitting || !formik.isValid}
                 >
-                  {loading || submitting ? (
-                    <>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      {editingProgramId ? "Updating..." : "Creating..."}
-                    </>
-                  ) : editingProgramId ? (
-                    "Update Program"
-                  ) : (
-                    "Create Program"
+                  {submitButtonContent(
+                    loading || submitting,
+                    editingProgramId ? "Updating..." : "Creating...",
+                    editingProgramId ? "Update Program" : "Create Program",
                   )}
                 </Button>
               </DialogActions>

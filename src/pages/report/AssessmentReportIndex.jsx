@@ -126,12 +126,15 @@ const AssessmentReportIndex = () => {
     () =>
       [...new Set(data.filter((r) => !serviceFilter || r.serviceKey === serviceFilter)
         .map((r) => r.course_name)
-        .filter(Boolean))].sort(),
+        .filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [data, serviceFilter],
   );
 
   const resultOptions = useMemo(
-    () => [...new Set(data.map((r) => r.overall_result).filter(Boolean))].sort(),
+    () =>
+      [...new Set(data.map((r) => r.overall_result).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
     [data],
   );
 
@@ -354,13 +357,14 @@ const AssessmentReportIndex = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={13} align="center" sx={{ py: 2 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
-            ) : pageRows.length > 0 ? (
+            )}
+            {!loading &&
               pageRows.map((r, i) => (
                 <TableRow key={`${r.announcement_no}-${r.trainee_application_no}-${i}`} hover>
                   <TableCell sx={cell}>{page * rowsPerPage + i + 1}</TableCell>
@@ -390,8 +394,8 @@ const AssessmentReportIndex = () => {
                   <TableCell sx={{ ...cell, textAlign: "center" }}>{show(r.overall_result)}</TableCell>
                   <TableCell sx={cell}>{show(r.certificate_no)}</TableCell>
                 </TableRow>
-              ))
-            ) : (
+              ))}
+            {!loading && pageRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={13} align="center" sx={{ py: 2 }}>
                   <Typography variant="body2" color="text.secondary">

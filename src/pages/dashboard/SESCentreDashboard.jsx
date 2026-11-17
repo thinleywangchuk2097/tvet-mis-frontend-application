@@ -156,6 +156,13 @@ CountBarChart.propTypes = {
   horizontal: PropTypes.bool,
 };
 
+
+// renewal due: red when overdue, orange within 60 days
+const renewalDueColor = (days) => {
+  if (days < 0) return "error.main";
+  return days < 60 ? "warning.main" : "text.secondary";
+};
+
 const SESCentreDashboard = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -396,13 +403,7 @@ const SESCentreDashboard = () => {
                   </Typography>
                   <Typography
                     variant="caption"
-                    color={
-                      v.days < 0
-                        ? "error.main"
-                        : v.days < 60
-                          ? "warning.main"
-                          : "text.secondary"
-                    }
+                    color={renewalDueColor(v.days)}
                   >
                     {v.days < 0
                       ? `${Math.abs(v.days)} days overdue`
@@ -487,15 +488,17 @@ const SESCentreDashboard = () => {
         <Grid size={{ xs: 12, md: 6 }}>
           <Panel title="Approved subjects by class level">
             <Box sx={{ height: 240 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : subjectsByClassLevel.length ? (
+              )}
+              {!loading && subjectsByClassLevel.length > 0 && (
                 <CountBarChart
                   data={subjectsByClassLevel}
                   name="Subjects"
                   color={theme.palette.primary.main}
                 />
-              ) : (
+              )}
+              {!loading && subjectsByClassLevel.length === 0 && (
                 <Empty text="No approved subjects yet" />
               )}
             </Box>
@@ -504,16 +507,18 @@ const SESCentreDashboard = () => {
         <Grid size={{ xs: 12, md: 6 }}>
           <Panel title="Tutors per subject (top 8)">
             <Box sx={{ height: 240 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : tutorsBySubject.length ? (
+              )}
+              {!loading && tutorsBySubject.length > 0 && (
                 <CountBarChart
                   data={tutorsBySubject}
                   name="Tutors"
                   color={theme.palette.primary.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && tutorsBySubject.length === 0 && (
                 <Empty text="No subjects assigned to tutors yet" />
               )}
             </Box>
@@ -536,9 +541,10 @@ const SESCentreDashboard = () => {
               </Button>
             }
           >
-            {loading ? (
+            {loading && (
               <Skeleton variant="rounded" height={160} />
-            ) : sortedSubjects.length ? (
+            )}
+            {!loading && sortedSubjects.length > 0 && (
               <TableContainer sx={{ maxHeight: 320 }}>
                 <Table size="small" stickyHeader sx={BORDERED_TABLE}>
                   <TableHead>
@@ -584,7 +590,8 @@ const SESCentreDashboard = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
-            ) : (
+            )}
+            {!loading && sortedSubjects.length === 0 && (
               <Box sx={{ height: 120 }}>
                 <Empty text="No subjects added yet" />
               </Box>
@@ -605,9 +612,10 @@ const SESCentreDashboard = () => {
               </Button>
             }
           >
-            {loading ? (
+            {loading && (
               <Skeleton variant="rounded" height={160} />
-            ) : recentTutors.length ? (
+            )}
+            {!loading && recentTutors.length > 0 && (
               <TableContainer>
                 <Table size="small" sx={BORDERED_TABLE}>
                   <TableHead>
@@ -640,7 +648,8 @@ const SESCentreDashboard = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
-            ) : (
+            )}
+            {!loading && recentTutors.length === 0 && (
               <Box sx={{ height: 120 }}>
                 <Empty text="No tutors added yet" />
               </Box>

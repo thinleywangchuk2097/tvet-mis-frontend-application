@@ -269,6 +269,23 @@ const createFieldChangeHandler = (
 
 // ==================== COMPONENT ====================
 
+// Excel "Validity Status" column
+const validityStatusText = (v) => {
+  if (v.state === "expired") return `Expired (${Math.abs(v.days)} days ago)`;
+  if (v.state === "soon") return `Expires in ${v.days} days`;
+  if (v.state === "valid") return "Valid";
+  return "";
+};
+
+// validity filter chip: red for expired / expiring soon, green for valid
+const validityChipColor = (value) => {
+  if (value === "expired" || value === "soon") return "error";
+  return value === "valid" ? "success" : "default";
+};
+
+const documentNames = (documents) =>
+  (documents || []).map((d) => d.name).join(", ");
+
 const CreateNcsIndex = () => {
   // ==================== SEARCH / PAGINATION ====================
 
@@ -1101,22 +1118,17 @@ const CreateNcsIndex = () => {
         Occupation: item.occupation,
         "BQF Certificate Level": item.bqfLevel,
         "Validity Date": item.validityDate,
-        "Validity Status": (() => {
-          const v = getValidityInfo(item.validityDate);
-          if (v.state === "expired") return `Expired (${Math.abs(v.days)} days ago)`;
-          if (v.state === "soon") return `Expires in ${v.days} days`;
-          if (v.state === "valid") return "Valid";
-          return "";
-        })(),
+        "Validity Status": validityStatusText(getValidityInfo(item.validityDate)),
         "Programme Title": item.programmeTitle,
       };
       const units = item.units?.length ? item.units : [null];
+      const attachments = documentNames(item.documents);
       units.forEach((u) =>
         rows.push({
           ...base,
           "Unit Code": u?.unitCode ?? "",
           "Unit Title": u?.unitTitle ?? "",
-          Attachments: (item.documents || []).map((d) => d.name).join(", "),
+          Attachments: attachments,
         }),
       );
     });
@@ -1323,12 +1335,7 @@ const CreateNcsIndex = () => {
           {VALIDITY_FILTERS.map((f) => {
             const count =
               f.value === "" ? data.length : validityCounts[f.value] || 0;
-            const color =
-              f.value === "expired" || f.value === "soon"
-                ? "error"
-                : f.value === "valid"
-                  ? "success"
-                  : "default";
+            const color = validityChipColor(f.value);
             return (
               <Chip
                 key={f.value || "all"}
@@ -1367,13 +1374,14 @@ const CreateNcsIndex = () => {
           </TableHead>
 
           <TableBody>
-            {loadingList ? (
+            {loadingList && (
               <TableRow>
                 <TableCell colSpan={10} align="center" sx={{ py: 3 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
-            ) : filteredData.length > 0 ? (
+            )}
+            {!loadingList && filteredData.length > 0 && (
               filteredData
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((item, index) => {
@@ -1465,7 +1473,8 @@ const CreateNcsIndex = () => {
                   </TableRow>
                   );
                 })
-            ) : (
+            )}
+            {!loadingList && !(filteredData.length > 0) && (
               <TableRow>
                 <TableCell colSpan={10} align="center">
                   {filterSectorId
@@ -1990,7 +1999,7 @@ const CreateNcsIndex = () => {
                                       <IconButton
                                         size="small"
                                         color="error"
-                                        onClick={() => remove(index)}
+                                        onClick={remove.bind(null, index)}
                                         disabled={
                                           isFormDisabled() ||
                                           form.values.units.length <= 1

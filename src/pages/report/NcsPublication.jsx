@@ -397,13 +397,14 @@ const DataTable = ({
           </TableRow>
         </TableHead>
         <TableBody>
-          {loading ? (
+          {loading && (
             <TableRow>
               <TableCell colSpan={columns.length + 1} align="center">
                 <CircularProgress size={30} />
               </TableCell>
             </TableRow>
-          ) : paginatedData.length > 0 ? (
+          )}
+          {!loading &&
             paginatedData.map((item, index) => (
               <TableRow key={item.id}>
                 <TableCell>{page * rowsPerPage + index + 1}</TableCell>
@@ -413,8 +414,8 @@ const DataTable = ({
                   </TableCell>
                 ))}
               </TableRow>
-            ))
-          ) : (
+            ))}
+          {!loading && paginatedData.length === 0 && (
             <TableRow>
               <TableCell colSpan={columns.length + 1} align="center">
                 {emptyMessage}

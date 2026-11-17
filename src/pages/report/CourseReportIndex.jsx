@@ -25,7 +25,6 @@ import DownloadIcon from "@mui/icons-material/Download";
 import { exportToExcel } from "@/utils/exportExcel";
 import { useSelector } from "react-redux";
 import ReportService from "../../api/services/internal/report/ReportService";
-import CommonService from "../../api/services/internal/common/CommonService";
 
 // Institute type (tbl_institute_registration_dtls.institute_type_id)
 const INSTITUTE_TYPES = [

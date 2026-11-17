@@ -127,7 +127,7 @@ const validationSchema = Yup.object({
     is: "yes",
     then: (schema) =>
       schema
-        .matches(/^[0-9]{11}$/, "Citizen ID must be exactly 11 digits")
+        .matches(/^\d{11}$/, "Citizen ID must be exactly 11 digits")
         .required("Citizen ID No required"),
   }),
 
@@ -150,7 +150,7 @@ const validationSchema = Yup.object({
   email: Yup.string().email("Invalid email format").required("Email required"),
 
   mobileNo: Yup.string()
-    .matches(/^[0-9]{8}$/, "Mobile must be exactly 8 digits")
+    .matches(/^\d{8}$/, "Mobile must be exactly 8 digits")
     .required("Mobile required"),
 
   traineeTypeId: Yup.string().required("Select trainee type"),
@@ -163,7 +163,7 @@ const validationSchema = Yup.object({
   // Guardian Details
   guardianName: Yup.string().required("Guardian name required"),
   guardianMobileNo: Yup.string()
-    .matches(/^[0-9]{8}$/, "Mobile must be exactly 8 digits")
+    .matches(/^\d{8}$/, "Mobile must be exactly 8 digits")
     .required("Guardian mobile required"),
   guardianOccupationId: Yup.string().required("Select guardian occupation"),
   guardianMaritalStatusId: Yup.string().required(
@@ -175,6 +175,9 @@ const validationSchema = Yup.object({
 
 /* ---------- Progress ---------- */
 // Mirrors the submit rules above: one unit per required field (+1 for documents).
+// local@domain.tld - domain labels exclude "." so the regex cannot backtrack
+const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
 const isFilled = (v) =>
   v !== undefined && v !== null && String(v).trim() !== "";
 
@@ -194,10 +197,9 @@ const getFormProgress = (values = {}) => {
   const valid = (f) => {
     const v = values[f];
     if (!isFilled(v)) return false;
-    if (f === "cidNo") return /^[0-9]{11}$/.test(v);
-    if (f === "mobileNo" || f === "guardianMobileNo")
-      return /^[0-9]{8}$/.test(v);
-    if (f === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    if (f === "cidNo") return /^\d{11}$/.test(v);
+    if (f === "mobileNo" || f === "guardianMobileNo") return /^\d{8}$/.test(v);
+    if (f === "email") return EMAIL_REGEX.test(v);
     return true;
   };
 
@@ -238,6 +240,110 @@ const getFormProgress = (values = {}) => {
   });
 
   return { percent: units ? Math.round((done / units) * 100) : 0, steps };
+};
+
+const isBlank = (v) => !v || (typeof v === "string" && v.trim() === "");
+
+// a required field left empty, or a conditional field (CID / reference no / gender) not filled
+const isFieldMissing = (field, values, required) => {
+  const value = values[field];
+  if (required && isBlank(value)) return true;
+  if (field === "cidNo" && values.hasCid === "yes") {
+    return !value || value.length !== 11;
+  }
+  if (
+    (field === "referenceNo" || field === "genderId") &&
+    values.hasCid === "no"
+  ) {
+    return isBlank(value);
+  }
+  return false;
+};
+
+// BCSEA exam year: drop any "+offset" and keep only the year (as 1st January)
+const normalizeExamYear = (raw) => {
+  let examYear = raw || "";
+  if (examYear.includes("+")) examYear = examYear.split("+")[0];
+  if (/^\d{4}-\d{2}-\d{2}/.test(examYear)) {
+    examYear = `${examYear.substring(0, 4)}-01-01`;
+  }
+  return examYear;
+};
+
+const buildAcademicEntry = (results) => {
+  const firstResult = results[0];
+  return {
+    id: Date.now(),
+    stream: firstResult.stream || "",
+    schoolName: firstResult.schoolName || "",
+    examYear: normalizeExamYear(firstResult.examYear),
+    subjects: results.map((r) => ({
+      name: r.subject || "",
+      marks: parseInt(r.total) || 0,
+      fromApi: true,
+    })),
+  };
+};
+
+const toIntOrNull = (v) => (v ? parseInt(v) : null);
+
+// Gyalsung details are only sent for applicants with a CID
+const gyalsungFields = (hasCid, g) => {
+  const pick = (key) => (hasCid === "yes" ? (g?.[key] ?? null) : null);
+  return {
+    completed: pick("completed"),
+    year: pick("year"),
+    academy: pick("academy"),
+    trainingStartDate: pick("trainingStartDate"),
+    trainingEndDate: pick("trainingEndDate"),
+  };
+};
+
+const buildTraineePayload = (
+  values,
+  academicEntries,
+  gyalsungDetails,
+  documents,
+) => {
+  // The backend expects "traineeMarks" with "subject" and "total"
+  const traineeMarks = academicEntries.flatMap((entry) =>
+    entry.subjects.map((subject) => ({
+      subject: subject.name || "",
+      total: subject.marks ? subject.marks.toString() : "0",
+    })),
+  );
+  // the first academic entry fills the main fields
+  const firstEntry = academicEntries[0] || {};
+
+  return {
+    applicationNo: values.applicationNo,
+    cidNo: values.cidNo,
+    referenceNo: values.referenceNo || null,
+    name: values.name,
+    dob: values.dob || null,
+    email: values.email,
+    mobileNo: values.mobileNo,
+    genderId: toIntOrNull(values.genderId),
+    traineeTypeId: toIntOrNull(values.traineeTypeId),
+    employmentStatusId: toIntOrNull(values.employmentStatusId),
+    academicQualificationId: toIntOrNull(values.academicQualificationId),
+    presentDzongkhagId: toIntOrNull(values.presentDzongkhagId),
+    presentGewogId: toIntOrNull(values.presentGewogId),
+    guardianName: values.guardianName,
+    guardianMobileNo: values.guardianMobileNo,
+    guardianMaritalStatusId: toIntOrNull(values.guardianMaritalStatusId),
+    guardianOccupationId: toIntOrNull(values.guardianOccupationId),
+    statusId: 89,
+    serviceId: 40,
+    createdBy: null,
+    updatedBy: null,
+    examYear: firstEntry.examYear || "",
+    schoolName: firstEntry.schoolName || "",
+    stream: firstEntry.stream || "",
+    traineeMarks: traineeMarks,
+    documents: documents,
+    ...gyalsungFields(values.hasCid, gyalsungDetails),
+  };
 };
 
 /* ---------- Component ---------- */
@@ -395,6 +501,13 @@ const ApplyCourse = () => {
     }
   };
 
+  const clearAcademicResults = () => {
+    setAcademicResults(null);
+    setIsDataFromApi(false);
+    setHasAcademicData(false);
+    setAcademicEntries([]);
+  };
+
   // Function to fetch student academic results from BCSEA
   const fetchStudentAcademicResults = async (citizenId) => {
     if (!citizenId || citizenId.length !== 11) {
@@ -406,75 +519,26 @@ const ApplyCourse = () => {
     try {
       const response =
         await BcseaStudentResultService.getBcseaStudentResult(citizenId);
-      if (response.data?.studentresults?.studentresult) {
-        const results = response.data.studentresults.studentresult;
-
-        if (results && results.length > 0) {
-          setAcademicResults(results);
-          setIsDataFromApi(true);
-          setHasAcademicData(true);
-          // Auto-fill form fields with BCSEA data
-          const firstResult = results[0];
-
-          // Extract exam year from the date string
-          let examYear = firstResult.examYear || "";
-          if (examYear) {
-            // If it contains '+', take only the date part
-            if (examYear.includes("+")) {
-              examYear = examYear.split("+")[0];
-            }
-            // If it's a full date, extract just the year
-            if (examYear.match(/^\d{4}-\d{2}-\d{2}/)) {
-              const year = examYear.substring(0, 4);
-              // Store as date with January 1st of that year
-              examYear = `${year}-01-01`;
-            }
-          }
-
-          // Update academic entries with API data
-          setAcademicEntries([
-            {
-              id: Date.now(),
-              stream: firstResult.stream || "",
-              schoolName: firstResult.schoolName || "",
-              examYear: examYear,
-              subjects: results.map((r) => ({
-                name: r.subject || "",
-                marks: parseInt(r.total) || 0,
-                fromApi: true,
-              })),
-            },
-          ]);
-
-          toast.success(`Found ${results.length} subject results from BCSEA`);
-        } else {
-          // No academic data found
-          toast.info(
-            "No academic records found. Please upload academic mark sheets.",
-          );
-          setAcademicResults(null);
-          setIsDataFromApi(false);
-          setHasAcademicData(false);
-          setAcademicEntries([]);
-        }
+      const results = response.data?.studentresults?.studentresult;
+      if (results?.length > 0) {
+        setAcademicResults(results);
+        setIsDataFromApi(true);
+        setHasAcademicData(true);
+        // Auto-fill the academic entry with BCSEA data
+        setAcademicEntries([buildAcademicEntry(results)]);
+        toast.success(`Found ${results.length} subject results from BCSEA`);
       } else {
         toast.info(
           "No academic records found. Please upload academic mark sheets.",
         );
-        setAcademicResults(null);
-        setIsDataFromApi(false);
-        setHasAcademicData(false);
-        setAcademicEntries([]);
+        clearAcademicResults();
       }
     } catch (error) {
       console.error("Error fetching academic results:", error);
       toast.error(
         "Failed to fetch academic results. Please upload academic mark sheets.",
       );
-      setAcademicResults(null);
-      setIsDataFromApi(false);
-      setHasAcademicData(false);
-      setAcademicEntries([]);
+      clearAcademicResults();
     } finally {
       setFetchingResults(false);
     }
@@ -653,49 +717,11 @@ const ApplyCourse = () => {
     }
 
     const fields = getStepFields(stepIndex);
-    let allValid = true;
-
-    for (const field of fields) {
-      const value = formik.values[field];
-      const isRequired = isFieldRequired(field);
-
-      // Check if required field has value
-      if (isRequired) {
-        if (!value || (typeof value === "string" && value.trim() === "")) {
-          allValid = false;
-          break;
-        }
-      }
-      // Check if field has validation error
-      if (formik.errors[field]) {
-        allValid = false;
-        break;
-      }
-
-      // Special handling for conditional fields
-      if (field === "cidNo" && formik.values.hasCid === "yes") {
-        if (!value || value.length !== 11) {
-          allValid = false;
-          break;
-        }
-      }
-
-      if (field === "referenceNo" && formik.values.hasCid === "no") {
-        if (!value || (typeof value === "string" && value.trim() === "")) {
-          allValid = false;
-          break;
-        }
-      }
-
-      if (field === "genderId" && formik.values.hasCid === "no") {
-        if (!value || (typeof value === "string" && value.trim() === "")) {
-          allValid = false;
-          break;
-        }
-      }
-    }
-
-    return allValid;
+    return !fields.some(
+      (field) =>
+        formik.errors[field] ||
+        isFieldMissing(field, formik.values, isFieldRequired(field)),
+    );
   };
 
   const formik = useFormik({
@@ -739,78 +765,12 @@ const ApplyCourse = () => {
           values.files.map((file) => fileToBase64(file)),
         );
 
-        // Format academic data for payload - matching the entity structure
-        // The backend expects "traineeMarks" with "subject" and "total"
-        const traineeMarks = academicEntries.flatMap((entry) =>
-          entry.subjects.map((subject) => ({
-            subject: subject.name || "",
-            total: subject.marks ? subject.marks.toString() : "0",
-          })),
+        const payload = buildTraineePayload(
+          values,
+          academicEntries,
+          gyalsungDetails,
+          documents,
         );
-
-        // Get the first academic entry for the main fields
-        const firstEntry = academicEntries.length > 0 ? academicEntries[0] : {};
-
-        const payload = {
-          applicationNo: values.applicationNo,
-          cidNo: values.cidNo,
-          referenceNo: values.referenceNo || null,
-          name: values.name,
-          dob: values.dob || null,
-          email: values.email,
-          mobileNo: values.mobileNo,
-          genderId: values.genderId ? parseInt(values.genderId) : null,
-          traineeTypeId: values.traineeTypeId
-            ? parseInt(values.traineeTypeId)
-            : null,
-          employmentStatusId: values.employmentStatusId
-            ? parseInt(values.employmentStatusId)
-            : null,
-          academicQualificationId: values.academicQualificationId
-            ? parseInt(values.academicQualificationId)
-            : null,
-          presentDzongkhagId: values.presentDzongkhagId
-            ? parseInt(values.presentDzongkhagId)
-            : null,
-          presentGewogId: values.presentGewogId
-            ? parseInt(values.presentGewogId)
-            : null,
-          guardianName: values.guardianName,
-          guardianMobileNo: values.guardianMobileNo,
-          guardianMaritalStatusId: values.guardianMaritalStatusId
-            ? parseInt(values.guardianMaritalStatusId)
-            : null,
-          guardianOccupationId: values.guardianOccupationId
-            ? parseInt(values.guardianOccupationId)
-            : null,
-          statusId: 89,
-          serviceId: 40,
-          createdBy: null,
-          updatedBy: null,
-          examYear: firstEntry.examYear || "",
-          schoolName: firstEntry.schoolName || "",
-          stream: firstEntry.stream || "",
-          // The backend expects "traineeMarks" with "subject" and "total"
-          traineeMarks: traineeMarks,
-          documents: documents,
-          // Gyalsung details (only for applicants with a CID)
-          completed:
-            values.hasCid === "yes"
-              ? (gyalsungDetails?.completed ?? null)
-              : null,
-          year:
-            values.hasCid === "yes" ? (gyalsungDetails?.year ?? null) : null,
-          academy:
-            values.hasCid === "yes" ? (gyalsungDetails?.academy ?? null) : null,
-          trainingStartDate:
-            values.hasCid === "yes"
-              ? (gyalsungDetails?.trainingStartDate ?? null)
-              : null,
-          trainingEndDate:
-            values.hasCid === "yes"
-              ? (gyalsungDetails?.trainingEndDate ?? null)
-              : null,
-        };
 
         console.log("payload : ", payload);
         const response = await CourseEnrollmentService.submitTrainee(payload);
@@ -860,42 +820,9 @@ const ApplyCourse = () => {
     }
 
     // Check if all required fields have values (additional check)
-    let hasEmptyRequired = false;
-    for (const field of fields) {
-      const isRequired = isFieldRequired(field);
-      if (isRequired) {
-        const value = formik.values[field];
-        if (!value || (typeof value === "string" && value.trim() === "")) {
-          hasEmptyRequired = true;
-          break;
-        }
-      }
-
-      // Special validation for conditional fields
-      if (field === "cidNo" && formik.values.hasCid === "yes") {
-        if (!formik.values.cidNo || formik.values.cidNo.length !== 11) {
-          hasEmptyRequired = true;
-          break;
-        }
-      }
-
-      if (field === "referenceNo" && formik.values.hasCid === "no") {
-        if (
-          !formik.values.referenceNo ||
-          formik.values.referenceNo.trim() === ""
-        ) {
-          hasEmptyRequired = true;
-          break;
-        }
-      }
-
-      if (field === "genderId" && formik.values.hasCid === "no") {
-        if (!formik.values.genderId || formik.values.genderId.trim() === "") {
-          hasEmptyRequired = true;
-          break;
-        }
-      }
-    }
+    const hasEmptyRequired = fields.some((field) =>
+      isFieldMissing(field, formik.values, isFieldRequired(field)),
+    );
 
     if (hasEmptyRequired) {
       toast.error("Please fill all required fields in this step");
@@ -904,11 +831,9 @@ const ApplyCourse = () => {
 
     // Only validate files when we are on the Documents step
     const stepLabel = currentSteps[activeStep];
-    if (stepLabel === "Documents") {
-      if (!formik.values.files || formik.values.files.length === 0) {
-        toast.error("Please upload your academic mark sheets");
-        return;
-      }
+    if (stepLabel === "Documents" && !formik.values.files?.length) {
+      toast.error("Please upload your academic mark sheets");
+      return;
     }
 
     setActiveStep((prev) => Math.min(prev + 1, currentSteps.length - 1));
@@ -1979,8 +1904,7 @@ const ApplyCourse = () => {
                 )}
 
               {/* Conditional message based on whether academic data exists */}
-              {formik.values.files?.length > 0 ? null : academicResults &&
-                academicResults.length > 0 ? (
+              {!formik.values.files?.length && academicResults?.length > 0 && (
                 <Alert severity="success" sx={{ mb: 2 }}>
                   <Typography variant="body2">
                     <strong>Academic records found.</strong> Please upload any
@@ -1988,7 +1912,8 @@ const ApplyCourse = () => {
                     should not exceed <strong>1 MB</strong>.
                   </Typography>
                 </Alert>
-              ) : (
+              )}
+              {!formik.values.files?.length && !academicResults?.length && (
                 <Alert severity="info" sx={{ mb: 2 }}>
                   <Typography variant="body2">
                     <strong>Please upload your academic mark sheets.</strong>{" "}

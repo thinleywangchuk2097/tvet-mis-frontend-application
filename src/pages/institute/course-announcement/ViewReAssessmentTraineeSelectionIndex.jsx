@@ -118,7 +118,8 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   const assessmentsEnabled = hasInternalAssessmentForCourse || isServiceId41;
   const traineeCanBeAssessed = (trainee) =>
     isServiceId41 ||
-    (trainee.internal_assessment !== null && trainee.internal_assessment !== "");
+    (trainee.internal_assessment !== null &&
+      trainee.internal_assessment !== "");
 
   const isDiplomaCertificationLevel = () => {
     const levelId = courseDetails?.certification_level_id;
@@ -239,13 +240,6 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
     isPaymentCompleted() &&
     areAssessorsAssigned() &&
     allTraineesHaveAssessments();
-
-  const getAssessmentDisabledTooltip = () => {
-    if (!isRole9) return "You do not have permission to edit assessments";
-    if (!isPaymentCompleted())
-      return "Payment must be completed before editing assessments";
-    return "";
-  };
 
   const getApproveDisabledTooltip = () => {
     if (currentStatusId === 57) return "Already approved";
@@ -732,116 +726,103 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
   };
 
   // Actions
-  const handleAction = async () => {
-    if (isDiplomaCertificationLevel() && hasInternalAssessmentForCourse) {
-      if (isServiceId41) {
-        const invalidViva = selectedTrainees.some((trainee) => {
-          const value = traineeVivaAssessments[trainee.id];
-          if (value && value !== "") {
-            const numValue = Number(value);
-            return numValue < 0 || numValue > 20;
-          }
-          return false;
-        });
 
-        if (invalidViva) {
-          toast.error("Viva Assessment must be between 0 and 20 for diploma");
-          return;
-        }
+  // any selected trainee whose mark is outside 0..max (empty marks are skipped)
+  const hasOutOfRange = (marks, max) =>
+    selectedTrainees.some((trainee) => {
+      const value = marks[trainee.id];
+      if (!value) return false;
+      const numValue = Number(value);
+      return numValue < 0 || numValue > max;
+    });
 
-        const invalidVivaPractical = selectedTrainees.some((trainee) => {
-          const value = traineeVivaPracticalAssessments[trainee.id];
-          if (value && value !== "") {
-            const numValue = Number(value);
-            return numValue < 0 || numValue > 60;
-          }
-          return false;
-        });
-
-        if (invalidVivaPractical) {
-          toast.error(
+  // diploma mark limits; returns the first error message, or null when all marks are valid
+  const getDiplomaMarkError = () => {
+    if (!isDiplomaCertificationLevel() || !hasInternalAssessmentForCourse) {
+      return null;
+    }
+    const checks = isServiceId41
+      ? [
+          [
+            traineeVivaAssessments,
+            20,
+            "Viva Assessment must be between 0 and 20 for diploma",
+          ],
+          [
+            traineeVivaPracticalAssessments,
+            60,
             "Practical Assessment must be between 0 and 60 for diploma",
-          );
-          return;
-        }
-      } else {
-        const invalidTheory = selectedTrainees.some((trainee) => {
-          const value = traineeTheoryAssessments[trainee.id];
-          if (value && value !== "") {
-            const numValue = Number(value);
-            return numValue < 0 || numValue > 20;
-          }
-          return false;
-        });
-
-        if (invalidTheory) {
-          toast.error("Theory Assessment must be between 0 and 20 for diploma");
-          return;
-        }
-
-        const invalidPractical = selectedTrainees.some((trainee) => {
-          const value = traineePracticalAssessments[trainee.id];
-          if (value && value !== "") {
-            const numValue = Number(value);
-            return numValue < 0 || numValue > 60;
-          }
-          return false;
-        });
-
-        if (invalidPractical) {
-          toast.error(
+          ],
+        ]
+      : [
+          [
+            traineeTheoryAssessments,
+            20,
+            "Theory Assessment must be between 0 and 20 for diploma",
+          ],
+          [
+            traineePracticalAssessments,
+            60,
             "Practical Assessment must be between 0 and 60 for diploma",
-          );
-          return;
-        }
+          ],
+        ];
+    const failed = checks.find(([marks, max]) => hasOutOfRange(marks, max));
+    return failed ? failed[2] : null;
+  };
+
+  const buildActionPayload = () => {
+    const payload = {
+      applicationNo: applicationNo,
+      statusId: currentAction,
+      certificationLevelId: courseDetails?.certification_level_id,
+      courseName: courseDetails?.course_name,
+      serviceId: serviceId ? parseInt(serviceId) : null,
+      assignedRoleId: currentRoleId,
+      remarks:
+        currentAction === 59 ? "Application endorsed" : "Application approved",
+    };
+
+    if (hasInternalAssessmentForCourse && !isServiceId41) {
+      const traineeMarksList = selectedTrainees.map((trainee) => ({
+        traineeId: parseInt(trainee.id),
+        internalAssessment: parseInternalAssessment(trainee),
+        theoryAssessment: parseTheory(trainee),
+        practicalAssessment: parsePractical(trainee),
+      }));
+      if (traineeMarksList.length > 0) {
+        payload.traineeMarks = traineeMarksList;
       }
+    }
+
+    if (isServiceId41) {
+      const traineeVivaList = selectedTrainees.map((trainee) => ({
+        traineeId: parseInt(trainee.id),
+        vivaAssessment: parseViva(trainee),
+        practicalAssessment: parseVivaPractical(trainee),
+      }));
+      if (traineeVivaList.length > 0) {
+        payload.traineeVivaAssessments = traineeVivaList;
+      }
+    }
+
+    if (assignedAssessors.length > 0) {
+      payload.assignedAssessors = assignedAssessors.map((ass) => ({
+        userId: ass.userId,
+      }));
+    }
+    return payload;
+  };
+
+  const handleAction = async () => {
+    const markError = getDiplomaMarkError();
+    if (markError) {
+      toast.error(markError);
+      return;
     }
 
     setActionLoading(true);
     try {
-      const payload = {
-        applicationNo: applicationNo,
-        statusId: currentAction,
-        certificationLevelId: courseDetails?.certification_level_id,
-        courseName: courseDetails?.course_name,
-        serviceId: serviceId ? parseInt(serviceId) : null,
-        assignedRoleId: currentRoleId,
-        remarks:
-          currentAction === 59
-            ? "Application endorsed"
-            : "Application approved",
-      };
-
-      if (hasInternalAssessmentForCourse && !isServiceId41) {
-        const traineeMarksList = selectedTrainees.map((trainee) => ({
-          traineeId: parseInt(trainee.id),
-          internalAssessment: parseInternalAssessment(trainee),
-          theoryAssessment: parseTheory(trainee),
-          practicalAssessment: parsePractical(trainee),
-        }));
-
-        if (traineeMarksList.length > 0) {
-          payload.traineeMarks = traineeMarksList;
-        }
-      }
-
-      if (isServiceId41) {
-        const traineeVivaList = selectedTrainees.map((trainee) => ({
-          traineeId: parseInt(trainee.id),
-          vivaAssessment: parseViva(trainee),
-          practicalAssessment: parseVivaPractical(trainee),
-        }));
-
-        if (traineeVivaList.length > 0) {
-          payload.traineeVivaAssessments = traineeVivaList;
-        }
-      }
-
-      if (assignedAssessors.length > 0) {
-        payload.assignedAssessors = assignedAssessors.map((ass) => ({
-          userId: ass.userId,
-        }));
-      }
+      const payload = buildActionPayload();
 
       const response = await CourseEnrollmentService.updateTraineeApplication(
         payload,
@@ -996,34 +977,38 @@ const ViewReAssessmentTraineeSelectionIndex = () => {
 
     const config = getAssessmentConfig();
 
+    // Tooltip: permission issues > lock-reason > max-value hint
+    const getFieldTooltip = (fieldConfig, fieldReadOnly) => {
+      if (!isRole9) return "You do not have permission to edit assessments";
+      if (!isPaymentCompleted()) {
+        return "Payment must be completed before editing assessments";
+      }
+      const diploma = isDiplomaCertificationLevel();
+      if (!diploma && fieldReadOnly) {
+        return "Already Competent — only Not Competent results can be changed";
+      }
+      if (diploma && fieldReadOnly) {
+        if (fieldConfig.type === "theory" || fieldConfig.type === "viva") {
+          return "Theory/Viva is editable only when the value is less than 10";
+        }
+        if (
+          fieldConfig.type === "practical" ||
+          fieldConfig.type === "vivaPractical"
+        ) {
+          return "Practical is editable only when the value is less than 36";
+        }
+        return "";
+      }
+      return fieldConfig.tooltipMessage || "";
+    };
+
     const renderAssessmentField = (fieldConfig, isNumericField) => {
       const fieldReadOnly = !isFieldEditable(
         fieldConfig.type,
         fieldConfig.savedValue,
       );
 
-      // Tooltip: permission issues > lock-reason > max-value hint
-      let tooltipMsg = "";
-      if (!isRole9) {
-        tooltipMsg = "You do not have permission to edit assessments";
-      } else if (!isPaymentCompleted()) {
-        tooltipMsg = "Payment must be completed before editing assessments";
-      } else if (!isDiplomaCertificationLevel() && fieldReadOnly) {
-        tooltipMsg = "Already Competent — only Not Competent results can be changed";
-      } else if (isDiplomaCertificationLevel() && fieldReadOnly) {
-        if (fieldConfig.type === "theory" || fieldConfig.type === "viva") {
-          tooltipMsg =
-            "Theory/Viva is editable only when the value is less than 10";
-        } else if (
-          fieldConfig.type === "practical" ||
-          fieldConfig.type === "vivaPractical"
-        ) {
-          tooltipMsg =
-            "Practical is editable only when the value is less than 36";
-        }
-      } else {
-        tooltipMsg = fieldConfig.tooltipMessage || "";
-      }
+      const tooltipMsg = getFieldTooltip(fieldConfig, fieldReadOnly);
 
       const fieldContent = isNumericField ? (
         <TextField

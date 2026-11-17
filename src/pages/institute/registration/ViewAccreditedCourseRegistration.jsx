@@ -84,6 +84,60 @@ const TABLE_STYLE = {
   },
 };
 
+// payment advice helpers (Generate PA Number tab)
+const isPaid = (payment) =>
+  String(payment?.paymentStatus || "").toLowerCase() === "paid";
+
+// no PA yet = blue, paid = green, waiting for payment = orange
+const paymentTone = (payment) => {
+  if (!payment) return "primary";
+  return isPaid(payment) ? "success" : "warning";
+};
+
+const formatPayableAmount = (payment) => {
+  const value = payment?.totalPayableAmount;
+  if (value === null || value === undefined || value === "") return "Nu. 0.00";
+  return `Nu. ${Number(value).toLocaleString("en-US")}`;
+};
+
+// application made from an NCS programme (role 12): no curriculum attached
+const isNcsBasedCourse = (course) => Boolean(course && !course.curriculum_id);
+
+// Renewal flow (service 54): 115 Revision -> role 7 Verify 56 / Reject 58 -> role 22 Approve 57 / Reject 58.
+// A new registration reaches role 22 only after REC endorsement, so 56 at role 22 means renewal.
+const isRenewalApplication = (statusId, roleId) =>
+  Number(statusId) === 115 || (roleId === "22" && Number(statusId) === 56);
+
+// Loading spinner, or "not found" when the application has no data; null = show the page
+const renderStatusScreen = (loading, courseData, applicationNo) => {
+  if (loading) {
+    return (
+      <Box sx={{ p: 1, minHeight: "100vh" }}>
+        <Paper sx={{ p: 3, textAlign: "center" }}>
+          <CircularProgress />
+          <Typography sx={{ mt: 2 }}>Loading...</Typography>
+        </Paper>
+      </Box>
+    );
+  }
+  if (!courseData) {
+    return (
+      <Box sx={{ m: 3 }}>
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
+            BQF Programme Details
+          </Typography>
+          <Alert severity="error">
+            BQF Programme with Application No: <strong>{applicationNo}</strong>{" "}
+            not found
+          </Alert>
+        </Paper>
+      </Box>
+    );
+  }
+  return null;
+};
+
 const ViewAccreditedCourseRegistration = () => {
   const { applicationNo } = useParams();
   const navigate = useNavigate();
@@ -146,7 +200,7 @@ const ViewAccreditedCourseRegistration = () => {
   }, [paymentStatus]);
 
   // application made from an NCS programme (role 12): no curriculum attached
-  const isNcsBased = Boolean(courseData && !courseData.curriculum_id);
+  const isNcsBased = isNcsBasedCourse(courseData);
 
   const getCertificateLevelName = useCallback(
     (id) => {
@@ -711,9 +765,7 @@ const ViewAccreditedCourseRegistration = () => {
 
   // Renewal flow (service 54): 115 Revision -> role 7 Verify 56 / Reject 58 -> role 22 Approve 57 / Reject 58.
   // A new registration reaches role 22 only after REC endorsement, so 56 at role 22 means renewal.
-  const isRenewalFlow =
-    Number(currentStatusId) === 115 ||
-    (roleId === "22" && Number(currentStatusId) === 56);
+  const isRenewalFlow = isRenewalApplication(currentStatusId, roleId);
 
   const validateAssignments = (statusId) => {
     const currentStatus = Number(currentStatusId);
@@ -1167,34 +1219,9 @@ const ViewAccreditedCourseRegistration = () => {
     if (tabValue > 0) setTabValue(tabValue - 1);
   };
 
-  // Loading state
-  if (loading) {
-    return (
-      <Box sx={{ p: 1, minHeight: "100vh" }}>
-        <Paper sx={{ p: 3, textAlign: "center" }}>
-          <CircularProgress />
-          <Typography sx={{ mt: 2 }}>Loading...</Typography>
-        </Paper>
-      </Box>
-    );
-  }
-
-  // Error state
-  if (!courseData) {
-    return (
-      <Box sx={{ m: 3 }}>
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-            BQF Programme Details
-          </Typography>
-          <Alert severity="error">
-            BQF Programme with Application No: <strong>{applicationNo}</strong>{" "}
-            not found
-          </Alert>
-        </Paper>
-      </Box>
-    );
-  }
+  // loading / not found screens
+  const statusScreen = renderStatusScreen(loading, courseData, applicationNo);
+  if (statusScreen) return statusScreen;
 
   return (
     <Box>
@@ -1484,20 +1511,9 @@ const ViewAccreditedCourseRegistration = () => {
         {isRole7 &&
           tabValue === paNumberIndex &&
           (() => {
-            const paid =
-              String(paymentStatus?.paymentStatus || "").toLowerCase() ===
-              "paid";
-            const tone = paymentStatus
-              ? paid
-                ? "success"
-                : "warning"
-              : "primary";
-            const amount =
-              paymentStatus?.totalPayableAmount !== null &&
-              paymentStatus?.totalPayableAmount !== undefined &&
-              paymentStatus?.totalPayableAmount !== ""
-                ? `Nu. ${Number(paymentStatus.totalPayableAmount).toLocaleString("en-US")}`
-                : "Nu. 0.00";
+            const paid = isPaid(paymentStatus);
+            const tone = paymentTone(paymentStatus);
+            const amount = formatPayableAmount(paymentStatus);
             const statusLabel = paymentStatus?.paymentStatus
               ? paymentStatus.paymentStatus.charAt(0).toUpperCase() +
                 paymentStatus.paymentStatus.slice(1)

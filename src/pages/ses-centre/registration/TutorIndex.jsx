@@ -85,6 +85,63 @@ RequiredLabel.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
+const DIALOG_TITLES = { add: "Add New Tutor", edit: "Edit Tutor Details" };
+
+const submitLabel = (loading, dialogMode) => {
+  if (loading) return "Saving...";
+  return dialogMode === "add" ? "Create" : "Update";
+};
+
+const subjectLabel = (subjects, id) =>
+  subjects.find((s) => s.id === Number(id))?.name || `Subject ${id}`;
+
+const buildTutorPayload = (values, dialogMode, instituteId, actionId) => ({
+  id: dialogMode === "edit" ? values.id : null,
+  citizenId: values.citizenId,
+  name: values.name.trim(),
+  genderId: parseInt(values.genderId),
+  qualificationId: parseInt(values.qualificationId),
+  subjectIds: values.subjectIds.map(Number),
+  email: values.email,
+  mobileNo: values.phone,
+  instituteId: instituteId,
+  createdBy: actionId,
+  updatedBy: actionId,
+});
+
+// create: 201 needs status SUCCESS in the body, 200 counts as success
+const addTutorResult = (response) => {
+  const data = response?.data;
+  const status = response?.status;
+  if (status === 201 && data?.status !== "SUCCESS") {
+    return { ok: false, message: data?.message || "Failed to create tutor" };
+  }
+  if (status === 201 || status === 200) {
+    return {
+      ok: true,
+      message: data?.message || "Tutor created successfully!",
+    };
+  }
+  return { ok: false, message: data?.message || "Failed to create tutor" };
+};
+
+const editTutorResult = (response) => {
+  const data = response?.data;
+  if (response?.status !== 200) {
+    return { ok: false, message: data?.message || "Failed to update tutor" };
+  }
+  const message = data?.status === "SUCCESS" ? data?.message : null;
+  return { ok: true, message: message || "Tutor updated successfully!" };
+};
+
+const saveErrorMessage = (error) => {
+  const status = error.response?.status;
+  const message = error.response?.data?.message;
+  if (status === 409) return message || "Tutor already exists!";
+  if (status === 404) return message || "Tutor not found!";
+  return message || "An error occurred while saving the tutor";
+};
+
 const TutorIndex = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -387,7 +444,7 @@ const TutorIndex = () => {
       .email("Invalid email format"),
     phone: Yup.string()
       .required("Phone number is required")
-      .matches(/^[0-9]{8}$/, "Phone number must be 8 digits"),
+      .matches(/^\d{8}$/, "Phone number must be 8 digits"),
   });
 
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
@@ -398,77 +455,30 @@ const TutorIndex = () => {
 
     setLoading(true);
     try {
-      const payload = {
-        id: dialogMode === "edit" ? values.id : null,
-        citizenId: values.citizenId,
-        name: values.name.trim(),
-        genderId: parseInt(values.genderId),
-        qualificationId: parseInt(values.qualificationId),
-        subjectIds: values.subjectIds.map(Number),
-        email: values.email,
-        mobileNo: values.phone,
-        instituteId: instituteId,
-        createdBy: actionId,
-        updatedBy: actionId,
-      };
-
-      let response;
-
-      if (dialogMode === "add") {
-        response = await TutorService.submitTutor(payload, access_token);
-
-        if (response && response.status === 201) {
-          const responseData = response.data;
-          if (responseData?.status === "SUCCESS") {
-            toast.success(
-              responseData?.message || "Tutor created successfully!",
-            );
-            resetForm();
-            setOpenDialog(false);
-            await fetchTutors();
-          } else {
-            toast.error(responseData?.message || "Failed to create tutor");
-          }
-        } else if (response && response.status === 200) {
-          toast.success(
-            response.data?.message || "Tutor created successfully!",
+      const payload = buildTutorPayload(
+        values,
+        dialogMode,
+        instituteId,
+        actionId,
+      );
+      const isAdd = dialogMode === "add";
+      const result = isAdd
+        ? addTutorResult(await TutorService.submitTutor(payload, access_token))
+        : editTutorResult(
+            await TutorService.updateTutor(payload, access_token),
           );
-          resetForm();
-          setOpenDialog(false);
-          await fetchTutors();
-        } else {
-          toast.error(response?.data?.message || "Failed to create tutor");
-        }
-      } else if (dialogMode === "edit") {
-        response = await TutorService.updateTutor(payload, access_token);
 
-        if (response && response.status === 200) {
-          const responseData = response.data;
-          if (responseData?.status === "SUCCESS") {
-            toast.success(
-              responseData?.message || "Tutor updated successfully!",
-            );
-          } else {
-            toast.success("Tutor updated successfully!");
-          }
-          setOpenDialog(false);
-          await fetchTutors();
-        } else {
-          toast.error(response?.data?.message || "Failed to update tutor");
-        }
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
       }
+      toast.success(result.message);
+      if (isAdd) resetForm();
+      setOpenDialog(false);
+      await fetchTutors();
     } catch (error) {
       console.error("Error saving tutor:", error);
-      if (error.response?.status === 409) {
-        toast.error(error.response?.data?.message || "Tutor already exists!");
-      } else if (error.response?.status === 404) {
-        toast.error(error.response?.data?.message || "Tutor not found!");
-      } else {
-        toast.error(
-          error.response?.data?.message ||
-            "An error occurred while saving the tutor",
-        );
-      }
+      toast.error(saveErrorMessage(error));
     } finally {
       setLoading(false);
       setSubmitting(false);
@@ -671,11 +681,7 @@ const TutorIndex = () => {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <SchoolIcon />
               <Typography variant="h6">
-                {dialogMode === "add"
-                  ? "Add New Tutor"
-                  : dialogMode === "edit"
-                    ? "Edit Tutor Details"
-                    : "Tutor Details"}
+                {DIALOG_TITLES[dialogMode] || "Tutor Details"}
               </Typography>
             </Box>
             <IconButton onClick={() => setOpenDialog(false)} size="small">
@@ -852,10 +858,7 @@ const TutorIndex = () => {
                                   <Chip
                                     key={id}
                                     size="small"
-                                    label={
-                                      subjects.find((s) => s.id === Number(id))
-                                        ?.name || `Subject ${id}`
-                                    }
+                                    label={subjectLabel(subjects, id)}
                                     sx={{ height: 22 }}
                                   />
                                 ))}
@@ -948,11 +951,7 @@ const TutorIndex = () => {
                       color="primary"
                       disabled={loading}
                     >
-                      {loading
-                        ? "Saving..."
-                        : dialogMode === "add"
-                          ? "Create"
-                          : "Update"}
+                      {submitLabel(loading, dialogMode)}
                     </Button>
                   </>
                 )}

@@ -258,10 +258,7 @@ const ReAssessmentIndex = () => {
 
   // Filtering logic with certification level filter
   const filteredProgrammes = programmes.filter((programme) => {
-    const programmeName = getProgrammeName(
-      programme.programme_id,
-      programme.service_id,
-    );
+    const programmeName = getProgrammeName(programme.programme_id);
     const matchesSearch =
       programmeName?.toLowerCase().includes(search.toLowerCase()) ||
       programme.application_no?.toLowerCase().includes(search.toLowerCase());
@@ -450,7 +447,7 @@ const ReAssessmentIndex = () => {
           <TableCell>{programme.application_no || "N/A"}</TableCell>
           <TableCell>{getReassessmentTypeName(programme.service_id)}</TableCell>
           <TableCell>
-            {getProgrammeName(programme.programme_id, programme.service_id)}
+            {getProgrammeName(programme.programme_id)}
           </TableCell>
           <TableCell>
             Nu.{" "}

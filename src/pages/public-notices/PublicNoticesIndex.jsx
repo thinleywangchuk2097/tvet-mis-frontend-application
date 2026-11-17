@@ -209,19 +209,21 @@ const PublicNoticesIndex = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
+              {loading &&
                 [0, 1, 2].map((i) => (
                   <TableRow key={i}>
                     <TableCell colSpan={6}><Skeleton height={30} /></TableCell>
                   </TableRow>
-                ))
-              ) : rows.length === 0 ? (
+                ))}
+              {!loading && rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 5, color: "text.secondary" }}>
                     No notices yet. Use “New notice” to publish the first one.
                   </TableCell>
                 </TableRow>
-              ) : (
+              )}
+              {!loading &&
+                rows.length > 0 &&
                 rows.map((row, i) => (
                   <TableRow key={row.id} hover sx={{ opacity: row.active ? 1 : 0.6 }}>
                     <TableCell>{i + 1}</TableCell>
@@ -250,8 +252,7 @@ const PublicNoticesIndex = () => {
                       </Tooltip>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
+                ))}
             </TableBody>
           </Table>
         </TableContainer>

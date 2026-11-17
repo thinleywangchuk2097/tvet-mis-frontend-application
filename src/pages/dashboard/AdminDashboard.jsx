@@ -145,9 +145,10 @@ const AdminSection = ({ fromDate, toDate, reloadTick }) => {
         <Grid item size={{ xs: 12, md: 4 }}>
           <Panel title="Users by role">
             <Box sx={{ height: Math.max(240, usersByRole.length * 30 + 30) }}>
-              {first ? (
+              {first && (
                 <Skeleton variant="rounded" height={240} />
-              ) : usersByRole.length ? (
+              )}
+              {!first && usersByRole.length > 0 && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={usersByRole} layout="vertical" margin={{ left: 4, right: 16 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -163,7 +164,8 @@ const AdminSection = ({ fromDate, toDate, reloadTick }) => {
                     />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
+              )}
+              {!first && usersByRole.length === 0 && (
                 <Empty text="No users assigned to roles" />
               )}
             </Box>
@@ -172,9 +174,10 @@ const AdminSection = ({ fromDate, toDate, reloadTick }) => {
         <Grid item size={{ xs: 12, md: 4 }}>
           <Panel title="New user registrations">
             <Box sx={{ height: 240 }}>
-              {first ? (
+              {first && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : hasNewUsers ? (
+              )}
+              {!first && hasNewUsers && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={usersByMonth} margin={{ left: -20, right: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -190,7 +193,8 @@ const AdminSection = ({ fromDate, toDate, reloadTick }) => {
                     />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
+              )}
+              {!first && !hasNewUsers && (
                 <Empty text="No new users in this period" />
               )}
             </Box>
@@ -217,7 +221,7 @@ const AdminSection = ({ fromDate, toDate, reloadTick }) => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {first ? (
+                  {first && (
                     [0, 1, 2].map((i) => (
                       <TableRow key={i}>
                         <TableCell colSpan={3}>
@@ -225,13 +229,15 @@ const AdminSection = ({ fromDate, toDate, reloadTick }) => {
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : tasksByRole.length === 0 ? (
+                  )}
+                  {!first && tasksByRole.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} align="center" sx={{ py: 4, color: "text.secondary" }}>
                         No open tasks
                       </TableCell>
                     </TableRow>
-                  ) : (
+                  )}
+                  {!first && !(tasksByRole.length === 0) && (
                     tasksByRole.map((r) => (
                       <TableRow key={r.name} hover>
                         <TableCell>

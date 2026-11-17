@@ -223,6 +223,48 @@ OptionBars.propTypes = {
 };
 
 // ---------------- page ----------------
+// Message for a failed load (404 = backend not rebuilt with the responses endpoint)
+const loadErrorMessage = (failed) => {
+  const status = failed?.response?.status;
+  if (status === 404) {
+    return "The responses service was not found (404). Rebuild and restart the backend so the new get-tracer-responses endpoint is available.";
+  }
+  if (failed?.response?.data?.message) return failed.response.data.message;
+  const httpPart = status ? " (HTTP " + status + ")" : "";
+  return `Failed to load tracer responses${httpPart}.`;
+};
+
+// Choice question: how many times each option was picked
+const countChoiceAnswers = (q, raws) => {
+  const counts = Object.fromEntries(q.options.map((o) => [o.id, 0]));
+  const addChoice = (id) => {
+    const k = String(id);
+    counts[k] = (counts[k] || 0) + 1;
+  };
+  raws.forEach((raw) => {
+    const v = parseJson(raw, "");
+    (Array.isArray(v) ? v : [v]).forEach(addChoice);
+  });
+  return Object.entries(counts).map(([id, value]) => ({
+    label: q.options.find((o) => o.id === id)?.text ?? id,
+    value,
+  }));
+};
+
+// Rating question: how many answers per star
+const countRatingAnswers = (q, raws) => {
+  const counts = {};
+  for (let i = 1; i <= q.ratingScale; i += 1) counts[i] = 0;
+  raws.forEach((raw) => {
+    const v = Number(parseJson(raw, 0));
+    if (v) counts[v] = (counts[v] || 0) + 1;
+  });
+  return Object.entries(counts).map(([k, value]) => ({
+    label: `${k} ★`,
+    value,
+  }));
+};
+
 const ResponseTracerIndex = () => {
   const theme = useTheme();
   const access_token = useSelector((state) => state.auth.accessToken);
@@ -277,20 +319,11 @@ const ResponseTracerIndex = () => {
           ),
           GenerateTracerService.getTracerResponses(applicationNo, access_token),
         ]);
-        const failed = isError(respRes)
-          ? respRes
-          : isError(detailRes)
-            ? detailRes
-            : null;
+        // first failed call (responses first, then details)
+        const failed = [respRes, detailRes].find(isError) ?? null;
         if (failed) {
-          const status = failed?.response?.status;
-          const msg =
-            status === 404
-              ? "The responses service was not found (404). Rebuild and restart the backend so the new get-tracer-responses endpoint is available."
-              : failed?.response?.data?.message ||
-                `Failed to load tracer responses${status ? ` (HTTP ${status})` : ""}.`;
           console.error("Tracer responses load failed:", failed);
-          setLoadError(msg);
+          setLoadError(loadErrorMessage(failed));
         } else {
           setLoadError("");
         }
@@ -392,29 +425,9 @@ const ResponseTracerIndex = () => {
         );
       let bars = null;
       if (CHOICE_TYPES.includes(q.type)) {
-        const counts = Object.fromEntries(q.options.map((o) => [o.id, 0]));
-        raws.forEach((raw) => {
-          const v = parseJson(raw, "");
-          (Array.isArray(v) ? v : [v]).forEach((id) => {
-            const k = String(id);
-            counts[k] = (counts[k] || 0) + 1;
-          });
-        });
-        bars = Object.entries(counts).map(([id, value]) => ({
-          label: q.options.find((o) => o.id === id)?.text ?? id,
-          value,
-        }));
+        bars = countChoiceAnswers(q, raws);
       } else if (q.type === "rating") {
-        const counts = {};
-        for (let i = 1; i <= q.ratingScale; i += 1) counts[i] = 0;
-        raws.forEach((raw) => {
-          const v = Number(parseJson(raw, 0));
-          if (v) counts[v] = (counts[v] || 0) + 1;
-        });
-        bars = Object.entries(counts).map(([k, value]) => ({
-          label: `${k} ★`,
-          value,
-        }));
+        bars = countRatingAnswers(q, raws);
       }
       const avg =
         q.type === "rating" && raws.length
@@ -672,14 +685,16 @@ const ResponseTracerIndex = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {loading ? (
+                    {loading && (
                       <TableRow>
                         <TableCell colSpan={8}>
                           <Skeleton height={28} />
                           <Skeleton height={28} />
                         </TableCell>
                       </TableRow>
-                    ) : paginated.length ? (
+                    )}
+                    {!loading &&
+                      paginated.length > 0 &&
                       paginated.map((r, i) => (
                         <TableRow key={r.id || r.uniqueId} hover>
                           <TableCell>{page * rowsPerPage + i + 1}</TableCell>
@@ -730,8 +745,8 @@ const ResponseTracerIndex = () => {
                             </Tooltip>
                           </TableCell>
                         </TableRow>
-                      ))
-                    ) : (
+                      ))}
+                    {!loading && paginated.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                           {respondents.length
@@ -777,17 +792,20 @@ const ResponseTracerIndex = () => {
           {/* ---------- Question summary ---------- */}
           {tab === 1 && (
             <Grid container spacing={1.5}>
-              {loading ? (
+              {loading && (
                 <Grid size={{ xs: 12 }}>
                   <Skeleton variant="rounded" height={200} />
                 </Grid>
-              ) : summary.length === 0 ? (
+              )}
+              {!loading && summary.length === 0 && (
                 <Grid size={{ xs: 12 }}>
                   <Box sx={{ height: 140 }}>
                     <Empty text="This tracer has no questions" />
                   </Box>
                 </Grid>
-              ) : (
+              )}
+              {!loading &&
+                summary.length > 0 &&
                 summary.map(({ q, answered, bars, avg }) => (
                   <Grid key={q.key} size={{ xs: 12, md: 6 }}>
                     <Panel
@@ -824,18 +842,18 @@ const ResponseTracerIndex = () => {
                         </Box>
                       }
                     >
-                      {bars ? (
-                        answered ? (
-                          <OptionBars
-                            data={bars}
-                            color={theme.palette.primary.main}
-                          />
-                        ) : (
-                          <Box sx={{ height: 80 }}>
-                            <Empty text="No answers yet" />
-                          </Box>
-                        )
-                      ) : (
+                      {bars && Boolean(answered) && (
+                        <OptionBars
+                          data={bars}
+                          color={theme.palette.primary.main}
+                        />
+                      )}
+                      {bars && !answered && (
+                        <Box sx={{ height: 80 }}>
+                          <Empty text="No answers yet" />
+                        </Box>
+                      )}
+                      {!bars && (
                         <Box
                           sx={{
                             p: 1.5,
@@ -851,8 +869,7 @@ const ResponseTracerIndex = () => {
                       )}
                     </Panel>
                   </Grid>
-                ))
-              )}
+                ))}
             </Grid>
           )}
         </>

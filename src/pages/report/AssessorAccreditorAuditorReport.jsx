@@ -376,13 +376,14 @@ const AssessorAccreditorAuditorReport = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={COLS} align="center" sx={{ py: 3 }}>
                   <CircularProgress size={26} />
                 </TableCell>
               </TableRow>
-            ) : paginated.length > 0 ? (
+            )}
+            {!loading &&
               paginated.map((r, index) => {
                 const st = statusStyle(r.status);
                 return (
@@ -419,8 +420,8 @@ const AssessorAccreditorAuditorReport = () => {
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{r.date || "—"}</TableCell>
                   </TableRow>
                 );
-              })
-            ) : (
+              })}
+            {!loading && paginated.length === 0 && (
               <TableRow>
                 <TableCell colSpan={COLS} align="center" sx={{ py: 3 }}>
                   No records found matching your criteria

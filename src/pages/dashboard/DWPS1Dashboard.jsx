@@ -113,6 +113,13 @@ CountBarChart.propTypes = {
 
 const toChart = (rows) => (rows || []).map((r) => ({ name: r.name, value: num(r.value) }));
 
+
+// tracer response rate: green from 60%, blue from 30%, otherwise orange
+const responseRateColor = (pct) => {
+  if (pct >= 60) return "success";
+  return pct >= 30 ? "primary" : "warning";
+};
+
 const DWPS1Dashboard = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -294,9 +301,10 @@ const DWPS1Dashboard = () => {
         <Grid size={{ xs: 12, md: 7 }}>
           <Panel title="Tracers sent vs responded (last 12 months)">
             <Box sx={{ height: 260 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : monthly.some((m) => m.Sent || m.Responded) ? (
+              )}
+              {!loading && monthly.some((m) => m.Sent || m.Responded) && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthly} margin={{ left: -20, right: 8 }} barCategoryGap={6}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -308,7 +316,8 @@ const DWPS1Dashboard = () => {
                     <Bar dataKey="Responded" fill={theme.palette.success.main} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
+              )}
+              {!loading && !(monthly.some((m) => m.Sent || m.Responded)) && (
                 <Empty text="No tracers sent in the last 12 months" />
               )}
             </Box>
@@ -317,16 +326,18 @@ const DWPS1Dashboard = () => {
         <Grid size={{ xs: 12, md: 5 }}>
           <Panel title="Tracers sent by type">
             <Box sx={{ height: 260 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (tracer.byType || []).length ? (
+              )}
+              {!loading && (tracer.byType || []).length > 0 && (
                 <CountBarChart
                   data={toChart(tracer.byType)}
                   name="Sent"
                   color={theme.palette.primary.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (tracer.byType || []).length === 0 && (
                 <Empty text="No tracers sent yet" />
               )}
             </Box>
@@ -361,13 +372,14 @@ const DWPS1Dashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading ? (
+                  {loading && (
                     <TableRow>
                       <TableCell colSpan={6}>
                         <Skeleton />
                       </TableCell>
                     </TableRow>
-                  ) : surveys.length ? (
+                  )}
+                  {!loading && surveys.length > 0 && (
                     surveys.map((sv) => {
                       const sent = num(sv.sent);
                       const pct = sent ? Math.round((num(sv.responded) / sent) * 100) : 0;
@@ -398,7 +410,7 @@ const DWPS1Dashboard = () => {
                                   variant="determinate"
                                   value={pct}
                                   sx={{ flex: 1, height: 6, borderRadius: 3 }}
-                                  color={pct >= 60 ? "success" : pct >= 30 ? "primary" : "warning"}
+                                  color={responseRateColor(pct)}
                                 />
                                 <Typography variant="caption" sx={{ minWidth: 72, textAlign: "right" }}>
                                   {fmtNum(sv.responded)}/{fmtNum(sent)} ({pct}%)
@@ -412,7 +424,8 @@ const DWPS1Dashboard = () => {
                         </TableRow>
                       );
                     })
-                  ) : (
+                  )}
+                  {!loading && surveys.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} align="center">
                         No tracer surveys yet
@@ -431,16 +444,18 @@ const DWPS1Dashboard = () => {
         <Grid size={{ xs: 12, md: 4 }}>
           <Panel title="Curriculum by status">
             <Box sx={{ height: 200 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (curriculum.byStatus || []).length ? (
+              )}
+              {!loading && (curriculum.byStatus || []).length > 0 && (
                 <CountBarChart
                   data={toChart(curriculum.byStatus)}
                   name="Curricula"
                   color={theme.palette.secondary.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (curriculum.byStatus || []).length === 0 && (
                 <Empty text="No curriculum applications yet" />
               )}
             </Box>
@@ -448,16 +463,18 @@ const DWPS1Dashboard = () => {
               By type
             </Typography>
             <Box sx={{ height: 160 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (curriculum.byType || []).length ? (
+              )}
+              {!loading && (curriculum.byType || []).length > 0 && (
                 <CountBarChart
                   data={toChart(curriculum.byType)}
                   name="Curricula"
                   color={theme.palette.primary.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (curriculum.byType || []).length === 0 && (
                 <Empty text="No curriculum applications yet" />
               )}
             </Box>
@@ -477,13 +494,14 @@ const DWPS1Dashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading ? (
+                  {loading && (
                     <TableRow>
                       <TableCell colSpan={5}>
                         <Skeleton />
                       </TableCell>
                     </TableRow>
-                  ) : (curriculum.recent || []).length ? (
+                  )}
+                  {!loading && (curriculum.recent || []).length > 0 && (
                     curriculum.recent.map((c) => (
                       <TableRow key={c.application_no} hover>
                         <TableCell sx={{ whiteSpace: "nowrap" }}>{c.application_no}</TableCell>
@@ -508,7 +526,8 @@ const DWPS1Dashboard = () => {
                         <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(c.created_at)}</TableCell>
                       </TableRow>
                     ))
-                  ) : (
+                  )}
+                  {!loading && (curriculum.recent || []).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} align="center">
                         No curriculum applications yet

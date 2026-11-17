@@ -144,6 +144,24 @@ StatTile.propTypes = {
   color: PropTypes.string,
 };
 
+const DIALOG_TITLES = { add: "Add New Trainer", edit: "Edit Trainer Details" };
+
+const coursePlaceholder = (courseTypeId, loadingCourses) => {
+  if (!courseTypeId) return "Select course type first";
+  return loadingCourses ? "Loading courses..." : "-select-";
+};
+
+const submitLabel = (loading, dialogMode) => {
+  if (loading) return "Saving...";
+  return dialogMode === "add" ? "Save Trainer" : "Update Trainer";
+};
+
+// changing the course type clears the chosen course
+const handleCourseTypeChange = (formik, index, e) => {
+  formik.handleChange(e);
+  formik.setFieldValue(`courses.${index}.courseId`, "");
+};
+
 const AddTrainerIndex = () => {
   const [trainers, setTrainers] = useState([]);
   const [search, setSearch] = useState("");
@@ -814,6 +832,19 @@ const AddTrainerIndex = () => {
     "& td .MuiIconButton-root": { p: 0.4 },
   };
 
+  const courseTypeOptions = courseTypes.map((type) => (
+    <MenuItem key={type.id} value={type.id}>
+      {type.name}
+    </MenuItem>
+  ));
+
+  const renderCourseOptions = (courseTypeId) =>
+    getCoursesByType(courseTypeId).map((c) => (
+      <MenuItem key={c.id} value={c.id}>
+        {getCourseLabel(c)}
+      </MenuItem>
+    ));
+
   return (
     <Paper
       elevation={0}
@@ -936,11 +967,7 @@ const AddTrainerIndex = () => {
               filteredTrainers
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((trainer, index) => (
-                  <TableRow
-                    key={trainer.id}
-                    hover
-                    sx={{ "& td": { py: 0.5 } }}
-                  >
+                  <TableRow key={trainer.id} hover sx={{ "& td": { py: 0.5 } }}>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
                         {index + 1 + page * rowsPerPage}
@@ -979,7 +1006,11 @@ const AddTrainerIndex = () => {
                     </TableCell>
                     <TableCell>
                       <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.75,
+                        }}
                       >
                         <EmailIcon
                           sx={{ fontSize: 14, color: "text.secondary" }}
@@ -989,7 +1020,11 @@ const AddTrainerIndex = () => {
                         </Typography>
                       </Box>
                       <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.75,
+                        }}
                       >
                         <PhoneIcon
                           sx={{ fontSize: 14, color: "text.secondary" }}
@@ -1037,8 +1072,10 @@ const AddTrainerIndex = () => {
                           arrow
                           title={
                             <Box>
-                              {trainer.courses.map((course, idx) => (
-                                <div key={idx}>
+                              {trainer.courses.map((course) => (
+                                <div
+                                  key={`${course.courseTypeId}-${course.courseId}`}
+                                >
                                   {getCourseTypeName(course.courseTypeId)}:{" "}
                                   {course.courseName}
                                 </div>
@@ -1175,11 +1212,7 @@ const AddTrainerIndex = () => {
                 <SchoolIcon fontSize="small" />
               </Avatar>
               <Typography variant="h6" fontWeight={600}>
-                {dialogMode === "add"
-                  ? "Add New Trainer"
-                  : dialogMode === "edit"
-                    ? "Edit Trainer Details"
-                    : "Trainer Details"}
+                {DIALOG_TITLES[dialogMode] || "Trainer Details"}
               </Typography>
             </Box>
             <IconButton onClick={() => setOpenDialog(false)} size="small">
@@ -1199,7 +1232,11 @@ const AddTrainerIndex = () => {
               <DialogContent dividers>
                 <Paper elevation={0} sx={{ p: { xs: 1, md: 2 } }}>
                   {/* Identification Section */}
-                  <SectionHeader icon={<BadgeOutlinedIcon />} title="Identification Information" first />
+                  <SectionHeader
+                    icon={<BadgeOutlinedIcon />}
+                    title="Identification Information"
+                    first
+                  />
                   <Grid container spacing={2}>
                     <Grid item size={{ xs: 12 }}>
                       <FormControl component="fieldset">
@@ -1295,7 +1332,10 @@ const AddTrainerIndex = () => {
                   </Grid>
 
                   {/* Personal Information */}
-                  <SectionHeader icon={<PersonOutlineIcon />} title="Personal Information" />
+                  <SectionHeader
+                    icon={<PersonOutlineIcon />}
+                    title="Personal Information"
+                  />
                   <Grid container spacing={2}>
                     <Grid item size={{ xs: 12, md: 6 }}>
                       <TextField
@@ -1399,7 +1439,10 @@ const AddTrainerIndex = () => {
                   </Grid>
 
                   {/* Professional Information */}
-                  <SectionHeader icon={<WorkOutlineIcon />} title="Professional Information" />
+                  <SectionHeader
+                    icon={<WorkOutlineIcon />}
+                    title="Professional Information"
+                  />
                   <Grid container spacing={2}>
                     <Grid item size={{ xs: 12, md: 6 }}>
                       <TextField
@@ -1568,7 +1611,10 @@ const AddTrainerIndex = () => {
                   </Grid>
 
                   {/* Course Assignment Section */}
-                  <SectionHeader icon={<MenuBookOutlinedIcon />} title="Course Assignment" />
+                  <SectionHeader
+                    icon={<MenuBookOutlinedIcon />}
+                    title="Course Assignment"
+                  />
 
                   <FieldArray name="courses">
                     {({ push, remove }) => (
@@ -1595,13 +1641,11 @@ const AddTrainerIndex = () => {
                                   name={`courses.${index}.courseTypeId`}
                                   size="small"
                                   value={course.courseTypeId}
-                                  onChange={(e) => {
-                                    formik.handleChange(e);
-                                    formik.setFieldValue(
-                                      `courses.${index}.courseId`,
-                                      "",
-                                    );
-                                  }}
+                                  onChange={handleCourseTypeChange.bind(
+                                    null,
+                                    formik,
+                                    index,
+                                  )}
                                   onBlur={formik.handleBlur}
                                   error={
                                     formik.touched.courses?.[index]
@@ -1623,11 +1667,7 @@ const AddTrainerIndex = () => {
                                   }}
                                 >
                                   <MenuItem value="">-select-</MenuItem>
-                                  {courseTypes.map((type) => (
-                                    <MenuItem key={type.id} value={type.id}>
-                                      {type.name}
-                                    </MenuItem>
-                                  ))}
+                                  {courseTypeOptions}
                                 </TextField>
                               </Grid>
 
@@ -1663,19 +1703,12 @@ const AddTrainerIndex = () => {
                                   }}
                                 >
                                   <MenuItem value="">
-                                    {!course.courseTypeId
-                                      ? "Select course type first"
-                                      : loadingCourses
-                                        ? "Loading courses..."
-                                        : "-select-"}
+                                    {coursePlaceholder(
+                                      course.courseTypeId,
+                                      loadingCourses,
+                                    )}
                                   </MenuItem>
-                                  {getCoursesByType(course.courseTypeId).map(
-                                    (c) => (
-                                      <MenuItem key={c.id} value={c.id}>
-                                        {getCourseLabel(c)}
-                                      </MenuItem>
-                                    ),
-                                  )}
+                                  {renderCourseOptions(course.courseTypeId)}
                                 </TextField>
                               </Grid>
 
@@ -1691,7 +1724,7 @@ const AddTrainerIndex = () => {
                                   >
                                     <IconButton
                                       color="error"
-                                      onClick={() => remove(index)}
+                                      onClick={remove.bind(null, index)}
                                     >
                                       <DeleteIcon />
                                     </IconButton>
@@ -1736,7 +1769,10 @@ const AddTrainerIndex = () => {
                   {/* Supporting Documents Section */}
                   {dialogMode !== "view" && (
                     <>
-                      <SectionHeader icon={<AttachFileIcon />} title="Supporting Documents" />
+                      <SectionHeader
+                        icon={<AttachFileIcon />}
+                        title="Supporting Documents"
+                      />
                       <Grid container spacing={2}>
                         <Grid item size={{ xs: 12 }}>
                           <FileUpload
@@ -1752,7 +1788,10 @@ const AddTrainerIndex = () => {
 
                   {dialogMode === "view" && formik.values.files?.length > 0 && (
                     <>
-                      <SectionHeader icon={<AttachFileIcon />} title="Uploaded Documents" />
+                      <SectionHeader
+                        icon={<AttachFileIcon />}
+                        title="Uploaded Documents"
+                      />
                       <Box>
                         {formik.values.files.map((file, index) => (
                           <Chip
@@ -1790,28 +1829,22 @@ const AddTrainerIndex = () => {
                   {dialogMode === "view" ? "Close" : "Cancel"}
                 </Button>
                 {dialogMode !== "view" && (
-                  <>
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      color="primary"
-                      disabled={loading}
-                      sx={{ textTransform: "none", fontWeight: 600, px: 3 }}
-                      startIcon={
-                        loading ? (
-                          <CircularProgress size={16} color="inherit" />
-                        ) : (
-                          <SaveIcon />
-                        )
-                      }
-                    >
-                      {loading
-                        ? "Saving..."
-                        : dialogMode === "add"
-                          ? "Save Trainer"
-                          : "Update Trainer"}
-                    </Button>
-                  </>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    disabled={loading}
+                    sx={{ textTransform: "none", fontWeight: 600, px: 3 }}
+                    startIcon={
+                      loading ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : (
+                        <SaveIcon />
+                      )
+                    }
+                  >
+                    {submitLabel(loading, dialogMode)}
+                  </Button>
                 )}
               </DialogActions>
             </Form>
@@ -1844,11 +1877,13 @@ const AddTrainerIndex = () => {
           </Typography>
           <Typography variant="body2" color="text.secondary">
             <strong>{trainerToDelete?.name}</strong> will be removed from your
-            trainer list. You can add them again later with the same CID or
-            work permit number.
+            trainer list. You can add them again later with the same CID or work
+            permit number.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1, justifyContent: "center" }}>
+        <DialogActions
+          sx={{ px: 3, pb: 2.5, gap: 1, justifyContent: "center" }}
+        >
           <Button
             variant="outlined"
             color="inherit"

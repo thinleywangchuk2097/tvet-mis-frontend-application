@@ -135,6 +135,13 @@ CountBarChart.propTypes = {
 
 const toChart = (rows) => (rows || []).map((r) => ({ name: r.name, value: num(r.value) }));
 
+
+// CMFG compliance: green from 80%, blue from 50%, otherwise orange
+const complianceColor = (pct) => {
+  if (pct >= 80) return "success";
+  return pct >= 50 ? "primary" : "warning";
+};
+
 const TTTRCDashboard = ({ roleId, title, subtitle }) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -362,13 +369,14 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading ? (
+                  {loading && (
                     <TableRow>
                       <TableCell colSpan={6}>
                         <Skeleton />
                       </TableCell>
                     </TableRow>
-                  ) : activeAnnouncements.length ? (
+                  )}
+                  {!loading && activeAnnouncements.length > 0 && (
                     activeAnnouncements.map((a) => (
                       <TableRow key={a.id} hover>
                         <TableCell>
@@ -404,7 +412,8 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : (
+                  )}
+                  {!loading && activeAnnouncements.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} align="center">
                         No TOT announcements yet
@@ -419,16 +428,18 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
         <Grid size={{ xs: 12, md: 4 }}>
           <Panel title="TOT results">
             <Box sx={{ height: 140 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (tot.byResult || []).length ? (
+              )}
+              {!loading && (tot.byResult || []).length > 0 && (
                 <CountBarChart
                   data={toChart(tot.byResult)}
                   name="Trainers"
                   color={theme.palette.success.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (tot.byResult || []).length === 0 && (
                 <Empty text="No TOT applications yet" />
               )}
             </Box>
@@ -436,15 +447,17 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
               Grades
             </Typography>
             <Box sx={{ height: 140 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (tot.byGrade || []).length ? (
+              )}
+              {!loading && (tot.byGrade || []).length > 0 && (
                 <CountBarChart
                   data={toChart(tot.byGrade)}
                   name="Trainers"
                   color={theme.palette.primary.main}
                 />
-              ) : (
+              )}
+              {!loading && (tot.byGrade || []).length === 0 && (
                 <Empty text="No grades yet" />
               )}
             </Box>
@@ -456,16 +469,18 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
         <Grid size={{ xs: 12, md: 6 }}>
           <Panel title="Trainers sent to TOT by institute (top 8)">
             <Box sx={{ height: 260 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (tot.byInstitute || []).length ? (
+              )}
+              {!loading && (tot.byInstitute || []).length > 0 && (
                 <CountBarChart
                   data={toChart(tot.byInstitute)}
                   name="Trainers"
                   color={theme.palette.info.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (tot.byInstitute || []).length === 0 && (
                 <Empty text="No TOT applications yet" />
               )}
             </Box>
@@ -474,16 +489,18 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
         <Grid size={{ xs: 12, md: 6 }}>
           <Panel title="Curriculum applications by status">
             <Box sx={{ height: 260 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (curriculum.byStatus || []).length ? (
+              )}
+              {!loading && (curriculum.byStatus || []).length > 0 && (
                 <CountBarChart
                   data={toChart(curriculum.byStatus)}
                   name="Curricula"
                   color={theme.palette.secondary.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (curriculum.byStatus || []).length === 0 && (
                 <Empty text="No curriculum applications yet" />
               )}
             </Box>
@@ -496,16 +513,18 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
         <Grid size={{ xs: 12, md: 4 }}>
           <Panel title="Curriculum by type">
             <Box sx={{ height: 220 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (curriculum.byType || []).length ? (
+              )}
+              {!loading && (curriculum.byType || []).length > 0 && (
                 <CountBarChart
                   data={toChart(curriculum.byType)}
                   name="Curricula"
                   color={theme.palette.primary.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (curriculum.byType || []).length === 0 && (
                 <Empty text="No curriculum applications yet" />
               )}
             </Box>
@@ -513,16 +532,18 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
               By certificate level
             </Typography>
             <Box sx={{ height: 180 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (curriculum.byLevel || []).length ? (
+              )}
+              {!loading && (curriculum.byLevel || []).length > 0 && (
                 <CountBarChart
                   data={toChart(curriculum.byLevel)}
                   name="Curricula"
                   color={theme.palette.success.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (curriculum.byLevel || []).length === 0 && (
                 <Empty text="No curriculum applications yet" />
               )}
             </Box>
@@ -542,13 +563,14 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading ? (
+                  {loading && (
                     <TableRow>
                       <TableCell colSpan={5}>
                         <Skeleton />
                       </TableCell>
                     </TableRow>
-                  ) : (curriculum.recent || []).length ? (
+                  )}
+                  {!loading && (curriculum.recent || []).length > 0 && (
                     curriculum.recent.map((c) => (
                       <TableRow key={c.application_no} hover>
                         <TableCell sx={{ whiteSpace: "nowrap" }}>{c.application_no}</TableCell>
@@ -573,7 +595,8 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
                         <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(c.created_at)}</TableCell>
                       </TableRow>
                     ))
-                  ) : (
+                  )}
+                  {!loading && (curriculum.recent || []).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} align="center">
                         No curriculum applications yet
@@ -624,16 +647,18 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
               By status
             </Typography>
             <Box sx={{ height: 200 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : (cmfg.byStatus || []).length ? (
+              )}
+              {!loading && (cmfg.byStatus || []).length > 0 && (
                 <CountBarChart
                   data={toChart(cmfg.byStatus)}
                   name="Monitorings"
                   color={theme.palette.warning.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && (cmfg.byStatus || []).length === 0 && (
                 <Empty text="No CMFG monitoring yet" />
               )}
             </Box>
@@ -664,13 +689,14 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading ? (
+                  {loading && (
                     <TableRow>
                       <TableCell colSpan={5}>
                         <Skeleton />
                       </TableCell>
                     </TableRow>
-                  ) : (cmfg.recent || []).length ? (
+                  )}
+                  {!loading && (cmfg.recent || []).length > 0 && (
                     cmfg.recent.map((m) => {
                       const total = num(m.total_items);
                       const pct = total ? Math.round((num(m.yes_count) / total) * 100) : 0;
@@ -684,7 +710,7 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
                                 variant="determinate"
                                 value={pct}
                                 sx={{ flex: 1, height: 6, borderRadius: 3 }}
-                                color={pct >= 80 ? "success" : pct >= 50 ? "primary" : "warning"}
+                                color={complianceColor(pct)}
                               />
                               <Typography variant="caption" sx={{ minWidth: 72, textAlign: "right" }}>
                                 {fmtNum(m.yes_count)}/{fmtNum(total)} ({pct}%)
@@ -703,7 +729,8 @@ const TTTRCDashboard = ({ roleId, title, subtitle }) => {
                         </TableRow>
                       );
                     })
-                  ) : (
+                  )}
+                  {!loading && (cmfg.recent || []).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} align="center">
                         No CMFG monitoring yet

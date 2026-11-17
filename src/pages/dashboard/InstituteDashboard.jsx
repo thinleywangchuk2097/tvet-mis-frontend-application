@@ -201,6 +201,22 @@ const EmptyChart = ({ text }) => (
 );
 EmptyChart.propTypes = { text: PropTypes.string };
 
+// Renewal is due when the registration expires (validity_date, set by SAR grade on renewal);
+// older records without it: one year after the last renewal
+const renewalDueDate = (inst) => {
+  if (inst.validity_date) return new Date(inst.validity_date);
+  if (!inst.institute_renewal_date) return null;
+  const d = new Date(inst.institute_renewal_date);
+  d.setFullYear(d.getFullYear() + 1);
+  return d;
+};
+
+// renewal due: red when overdue, orange within 60 days
+const renewalDueColor = (days) => {
+  if (days < 0) return "error.main";
+  return days < 60 ? "warning.main" : "text.secondary";
+};
+
 // ---------------------------------------------------------------- page
 const InstituteDashboard = () => {
   const theme = useTheme();
@@ -262,6 +278,8 @@ const InstituteDashboard = () => {
   const hasPerMonth = perMonth.some((x) => Number(x.value) > 0);
   const trainersByEmployment = data?.trainersByEmployment || [];
   const tot = data?.tot || {};
+  // first load (nothing to show yet); later reloads keep the old data on screen
+  const initialLoading = loading && !data;
 
   const programmes = useMemo(() => {
     const list = data?.programmeList || [];
@@ -270,17 +288,7 @@ const InstituteDashboard = () => {
   }, [data, programmeTab]);
   const applications = data?.recentApplications || [];
 
-  // Renewal is due when the registration expires (validity_date, set by SAR grade on renewal);
-  // older records without it: one year after the last renewal
-  const renewalDate = inst.validity_date
-    ? new Date(inst.validity_date)
-    : inst.institute_renewal_date
-      ? (() => {
-          const d = new Date(inst.institute_renewal_date);
-          d.setFullYear(d.getFullYear() + 1);
-          return d;
-        })()
-      : null;
+  const renewalDate = renewalDueDate(inst);
   // latest APPROVED Self Assessment Report (null until one is approved)
   const sar = data?.sar || null;
   const SAR_GRADE_COLOR = { "A+": "success", A: "success", B: "primary", C: "warning" };
@@ -381,7 +389,7 @@ const InstituteDashboard = () => {
             <BusinessIcon />
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 220 }}>
-            {loading && !data ? (
+            {initialLoading ? (
               <>
                 <Skeleton width={260} height={34} />
                 <Skeleton width={340} />
@@ -496,13 +504,7 @@ const InstituteDashboard = () => {
                 {daysToRenewal !== null && (
                   <Typography
                     variant="caption"
-                    color={
-                      daysToRenewal < 0
-                        ? "error.main"
-                        : daysToRenewal < 60
-                          ? "warning.main"
-                          : "text.secondary"
-                    }
+                    color={renewalDueColor(daysToRenewal)}
                   >
                     {daysToRenewal < 0
                       ? `${Math.abs(daysToRenewal)} days overdue`
@@ -527,7 +529,7 @@ const InstituteDashboard = () => {
       <Grid container spacing={2} sx={{ mb: 2 }}>
         {metrics.map((metric) => (
           <Grid item size={{ xs: 12, sm: 6, md: 3 }} key={metric.title}>
-            <MetricCard {...metric} loading={loading && !data} />
+            <MetricCard {...metric} loading={initialLoading} />
           </Grid>
         ))}
       </Grid>
@@ -542,9 +544,10 @@ const InstituteDashboard = () => {
             }
           >
             <Box sx={{ height: 250 }}>
-              {loading && !data ? (
+              {initialLoading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : hasMonthly ? (
+              )}
+              {!initialLoading && hasMonthly && (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={monthly} margin={{ left: -20, right: 8 }}>
                     <defs>
@@ -575,7 +578,8 @@ const InstituteDashboard = () => {
                     />
                   </AreaChart>
                 </ResponsiveContainer>
-              ) : (
+              )}
+              {!initialLoading && !hasMonthly && (
                 <EmptyChart text="No enrolments in the last 12 months" />
               )}
             </Box>
@@ -584,9 +588,10 @@ const InstituteDashboard = () => {
         <Grid item size={{ xs: 12, md: 4 }}>
           <Card title="Trainees by gender">
             <Box sx={{ height: 250, position: "relative" }}>
-              {loading && !data ? (
+              {initialLoading && (
                 <Skeleton variant="circular" width={180} height={180} sx={{ mx: "auto", mt: 3 }} />
-              ) : genderTotal > 0 ? (
+              )}
+              {!initialLoading && genderTotal > 0 && (
                 <>
                   <ResponsiveContainer width="100%" height="85%">
                     <PieChart>
@@ -633,7 +638,8 @@ const InstituteDashboard = () => {
                     ))}
                   </Box>
                 </>
-              ) : (
+              )}
+              {!initialLoading && genderTotal <= 0 && (
                 <EmptyChart text="No trainee data yet" />
               )}
             </Box>
@@ -645,9 +651,10 @@ const InstituteDashboard = () => {
         <Grid item size={{ xs: 12, md: 6 }}>
           <Card title="Programmes starting per month">
             <Box sx={{ height: 220 }}>
-              {loading && !data ? (
+              {initialLoading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : hasPerMonth ? (
+              )}
+              {!initialLoading && hasPerMonth && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={perMonth} margin={{ left: -20, right: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -663,7 +670,8 @@ const InstituteDashboard = () => {
                     />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
+              )}
+              {!initialLoading && !hasPerMonth && (
                 <EmptyChart text="No programmes started in the last 12 months" />
               )}
             </Box>
@@ -671,11 +679,13 @@ const InstituteDashboard = () => {
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
           <Card title="Trainers by employment">
-            {loading && !data ? (
+            {initialLoading && (
               <Skeleton variant="rounded" height={150} />
-            ) : trainersByEmployment.length === 0 ? (
+            )}
+            {!initialLoading && trainersByEmployment.length === 0 && (
               <EmptyChart text="No trainers registered" />
-            ) : (
+            )}
+            {!initialLoading && trainersByEmployment.length > 0 && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                 {trainersByEmployment.map((t, i) => {
                   const pct = m.trainers
@@ -721,7 +731,7 @@ const InstituteDashboard = () => {
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
           <Card title="Training of Trainers (TOT)">
-            {loading && !data ? (
+            {initialLoading ? (
               <Skeleton variant="rounded" height={150} />
             ) : (
               <Box
@@ -793,7 +803,7 @@ const InstituteDashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading && !data ? (
+                  {initialLoading && (
                     [0, 1, 2].map((i) => (
                       <TableRow key={i}>
                         <TableCell colSpan={5}>
@@ -801,13 +811,15 @@ const InstituteDashboard = () => {
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : programmes.length === 0 ? (
+                  )}
+                  {!initialLoading && programmes.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} align="center" sx={{ py: 4, color: "text.secondary" }}>
                         No programmes in this list
                       </TableCell>
                     </TableRow>
-                  ) : (
+                  )}
+                  {!initialLoading && programmes.length > 0 && (
                     programmes
                       .slice(progPage * progRows, progPage * progRows + progRows)
                       .map((p) => {
@@ -886,7 +898,7 @@ const InstituteDashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading && !data ? (
+                  {initialLoading && (
                     [0, 1, 2].map((i) => (
                       <TableRow key={i}>
                         <TableCell colSpan={3}>
@@ -894,13 +906,15 @@ const InstituteDashboard = () => {
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : applications.length === 0 ? (
+                  )}
+                  {!initialLoading && applications.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} align="center" sx={{ py: 4, color: "text.secondary" }}>
                         No application activity in the last 3 days
                       </TableCell>
                     </TableRow>
-                  ) : (
+                  )}
+                  {!initialLoading && applications.length > 0 && (
                     applications
                       .slice(appPage * appRows, appPage * appRows + appRows)
                       .map((a) => (

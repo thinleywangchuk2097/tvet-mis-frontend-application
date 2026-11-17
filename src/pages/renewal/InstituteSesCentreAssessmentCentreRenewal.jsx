@@ -153,6 +153,19 @@ const getMappedServiceId = (originalServiceId) => {
   return serviceIdMap[stringId] || originalServiceId;
 };
 
+// validity bar colour: red when expired, orange within 90 days, otherwise green
+const validityColor = (expired, dueSoon) => {
+  if (expired) return "#c62828";
+  return dueSoon ? "#e65100" : "#2e7d32";
+};
+
+// first (empty) item of the course dropdown
+const coursePlaceholder = (sector, loading, courses) => {
+  if (!sector) return "Select sector first";
+  if (loading) return "Loading courses...";
+  return courses?.length === 0 ? "No courses available" : "Select Course";
+};
+
 const InstituteSesCentreAssessmentCentreRenewal = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -210,7 +223,7 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
     const daysLeft = date ? Math.ceil((date - today) / 86400000) : null;
     const expired = date ? daysLeft < 0 : false;
     const dueSoon = date ? !expired && daysLeft <= 90 : false;
-    const color = expired ? "#c62828" : dueSoon ? "#e65100" : "#2e7d32";
+    const color = validityColor(expired, dueSoon);
     return (
       <Box sx={{ mb: 2 }}>
         <Box
@@ -2444,13 +2457,11 @@ const InstituteSesCentreAssessmentCentreRenewal = () => {
                           }}
                         >
                           <MenuItem value="">
-                            {!course.sector
-                              ? "Select sector first"
-                              : loadingCourses[course.sector]
-                                ? "Loading courses..."
-                                : coursesMap[course.sector]?.length === 0
-                                  ? "No courses available"
-                                  : "Select Course"}
+                            {coursePlaceholder(
+                              course.sector,
+                              loadingCourses[course.sector],
+                              coursesMap[course.sector],
+                            )}
                           </MenuItem>
                           {coursesMap[course.sector]?.map((opt) => (
                             <MenuItem key={opt.id} value={opt.id}>

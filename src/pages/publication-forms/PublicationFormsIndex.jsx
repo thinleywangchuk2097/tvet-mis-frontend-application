@@ -89,7 +89,8 @@ const toDocumentDto = (file) =>
     const reader = new FileReader();
     reader.onload = (e) =>
       resolve({
-        content: String(e.target.result).split(",")[1],
+        // readAsDataURL gives "data:<type>;base64,<content>"
+        content: (typeof e.target.result === "string" ? e.target.result : "").split(",")[1],
         name: file.name,
         originalFilename: file.name,
         contentType: file.type || "application/octet-stream",
@@ -350,19 +351,21 @@ const PublicationFormsIndex = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
+              {loading &&
                 [0, 1, 2].map((i) => (
                   <TableRow key={i}>
                     <TableCell colSpan={5}><Skeleton height={32} /></TableCell>
                   </TableRow>
-                ))
-              ) : visible.length === 0 ? (
+                ))}
+              {!loading && visible.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 5, color: "text.secondary" }}>
                     {search ? "Nothing matches your search." : "Nothing added yet. Use the Add button to upload the first one."}
                   </TableCell>
                 </TableRow>
-              ) : (
+              )}
+              {!loading &&
+                visible.length > 0 &&
                 visible
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((row, i) => {
@@ -414,8 +417,7 @@ const PublicationFormsIndex = () => {
                         </TableCell>
                       </TableRow>
                     );
-                  })
-              )}
+                  })}
             </TableBody>
           </Table>
         </TableContainer>

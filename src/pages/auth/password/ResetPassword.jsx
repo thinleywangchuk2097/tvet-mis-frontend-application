@@ -16,6 +16,9 @@ import {
 import { LockReset as LockResetIcon } from "@mui/icons-material";
 import UserProfileService from "../../../api/services/internal/userprofile/UserProfileService";
 
+// required-field star (*) in red
+const RED_ASTERISK = { "& .MuiFormLabel-asterisk": { color: "error.main" } };
+
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
@@ -113,7 +116,7 @@ const ResetPassword = () => {
   }
 
   return (
-    <Container component="main" maxWidth="md">
+    <Container component="main" maxWidth="sm">
       <CssBaseline />
       <Box
         sx={{
@@ -153,6 +156,7 @@ const ResetPassword = () => {
               margin="normal"
               required
               fullWidth
+              size="small"
               name="newPassword"
               label="New Password"
               type="password"
@@ -167,12 +171,13 @@ const ResetPassword = () => {
               helperText={
                 formik.touched.newPassword && formik.errors.newPassword
               }
-              sx={{ mb: 2 }}
+              sx={{ mb: 2, ...RED_ASTERISK }}
             />
             <TextField
               margin="normal"
               required
               fullWidth
+              size="small"
               name="confirmPassword"
               label="Confirm New Password"
               type="password"
@@ -188,13 +193,14 @@ const ResetPassword = () => {
               helperText={
                 formik.touched.confirmPassword && formik.errors.confirmPassword
               }
+              sx={RED_ASTERISK}
             />
             <Button
               type="submit"
               fullWidth
               variant="contained"
               disabled={isSubmitting}
-              sx={{ mt: 3, mb: 2, py: 1.5 }}
+              sx={{ mt: 3, mb: 2, py: 1 }}
             >
               {isSubmitting ? (
                 <CircularProgress size={24} color="inherit" />

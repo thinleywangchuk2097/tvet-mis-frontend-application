@@ -86,6 +86,12 @@ const totalMark = (record) => {
 
 const isRplRecord = (record) => ["39", "41"].includes(String(record?.service_id));
 
+// RPL rows show the Viva mark in the Theory column
+const theoryHeader = (allRpl, someRpl) => {
+  if (allRpl) return "Viva";
+  return someRpl ? "Theory / Viva" : "Theory";
+};
+
 const TraineeCertificateIndex = () => {
   // ==================== STATE ====================
   const [applicationNo, setApplicationNo] = useState("");
@@ -238,7 +244,7 @@ const TraineeCertificateIndex = () => {
               <TableCell>Course End Date</TableCell>
               <TableCell>Certificate</TableCell>
               <TableCell>Internal</TableCell>
-              <TableCell>{allRpl ? "Viva" : someRpl ? "Theory / Viva" : "Theory"}</TableCell>
+              <TableCell>{theoryHeader(allRpl, someRpl)}</TableCell>
               <TableCell>Practical</TableCell>
               <TableCell>Total</TableCell>
               <TableCell>Result</TableCell>
@@ -247,13 +253,14 @@ const TraineeCertificateIndex = () => {
           </TableHead>
 
           <TableBody>
-            {loadingReports ? (
+            {loadingReports && (
               <TableRow>
                 <TableCell colSpan={15} align="center" sx={{ py: 4 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
-            ) : paginatedReports.length > 0 ? (
+            )}
+            {!loadingReports &&
               paginatedReports.map((report, index) => (
                 <TableRow key={report.id ?? report.cid_no ?? index} hover>
                   <TableCell>{page * rowsPerPage + index + 1}</TableCell>
@@ -295,8 +302,8 @@ const TraineeCertificateIndex = () => {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
+              ))}
+            {!loadingReports && paginatedReports.length === 0 && (
               <TableRow>
                 <TableCell colSpan={15} align="center" sx={{ py: 3 }}>
                   {hasSearched

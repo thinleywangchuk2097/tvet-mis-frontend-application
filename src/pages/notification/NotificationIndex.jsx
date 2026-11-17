@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Box,
   Typography,
   Paper,
   Table,
@@ -105,7 +104,11 @@ const headCell = {
   fontSize: "0.78rem",
   padding: "6px 8px",
 };
-const cell = { border: "1px solid #ccc", fontSize: "0.78rem", padding: "4px 8px" };
+const cell = {
+  border: "1px solid #ccc",
+  fontSize: "0.78rem",
+  padding: "4px 8px",
+};
 
 const NotificationIndex = () => {
   const token = useSelector((state) => state.auth.accessToken);
@@ -260,17 +263,33 @@ const NotificationIndex = () => {
 
   const sentToType = (n) => {
     if (n.notificationType === NOTIFY_PUBLIC)
-      return <Chip label="Public" size="small" color="success" sx={{ height: 20, fontSize: "0.68rem" }} />;
+      return (
+        <Chip
+          label="Public"
+          size="small"
+          color="success"
+          sx={{ height: 20, fontSize: "0.68rem" }}
+        />
+      );
     if (n.notificationType === NOTIFY_REGISTERED) {
       const uIds = splitIds(n.userId);
       const rIds = splitIds(n.roleId);
       const roleNames = rIds.map(
-        (id) => roles.find((r) => String(r.id) === id)?.role_name || `Role ${id}`,
+        (id) =>
+          roles.find((r) => String(r.id) === id)?.role_name || `Role ${id}`,
       );
       return (
         <>
-          <Chip label="Selective" size="small" color="primary" sx={{ height: 20, fontSize: "0.68rem" }} />
-          <Typography sx={{ fontSize: "0.72rem", mt: 0.25 }} color="text.secondary">
+          <Chip
+            label="Selective"
+            size="small"
+            color="primary"
+            sx={{ height: 20, fontSize: "0.68rem" }}
+          />
+          <Typography
+            sx={{ fontSize: "0.72rem", mt: 0.25 }}
+            color="text.secondary"
+          >
             {[
               uIds.length ? `${uIds.length} user(s)` : null,
               roleNames.length ? roleNames.join(", ") : null,
@@ -282,8 +301,21 @@ const NotificationIndex = () => {
       );
     }
     if (n.notificationType === NOTIFY_ALL_REGISTERED)
-      return <Chip label="All Registered" size="small" color="secondary" sx={{ height: 20, fontSize: "0.68rem" }} />;
-    return <Chip label="Not sent" size="small" sx={{ height: 20, fontSize: "0.68rem" }} />;
+      return (
+        <Chip
+          label="All Registered"
+          size="small"
+          color="secondary"
+          sx={{ height: 20, fontSize: "0.68rem" }}
+        />
+      );
+    return (
+      <Chip
+        label="Not sent"
+        size="small"
+        sx={{ height: 20, fontSize: "0.68rem" }}
+      />
+    );
   };
 
   const formik = useFormik({
@@ -425,13 +457,15 @@ const NotificationIndex = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 2 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
-            ) : filtered.length > 0 ? (
+            )}
+            {!loading &&
+              filtered.length > 0 &&
               filtered
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((n, index) => (
@@ -477,8 +511,8 @@ const NotificationIndex = () => {
                       </Tooltip>
                     </TableCell>
                   </TableRow>
-                ))
-            ) : (
+                ))}
+            {!loading && filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 2 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -511,7 +545,12 @@ const NotificationIndex = () => {
       </TableContainer>
 
       {/* Add / Edit */}
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <form onSubmit={formik.handleSubmit}>
           <DialogTitle sx={{ pr: 6 }}>
             {editing ? "Edit Notification" : "Add Notification"}
@@ -599,7 +638,10 @@ const NotificationIndex = () => {
             {sendTarget?.title}
           </Typography>
           {isLocked && (
-            <Typography sx={{ mt: 1, fontSize: "0.78rem" }} color="warning.main">
+            <Typography
+              sx={{ mt: 1, fontSize: "0.78rem" }}
+              color="warning.main"
+            >
               Already sent. It can only be sent again to the same type.
             </Typography>
           )}
@@ -632,7 +674,10 @@ const NotificationIndex = () => {
           </FormControl>
 
           {sendType === String(NOTIFY_PUBLIC) ? (
-            <Typography sx={{ mt: 1, fontSize: "0.8rem" }} color="text.secondary">
+            <Typography
+              sx={{ mt: 1, fontSize: "0.8rem" }}
+              color="text.secondary"
+            >
               It will be shown on the public page.
             </Typography>
           ) : null}
@@ -652,82 +697,96 @@ const NotificationIndex = () => {
             helperText="It stops showing after this day"
           />
 
-          {sendType === String(NOTIFY_PUBLIC) ? null : sendType === String(NOTIFY_ALL_REGISTERED) ? (
-            <Typography sx={{ mt: 1, fontSize: "0.8rem" }} color="text.secondary">
+          {sendType === String(NOTIFY_ALL_REGISTERED) && (
+            <Typography
+              sx={{ mt: 1, fontSize: "0.8rem" }}
+              color="text.secondary"
+            >
               Every registered user will see it under the notification bell.
             </Typography>
-          ) : (
-            <Stack spacing={2} sx={{ mt: 1.5 }}>
-              <Autocomplete
-                multiple
-                disableCloseOnSelect
-                size="small"
-                options={users}
-                value={selectedUsers}
-                onChange={(e, v) => setSelectedUsers(v)}
-                getOptionLabel={userLabel}
-                isOptionEqualToValue={(o, v) => String(o.user_id) === String(v.user_id)}
-                renderOption={(props, option, { selected }) => {
-                  const { key, ...rest } = props;
-                  return (
-                    <li key={key} {...rest}>
-                      <Checkbox
-                        size="small"
-                        icon={<CheckBoxOutlineBlank fontSize="small" />}
-                        checkedIcon={<CheckBoxIcon fontSize="small" />}
-                        checked={selected}
-                        sx={{ mr: 1, p: 0.5 }}
-                      />
-                      {userLabel(option)}
-                    </li>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="By Username"
-                    placeholder="Search users..."
-                  />
-                )}
-              />
-              <Autocomplete
-                multiple
-                disableCloseOnSelect
-                size="small"
-                options={roles}
-                value={selectedRoles}
-                onChange={(e, v) => setSelectedRoles(v)}
-                getOptionLabel={(r) => r.role_name || `Role ${r.id}`}
-                isOptionEqualToValue={(o, v) => String(o.id) === String(v.id)}
-                renderOption={(props, option, { selected }) => {
-                  const { key, ...rest } = props;
-                  return (
-                    <li key={key} {...rest}>
-                      <Checkbox
-                        size="small"
-                        icon={<CheckBoxOutlineBlank fontSize="small" />}
-                        checkedIcon={<CheckBoxIcon fontSize="small" />}
-                        checked={selected}
-                        sx={{ mr: 1, p: 0.5 }}
-                      />
-                      {option.role_name || `Role ${option.id}`}
-                    </li>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="By Role"
-                    placeholder="Search roles..."
-                  />
-                )}
-              />
-              <Typography sx={{ fontSize: "0.75rem" }} color="text.secondary">
-                Pick users, roles, or both. Everyone selected, and every user
-                with a selected role, will see it under the notification bell.
-              </Typography>
-            </Stack>
           )}
+          {/* selective users / roles */}
+          {sendType !== String(NOTIFY_PUBLIC) &&
+            sendType !== String(NOTIFY_ALL_REGISTERED) && (
+              <Stack spacing={2} sx={{ mt: 1.5 }}>
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  size="small"
+                  options={users}
+                  value={selectedUsers}
+                  onChange={(e, v) => setSelectedUsers(v)}
+                  getOptionLabel={userLabel}
+                  isOptionEqualToValue={(o, v) =>
+                    String(o.user_id) === String(v.user_id)
+                  }
+                  renderOption={(
+                    { key, ...optionProps },
+                    option,
+                    { selected },
+                  ) => {
+                    return (
+                      <li key={key} {...optionProps}>
+                        <Checkbox
+                          size="small"
+                          icon={<CheckBoxOutlineBlank fontSize="small" />}
+                          checkedIcon={<CheckBoxIcon fontSize="small" />}
+                          checked={selected}
+                          sx={{ mr: 1, p: 0.5 }}
+                        />
+                        {userLabel(option)}
+                      </li>
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="By Username"
+                      placeholder="Search users..."
+                    />
+                  )}
+                />
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  size="small"
+                  options={roles}
+                  value={selectedRoles}
+                  onChange={(e, v) => setSelectedRoles(v)}
+                  getOptionLabel={(r) => r.role_name || `Role ${r.id}`}
+                  isOptionEqualToValue={(o, v) => String(o.id) === String(v.id)}
+                  renderOption={(
+                    { key, ...optionProps },
+                    option,
+                    { selected },
+                  ) => {
+                    return (
+                      <li key={key} {...optionProps}>
+                        <Checkbox
+                          size="small"
+                          icon={<CheckBoxOutlineBlank fontSize="small" />}
+                          checkedIcon={<CheckBoxIcon fontSize="small" />}
+                          checked={selected}
+                          sx={{ mr: 1, p: 0.5 }}
+                        />
+                        {option.role_name || `Role ${option.id}`}
+                      </li>
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="By Role"
+                      placeholder="Search roles..."
+                    />
+                  )}
+                />
+                <Typography sx={{ fontSize: "0.75rem" }} color="text.secondary">
+                  Pick users, roles, or both. Everyone selected, and every user
+                  with a selected role, will see it under the notification bell.
+                </Typography>
+              </Stack>
+            )}
         </DialogContent>
         <DialogActions>
           <Button
@@ -745,7 +804,11 @@ const NotificationIndex = () => {
             disabled={sending}
             onClick={handleSend}
             startIcon={
-              sending ? <CircularProgress size={16} /> : <IosShareIcon fontSize="small" />
+              sending ? (
+                <CircularProgress size={16} />
+              ) : (
+                <IosShareIcon fontSize="small" />
+              )
             }
           >
             Send

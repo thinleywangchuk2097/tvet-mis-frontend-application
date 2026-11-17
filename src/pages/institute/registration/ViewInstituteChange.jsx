@@ -48,6 +48,69 @@ const APPROVER_ROLE_ID = 22;
 const PENDING_STATUS_IDS = [55, 115];
 
 // Shared look for the sections on this page
+// JSON text -> value (fallback when it cannot be parsed)
+const parseJsonSafe = (text, fallback) => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+};
+
+// partnerships come as JSON text or as an array
+const parsePartners = (partnerships) =>
+  typeof partnerships === "string"
+    ? parseJsonSafe(partnerships, [])
+    : partnerships;
+
+const formatDocuments = (docs) =>
+  docs.map((doc) => ({
+    name: doc.name || doc.documentName || "Document",
+    url: doc.url || doc.filePath || "",
+    id: doc.id,
+    filePath: doc.url || doc.filePath,
+  }));
+
+// current institute (display + payment details) returned with the change request
+const currentInstituteFrom = (data, instituteId) => ({
+  // For display
+  registration_no: data.current_registration_no || "",
+  instituteName: data.institute_name || "",
+  dzongkhag_id: data.current_dzongkhag_id || "",
+  exact_location: data.current_exact_location || "",
+  // For payment
+  instituteId: instituteId || "",
+  taxPayerNo: data.current_registration_no || "",
+  taxPayerEmail: data.current_email_id || "",
+  taxPayerMobileNo: data.current_mobile_no || "",
+  taxPayerName: data.institute_name || "",
+});
+
+// why there is no action for this role at the current status
+const statusMessage = (statusIdNum, rawStatus) => {
+  if (statusIdNum === STATUS_VERIFY)
+    return "Verified — waiting for approval (role 22).";
+  if (statusIdNum === STATUS_APPROVE)
+    return "Approved — the change has been applied.";
+  if (statusIdNum === STATUS_REJECT) return "This change request was rejected.";
+  if (PENDING_STATUS_IDS.includes(statusIdNum)) {
+    return "Pending — waiting for verification (role 7).";
+  }
+  return `No action available (status ${rawStatus ?? "—"}).`;
+};
+
+// role 22 acts on verified requests (56); role 7 on new ones (55 / 115)
+const isPendingFor = (isApprover, statusIdNum) =>
+  isApprover
+    ? statusIdNum === STATUS_VERIFY
+    : PENDING_STATUS_IDS.includes(statusIdNum);
+
+const actionTooltip = (isPaymentPaid, isApprover, actionLabel) => {
+  if (isPaymentPaid) return `${actionLabel} this change request`;
+  const step = isApprover ? "approval" : "verification";
+  return `Payment must be completed before ${step}`;
+};
+
 const SECTION_SX = { p: 2, mb: 2, borderRadius: 2 };
 const FIELD_LABEL_SX = {
   fontSize: "0.7rem",
@@ -146,32 +209,12 @@ const ViewInstituteChange = () => {
         }
 
         // Parse JSON strings if they exist
-        if (data.partnerships && typeof data.partnerships === "string") {
-          try {
-            data.partners = JSON.parse(data.partnerships);
-          } catch (e) {
-            data.partners = [];
-          }
-        } else if (data.partnerships && typeof data.partnerships === "object") {
-          data.partners = data.partnerships;
-        }
-
+        if (data.partnerships) data.partners = parsePartners(data.partnerships);
         if (data.documents && typeof data.documents === "string") {
-          try {
-            const parsedDocs = JSON.parse(data.documents);
-            if (Array.isArray(parsedDocs)) {
-              const formattedDocs = parsedDocs.map((doc) => ({
-                name: doc.name || doc.documentName || "Document",
-                url: doc.url || doc.filePath || "",
-                id: doc.id,
-                filePath: doc.url || doc.filePath,
-              }));
-              setDocuments(formattedDocs);
-            }
-            data.documents = parsedDocs;
-          } catch (e) {
-            data.documents = [];
-          }
+          const parsedDocs = parseJsonSafe(data.documents, []);
+          if (Array.isArray(parsedDocs))
+            setDocuments(formatDocuments(parsedDocs));
+          data.documents = parsedDocs;
         }
 
         setChangeRequestData(data);
@@ -179,19 +222,7 @@ const ViewInstituteChange = () => {
         // Current institute details come with the change request
         // (tbl_institute_change_dtls.institute_id -> tbl_institute_registration_dtls)
         const instituteId = data.institute_id || data.instituteId;
-        setCurrentInstituteData({
-          // For display
-          registration_no: data.current_registration_no || "",
-          instituteName: data.institute_name || "",
-          dzongkhag_id: data.current_dzongkhag_id || "",
-          exact_location: data.current_exact_location || "",
-          // For payment
-          instituteId: instituteId || "",
-          taxPayerNo: data.current_registration_no || "",
-          taxPayerEmail: data.current_email_id || "",
-          taxPayerMobileNo: data.current_mobile_no || "",
-          taxPayerName: data.institute_name || "",
-        });
+        setCurrentInstituteData(currentInstituteFrom(data, instituteId));
         if (!data.current_registration_no) {
           toast.warning(
             `No registered institute found for institute ID ${instituteId}`,
@@ -453,9 +484,7 @@ const ViewInstituteChange = () => {
   // Check if the request is pending (can be verified or rejected)
   // role 7 acts on new requests (115); role 22 acts on verified ones (56)
   const statusIdNum = Number(changeRequestData?.status_id);
-  const isPending = isApprover
-    ? statusIdNum === STATUS_VERIFY
-    : PENDING_STATUS_IDS.includes(statusIdNum);
+  const isPending = isPendingFor(isApprover, statusIdNum);
 
   // Open dialog with action type
   const openVerifyDialog = () => {
@@ -1335,25 +1364,13 @@ const ViewInstituteChange = () => {
               color="text.secondary"
               sx={{ mr: "auto" }}
             >
-              {statusIdNum === STATUS_VERIFY
-                ? "Verified — waiting for approval (role 22)."
-                : statusIdNum === STATUS_APPROVE
-                  ? "Approved — the change has been applied."
-                  : statusIdNum === STATUS_REJECT
-                    ? "This change request was rejected."
-                    : PENDING_STATUS_IDS.includes(statusIdNum)
-                      ? "Pending — waiting for verification (role 7)."
-                      : `No action available (status ${changeRequestData?.status_id ?? "—"}).`}
+              {statusMessage(statusIdNum, changeRequestData?.status_id)}
             </Typography>
           )}
           {isPending && (
             <>
               <Tooltip
-                title={
-                  !isPaymentPaid
-                    ? `Payment must be completed before ${isApprover ? "approval" : "verification"}`
-                    : `${actionLabel} this change request`
-                }
+                title={actionTooltip(isPaymentPaid, isApprover, actionLabel)}
                 arrow
               >
                 <span>

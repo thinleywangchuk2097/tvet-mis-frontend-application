@@ -248,13 +248,14 @@ const CurriculumPublication = () => {
           </TableHead>
 
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={COLS} align="center">
                   <CircularProgress size={30} />
                 </TableCell>
               </TableRow>
-            ) : paginatedCurriculums.length > 0 ? (
+            )}
+            {!loading &&
               paginatedCurriculums.map((item, index) => (
                 <TableRow key={item.id ?? index}>
                   <TableCell>{page * rowsPerPage + index + 1}</TableCell>
@@ -305,8 +306,8 @@ const CurriculumPublication = () => {
                     )}
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
+              ))}
+            {!loading && paginatedCurriculums.length === 0 && (
               <TableRow>
                 <TableCell colSpan={COLS} align="center">
                   {filters.search || filters.sector !== "All"

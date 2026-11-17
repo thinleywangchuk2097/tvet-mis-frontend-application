@@ -63,6 +63,18 @@ const safeFilePart = (text) =>
     .replace(/[\\/:*?"<>|]+/g, "")
     .replace(/\s+/g, "_");
 
+// "Non-BQF ..." course types -> non-accredited list, "BQF ..." -> accredited list
+const coursesForType = (typeName, accreditedCourses, nonAccreditedCourses) => {
+  if (typeName.includes("non-bqf") || typeName.includes("non bqf")) return nonAccreditedCourses;
+  if (typeName.includes("bqf")) return accreditedCourses;
+  return [];
+};
+
+const idTypeOf = (t) => {
+  if (t.citizen_id) return "CID";
+  return t.work_permit_no ? "Work Permit" : "";
+};
+
 const headCell = {
   border: "1px solid #ccc",
   fontWeight: "bold",
@@ -153,12 +165,7 @@ const TrainerReportListIndex = () => {
   const courseName = useCallback(
     (courseTypeId, courseId) => {
       const typeName = nameById(courseTypes, courseTypeId).toLowerCase();
-      const list =
-        typeName.includes("non-bqf") || typeName.includes("non bqf")
-          ? nonAccreditedCourses
-          : typeName.includes("bqf")
-            ? accreditedCourses
-            : [];
+      const list = coursesForType(typeName, accreditedCourses, nonAccreditedCourses);
       const c = list.find((x) => String(x.id) === String(courseId));
       return (
         c?.course_name || c?.name || c?.programme_title || (courseId ? `Course ${courseId}` : "")
@@ -173,7 +180,7 @@ const TrainerReportListIndex = () => {
         id: t.id,
         name: t.name || "",
         idNo: t.citizen_id || t.work_permit_no || "",
-        idType: t.citizen_id ? "CID" : t.work_permit_no ? "Work Permit" : "",
+        idType: idTypeOf(t),
         genderId: t.gender_id,
         gender: nameById(genders, t.gender_id),
         qualification: nameById(qualifications, t.qualification_id),
@@ -368,13 +375,14 @@ const TrainerReportListIndex = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={12} align="center" sx={{ py: 2 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
-            ) : pageRows.length > 0 ? (
+            )}
+            {!loading &&
               pageRows.map((t, i) => (
                 <TableRow key={t.id || i} hover>
                   <TableCell sx={cell}>{page * rowsPerPage + i + 1}</TableCell>
@@ -394,8 +402,8 @@ const TrainerReportListIndex = () => {
                   <TableCell sx={cell}>{t.mobileNo || "—"}</TableCell>
                   <TableCell sx={{ ...cell, minWidth: 200 }}>{t.courses || "—"}</TableCell>
                 </TableRow>
-              ))
-            ) : (
+              ))}
+            {!loading && pageRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={12} align="center" sx={{ py: 2 }}>
                   <Typography variant="body2" color="text.secondary">

@@ -190,6 +190,34 @@ const mapStaffData = (rawData) => {
   });
 };
 
+// "First Middle Last" from the Datahub citizen record
+const citizenFullName = (citizen) =>
+  [citizen.firstName, citizen.middleName, citizen.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+// Datahub sends "M" / "F": match the gender dropdown by name or first letter
+const findGenderOption = (genders, gender) => {
+  if (!gender) return null;
+  const g = String(gender).trim().toLowerCase();
+  if (!g) return null;
+  return genders.find((opt) => {
+    const name = String(opt.name || "")
+      .trim()
+      .toLowerCase();
+    return name === g || name.startsWith(g.charAt(0));
+  });
+};
+
+// dob comes as "DD/MM/YYYY" — convert to "YYYY-MM-DD" for <input type="date">
+const toInputDate = (dob) => {
+  const parts = dob.split("/");
+  if (parts.length !== 3) return dob;
+  const [day, month, year] = parts;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+};
+
 const StaffManagement = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -278,41 +306,15 @@ const StaffManagement = () => {
 
       if (citizenData && (citizenData.cid || citizenData.firstName)) {
         // Build full name including middle name if present
-        const nameParts = [
-          citizenData.firstName,
-          citizenData.middleName,
-          citizenData.lastName,
-        ].filter(Boolean);
+        setFieldValue("name", citizenFullName(citizenData));
 
-        const fullName = nameParts.join(" ").trim();
-
-        setFieldValue("name", fullName);
-
-        if (citizenData.gender) {
-          // Datahub sends "M" / "F": match the gender dropdown by its first letter
-          const g = String(citizenData.gender).trim().toLowerCase();
-          const option = genders.find(
-            (opt) =>
-              String(opt.name || "").trim().toLowerCase() === g ||
-              String(opt.name || "").trim().toLowerCase().charAt(0) === g.charAt(0),
-          );
-          if (option) {
-            setFieldValue("genderId", String(option.id));
-          }
+        const option = findGenderOption(genders, citizenData.gender);
+        if (option) {
+          setFieldValue("genderId", String(option.id));
         }
 
-        // FIXED: dob comes as "DD/MM/YYYY" — convert to "YYYY-MM-DD" for <input type="date">
         if (citizenData.dob) {
-          const parts = citizenData.dob.split("/");
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            setFieldValue(
-              "dob",
-              `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`,
-            );
-          } else {
-            setFieldValue("dob", citizenData.dob);
-          }
+          setFieldValue("dob", toInputDate(citizenData.dob));
         }
 
         toast.success("Citizen details fetched successfully");
@@ -658,6 +660,16 @@ const StaffManagement = () => {
       (s) => s === member || (member.id && String(s.id) === String(member.id)),
     );
 
+  // dropdown options for the employment / training history rows (built once, outside the rows)
+  const toOptions = (items) =>
+    items.map((item) => (
+      <MenuItem key={item.id} value={item.id.toString()}>
+        {item.name}
+      </MenuItem>
+    ));
+  const employmentTypeOptions = toOptions(employmentTypes);
+  const qualificationOptions = toOptions(qualifications);
+  const fundingSourceOptions = toOptions(fundingSources);
   return (
     <Paper elevation={3} sx={{ p: 3, m: 2 }}>
       <Typography variant="h5" gutterBottom>
@@ -709,13 +721,15 @@ const StaffManagement = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   <CircularProgress size={30} />
                 </TableCell>
               </TableRow>
-            ) : filteredStaff.length > 0 ? (
+            )}
+            {!loading &&
+              filteredStaff.length > 0 &&
               filteredStaff
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((staffMember, index) => (
@@ -757,8 +771,8 @@ const StaffManagement = () => {
                       </IconButton>
                     </TableCell>
                   </TableRow>
-                ))
-            ) : (
+                ))}
+            {!loading && filteredStaff.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   {instituteId
@@ -813,7 +827,9 @@ const StaffManagement = () => {
             )}
           </Avatar>
           <Box sx={{ flex: 1 }}>
-            <Typography sx={{ fontWeight: 700, fontSize: "1.1rem", lineHeight: 1.2 }}>
+            <Typography
+              sx={{ fontWeight: 700, fontSize: "1.1rem", lineHeight: 1.2 }}
+            >
               {editingIndex !== null ? "Edit Staff" : "Add Staff"}
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -826,7 +842,8 @@ const StaffManagement = () => {
         </DialogTitle>
         <DialogContent
           sx={{
-            bgcolor: (t) => (t.palette.mode === "dark" ? "background.default" : "#f7f9fc"),
+            bgcolor: (t) =>
+              t.palette.mode === "dark" ? "background.default" : "#f7f9fc",
             pt: "20px !important",
           }}
         >
@@ -1186,14 +1203,7 @@ const StaffManagement = () => {
                                         <MenuItem value="">
                                           Select Employment Type
                                         </MenuItem>
-                                        {employmentTypes.map((type) => (
-                                          <MenuItem
-                                            key={type.id}
-                                            value={type.id.toString()}
-                                          >
-                                            {type.name}
-                                          </MenuItem>
-                                        ))}
+                                        {employmentTypeOptions}
                                       </Field>
                                       <ErrorMessage
                                         name={`staffemploymenthistory.${idx}.employmentTypeId`}
@@ -1216,14 +1226,7 @@ const StaffManagement = () => {
                                         <MenuItem value="">
                                           Select Qualification
                                         </MenuItem>
-                                        {qualifications.map((qualification) => (
-                                          <MenuItem
-                                            key={qualification.id}
-                                            value={qualification.id.toString()}
-                                          >
-                                            {qualification.name}
-                                          </MenuItem>
-                                        ))}
+                                        {qualificationOptions}
                                       </Field>
                                       <ErrorMessage
                                         name={`staffemploymenthistory.${idx}.qualificationId`}
@@ -1250,7 +1253,7 @@ const StaffManagement = () => {
                                     <Grid item size={{ xs: 12, md: 1 }}>
                                       {idx > 0 && (
                                         <IconButton
-                                          onClick={() => remove(idx)}
+                                          onClick={remove.bind(null, idx)}
                                           sx={{
                                             color: "error.main",
                                             borderRadius: "50%",
@@ -1416,14 +1419,7 @@ const StaffManagement = () => {
                                         <MenuItem value="">
                                           Select Funding Source
                                         </MenuItem>
-                                        {fundingSources.map((source) => (
-                                          <MenuItem
-                                            key={source.id}
-                                            value={source.id.toString()}
-                                          >
-                                            {source.name}
-                                          </MenuItem>
-                                        ))}
+                                        {fundingSourceOptions}
                                       </Field>
                                       <ErrorMessage
                                         name={`stafftraininghistory.${idx}.fundingSourceId`}
@@ -1461,7 +1457,7 @@ const StaffManagement = () => {
                                     <Grid item size={{ xs: 12, md: 1 }}>
                                       {idx > 0 && (
                                         <IconButton
-                                          onClick={() => remove(idx)}
+                                          onClick={remove.bind(null, idx)}
                                           sx={{
                                             color: "error.main",
                                             borderRadius: "50%",

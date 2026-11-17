@@ -92,7 +92,8 @@ const drawLabelValue = (doc, label, value, x, y, maxWidth, lineHeight = 5) => {
   };
 
   tokens.forEach(({ text, space }) => {
-    const candidate = line ? `${line}${space ? " " : ""}${text}` : text;
+    const separator = space ? " " : "";
+    const candidate = line ? `${line}${separator}${text}` : text;
     if (doc.getTextWidth(candidate) <= x + maxWidth - lineX) {
       line = candidate;
       return;

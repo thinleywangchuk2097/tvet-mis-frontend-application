@@ -157,6 +157,13 @@ CountBarChart.propTypes = {
   horizontal: PropTypes.bool,
 };
 
+
+// NCS coverage: green from 75%, blue from 40%, otherwise orange
+const coverageColor = (pct) => {
+  if (pct >= 75) return "success";
+  return pct >= 40 ? "primary" : "warning";
+};
+
 const SQSDashboard = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -509,16 +516,18 @@ const SQSDashboard = () => {
         <Grid size={{ xs: 12, md: 7 }}>
           <Panel title="NCS by sector (top 10)">
             <Box sx={{ height: 280 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : ncsBySector.length ? (
+              )}
+              {!loading && ncsBySector.length > 0 && (
                 <CountBarChart
                   data={ncsBySector}
                   name="NCS"
                   color={theme.palette.primary.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && ncsBySector.length === 0 && (
                 <Empty text="No NCS yet" />
               )}
             </Box>
@@ -527,15 +536,17 @@ const SQSDashboard = () => {
         <Grid size={{ xs: 12, md: 5 }}>
           <Panel title="NCS by BQF certificate level">
             <Box sx={{ height: 280 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : ncsByLevel.length ? (
+              )}
+              {!loading && ncsByLevel.length > 0 && (
                 <CountBarChart
                   data={ncsByLevel}
                   name="NCS"
                   color={theme.palette.success.main}
                 />
-              ) : (
+              )}
+              {!loading && ncsByLevel.length === 0 && (
                 <Empty text="No NCS yet" />
               )}
             </Box>
@@ -569,13 +580,14 @@ const SQSDashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading ? (
+                  {loading && (
                     <TableRow>
                       <TableCell colSpan={4}>
                         <Skeleton />
                       </TableCell>
                     </TableRow>
-                  ) : sectorRows.length ? (
+                  )}
+                  {!loading && sectorRows.length > 0 && (
                     sectorRows.map((r) => (
                       <TableRow key={r.id} hover>
                         <TableCell>{r.name}</TableCell>
@@ -595,13 +607,7 @@ const SQSDashboard = () => {
                               variant="determinate"
                               value={r.pct}
                               sx={{ flex: 1, height: 6, borderRadius: 3 }}
-                              color={
-                                r.pct >= 75
-                                  ? "success"
-                                  : r.pct >= 40
-                                    ? "primary"
-                                    : "warning"
-                              }
+                              color={coverageColor(r.pct)}
                             />
                             <Typography
                               variant="caption"
@@ -613,7 +619,8 @@ const SQSDashboard = () => {
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : (
+                  )}
+                  {!loading && sectorRows.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} align="center">
                         No sectors found
@@ -649,13 +656,14 @@ const SQSDashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading ? (
+                  {loading && (
                     <TableRow>
                       <TableCell colSpan={3}>
                         <Skeleton />
                       </TableCell>
                     </TableRow>
-                  ) : attention.length ? (
+                  )}
+                  {!loading && attention.length > 0 && (
                     attention.map((n) => (
                       <TableRow key={n.id} hover>
                         <TableCell>
@@ -688,7 +696,8 @@ const SQSDashboard = () => {
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : (
+                  )}
+                  {!loading && attention.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} align="center">
                         All NCS are valid for at least 3 months

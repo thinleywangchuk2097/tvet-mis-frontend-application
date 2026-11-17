@@ -27,8 +27,6 @@ import {
   Alert,
   Chip,
   Avatar,
-  Card,
-  CardContent,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import FileOpenIcon from "@mui/icons-material/FileOpen";
@@ -720,6 +718,16 @@ const TabNavigation = ({
 
 TabNavigation.propTypes = tabNavigationPropTypes;
 
+// action dialog title per status
+const DIALOG_TITLES = {
+  [STATUS.VERIFY_QAS1]: "Verify Course Application",
+  [STATUS.VERIFY_QAS2]: "Verify Course Application",
+  [STATUS.ENDORSE_REC]: "Endorse Course Application",
+  [STATUS.APPROVE_DG]: "Approve Course Application",
+  [STATUS.REJECT]: "Reject Course Application",
+  [STATUS.REJECT_QAS2]: "Forward Back to QAS Level 1",
+};
+
 // ==================== MAIN COMPONENT ====================
 const ViewNonAccreditedCourseRegistration = () => {
   const { applicationNo } = useParams();
@@ -911,20 +919,20 @@ const ViewNonAccreditedCourseRegistration = () => {
       {roleId === "7" && (
         <>
           <Button
-                variant="contained"
-                color="success"
-                size="small"
-                startIcon={<CheckCircleIcon />}
-                onClick={() => dialogHook.openDialog(STATUS.VERIFY_QAS1)}
-                sx={{
-                  px: 3,
-                  py: 0.5,
-                  fontWeight: 600,
-                  textTransform: "none",
-                }}
-              >
-                Verify
-              </Button>
+            variant="contained"
+            color="success"
+            size="small"
+            startIcon={<CheckCircleIcon />}
+            onClick={() => dialogHook.openDialog(STATUS.VERIFY_QAS1)}
+            sx={{
+              px: 3,
+              py: 0.5,
+              fontWeight: 600,
+              textTransform: "none",
+            }}
+          >
+            Verify
+          </Button>
           <Button
             variant="contained"
             color="error"
@@ -994,21 +1002,21 @@ const ViewNonAccreditedCourseRegistration = () => {
         </Button>
       )}
       {roleId === "22" && (
-            <Button
-              variant="contained"
-              color="success"
-              size="small"
-              startIcon={<CheckCircleIcon />}
-              onClick={() => dialogHook.openDialog(STATUS.APPROVE_DG)}
-              sx={{
-                px: 3,
-                py: 0.5,
-                fontWeight: 600,
-                textTransform: "none",
-              }}
-            >
-              Approve
-            </Button>
+        <Button
+          variant="contained"
+          color="success"
+          size="small"
+          startIcon={<CheckCircleIcon />}
+          onClick={() => dialogHook.openDialog(STATUS.APPROVE_DG)}
+          sx={{
+            px: 3,
+            py: 0.5,
+            fontWeight: 600,
+            textTransform: "none",
+          }}
+        >
+          Approve
+        </Button>
       )}
     </>
   );
@@ -1282,7 +1290,6 @@ const ViewNonAccreditedCourseRegistration = () => {
               </Grid>
             </Grid>
           )}
-
         </TabNavigation>
       </Paper>
 
@@ -1294,19 +1301,7 @@ const ViewNonAccreditedCourseRegistration = () => {
         fullWidth
       >
         <DialogTitle>
-          {dialogHook.selectedStatusId === STATUS.VERIFY_QAS1
-            ? "Verify Course Application"
-            : dialogHook.selectedStatusId === STATUS.VERIFY_QAS2
-              ? "Verify Course Application"
-              : dialogHook.selectedStatusId === STATUS.ENDORSE_REC
-                ? "Endorse Course Application"
-                : dialogHook.selectedStatusId === STATUS.APPROVE_DG
-                  ? "Approve Course Application"
-                  : dialogHook.selectedStatusId === STATUS.REJECT
-                    ? "Reject Course Application"
-                    : dialogHook.selectedStatusId === STATUS.REJECT_QAS2
-                      ? "Forward Back to QAS Level 1"
-                      : "Confirm Action"}
+          {DIALOG_TITLES[dialogHook.selectedStatusId] || "Confirm Action"}
         </DialogTitle>
         <DialogContent>{getDialogContent()}</DialogContent>
         <DialogActions>

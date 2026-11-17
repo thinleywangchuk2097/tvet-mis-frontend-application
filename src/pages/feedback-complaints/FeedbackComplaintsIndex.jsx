@@ -5,7 +5,6 @@ import { toast } from "react-toastify";
 import {
   Box,
   Button,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -83,6 +82,13 @@ const searchSx = {
 };
 
 // ── Feedback (every logged-in user) ────────────────────────────────────
+// Recommend column: Yes / No pill, or "—" when not answered
+const recommendCell = (value) => {
+  if (value === true) return <Pill label="Yes" color="#2e7d32" />;
+  if (value === false) return <Pill label="No" color="#78909c" />;
+  return "—";
+};
+
 const FeedbackTab = ({ token }) => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -136,11 +142,11 @@ const FeedbackTab = ({ token }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
-              [0, 1, 2].map((i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton height={28} /></TableCell></TableRow>)
-            ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: "text.secondary" }}>No feedback yet.</TableCell></TableRow>
-            ) : (
+            {loading &&
+              [0, 1, 2].map((i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton height={28} /></TableCell></TableRow>)}
+            {!loading && filtered.length === 0 && (
+              <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: "text.secondary" }}>No feedback yet.</TableCell></TableRow>)}
+            {!loading && filtered.length > 0 &&
               filtered.slice(page * perPage, page * perPage + perPage).map((r, i) => (
                 <TableRow key={r.id}>
                   <TableCell align="center" sx={{ color: "text.secondary" }}>{page * perPage + i + 1}</TableCell>
@@ -159,11 +165,10 @@ const FeedbackTab = ({ token }) => {
                   <TableCell sx={{ color: "#33415c" }}>{r.experience}</TableCell>
                   <TableCell sx={{ color: "text.secondary" }}>{r.suggestions || "—"}</TableCell>
                   <TableCell align="center">
-                    {r.recommend === true ? <Pill label="Yes" color="#2e7d32" /> : r.recommend === false ? <Pill label="No" color="#78909c" /> : "—"}
+                    {recommendCell(r.recommend)}
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
           </TableBody>
         </Table>
       </TableContainer>
@@ -303,11 +308,11 @@ const ComplaintsTab = ({ token }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
-              [0, 1, 2].map((i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton height={28} /></TableCell></TableRow>)
-            ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: "text.secondary" }}>No complaints found.</TableCell></TableRow>
-            ) : (
+            {loading &&
+              [0, 1, 2].map((i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton height={28} /></TableCell></TableRow>)}
+            {!loading && filtered.length === 0 && (
+              <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: "text.secondary" }}>No complaints found.</TableCell></TableRow>)}
+            {!loading && filtered.length > 0 &&
               filtered.slice(page * perPage, page * perPage + perPage).map((r, i) => (
                 <TableRow key={r.id}>
                   <TableCell align="center" sx={{ color: "text.secondary" }}>{page * perPage + i + 1}</TableCell>
@@ -345,8 +350,7 @@ const ComplaintsTab = ({ token }) => {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
           </TableBody>
         </Table>
       </TableContainer>
