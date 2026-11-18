@@ -1474,7 +1474,7 @@ const CreateNcsIndex = () => {
                   );
                 })
             )}
-            {!loadingList && !(filteredData.length > 0) && (
+            {!loadingList && filteredData.length === 0 && (
               <TableRow>
                 <TableCell colSpan={10} align="center">
                   {filterSectorId

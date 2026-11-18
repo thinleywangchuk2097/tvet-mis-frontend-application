@@ -1031,7 +1031,7 @@ const ApplyTrainerToTProgram = () => {
                   );
                 })
             )}
-            {!loading && !(filteredAnnouncements.length > 0) && (
+            {!loading && filteredAnnouncements.length === 0 && (
               <TableRow>
                 <TableCell colSpan={10} align="center">
                   No TOT announcements available

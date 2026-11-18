@@ -237,7 +237,7 @@ const AdminSection = ({ fromDate, toDate, reloadTick }) => {
                       </TableCell>
                     </TableRow>
                   )}
-                  {!first && !(tasksByRole.length === 0) && (
+                  {!first && tasksByRole.length > 0 && (
                     tasksByRole.map((r) => (
                       <TableRow key={r.name} hover>
                         <TableCell>

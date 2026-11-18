@@ -89,7 +89,6 @@ const ViewSubjectIndex = () => {
     useSelector((state) => state.auth.current_roleId),
   );
   const actionId = useSelector((state) => state.auth.id);
-  const userId = useSelector((state) => state.auth.userId);
 
   const [loading, setLoading] = useState(true);
   const [subject, setSubject] = useState(null);

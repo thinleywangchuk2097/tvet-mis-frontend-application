@@ -101,6 +101,14 @@ const validationSchema = Yup.object().shape({
   enrollmentYear: Yup.string().required("Year is required"),
 });
 
+
+const DIALOG_TITLES = { add: "Enrol Student", edit: "Edit Student" };
+
+const submitLabel = (loading, dialogMode) => {
+  if (loading) return "Saving...";
+  return dialogMode === "add" ? "Enrol" : "Update";
+};
+
 const StudentEnrollmentIndex = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
@@ -459,11 +467,7 @@ const StudentEnrollmentIndex = () => {
         fullWidth
       >
         <DialogTitle>
-          {dialogMode === "add"
-            ? "Enrol Student"
-            : dialogMode === "edit"
-              ? "Edit Student"
-              : "Student Details"}
+          {DIALOG_TITLES[dialogMode] || "Student Details"}
           <IconButton
             sx={{ position: "absolute", right: 8, top: 8 }}
             onClick={() => setOpenDialog(false)}
@@ -600,11 +604,7 @@ const StudentEnrollmentIndex = () => {
                         variant="contained"
                         disabled={loading}
                       >
-                        {loading
-                          ? "Saving..."
-                          : dialogMode === "add"
-                            ? "Enrol"
-                            : "Update"}
+                        {submitLabel(loading, dialogMode)}
                       </Button>
                     </>
                   )}

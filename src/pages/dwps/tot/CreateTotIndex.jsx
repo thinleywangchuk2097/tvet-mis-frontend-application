@@ -1294,7 +1294,7 @@ const CreateTotIndex = () => {
                       </TableRow>
                     ))
                 )}
-                {!loading && !(filteredPrograms.length > 0) && (
+                {!loading && filteredPrograms.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
                       No TOT programs available. Click &quot;Create
