@@ -43,6 +43,7 @@ import CurriculumIndexService from "../../../api/services/internal/course/Curric
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
 import ApplyAccreditedCourseService from "../../../api/services/internal/course/ApplyAccreditedCourseService";
 import NcsService from "../../../api/services/internal/ncs/NcsService";
+import AddTrainerService from "../../../api/services/internal/trainer/AddTrainerService";
 
 // Helper component for required field indicator
 const RequiredStar = () => (
@@ -167,6 +168,11 @@ const AccreditedCourseRegistration = () => {
   // Curriculum Duplication Check State
   const [curriculumDuplicateError, setCurriculumDuplicateError] = useState("");
   const [checkingCurriculum, setCheckingCurriculum] = useState(false);
+
+  // Lead trainer: must be one of this institute's trainers (tbl_trainer_dtls)
+  const [leadTrainerMessage, setLeadTrainerMessage] = useState("");
+  const [checkingLeadTrainer, setCheckingLeadTrainer] = useState(false);
+  const latestLeadCid = useRef("");
 
   // Formik ref for auto-fill functionality
   const formikRef = useRef(null);
@@ -609,6 +615,44 @@ const AccreditedCourseRegistration = () => {
 
   const handleRenewal = (course) => openCourseDialog(course, "renewal");
 
+  // 11-digit CID typed: fill the lead trainer from the institute's trainer list
+  const lookupLeadTrainer = async (cid, formik) => {
+    latestLeadCid.current = cid;
+    setLeadTrainerMessage("");
+    if (!/^\d{11}$/.test(cid)) {
+      setCheckingLeadTrainer(false);
+      return;
+    }
+    setCheckingLeadTrainer(true);
+    const instituteId =
+      formik.values.instituteId || instituteDetails?.institute_id;
+    const response = await AddTrainerService.findInstituteTrainer(
+      cid,
+      instituteId,
+      access_token,
+    );
+    if (latestLeadCid.current !== cid) return; // a newer CID was typed
+    setCheckingLeadTrainer(false);
+
+    const result = response?.data;
+    if (result?.found) {
+      const trainer = result.data || {};
+      formik.setFieldValue("leadTrainerName", trainer.name || "");
+      formik.setFieldValue("genderId", trainer.genderId ?? "");
+      formik.setFieldValue("qualificationId", trainer.qualificationId ?? "");
+      formik.setFieldValue(
+        "professionalExperience",
+        trainer.workExperience || "",
+      );
+      return;
+    }
+    setLeadTrainerMessage(
+      result?.message ||
+        response?.response?.data?.message ||
+        "Could not check the trainer. Please try again.",
+    );
+  };
+
   const handleAdd = () => {
     setSelectedCourse(null);
     setDialogMode("add");
@@ -618,6 +662,8 @@ const AccreditedCourseRegistration = () => {
     setSelectedCurriculumDetails(null);
     setProgrammeTitle("");
     setCurriculumDuplicateError("");
+    setLeadTrainerMessage("");
+    latestLeadCid.current = "";
     setOpenDialog(true);
   };
 
@@ -998,6 +1044,14 @@ const AccreditedCourseRegistration = () => {
     files: Yup.array().min(1, "Upload at least one document"),
   });
 
+  // The service returns the axios error instead of throwing it.
+  // 409 = lead trainer is not this institute's trainer: also shown under the CID.
+  const showSubmitError = (response) => {
+    const message = response?.response?.data?.message;
+    if (response?.status === 409) setLeadTrainerMessage(message || "");
+    toast.error(message || response?.message || "Failed to submit application");
+  };
+
   const handleSubmit = async (values, { resetForm, setSubmitting }) => {
     // Final check before submission
     if (curriculumDuplicateError) {
@@ -1061,7 +1115,7 @@ const AccreditedCourseRegistration = () => {
           setCurriculumDuplicateError("");
           setOpenDialog(false);
         } else {
-          toast.error(response.message || "Failed to submit application");
+          showSubmitError(response);
         }
       } else if (dialogMode === "renewal") {
         const documents = await Promise.all(
@@ -1942,15 +1996,20 @@ const AccreditedCourseRegistration = () => {
                         name="leadTrainerCidNo"
                         size="small"
                         value={formik.values.leadTrainerCidNo}
-                        onChange={formik.handleChange}
+                        onChange={(e) => {
+                          formik.handleChange(e);
+                          lookupLeadTrainer(e.target.value.trim(), formik);
+                        }}
                         onBlur={formik.handleBlur}
                         error={
-                          formik.touched.leadTrainerCidNo &&
-                          Boolean(formik.errors.leadTrainerCidNo)
+                          !!leadTrainerMessage ||
+                          (formik.touched.leadTrainerCidNo &&
+                            Boolean(formik.errors.leadTrainerCidNo))
                         }
                         helperText={
-                          formik.touched.leadTrainerCidNo &&
-                          formik.errors.leadTrainerCidNo
+                          leadTrainerMessage ||
+                          (formik.touched.leadTrainerCidNo &&
+                            formik.errors.leadTrainerCidNo)
                         }
                         slotProps={{
                           input: {
@@ -2232,6 +2291,8 @@ const AccreditedCourseRegistration = () => {
                         formik.values.files.length === 0 ||
                         !!curriculumDuplicateError ||
                         checkingCurriculum ||
+                        !!leadTrainerMessage ||
+                        checkingLeadTrainer ||
                         // role 12 needs an NCS programme, others a curriculum
                         (isRole12
                           ? !formik.values.ncsId

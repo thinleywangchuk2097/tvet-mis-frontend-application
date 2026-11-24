@@ -8,6 +8,14 @@ class InstituteProposalService {
       .catch((error) => error);
   }
 
+  // { exists, message }: is this proposed institute name already used by another proposal?
+  checkDuplicateName(name) {
+    return apiClient
+      .get(`/api/v1/public/institute-proposal/check-name`, { params: { name } })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getInstituteProposalByApplicationNo(application_no, token) {
     return apiClient
       .get(

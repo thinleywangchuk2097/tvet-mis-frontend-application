@@ -5,7 +5,7 @@ FROM node:22-alpine3.22 AS builder
 
 # Pin npm to a specific version (reproducible) and install without scripts.
 ARG NPM_VERSION=10.9.2
-RUN npm install -g npm@${NPM_VERSION} --ignore-scripts \
+RUN npm install --ignore-scripts --global "npm@${NPM_VERSION}" \
  && npm cache clean --force
 
 WORKDIR /app

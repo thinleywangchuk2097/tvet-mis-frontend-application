@@ -30,6 +30,7 @@ import SummaryTable from "./SummaryTable";
 import {
   TABLE_STYLE,
   computeCriteriaScore,
+  MIN_CRITERIA_PERCENT,
   computeSummary,
   formatScore,
   getPointOptions,
@@ -173,7 +174,12 @@ const QualityStandardsTabs = ({
               />
               <Chip
                 size="small"
-                color="success"
+                label={`Minimum (${MIN_CRITERIA_PERCENT}%): ${formatScore(stats.minScore)}`}
+                variant="outlined"
+              />
+              <Chip
+                size="small"
+                color={stats.meetsMinimum ? "success" : "error"}
                 label={`Score: ${formatScore(stats.score)}`}
               />
             </Stack>
@@ -194,6 +200,16 @@ const QualityStandardsTabs = ({
               sx={{ height: 6, borderRadius: 3 }}
             />
           </Box>
+          {!isVerification &&
+            stats.answered === stats.total &&
+            !stats.meetsMinimum && (
+              <Alert severity="error" sx={{ mt: 1.5 }}>
+                This criteria scores {formatScore(stats.score)}, below the
+                minimum of {formatScore(stats.minScore)} ({MIN_CRITERIA_PERCENT}%
+                of {item.weight}). The report cannot be submitted until every
+                criteria reaches its minimum.
+              </Alert>
+            )}
         </Paper>
 
         {/* Checklist */}

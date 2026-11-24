@@ -1,25 +1,29 @@
-import ExcelJS from "exceljs";
+import writeXlsxFile from "write-excel-file/universal";
 import { saveAs } from "file-saver";
 
-export const exportToExcel = async (data, fileName = "Report") => {
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet("Sheet1");
-
-  // Add headers and data
-  if (data && data.length > 0) {
-    const headers = Object.keys(data[0]);
-    worksheet.addRow(headers);
-
-    data.forEach((item) => {
-      worksheet.addRow(headers.map((header) => item[header] ?? ""));
-    });
+// numbers, booleans, text and dates are kept as they are; anything else becomes text
+const toCell = (value) => {
+  if (value === null || value === undefined) return "";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value instanceof Date
+  ) {
+    return value;
   }
+  return String(value);
+};
 
-  const buffer = await workbook.xlsx.writeBuffer();
+export const exportToExcel = async (data, fileName = "Report") => {
+  // Sheet1: column names in the first row, then one row per record
+  const headers = data && data.length > 0 ? Object.keys(data[0]) : [];
+  const sheetData =
+    headers.length > 0
+      ? [headers, ...data.map((item) => headers.map((h) => toCell(item[h])))]
+      : [[""]];
 
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const blob = await writeXlsxFile(sheetData, { sheet: "Sheet1" }).toBlob();
 
   saveAs(blob, `${fileName}.xlsx`);
 };

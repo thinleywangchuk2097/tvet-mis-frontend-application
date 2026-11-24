@@ -174,8 +174,17 @@ const extractCitizenName = (payload) => {
   return "";
 };
 
+
+// heading of the profile section: SES centre, assessment centre (35) or training provider
+const profileTitle = (isSES, serviceId) => {
+  if (isSES) return "Supplementary Education Service Centre Profile";
+  return Number(serviceId) === 35 ? "Assessment Center Profile" : "Training Provider Profile";
+};
+
 const InstituteSesCentreAssessmentCentreProposal = () => {
   const [loading, setLoading] = useState(false);
+  // set when the proposed institute name is already used by another proposal
+  const [nameTakenMessage, setNameTakenMessage] = useState("");
 
   // ✅ Per-field loading state instead of a single shared boolean
   const [fetchingCitizen, setFetchingCitizen] = useState({
@@ -448,6 +457,9 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
 
         const response =
           await InstituteProposalService.submitInstituteProposal(payload);
+        if (response.status === 409) {
+          setNameTakenMessage(response.response?.data?.message || "");
+        }
         if (response.status == 201) {
           toast.success(
             `${serviceName} form submitted successfully! Application No: ${response.data.applicationNo}`,
@@ -456,7 +468,11 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
           resetForm();
           navigate("/");
         } else {
-          toast.error("Submission failed. Please try again.");
+          // e.g. 409: the proposed institute name is already used
+          toast.error(
+            response?.response?.data?.message ||
+              "Submission failed. Please try again.",
+          );
         }
       } catch (error) {
         toast.error(error.message || "Submission failed");
@@ -465,6 +481,23 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       }
     },
   });
+
+  // while typing: ~0.6 s after the user stops, check whether another proposal already uses the name
+  const proposedName = formik.values.proposedInstituteName;
+  useEffect(() => {
+    const name = proposedName?.trim();
+    setNameTakenMessage("");
+    if (!name) return undefined;
+    let cancelled = false; // ignore the answer if the user typed again meanwhile
+    const timer = setTimeout(async () => {
+      const res = await InstituteProposalService.checkDuplicateName(name);
+      if (!cancelled) setNameTakenMessage(res?.data?.exists ? res.data.message : "");
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [proposedName]);
 
   const isOthersType = () => formik.values.ownershipTypeId === "2";
 
@@ -1044,11 +1077,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
             }}
           >
             <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-              {isSES
-                ? "Supplementary Education Service Centre Profile"
-                : Number(serviceId) === 35
-                  ? "Assessment Center Profile"
-                  : "Training Provider Profile"}
+              {profileTitle(isSES, serviceId)}
             </Typography>
             <Divider sx={{ mb: 3 }} />
             <Grid container spacing={3}>
@@ -1062,16 +1091,18 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   error={
-                    formik.touched.proposedInstituteName &&
-                    Boolean(formik.errors.proposedInstituteName)
+                    Boolean(nameTakenMessage) ||
+                    (formik.touched.proposedInstituteName &&
+                      Boolean(formik.errors.proposedInstituteName))
                   }
                   helperText={
-                    formik.touched.proposedInstituteName &&
-                    formik.errors.proposedInstituteName &&
-                    String(formik.errors.proposedInstituteName).replace(
-                      DEFAULT_PROPOSED_NAME_LABEL,
-                      proposedNameLabel,
-                    )
+                    nameTakenMessage ||
+                    (formik.touched.proposedInstituteName &&
+                      formik.errors.proposedInstituteName &&
+                      String(formik.errors.proposedInstituteName).replace(
+                        DEFAULT_PROPOSED_NAME_LABEL,
+                        proposedNameLabel,
+                      ))
                   }
                 />
               </Grid>

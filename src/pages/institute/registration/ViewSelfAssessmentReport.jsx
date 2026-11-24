@@ -91,22 +91,22 @@ const STAGE_ACTIONS = {
 
 const ACTION_TEXT = {
   [SAR_STATUS.VERIFIED]: {
-    title: "Verify Self Assessment Report",
+    title: "Verify TVET Provider Accreditation Report",
     verb: "verify",
     done: "Report verified successfully",
   },
   [SAR_STATUS.ENDORSED]: {
-    title: "Endorse Self Assessment Report",
+    title: "Endorse TVET Provider Accreditation Report",
     verb: "endorse",
     done: "Report endorsed successfully",
   },
   [SAR_STATUS.APPROVED]: {
-    title: "Approve Self Assessment Report",
+    title: "Approve TVET Provider Accreditation Report",
     verb: "approve",
     done: "Report approved successfully",
   },
   [SAR_STATUS.REJECTED]: {
-    title: "Reject Self Assessment Report",
+    title: "Reject TVET Provider Accreditation Report",
     verb: "reject",
     done: "Report rejected successfully",
   },
@@ -352,7 +352,7 @@ const ViewSelfAssessmentReport = () => {
       await Promise.all([fetchReportDetails(), fetchQualityStandards()]);
     } catch (error) {
       console.error("Error fetching report data:", error);
-      toast.error("Failed to load Self Assessment Report");
+      toast.error("Failed to load TVET Provider Accreditation Report");
     } finally {
       setLoading(false);
     }
@@ -594,14 +594,14 @@ const ViewSelfAssessmentReport = () => {
       } else {
         toast.error(
           response.response?.data?.message ||
-            "Failed to process Self Assessment Report",
+            "Failed to process TVET Provider Accreditation Report",
         );
       }
     } catch (error) {
       console.error("Error performing action:", error);
       toast.error(
         error.response?.data?.message ||
-          "Failed to process Self Assessment Report",
+          "Failed to process TVET Provider Accreditation Report",
       );
     } finally {
       setActionLoading(false);
@@ -634,10 +634,10 @@ const ViewSelfAssessmentReport = () => {
       <Box sx={{ m: 3 }}>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-            Self Assessment Report
+            TVET Provider Accreditation Report
           </Typography>
           <Alert severity="error">
-            Self Assessment Report with Application No:{" "}
+            TVET Provider Accreditation Report with Application No:{" "}
             <strong>{applicationNo}</strong> not found
           </Alert>
         </Paper>
@@ -660,7 +660,7 @@ const ViewSelfAssessmentReport = () => {
         >
           <Box>
             <Typography variant="h6" fontWeight={700}>
-              Self Assessment Report - TVET Provider Accreditation
+              TVET Provider Accreditation Report - TVET Provider Accreditation
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Application No: <strong>{applicationNo}</strong> ·{" "}
@@ -690,6 +690,12 @@ const ViewSelfAssessmentReport = () => {
                 fontWeight: 700,
               }}
             />
+            {summary.grade.renewalYears && (
+              <Chip
+                label={`Renewal: every ${summary.grade.renewalYears} years`}
+                variant="outlined"
+              />
+            )}
           </Stack>
         </Stack>
         <Divider />
@@ -900,7 +906,10 @@ const ViewSelfAssessmentReport = () => {
             <br />
             <strong>
               Score: {formatScore(summary.totalScore)} / {summary.totalWeight} (
-              {summary.grade.grade})
+              {summary.grade.grade}
+              {summary.grade.renewalYears &&
+                `, renewal every ${summary.grade.renewalYears} years`}
+              )
             </strong>
           </DialogContentText>
           <TextField

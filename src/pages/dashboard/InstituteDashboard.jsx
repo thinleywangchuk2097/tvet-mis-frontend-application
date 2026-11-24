@@ -272,7 +272,8 @@ const InstituteDashboard = () => {
     value: Number(g.value) || 0,
   }));
   const genderTotal = gender.reduce((s, g) => s + g.value, 0);
-  const monthly = data?.monthlyEnrollments || [];
+  // enrolment chart: per day for the last 1 month
+  const monthly = data?.dailyEnrollments || [];
   const perMonth = data?.programmesPerMonth || [];
   const hasMonthly = monthly.some((x) => Number(x.value) > 0);
   const hasPerMonth = perMonth.some((x) => Number(x.value) > 0);
@@ -538,7 +539,7 @@ const InstituteDashboard = () => {
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item size={{ xs: 12, md: 8 }}>
           <Card
-            title="Trainee enrolments — last 12 months"
+            title="Trainee enrolments — last 1 month"
             action={
               <Chip size="small" variant="outlined" label={`${fmtNum(m.trainees)} total`} />
             }
@@ -580,7 +581,7 @@ const InstituteDashboard = () => {
                 </ResponsiveContainer>
               )}
               {!initialLoading && !hasMonthly && (
-                <EmptyChart text="No enrolments in the last 12 months" />
+                <EmptyChart text="No enrolments in the last 1 month" />
               )}
             </Box>
           </Card>

@@ -157,6 +157,7 @@ const useDropdownData = () => {
     genders,
     occupations,
     selectedSectorId,
+    setSelectedSectorId,
     fetchDropdownData,
     fetchOccupationsBySector,
     handleSectorChange,
@@ -667,7 +668,8 @@ const AssessorAccreditorQMSAuditorRenewal = () => {
           values.documents.map((file) => fileToBase64(file)),
         );
 
-        const submitData = { ...values, documents };
+        // renewal: true -> the backend allows it for an already approved registration
+        const submitData = { ...values, documents, renewal: true };
         if (hasCitizenId === "yes") delete submitData.referenceNo;
         else delete submitData.citizenId;
 
@@ -705,6 +707,9 @@ const AssessorAccreditorQMSAuditorRenewal = () => {
           setHasCitizenId("yes");
           applicant.resetApplicantDetails();
           navigate("/");
+        } else {
+          // e.g. 409: a renewal for this CID is already in process
+          toast.error(response?.response?.data?.message || "Submission failed");
         }
       } catch (error) {
         console.error("Submission error:", error);

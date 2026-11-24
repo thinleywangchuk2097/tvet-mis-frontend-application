@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import {
   Paper,
@@ -27,31 +27,18 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
+  Switch,
   FormControl,
   FormLabel,
-  InputAdornment,
+  Divider,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import SearchIcon from "@mui/icons-material/Search";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
-import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
-import SaveIcon from "@mui/icons-material/Save";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import EmailIcon from "@mui/icons-material/Email";
-import PhoneIcon from "@mui/icons-material/Phone";
-import SchoolIcon from "@mui/icons-material/School";
-import CloseIcon from "@mui/icons-material/Close";
 import FileUpload from "../../components/file/FileUpload";
 import { Formik, Form, FieldArray } from "formik";
 import { useSelector } from "react-redux";
@@ -75,73 +62,75 @@ RequiredLabel.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
-// Form section heading with icon
-const SectionHeader = ({ icon, title, first }) => (
-  <Box
-    sx={{
-      display: "flex",
-      alignItems: "center",
-      gap: 1,
-      mt: first ? 0 : 3.5,
-      mb: 2,
-      pb: 1,
-      borderBottom: "1px solid",
-      borderColor: "divider",
-    }}
-  >
-    <Avatar
-      sx={{
-        width: 28,
-        height: 28,
-        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
-        color: "primary.main",
-        "& svg": { fontSize: 17 },
-      }}
-    >
-      {icon}
-    </Avatar>
-    <Typography variant="subtitle1" fontWeight={600}>
-      {title}
-    </Typography>
-  </Box>
-);
-
-SectionHeader.propTypes = {
-  icon: PropTypes.node,
-  title: PropTypes.string.isRequired,
-  first: PropTypes.bool,
+// Table style (same as the Non-BQF programme list)
+const TABLE_STYLE = {
+  border: "1px solid",
+  borderColor: "divider",
+  "& th, & td": {
+    border: "1px solid",
+    borderColor: "divider",
+  },
 };
 
-// Small summary tile for the page header
-const StatTile = ({ label, value, color }) => (
-  <Box
-    sx={{
-      px: 2,
-      py: 1,
-      borderRadius: 2,
-      border: "1px solid",
-      borderColor: "divider",
-      bgcolor: "background.paper",
-      minWidth: 96,
-    }}
-  >
-    <Typography
-      variant="h6"
-      fontWeight={700}
-      sx={{ lineHeight: 1.2, color: color || "text.primary" }}
-    >
-      {value}
+const SEARCH_FIELD_SX = {
+  "& .MuiOutlinedInput-root": {
+    height: "36px",
+    "& input": { padding: "8px 12px" },
+    "& fieldset": { borderRadius: "4px" },
+  },
+};
+
+// Active (green) / Inactive (grey) chip, sized like the programme status chips
+const statusChipSx = (active) => ({
+  backgroundColor: active ? "#4caf50" : "#9e9e9e",
+  color: "white",
+  fontWeight: "medium",
+  minWidth: "100px",
+  "& .MuiChip-label": { px: 1.5, py: 0.5 },
+});
+
+// Bordered form section with a bold title and divider
+const FormSection = ({ title, children }) => (
+  <Paper sx={{ p: 3, mb: 3, border: "1px solid", borderColor: "divider" }}>
+    <Typography fontWeight={600} gutterBottom>
+      {title}
     </Typography>
-    <Typography variant="caption" color="text.secondary" noWrap>
-      {label}
-    </Typography>
-  </Box>
+    <Divider sx={{ mb: 2 }} />
+    {children}
+  </Paper>
 );
 
-StatTile.propTypes = {
-  label: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
-  color: PropTypes.string,
+FormSection.propTypes = {
+  title: PropTypes.string.isRequired,
+  children: PropTypes.node,
+};
+
+// "n course(s)" with the course names in a tooltip
+const CoursesCell = ({ courses, getCourseTypeName }) => {
+  if (!courses?.length) return "-";
+  return (
+    <Tooltip
+      arrow
+      title={
+        <Box>
+          {courses.map((course) => (
+            <div key={`${course.courseTypeId}-${course.courseId}`}>
+              {getCourseTypeName(course.courseTypeId)}: {course.courseName}
+            </div>
+          ))}
+        </Box>
+      }
+    >
+      <span>
+        {courses.length} course{courses.length === 1 ? "" : "s"}
+      </span>
+    </Tooltip>
+  );
+};
+
+CoursesCell.propTypes = {
+  courses: PropTypes.array,
+  getCourseTypeName: PropTypes.func.isRequired,
 };
 
 const DIALOG_TITLES = { add: "Add New Trainer", edit: "Edit Trainer Details" };
@@ -171,6 +160,10 @@ const AddTrainerIndex = () => {
   const [dialogMode, setDialogMode] = useState("add");
   const [selectedTrainer, setSelectedTrainer] = useState(null);
   const [loading, setLoading] = useState(false);
+  // shown under the CID / Work Permit field when the trainer can't be added (see checkTrainerConflict)
+  const [idConflictMessage, setIdConflictMessage] = useState("");
+  const idCheckTimer = useRef(null);
+  const latestIdCheck = useRef("");
   const [genders, setGenders] = useState([]);
   const [academicQualifications, setAcademicQualifications] = useState([]);
   const [employmentTypes, setEmploymentTypes] = useState([]);
@@ -302,6 +295,7 @@ const AddTrainerIndex = () => {
       mobileNo: trainer.mobile_no,
       specialization: trainer.specialization || "",
       description: trainer.description || "",
+      active: trainer.is_active || "Y",
       joiningDate: trainer.joining_date,
       files: trainer.files || [],
       courses: coursesWithNames,
@@ -476,13 +470,42 @@ const AddTrainerIndex = () => {
   const handleEdit = (trainer) => {
     setSelectedTrainer(trainer);
     setDialogMode("edit");
+    setIdConflictMessage("");
     setOpenDialog(true);
   };
 
   const handleAdd = () => {
     setSelectedTrainer(null);
     setDialogMode("add");
+    setIdConflictMessage("");
     setOpenDialog(true);
+  };
+
+  // ~0.6 s after typing stops: is this CID / work permit no already in our institute,
+  // or still active at another institute?
+  const scheduleIdCheck = ({ citizenId, workPermitNo }, excludeId) => {
+    clearTimeout(idCheckTimer.current);
+    setIdConflictMessage("");
+    const cid = citizenId?.trim() || "";
+    const wp = workPermitNo?.trim() || "";
+    const key = `${cid}|${wp}`;
+    latestIdCheck.current = key;
+    if ((!cid && !wp) || !instituteId) return;
+    idCheckTimer.current = setTimeout(async () => {
+      const res = await AddTrainerService.checkTrainerConflict(
+        {
+          citizenId: cid || undefined,
+          workPermitNo: wp || undefined,
+          instituteId,
+          excludeId: excludeId || undefined,
+        },
+        access_token,
+      );
+      // ignore the answer if the user typed again meanwhile
+      if (latestIdCheck.current === key) {
+        setIdConflictMessage(res?.data?.exists ? res.data.message : "");
+      }
+    }, 600);
   };
 
   const handleDeleteClick = (trainer) => {
@@ -542,6 +565,7 @@ const AddTrainerIndex = () => {
         specialization: selectedTrainer.specialization || "",
         joiningDate: selectedTrainer.joiningDate || "",
         description: selectedTrainer.description || "",
+        active: selectedTrainer.active || "Y",
         files: selectedTrainer.files || [],
         courses: selectedTrainer.courses || [],
       };
@@ -561,6 +585,7 @@ const AddTrainerIndex = () => {
       specialization: "",
       joiningDate: new Date().toISOString().split("T")[0],
       description: "",
+      active: "Y",
       files: [],
       courses: [],
     };
@@ -662,6 +687,7 @@ const AddTrainerIndex = () => {
         specialization: values.specialization,
         joiningDate: values.joiningDate,
         description: values.description || null,
+        active: values.active || "Y", // Y = active, N = inactive
         instituteId: instituteId,
         createdBy: actionId,
         updatedBy: actionId,
@@ -679,12 +705,7 @@ const AddTrainerIndex = () => {
           resetForm();
           setOpenDialog(false);
         } else {
-          // The service returns the axios error instead of throwing it
-          toast.error(
-            response?.response?.data?.message ||
-              response?.data?.message ||
-              "Failed to add trainer",
-          );
+          showSaveError(response, "Failed to add trainer");
         }
       } else if (dialogMode === "edit") {
         response = await AddTrainerService.updateTrainer(payload, access_token);
@@ -695,11 +716,7 @@ const AddTrainerIndex = () => {
           await fetchTrainers(instituteId);
           setOpenDialog(false);
         } else {
-          toast.error(
-            response?.response?.data?.message ||
-              response?.data?.message ||
-              "Failed to update trainer",
-          );
+          showSaveError(response, "Failed to update trainer");
         }
       }
     } catch (error) {
@@ -709,6 +726,15 @@ const AddTrainerIndex = () => {
       setLoading(false);
       setSubmitting(false);
     }
+  };
+
+  // The service returns the axios error instead of throwing it.
+  // 409 (CID / work permit taken) is also shown under the field.
+  const showSaveError = (response, fallback) => {
+    const message =
+      response?.response?.data?.message || response?.data?.message;
+    if (response?.status === 409) setIdConflictMessage(message || "");
+    toast.error(message || fallback);
   };
 
   const handleReset = (resetForm) => {
@@ -723,16 +749,6 @@ const AddTrainerIndex = () => {
     return trainer.workPermitNo;
   };
 
-  const getInitials = (name) => {
-    if (!name) return "T";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   const getCourseTypeName = (courseTypeId) => {
     const courseType = courseTypes.find(
       (type) => String(type.id) === String(courseTypeId),
@@ -743,15 +759,9 @@ const AddTrainerIndex = () => {
   if (!isDataLoaded) {
     return (
       <Paper
-        elevation={0}
-        sx={{
-          p: 6,
-          m: 1.25,
-          textAlign: "center",
-          borderRadius: 3,
-          border: "1px solid",
-          borderColor: "divider",
-        }}
+        elevation={3}
+        style={{ padding: 20, margin: 10 }}
+        sx={{ textAlign: "center" }}
       >
         <CircularProgress />
         <Typography variant="body1" sx={{ mt: 2 }}>
@@ -764,15 +774,9 @@ const AddTrainerIndex = () => {
   if (!instituteId && trainers.length === 0 && !loading) {
     return (
       <Paper
-        elevation={0}
-        sx={{
-          p: 6,
-          m: 1.25,
-          textAlign: "center",
-          borderRadius: 3,
-          border: "1px solid",
-          borderColor: "divider",
-        }}
+        elevation={3}
+        style={{ padding: 20, margin: 10 }}
+        sx={{ textAlign: "center" }}
       >
         <CircularProgress />
         <Typography variant="body1" sx={{ mt: 2 }}>
@@ -781,56 +785,6 @@ const AddTrainerIndex = () => {
       </Paper>
     );
   }
-
-  // Header summary
-  const employmentCounts = employmentTypes
-    .map((et) => ({
-      name: et.name,
-      count: trainers.filter(
-        (t) => String(t.employmentTypeId) === String(et.id),
-      ).length,
-    }))
-    .filter((e) => e.count > 0);
-  const withCourses = trainers.filter((t) => t.courses?.length > 0).length;
-
-  const employmentChipColor = (name = "") => {
-    const n = name.toLowerCase();
-    if (n.includes("full")) return "primary";
-    if (n.includes("part")) return "warning";
-    if (n.includes("contract")) return "info";
-    return "default";
-  };
-
-  const headCellSx = {
-    fontWeight: 600,
-    color: "text.secondary",
-    textTransform: "uppercase",
-    fontSize: "0.72rem",
-    letterSpacing: 0.4,
-    bgcolor: "#fafafa",
-    py: 0.75,
-    whiteSpace: "nowrap",
-  };
-
-  // bordered, compact table (every cell outlined)
-  const borderedTableSx = {
-    borderCollapse: "collapse",
-    "& th, & td": {
-      border: "1px solid",
-      borderColor: "divider",
-      px: 1,
-      fontSize: "0.8rem",
-      lineHeight: 1.3,
-      verticalAlign: "middle",
-    },
-    "& td": { py: 0.5 },
-    // keep cell content compact too
-    "& td .MuiTypography-body2": { fontSize: "0.8rem" },
-    "& td .MuiTypography-caption": { fontSize: "0.7rem" },
-    "& td .MuiChip-root": { height: 22, fontSize: "0.7rem" },
-    "& td .MuiChip-icon": { fontSize: 14 },
-    "& td .MuiIconButton-root": { p: 0.4 },
-  };
 
   const courseTypeOptions = courseTypes.map((type) => (
     <MenuItem key={type.id} value={type.id}>
@@ -846,320 +800,129 @@ const AddTrainerIndex = () => {
     ));
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: { xs: 2, md: 3 },
-        m: 1.25,
-        borderRadius: 3,
-        border: "1px solid",
-        borderColor: "divider",
-      }}
-    >
-      {/* Page header */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: { xs: "flex-start", md: "center" },
-          gap: 2,
-          flexWrap: "wrap",
-          mb: 3,
-        }}
-      >
-        <Avatar
-          sx={{
-            width: 48,
-            height: 48,
-            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
-            color: "primary.main",
-          }}
-        >
-          <GroupsOutlinedIcon />
-        </Avatar>
-        <Box sx={{ flex: 1, minWidth: 220 }}>
-          <Typography variant="h5" fontWeight={600}>
-            Trainer Management
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Register your institute&apos;s trainers and the courses they teach.
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-          <StatTile label="Total trainers" value={trainers.length} />
-          {employmentCounts.map((e) => (
-            <StatTile key={e.name} label={e.name} value={e.count} />
-          ))}
-          <StatTile
-            label="With courses"
-            value={withCourses}
-            color="success.main"
-          />
-        </Box>
-      </Box>
+    <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
+      <Typography variant="h5" gutterBottom>
+        List of Trainers
+      </Typography>
 
-      {/* Toolbar */}
-      <Box
-        sx={{
-          display: "flex",
-          gap: 1.5,
-          alignItems: "center",
-          flexWrap: "wrap",
-          mb: 2,
-        }}
+      {/* Search + Add Button */}
+      <Grid
+        container
+        spacing={1}
+        alignItems="center"
+        sx={{ justifyContent: "flex-end", mb: 2 }}
       >
-        <TextField
-          size="small"
-          placeholder="Search by name, CID / work permit, email, qualification or specialization"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(0);
-          }}
-          sx={{ flex: 1, minWidth: 260, maxWidth: 520 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-        <Box sx={{ flex: 1 }} />
-        <Button
-          variant="contained"
-          startIcon={<PersonAddIcon />}
-          onClick={handleAdd}
-          sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-        >
-          Add Trainer
-        </Button>
-      </Box>
+        <Grid item size={{ xs: 12, md: 4 }}>
+          <TextField
+            label="Search"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+            sx={SEARCH_FIELD_SX}
+          />
+        </Grid>
+        <Grid item size={{ xs: 12, md: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={handleAdd}
+            sx={{ height: "36px" }}
+          >
+            Add Trainer
+          </Button>
+        </Grid>
+      </Grid>
 
       {/* Trainer table */}
-      <TableContainer
-        sx={{
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 2,
-        }}
-      >
-        <Table size="small" stickyHeader sx={borderedTableSx}>
+      <TableContainer component={Paper} elevation={1}>
+        <Table size="small" sx={TABLE_STYLE}>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ ...headCellSx, width: 48 }}>#</TableCell>
-              <TableCell sx={headCellSx}>Trainer</TableCell>
-              <TableCell sx={headCellSx}>Contact</TableCell>
-              <TableCell sx={headCellSx}>Qualification</TableCell>
-              <TableCell sx={headCellSx} align="center">
-                Experience
-              </TableCell>
-              <TableCell sx={headCellSx}>Employment</TableCell>
-              <TableCell sx={headCellSx}>Courses</TableCell>
-              <TableCell sx={{ ...headCellSx, width: 130 }} align="center">
-                Actions
-              </TableCell>
+              <TableCell>#</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>CID / Work Permit No.</TableCell>
+              <TableCell>Gender</TableCell>
+              <TableCell>Qualification</TableCell>
+              <TableCell>Specialization</TableCell>
+              <TableCell>Experience (Yrs)</TableCell>
+              <TableCell>Employment Type</TableCell>
+              <TableCell>Mobile No.</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Courses</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell align="center">Action</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredTrainers.length > 0 ? (
-              filteredTrainers
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((trainer, index) => (
-                  <TableRow key={trainer.id} hover sx={{ "& td": { py: 0.5 } }}>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {index + 1 + page * rowsPerPage}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Avatar
-                          sx={{
-                            width: 28,
-                            height: 28,
-                            fontSize: "0.72rem",
-                            bgcolor: "primary.main",
-                          }}
-                        >
-                          {getInitials(trainer.name)}
-                        </Avatar>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="body2" fontWeight={600}>
-                            {trainer.name}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ fontFamily: "monospace" }}
-                          >
-                            {getTrainerDisplayId(trainer) || "-"}
-                            {trainer.genderName
-                              ? ` • ${trainer.genderName}`
-                              : ""}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.75,
-                        }}
-                      >
-                        <EmailIcon
-                          sx={{ fontSize: 14, color: "text.secondary" }}
-                        />
-                        <Typography variant="body2">
-                          {trainer.email || "—"}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.75,
-                        }}
-                      >
-                        <PhoneIcon
-                          sx={{ fontSize: 14, color: "text.secondary" }}
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          {trainer.mobileNo || "—"}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {trainer.qualificationName || "—"}
-                      </Typography>
-                      {trainer.specialization && (
-                        <Typography variant="caption" color="text.secondary">
-                          {trainer.specialization}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        label={`${trainer.workExperience || 0} yrs`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {trainer.employmentTypeName ? (
-                        <Chip
-                          label={trainer.employmentTypeName}
-                          size="small"
-                          color={employmentChipColor(
-                            trainer.employmentTypeName,
-                          )}
-                          variant="outlined"
-                          sx={{ textTransform: "capitalize" }}
-                        />
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {trainer.courses && trainer.courses.length > 0 ? (
-                        <Tooltip
-                          arrow
-                          title={
-                            <Box>
-                              {trainer.courses.map((course) => (
-                                <div
-                                  key={`${course.courseTypeId}-${course.courseId}`}
-                                >
-                                  {getCourseTypeName(course.courseTypeId)}:{" "}
-                                  {course.courseName}
-                                </div>
-                              ))}
-                            </Box>
-                          }
-                        >
-                          <Chip
-                            size="small"
-                            color="success"
-                            variant="outlined"
-                            icon={<MenuBookOutlinedIcon />}
-                            label={`${trainer.courses.length} course${
-                              trainer.courses.length === 1 ? "" : "s"
-                            }`}
-                          />
-                        </Tooltip>
-                      ) : (
-                        <Typography variant="caption" color="text.disabled">
-                          None assigned
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                      <Tooltip title="View details">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleView(trainer)}
-                          sx={{ color: "info.main" }}
-                        >
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit trainer">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEdit(trainer)}
-                          sx={{ color: "primary.main" }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete trainer">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteClick(trainer)}
-                          sx={{ color: "error.main" }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-            ) : (
+            {filteredTrainers
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((trainer, index) => (
+                <TableRow key={trainer.id}>
+                  <TableCell>{index + 1 + page * rowsPerPage}</TableCell>
+                  <TableCell>{trainer.name}</TableCell>
+                  <TableCell>{getTrainerDisplayId(trainer) || "-"}</TableCell>
+                  <TableCell>{trainer.genderName || "-"}</TableCell>
+                  <TableCell>{trainer.qualificationName || "-"}</TableCell>
+                  <TableCell>{trainer.specialization || "-"}</TableCell>
+                  <TableCell>{trainer.workExperience || 0}</TableCell>
+                  <TableCell>{trainer.employmentTypeName || "-"}</TableCell>
+                  <TableCell>{trainer.mobileNo || "-"}</TableCell>
+                  <TableCell>{trainer.email || "-"}</TableCell>
+                  <TableCell>
+                    <CoursesCell
+                      courses={trainer.courses}
+                      getCourseTypeName={getCourseTypeName}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={trainer.active === "N" ? "Inactive" : "Active"}
+                      size="small"
+                      sx={statusChipSx(trainer.active !== "N")}
+                    />
+                  </TableCell>
+                  <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                    <IconButton
+                      color="primary"
+                      size="small"
+                      onClick={() => handleView(trainer)}
+                    >
+                      <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      color="primary"
+                      size="small"
+                      onClick={() => handleEdit(trainer)}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      sx={{
+                        color: "error.main",
+                        "&:hover": { backgroundColor: "#ffebee" },
+                      }}
+                      onClick={() => handleDeleteClick(trainer)}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            {filteredTrainers.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 7 }}>
+                <TableCell colSpan={13} align="center">
                   {loading ? (
-                    <CircularProgress size={28} />
+                    <CircularProgress size={22} sx={{ my: 1 }} />
                   ) : (
-                    <Box>
-                      <PersonSearchOutlinedIcon
-                        sx={{ fontSize: 48, color: "text.disabled" }}
-                      />
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 1 }}
-                      >
-                        {search
-                          ? "No trainers match your search"
-                          : "No trainers registered yet"}
-                      </Typography>
-                      {!search && (
-                        <Button
-                          size="small"
-                          startIcon={<AddIcon />}
-                          onClick={handleAdd}
-                          sx={{ mt: 1.5, textTransform: "none" }}
-                        >
-                          Add your first trainer
-                        </Button>
-                      )}
-                    </Box>
+                    "No data available in table"
                   )}
                 </TableCell>
               </TableRow>
@@ -1174,7 +937,6 @@ const AddTrainerIndex = () => {
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          sx={{ borderTop: "1px solid", borderColor: "divider" }}
         />
       </TableContainer>
 
@@ -1182,43 +944,11 @@ const AddTrainerIndex = () => {
       <Dialog
         open={openDialog}
         onClose={() => setOpenDialog(false)}
-        maxWidth="lg"
+        maxWidth="xl"
         fullWidth
-        scroll="paper"
       >
-        <DialogTitle
-          sx={{
-            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.05),
-            borderBottom: "1px solid",
-            borderColor: "divider",
-          }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              justifyContent: "space-between",
-            }}
-          >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <Avatar
-                sx={{
-                  bgcolor: "primary.main",
-                  width: 36,
-                  height: 36,
-                }}
-              >
-                <SchoolIcon fontSize="small" />
-              </Avatar>
-              <Typography variant="h6" fontWeight={600}>
-                {DIALOG_TITLES[dialogMode] || "Trainer Details"}
-              </Typography>
-            </Box>
-            <IconButton onClick={() => setOpenDialog(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-          </Box>
+        <DialogTitle>
+          {DIALOG_TITLES[dialogMode] || "Trainer Details"}
         </DialogTitle>
         <Formik
           key={dialogMode + (selectedTrainer?.id || "")}
@@ -1230,65 +960,199 @@ const AddTrainerIndex = () => {
           {(formik) => (
             <Form>
               <DialogContent dividers>
-                <Paper elevation={0} sx={{ p: { xs: 1, md: 2 } }}>
+                <>
                   {/* Identification Section */}
-                  <SectionHeader
-                    icon={<BadgeOutlinedIcon />}
-                    title="Identification Information"
-                    first
-                  />
-                  <Grid container spacing={2}>
-                    <Grid item size={{ xs: 12 }}>
-                      <FormControl component="fieldset">
-                        <FormLabel component="legend">
-                          <RequiredLabel>Has Citizen ID Number?</RequiredLabel>
-                        </FormLabel>
-                        <RadioGroup
-                          row
-                          name="hasCitizenId"
-                          value={formik.values.hasCitizenId}
-                          onChange={(e) => {
-                            formik.setFieldValue(
-                              "hasCitizenId",
-                              e.target.value,
-                            );
-                            if (e.target.value === "yes") {
-                              formik.setFieldValue("workPermitNo", "");
-                            } else {
-                              formik.setFieldValue("citizenId", "");
-                            }
-                          }}
-                        >
-                          <FormControlLabel
-                            value="yes"
-                            control={<Radio disabled={dialogMode === "view"} />}
-                            label="Yes"
-                          />
-                          <FormControlLabel
-                            value="no"
-                            control={<Radio disabled={dialogMode === "view"} />}
-                            label="No"
-                          />
-                        </RadioGroup>
-                      </FormControl>
-                    </Grid>
+                  <FormSection title="Identification Information">
+                    <Grid container spacing={2}>
+                      <Grid item size={{ xs: 12 }}>
+                        <FormControl component="fieldset">
+                          <FormLabel component="legend">
+                            <RequiredLabel>
+                              Has Citizen ID Number?
+                            </RequiredLabel>
+                          </FormLabel>
+                          <RadioGroup
+                            row
+                            name="hasCitizenId"
+                            value={formik.values.hasCitizenId}
+                            onChange={(e) => {
+                              formik.setFieldValue(
+                                "hasCitizenId",
+                                e.target.value,
+                              );
+                              if (e.target.value === "yes") {
+                                formik.setFieldValue("workPermitNo", "");
+                              } else {
+                                formik.setFieldValue("citizenId", "");
+                              }
+                              clearTimeout(idCheckTimer.current);
+                              latestIdCheck.current = "";
+                              setIdConflictMessage("");
+                            }}
+                          >
+                            <FormControlLabel
+                              value="yes"
+                              control={
+                                <Radio disabled={dialogMode === "view"} />
+                              }
+                              label="Yes"
+                            />
+                            <FormControlLabel
+                              value="no"
+                              control={
+                                <Radio disabled={dialogMode === "view"} />
+                              }
+                              label="No"
+                            />
+                          </RadioGroup>
+                        </FormControl>
+                      </Grid>
 
-                    {formik.values.hasCitizenId === "yes" && (
-                      <Grid item size={{ xs: 12, md: 6 }}>
+                      {formik.values.hasCitizenId === "yes" && (
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            label={<RequiredLabel>Citizen ID No</RequiredLabel>}
+                            name="citizenId"
+                            size="small"
+                            value={formik.values.citizenId}
+                            onChange={(e) => {
+                              formik.handleChange(e);
+                              scheduleIdCheck(
+                                { citizenId: e.target.value },
+                                formik.values.id,
+                              );
+                            }}
+                            onBlur={formik.handleBlur}
+                            error={
+                              Boolean(idConflictMessage) ||
+                              (formik.touched.citizenId &&
+                                Boolean(formik.errors.citizenId))
+                            }
+                            helperText={
+                              idConflictMessage ||
+                              (formik.touched.citizenId &&
+                                formik.errors.citizenId)
+                            }
+                            slotProps={{
+                              input: {
+                                readOnly: dialogMode === "view",
+                              },
+                            }}
+                          />
+                        </Grid>
+                      )}
+
+                      {formik.values.hasCitizenId === "no" && (
+                        <Grid item size={{ xs: 12, md: 4 }}>
+                          <TextField
+                            fullWidth
+                            label={
+                              <RequiredLabel>
+                                Work Permit No/Reference No
+                              </RequiredLabel>
+                            }
+                            name="workPermitNo"
+                            size="small"
+                            value={formik.values.workPermitNo}
+                            onChange={(e) => {
+                              formik.handleChange(e);
+                              scheduleIdCheck(
+                                { workPermitNo: e.target.value },
+                                formik.values.id,
+                              );
+                            }}
+                            onBlur={formik.handleBlur}
+                            error={
+                              Boolean(idConflictMessage) ||
+                              (formik.touched.workPermitNo &&
+                                Boolean(formik.errors.workPermitNo))
+                            }
+                            helperText={
+                              idConflictMessage ||
+                              (formik.touched.workPermitNo &&
+                                formik.errors.workPermitNo)
+                            }
+                            slotProps={{
+                              input: {
+                                readOnly: dialogMode === "view",
+                              },
+                            }}
+                          />
+                        </Grid>
+                      )}
+                    </Grid>
+                  </FormSection>
+
+                  {/* Personal Information */}
+                  <FormSection title="Personal Information">
+                    <Grid container spacing={2}>
+                      <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           fullWidth
-                          label={<RequiredLabel>Citizen ID No</RequiredLabel>}
-                          name="citizenId"
+                          label={<RequiredLabel>Full Name</RequiredLabel>}
+                          name="name"
                           size="small"
-                          value={formik.values.citizenId}
+                          value={formik.values.name}
                           onChange={formik.handleChange}
                           onBlur={formik.handleBlur}
                           error={
-                            formik.touched.citizenId &&
-                            Boolean(formik.errors.citizenId)
+                            formik.touched.name && Boolean(formik.errors.name)
+                          }
+                          helperText={formik.touched.name && formik.errors.name}
+                          slotProps={{
+                            input: {
+                              readOnly: dialogMode === "view",
+                            },
+                          }}
+                        />
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          select
+                          fullWidth
+                          label={<RequiredLabel>Gender</RequiredLabel>}
+                          name="genderId"
+                          size="small"
+                          value={formik.values.genderId}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.genderId &&
+                            Boolean(formik.errors.genderId)
                           }
                           helperText={
-                            formik.touched.citizenId && formik.errors.citizenId
+                            formik.touched.genderId && formik.errors.genderId
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: dialogMode === "view",
+                            },
+                          }}
+                        >
+                          <MenuItem value="">-select-</MenuItem>
+                          {genders.map((gender) => (
+                            <MenuItem key={gender.id} value={gender.id}>
+                              {gender.name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label={<RequiredLabel>Email</RequiredLabel>}
+                          name="email"
+                          type="email"
+                          size="small"
+                          value={formik.values.email}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.email && Boolean(formik.errors.email)
+                          }
+                          helperText={
+                            formik.touched.email && formik.errors.email
                           }
                           slotProps={{
                             input: {
@@ -1297,29 +1161,221 @@ const AddTrainerIndex = () => {
                           }}
                         />
                       </Grid>
-                    )}
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label={<RequiredLabel>Phone Number</RequiredLabel>}
+                          name="mobileNo"
+                          size="small"
+                          value={formik.values.mobileNo}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.mobileNo &&
+                            Boolean(formik.errors.mobileNo)
+                          }
+                          helperText={
+                            formik.touched.mobileNo && formik.errors.mobileNo
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: dialogMode === "view",
+                            },
+                            htmlInput: {
+                              maxLength: 8,
+                              pattern: "[0-9]{8}",
+                            },
+                          }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </FormSection>
 
-                    {formik.values.hasCitizenId === "no" && (
-                      <Grid item size={{ xs: 12, md: 6 }}>
+                  {/* Professional Information */}
+                  <FormSection title="Professional Information">
+                    <Grid container spacing={2}>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          select
+                          fullWidth
+                          label={<RequiredLabel>Qualification</RequiredLabel>}
+                          name="qualificationId"
+                          size="small"
+                          value={formik.values.qualificationId}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.qualificationId &&
+                            Boolean(formik.errors.qualificationId)
+                          }
+                          helperText={
+                            formik.touched.qualificationId &&
+                            formik.errors.qualificationId
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: dialogMode === "view",
+                            },
+                          }}
+                        >
+                          <MenuItem value="">-select-</MenuItem>
+                          {academicQualifications.map((qualification) => (
+                            <MenuItem
+                              key={qualification.id}
+                              value={qualification.id}
+                            >
+                              {qualification.name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label={<RequiredLabel>Specialization</RequiredLabel>}
+                          name="specialization"
+                          size="small"
+                          value={formik.values.specialization}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.specialization &&
+                            Boolean(formik.errors.specialization)
+                          }
+                          helperText={
+                            formik.touched.specialization &&
+                            formik.errors.specialization
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: dialogMode === "view",
+                            },
+                          }}
+                          placeholder="e.g., Mathematics, Computer Science, Physics"
+                        />
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
                         <TextField
                           fullWidth
                           label={
                             <RequiredLabel>
-                              Work Permit No/Reference No
+                              Work Experience (Years)
                             </RequiredLabel>
                           }
-                          name="workPermitNo"
+                          name="workExperience"
+                          type="number"
                           size="small"
-                          value={formik.values.workPermitNo}
+                          value={formik.values.workExperience}
                           onChange={formik.handleChange}
                           onBlur={formik.handleBlur}
                           error={
-                            formik.touched.workPermitNo &&
-                            Boolean(formik.errors.workPermitNo)
+                            formik.touched.workExperience &&
+                            Boolean(formik.errors.workExperience)
                           }
                           helperText={
-                            formik.touched.workPermitNo &&
-                            formik.errors.workPermitNo
+                            formik.touched.workExperience &&
+                            formik.errors.workExperience
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: dialogMode === "view",
+                            },
+                          }}
+                          inputProps={{ min: 0, step: 1 }}
+                        />
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          select
+                          fullWidth
+                          label={<RequiredLabel>Employment Type</RequiredLabel>}
+                          name="employmentTypeId"
+                          size="small"
+                          value={formik.values.employmentTypeId}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.employmentTypeId &&
+                            Boolean(formik.errors.employmentTypeId)
+                          }
+                          helperText={
+                            formik.touched.employmentTypeId &&
+                            formik.errors.employmentTypeId
+                          }
+                          slotProps={{
+                            input: {
+                              readOnly: dialogMode === "view",
+                            },
+                          }}
+                        >
+                          <MenuItem value="">-select-</MenuItem>
+                          {employmentTypes.map((type) => (
+                            <MenuItem key={type.id} value={type.id}>
+                              {type.name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid item size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          label="Joining Date"
+                          name="joiningDate"
+                          type="date"
+                          size="small"
+                          value={formik.values.joiningDate}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          slotProps={{
+                            input: {
+                              readOnly: dialogMode === "view",
+                            },
+                          }}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      {dialogMode !== "add" && (
+                        <Grid item size={{ xs: 12 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={formik.values.active === "Y"}
+                                onChange={(e) =>
+                                  formik.setFieldValue(
+                                    "active",
+                                    e.target.checked ? "Y" : "N",
+                                  )
+                                }
+                                color="success"
+                                disabled={dialogMode === "view"}
+                              />
+                            }
+                            label={
+                              formik.values.active === "Y"
+                                ? "Active"
+                                : "Inactive"
+                            }
+                          />
+                        </Grid>
+                      )}
+                      <Grid item size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          label="Description"
+                          name="description"
+                          size="small"
+                          multiline
+                          rows={3}
+                          value={formik.values.description}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          error={
+                            formik.touched.description &&
+                            Boolean(formik.errors.description)
+                          }
+                          helperText={
+                            formik.touched.description &&
+                            formik.errors.description
                           }
                           slotProps={{
                             input: {
@@ -1328,451 +1384,169 @@ const AddTrainerIndex = () => {
                           }}
                         />
                       </Grid>
-                    )}
-                  </Grid>
-
-                  {/* Personal Information */}
-                  <SectionHeader
-                    icon={<PersonOutlineIcon />}
-                    title="Personal Information"
-                  />
-                  <Grid container spacing={2}>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Full Name</RequiredLabel>}
-                        name="name"
-                        size="small"
-                        value={formik.values.name}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.name && Boolean(formik.errors.name)
-                        }
-                        helperText={formik.touched.name && formik.errors.name}
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      />
                     </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={<RequiredLabel>Gender</RequiredLabel>}
-                        name="genderId"
-                        size="small"
-                        value={formik.values.genderId}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.genderId &&
-                          Boolean(formik.errors.genderId)
-                        }
-                        helperText={
-                          formik.touched.genderId && formik.errors.genderId
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      >
-                        <MenuItem value="">-select-</MenuItem>
-                        {genders.map((gender) => (
-                          <MenuItem key={gender.id} value={gender.id}>
-                            {gender.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Email</RequiredLabel>}
-                        name="email"
-                        type="email"
-                        size="small"
-                        value={formik.values.email}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.email && Boolean(formik.errors.email)
-                        }
-                        helperText={formik.touched.email && formik.errors.email}
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Phone Number</RequiredLabel>}
-                        name="mobileNo"
-                        size="small"
-                        value={formik.values.mobileNo}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.mobileNo &&
-                          Boolean(formik.errors.mobileNo)
-                        }
-                        helperText={
-                          formik.touched.mobileNo && formik.errors.mobileNo
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                          htmlInput: {
-                            maxLength: 8,
-                            pattern: "[0-9]{8}",
-                          },
-                        }}
-                      />
-                    </Grid>
-                  </Grid>
-
-                  {/* Professional Information */}
-                  <SectionHeader
-                    icon={<WorkOutlineIcon />}
-                    title="Professional Information"
-                  />
-                  <Grid container spacing={2}>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={<RequiredLabel>Qualification</RequiredLabel>}
-                        name="qualificationId"
-                        size="small"
-                        value={formik.values.qualificationId}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.qualificationId &&
-                          Boolean(formik.errors.qualificationId)
-                        }
-                        helperText={
-                          formik.touched.qualificationId &&
-                          formik.errors.qualificationId
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      >
-                        <MenuItem value="">-select-</MenuItem>
-                        {academicQualifications.map((qualification) => (
-                          <MenuItem
-                            key={qualification.id}
-                            value={qualification.id}
-                          >
-                            {qualification.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={<RequiredLabel>Specialization</RequiredLabel>}
-                        name="specialization"
-                        size="small"
-                        value={formik.values.specialization}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.specialization &&
-                          Boolean(formik.errors.specialization)
-                        }
-                        helperText={
-                          formik.touched.specialization &&
-                          formik.errors.specialization
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        placeholder="e.g., Mathematics, Computer Science, Physics"
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label={
-                          <RequiredLabel>Work Experience (Years)</RequiredLabel>
-                        }
-                        name="workExperience"
-                        type="number"
-                        size="small"
-                        value={formik.values.workExperience}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.workExperience &&
-                          Boolean(formik.errors.workExperience)
-                        }
-                        helperText={
-                          formik.touched.workExperience &&
-                          formik.errors.workExperience
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        inputProps={{ min: 0, step: 1 }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        label={<RequiredLabel>Employment Type</RequiredLabel>}
-                        name="employmentTypeId"
-                        size="small"
-                        value={formik.values.employmentTypeId}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.employmentTypeId &&
-                          Boolean(formik.errors.employmentTypeId)
-                        }
-                        helperText={
-                          formik.touched.employmentTypeId &&
-                          formik.errors.employmentTypeId
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      >
-                        <MenuItem value="">-select-</MenuItem>
-                        {employmentTypes.map((type) => (
-                          <MenuItem key={type.id} value={type.id}>
-                            {type.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        fullWidth
-                        label="Joining Date"
-                        name="joiningDate"
-                        type="date"
-                        size="small"
-                        value={formik.values.joiningDate}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                    <Grid item size={{ xs: 12 }}>
-                      <TextField
-                        fullWidth
-                        label="Description"
-                        name="description"
-                        size="small"
-                        multiline
-                        rows={3}
-                        value={formik.values.description}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        error={
-                          formik.touched.description &&
-                          Boolean(formik.errors.description)
-                        }
-                        helperText={
-                          formik.touched.description &&
-                          formik.errors.description
-                        }
-                        slotProps={{
-                          input: {
-                            readOnly: dialogMode === "view",
-                          },
-                        }}
-                      />
-                    </Grid>
-                  </Grid>
+                  </FormSection>
 
                   {/* Course Assignment Section */}
-                  <SectionHeader
-                    icon={<MenuBookOutlinedIcon />}
-                    title="Course Assignment"
-                  />
-
-                  <FieldArray name="courses">
-                    {({ push, remove }) => (
-                      <>
-                        {formik.values.courses.map((course, index) => (
-                          <Box
-                            key={index}
-                            sx={{
-                              mb: 3,
-                              p: 2,
-                              border: "1px solid",
-                              borderColor: "divider",
-                              borderRadius: 1,
-                            }}
-                          >
-                            <Grid container spacing={2} alignItems="center">
-                              <Grid item size={{ xs: 12, md: 5 }}>
-                                <TextField
-                                  select
-                                  fullWidth
-                                  label={
-                                    <RequiredLabel>Course Type</RequiredLabel>
-                                  }
-                                  name={`courses.${index}.courseTypeId`}
-                                  size="small"
-                                  value={course.courseTypeId}
-                                  onChange={handleCourseTypeChange.bind(
-                                    null,
-                                    formik,
-                                    index,
-                                  )}
-                                  onBlur={formik.handleBlur}
-                                  error={
-                                    formik.touched.courses?.[index]
-                                      ?.courseTypeId &&
-                                    Boolean(
-                                      formik.errors.courses?.[index]
-                                        ?.courseTypeId,
-                                    )
-                                  }
-                                  helperText={
-                                    formik.touched.courses?.[index]
-                                      ?.courseTypeId &&
-                                    formik.errors.courses?.[index]?.courseTypeId
-                                  }
-                                  slotProps={{
-                                    input: {
-                                      readOnly: dialogMode === "view",
-                                    },
-                                  }}
-                                >
-                                  <MenuItem value="">-select-</MenuItem>
-                                  {courseTypeOptions}
-                                </TextField>
-                              </Grid>
-
-                              <Grid item size={{ xs: 12, md: 6 }}>
-                                <TextField
-                                  select
-                                  fullWidth
-                                  label={
-                                    <RequiredLabel>Course Name</RequiredLabel>
-                                  }
-                                  name={`courses.${index}.courseId`}
-                                  size="small"
-                                  value={course.courseId}
-                                  onChange={formik.handleChange}
-                                  onBlur={formik.handleBlur}
-                                  disabled={
-                                    !course.courseTypeId || loadingCourses
-                                  }
-                                  error={
-                                    formik.touched.courses?.[index]?.courseId &&
-                                    Boolean(
-                                      formik.errors.courses?.[index]?.courseId,
-                                    )
-                                  }
-                                  helperText={
-                                    formik.touched.courses?.[index]?.courseId &&
-                                    formik.errors.courses?.[index]?.courseId
-                                  }
-                                  slotProps={{
-                                    input: {
-                                      readOnly: dialogMode === "view",
-                                    },
-                                  }}
-                                >
-                                  <MenuItem value="">
-                                    {coursePlaceholder(
-                                      course.courseTypeId,
-                                      loadingCourses,
+                  <FormSection title="Course Assignment">
+                    <FieldArray name="courses">
+                      {({ push, remove }) => (
+                        <>
+                          {formik.values.courses.map((course, index) => (
+                            <Box
+                              key={index}
+                              sx={{
+                                mb: 3,
+                                p: 2,
+                                border: "1px solid",
+                                borderColor: "divider",
+                                borderRadius: 1,
+                              }}
+                            >
+                              <Grid container spacing={2} alignItems="center">
+                                <Grid item size={{ xs: 12, md: 5 }}>
+                                  <TextField
+                                    select
+                                    fullWidth
+                                    label={
+                                      <RequiredLabel>Course Type</RequiredLabel>
+                                    }
+                                    name={`courses.${index}.courseTypeId`}
+                                    size="small"
+                                    value={course.courseTypeId}
+                                    onChange={handleCourseTypeChange.bind(
+                                      null,
+                                      formik,
+                                      index,
                                     )}
-                                  </MenuItem>
-                                  {renderCourseOptions(course.courseTypeId)}
-                                </TextField>
-                              </Grid>
-
-                              {dialogMode !== "view" && (
-                                <Grid item size={{ xs: 12, md: 1 }}>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      justifyContent: "center",
-                                      alignItems: "center",
-                                      height: "100%",
+                                    onBlur={formik.handleBlur}
+                                    error={
+                                      formik.touched.courses?.[index]
+                                        ?.courseTypeId &&
+                                      Boolean(
+                                        formik.errors.courses?.[index]
+                                          ?.courseTypeId,
+                                      )
+                                    }
+                                    helperText={
+                                      formik.touched.courses?.[index]
+                                        ?.courseTypeId &&
+                                      formik.errors.courses?.[index]
+                                        ?.courseTypeId
+                                    }
+                                    slotProps={{
+                                      input: {
+                                        readOnly: dialogMode === "view",
+                                      },
                                     }}
                                   >
-                                    <IconButton
-                                      color="error"
-                                      onClick={remove.bind(null, index)}
-                                    >
-                                      <DeleteIcon />
-                                    </IconButton>
-                                  </Box>
+                                    <MenuItem value="">-select-</MenuItem>
+                                    {courseTypeOptions}
+                                  </TextField>
                                 </Grid>
-                              )}
-                            </Grid>
-                          </Box>
-                        ))}
 
-                        {dialogMode !== "view" && (
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<AddIcon />}
-                            onClick={() =>
-                              push({
-                                courseTypeId: "",
-                                courseId: "",
-                              })
-                            }
-                            sx={{ mt: 1 }}
-                          >
-                            Add Course
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </FieldArray>
+                                <Grid item size={{ xs: 12, md: 6 }}>
+                                  <TextField
+                                    select
+                                    fullWidth
+                                    label={
+                                      <RequiredLabel>Course Name</RequiredLabel>
+                                    }
+                                    name={`courses.${index}.courseId`}
+                                    size="small"
+                                    value={course.courseId}
+                                    onChange={formik.handleChange}
+                                    onBlur={formik.handleBlur}
+                                    disabled={
+                                      !course.courseTypeId || loadingCourses
+                                    }
+                                    error={
+                                      formik.touched.courses?.[index]
+                                        ?.courseId &&
+                                      Boolean(
+                                        formik.errors.courses?.[index]
+                                          ?.courseId,
+                                      )
+                                    }
+                                    helperText={
+                                      formik.touched.courses?.[index]
+                                        ?.courseId &&
+                                      formik.errors.courses?.[index]?.courseId
+                                    }
+                                    slotProps={{
+                                      input: {
+                                        readOnly: dialogMode === "view",
+                                      },
+                                    }}
+                                  >
+                                    <MenuItem value="">
+                                      {coursePlaceholder(
+                                        course.courseTypeId,
+                                        loadingCourses,
+                                      )}
+                                    </MenuItem>
+                                    {renderCourseOptions(course.courseTypeId)}
+                                  </TextField>
+                                </Grid>
 
-                  {dialogMode === "view" &&
-                    formik.values.courses?.length === 0 && (
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 1 }}
-                      >
-                        No courses assigned
-                      </Typography>
-                    )}
+                                {dialogMode !== "view" && (
+                                  <Grid item size={{ xs: 12, md: 1 }}>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        height: "100%",
+                                      }}
+                                    >
+                                      <IconButton
+                                        color="error"
+                                        onClick={remove.bind(null, index)}
+                                      >
+                                        <DeleteIcon />
+                                      </IconButton>
+                                    </Box>
+                                  </Grid>
+                                )}
+                              </Grid>
+                            </Box>
+                          ))}
+
+                          {dialogMode !== "view" && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<AddIcon />}
+                              onClick={() =>
+                                push({
+                                  courseTypeId: "",
+                                  courseId: "",
+                                })
+                              }
+                              sx={{ mt: 1 }}
+                            >
+                              Add Course
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </FieldArray>
+
+                    {dialogMode === "view" &&
+                      formik.values.courses?.length === 0 && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 1 }}
+                        >
+                          No courses assigned
+                        </Typography>
+                      )}
+                  </FormSection>
 
                   {/* Supporting Documents Section */}
                   {dialogMode !== "view" && (
-                    <>
-                      <SectionHeader
-                        icon={<AttachFileIcon />}
-                        title="Supporting Documents"
-                      />
+                    <FormSection title="Supporting Documents">
                       <Grid container spacing={2}>
                         <Grid item size={{ xs: 12 }}>
                           <FileUpload
@@ -1783,15 +1557,11 @@ const AddTrainerIndex = () => {
                           />
                         </Grid>
                       </Grid>
-                    </>
+                    </FormSection>
                   )}
 
                   {dialogMode === "view" && formik.values.files?.length > 0 && (
-                    <>
-                      <SectionHeader
-                        icon={<AttachFileIcon />}
-                        title="Uploaded Documents"
-                      />
+                    <FormSection title="Uploaded Documents">
                       <Box>
                         {formik.values.files.map((file, index) => (
                           <Chip
@@ -1803,45 +1573,39 @@ const AddTrainerIndex = () => {
                           />
                         ))}
                       </Box>
-                    </>
+                    </FormSection>
                   )}
-                </Paper>
+                </>
               </DialogContent>
-              <DialogActions sx={{ px: 3, py: 1.5, gap: 1 }}>
-                {dialogMode !== "view" && (
-                  <Button
-                    onClick={() => handleReset(formik.resetForm)}
-                    startIcon={<RotateLeftIcon />}
-                    disabled={loading}
-                    sx={{ textTransform: "none", mr: "auto" }}
-                    color="inherit"
-                  >
-                    Reset form
-                  </Button>
-                )}
+              <DialogActions>
                 <Button
-                  variant="outlined"
-                  color="inherit"
+                  size="small"
+                  variant="contained"
+                  color="error"
                   onClick={() => setOpenDialog(false)}
                   disabled={loading}
-                  sx={{ textTransform: "none" }}
                 >
                   {dialogMode === "view" ? "Close" : "Cancel"}
                 </Button>
                 {dialogMode !== "view" && (
                   <Button
+                    size="small"
+                    variant="contained"
+                    color="secondary"
+                    onClick={() => handleReset(formik.resetForm)}
+                    startIcon={<RotateLeftIcon />}
+                    disabled={loading}
+                  >
+                    Reset
+                  </Button>
+                )}
+                {dialogMode !== "view" && (
+                  <Button
+                    size="small"
                     type="submit"
                     variant="contained"
                     color="primary"
-                    disabled={loading}
-                    sx={{ textTransform: "none", fontWeight: 600, px: 3 }}
-                    startIcon={
-                      loading ? (
-                        <CircularProgress size={16} color="inherit" />
-                      ) : (
-                        <SaveIcon />
-                      )
-                    }
+                    disabled={loading || Boolean(idConflictMessage)}
                   >
                     {submitLabel(loading, dialogMode)}
                   </Button>

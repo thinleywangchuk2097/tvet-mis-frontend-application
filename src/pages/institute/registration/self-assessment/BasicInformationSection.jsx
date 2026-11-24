@@ -52,7 +52,7 @@ const statusColor = (statusId) => {
 };
 
 /**
- * Basic Information of the Self Assessment Report
+ * Basic Information of the TVET Provider Accreditation Report
  *  1. Institute Details  (tbl_institute_registration_dtls)
  *  2. Trainer Details    (tbl_trainer_dtls)
  *  3. Course Details     (tbl_accredited_course_dtls + tbl_non_accredited_course_dtls)

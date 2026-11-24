@@ -48,6 +48,8 @@ import {
   formatScore,
   getAllSubIndicators,
   getGradeColor,
+  getRenewalLabel,
+  MIN_CRITERIA_PERCENT,
   parseJson,
 } from "./self-assessment/sarUtils";
 
@@ -138,6 +140,8 @@ const SelfAssessmentReport = () => {
     () => computeSummary(criteria, selfPoints),
     [criteria, selfPoints],
   );
+  // any criteria tab under its 30% minimum: Submit stays disabled
+  const belowMinimum = summary.belowMinimum.length > 0;
 
   const activeReport = useMemo(
     () =>
@@ -224,6 +228,7 @@ const SelfAssessmentReport = () => {
             statusName: item.status_name,
             totalScore: item.total_score,
             grade: item.grade,
+            renewalDate: item.renewal_date,
             submittedDate: item.submitted_date,
             instituteName: item.proposed_institute_name,
             qualityStandards: parseJson(item.quality_standard_responses, []),
@@ -363,6 +368,15 @@ const SelfAssessmentReport = () => {
       );
       return false;
     }
+    if (summary.belowMinimum.length > 0) {
+      const tabs = summary.belowMinimum
+        .map((r) => `Criteria ${r.sl} (${formatScore(r.score)} / min ${formatScore(r.minScore)})`)
+        .join(", ");
+      toast.error(
+        `Each criteria must score at least ${MIN_CRITERIA_PERCENT}% of its allocated score. Below minimum: ${tabs}.`,
+      );
+      return false;
+    }
     return true;
   };
 
@@ -431,7 +445,7 @@ const SelfAssessmentReport = () => {
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
       <Typography variant="h5" gutterBottom>
-        Self Assessment Report
+        TVET Provider Accreditation Report
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
         TVET Provider Accreditation - assess your institute against the
@@ -493,6 +507,7 @@ const SelfAssessmentReport = () => {
               <TableCell>Submitted Date</TableCell>
               <TableCell align="center">Score (out of 1000)</TableCell>
               <TableCell align="center">Grade</TableCell>
+              <TableCell align="center">Renewal Cycle</TableCell>
               <TableCell align="center">Status</TableCell>
               <TableCell align="center">Action</TableCell>
             </TableRow>
@@ -525,6 +540,10 @@ const SelfAssessmentReport = () => {
                       )}
                     </TableCell>
                     <TableCell align="center">
+                      {getRenewalLabel(report.grade)}
+                      {report.renewalDate && ` (${formatDate(report.renewalDate)})`}
+                    </TableCell>
+                    <TableCell align="center">
                       <Chip
                         label={getStatusName(report)}
                         size="small"
@@ -552,7 +571,7 @@ const SelfAssessmentReport = () => {
                 ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   No data available in table
                 </TableCell>
               </TableRow>
@@ -690,6 +709,11 @@ const SelfAssessmentReport = () => {
               label={summary.grade.grade}
               sx={{ borderColor: summary.grade.color, color: summary.grade.color }}
             />
+            {summary.grade.renewalYears && (
+              <Typography variant="body2" color="text.secondary">
+                Renewal every {summary.grade.renewalYears} years
+              </Typography>
+            )}
           </Stack>
           <Stack direction="row" spacing={1}>
             <Button
@@ -723,16 +747,28 @@ const SelfAssessmentReport = () => {
                 >
                   Save Draft
                 </Button>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="primary"
-                  onClick={handleSubmitClick}
-                  startIcon={<SendIcon />}
-                  disabled={loading || basicLoading}
+                <Tooltip
+                  arrow
+                  title={
+                    belowMinimum
+                      ? `Every criteria must score at least ${MIN_CRITERIA_PERCENT}% of its allocated score`
+                      : ""
+                  }
                 >
-                  Submit
-                </Button>
+                  {/* span: a disabled button cannot show a tooltip */}
+                  <span>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="primary"
+                      onClick={handleSubmitClick}
+                      startIcon={<SendIcon />}
+                      disabled={loading || basicLoading || belowMinimum}
+                    >
+                      Submit
+                    </Button>
+                  </span>
+                </Tooltip>
               </>
             )}
           </Stack>
@@ -753,7 +789,10 @@ const SelfAssessmentReport = () => {
             <strong>
               {formatScore(summary.totalScore)} / {summary.totalWeight}
             </strong>{" "}
-            (Grade <strong>{summary.grade.grade}</strong>).
+            (Grade <strong>{summary.grade.grade}</strong>
+            {summary.grade.renewalYears &&
+              `, accreditation renewal every ${summary.grade.renewalYears} years`}
+            ).
             <br />
             Once submitted the report will be forwarded to TVET Quality
             Assurance for verification and can no longer be edited. Do you want
