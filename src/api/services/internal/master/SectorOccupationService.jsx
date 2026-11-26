@@ -5,7 +5,7 @@ class SectorOccupationService {
   getSectorOccupationsBySector(sectorId, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/sector-occupation/get-sector-occupation-details/${sectorId}`,
+        `/api/v1/sector-occupation/get-sector-occupation-details/${sectorId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -19,7 +19,7 @@ class SectorOccupationService {
   getAllSectorOccupationsList(token) {
     return apiClient
       .get(
-        `/api/v1/user/management/sector-occupation/get-sector-occupation-details`,
+        `/api/v1/sector-occupation/get-sector-occupation-details`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -31,7 +31,7 @@ class SectorOccupationService {
   }
   submitSectorWithOccupations(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/sector-occupation/create`, data, {
+      .post(`/api/v1/sector-occupation/create`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -42,7 +42,7 @@ class SectorOccupationService {
 
   updateSectorWithOccupations(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/sector-occupation/update`, data, {
+      .post(`/api/v1/sector-occupation/update`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -53,7 +53,7 @@ class SectorOccupationService {
   deleteSectorWithOccupations(sectorId, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/sector-occupation/delete/${sectorId}`,
+        `/api/v1/sector-occupation/delete/${sectorId}`,
         {},
         {
           headers: {

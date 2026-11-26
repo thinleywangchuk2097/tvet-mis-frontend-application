@@ -5,7 +5,7 @@ class CampusPlacementService {
     
  submitPlacementSession(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/campus-placement/submit-session`, data, {
+      .post(`/api/v1/campus-placement/submit-session`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -16,7 +16,7 @@ class CampusPlacementService {
 
   getPlacementSessionByInstituteId(institute_id, token) {
     return apiClient
-      .get(`/api/v1/user/management/campus-placement/get-session/${institute_id}`, {
+      .get(`/api/v1/campus-placement/get-session/${institute_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -27,7 +27,7 @@ class CampusPlacementService {
 
   submitFirm(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/campus-placement/submit-firm`, data, {
+      .post(`/api/v1/campus-placement/submit-firm`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -38,7 +38,7 @@ class CampusPlacementService {
 
   getFirmByInstituteId(institute_id, token) {
     return apiClient
-      .get(`/api/v1/user/management/campus-placement/get-firm/${institute_id}`, {
+      .get(`/api/v1/campus-placement/get-firm/${institute_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -49,7 +49,7 @@ class CampusPlacementService {
 
   submitPlacementTrainee(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/campus-placement/submit-trainee`, data, {
+      .post(`/api/v1/campus-placement/submit-trainee`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -60,7 +60,7 @@ class CampusPlacementService {
 
   getTraineeByInstituteId(institute_id, token) {
     return apiClient
-      .get(`/api/v1/user/management/campus-placement/get-trainee/${institute_id}`, {
+      .get(`/api/v1/campus-placement/get-trainee/${institute_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -71,7 +71,7 @@ class CampusPlacementService {
 
     getTraineeOnPlacementReport(token) {
     return apiClient
-      .get(`/api/v1/user/management/campus-placement/get-trainee-report`, {
+      .get(`/api/v1/campus-placement/get-trainee-report`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

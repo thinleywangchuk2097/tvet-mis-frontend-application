@@ -1,6 +1,6 @@
 import apiClient from "../../../axios";
 
-const BASE = "/api/v1/user/management/notification";
+const BASE = "/api/v1/notification";
 const auth = (token) => ({ headers: { Authorization: `Bearer ${token}` } });
 
 // Calls return the axios response, or the error object on failure (same as the other services)

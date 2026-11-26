@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class ReportService {
   courseServiceType(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-course-service-type`, {
+      .get(`/api/v1/report/get-course-service-type`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -14,7 +14,7 @@ class ReportService {
 
   getAllInstitutes(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-institutes`, {
+      .get(`/api/v1/report/get-institutes`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -25,7 +25,7 @@ class ReportService {
 
   getcourseData(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-course-data`, {
+      .get(`/api/v1/report/get-course-data`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -36,7 +36,7 @@ class ReportService {
 
   getInstitutesProposalType(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-institutes-proposal-type`, {
+      .get(`/api/v1/report/get-institutes-proposal-type`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -47,7 +47,7 @@ class ReportService {
 
   getInstituteRegistrationType(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-institutes-registration-type`, {
+      .get(`/api/v1/report/get-institutes-registration-type`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -58,7 +58,7 @@ class ReportService {
 
   getInstitutesProposalDetails(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-institutes-proposal-details`, {
+      .get(`/api/v1/report/get-institutes-proposal-details`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -70,7 +70,7 @@ class ReportService {
   getInstitutesRegistrationDetails(token) {
     return apiClient
       .get(
-        `/api/v1/user/management/report/get-institutes-registration-details`,
+        `/api/v1/report/get-institutes-registration-details`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -82,7 +82,7 @@ class ReportService {
   }
   getInstitutesTraineesDetails(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-institutes-trainees-details`, {
+      .get(`/api/v1/report/get-institutes-trainees-details`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -98,7 +98,7 @@ class ReportService {
   ) {
     return apiClient
       .get(
-        `/api/v1/user/management/report/get-registration-applicant-details/${registration_type}/${application_no}`,
+        `/api/v1/report/get-registration-applicant-details/${registration_type}/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -113,7 +113,7 @@ class ReportService {
   getInstituteAssessmentReport(registration_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/report/get-institute-assessment-report/${registration_no}`,
+        `/api/v1/report/get-institute-assessment-report/${registration_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -127,7 +127,7 @@ class ReportService {
   // Certificate printing: competent trainees of all institutes
   getAllTraineesDetailsForCertificate(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-all-trainee-certificate-details`, {
+      .get(`/api/v1/report/get-all-trainee-certificate-details`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -139,7 +139,7 @@ class ReportService {
   getTraineesDetailsForCertificate(registration_no, application_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/report/get-trainee-applicant-details/${registration_no}/${application_no}`,
+        `/api/v1/report/get-trainee-applicant-details/${registration_no}/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -153,7 +153,7 @@ class ReportService {
   getAccreditedProgrammeDetailsForCertificate(registration_no, application_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/report/get-accredited-programme-details/${registration_no}/${application_no}`,
+        `/api/v1/report/get-accredited-programme-details/${registration_no}/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -167,7 +167,7 @@ class ReportService {
   // Assessor / Accreditor / QMS Auditor registrations report
   getAssessorAccreditorAuditorReport(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-assessor-accreditor-auditor-report`, {
+      .get(`/api/v1/report/get-assessor-accreditor-auditor-report`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -179,7 +179,7 @@ class ReportService {
   // BQF / RPL / Non-BQF programmes report
   getProgrammesReport(token) {
     return apiClient
-      .get(`/api/v1/user/management/report/get-programmes-report`, {
+      .get(`/api/v1/report/get-programmes-report`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

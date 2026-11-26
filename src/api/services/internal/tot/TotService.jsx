@@ -2,7 +2,7 @@ import apiClient from "../../../axios";
 class TotService {
   submitTOTProgram(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tot/submit-tot-program`, data, {
+      .post(`/api/v1/tot/submit-tot-program`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -13,7 +13,7 @@ class TotService {
 
   getToTPrograms(token) {
     return apiClient
-      .get(`/api/v1/user/management/tot/get-tot-programs`, {
+      .get(`/api/v1/tot/get-tot-programs`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -24,7 +24,7 @@ class TotService {
 
   deleteToTPrograms(id, token) {
     return apiClient
-      .delete(`/api/v1/user/management/tot/delete-tot-program/${id}`, {
+      .delete(`/api/v1/tot/delete-tot-program/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -35,7 +35,7 @@ class TotService {
 
   submitTOTProgramAnnouncement(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tot/submit-tot-announcement`, data, {
+      .post(`/api/v1/tot/submit-tot-announcement`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -46,7 +46,7 @@ class TotService {
 
   getToTProgramsAnnouncement(token) {
     return apiClient
-      .get(`/api/v1/user/management/tot/get-tot-announcements`, {
+      .get(`/api/v1/tot/get-tot-announcements`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -57,7 +57,7 @@ class TotService {
 
   deleteToTProgramsAnnouncement(id, token) {
     return apiClient
-      .delete(`/api/v1/user/management/tot/delete-tot-announcement/${id}`, {
+      .delete(`/api/v1/tot/delete-tot-announcement/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -67,7 +67,7 @@ class TotService {
   }
   applyTrainerToTOTProgram(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tot/apply-trainer-to-tot-program`, data, {
+      .post(`/api/v1/tot/apply-trainer-to-tot-program`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },  
@@ -79,7 +79,7 @@ class TotService {
    getTrainerApplied(applicationNo, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/tot/get-trainer-applied/${applicationNo}`,
+        `/api/v1/tot/get-trainer-applied/${applicationNo}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -92,7 +92,7 @@ class TotService {
 
   saveTrainerSelection(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tot/save-trainer-selection`, data, {
+      .post(`/api/v1/tot/save-trainer-selection`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -103,7 +103,7 @@ class TotService {
 
   saveModuleMarks(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tot/save-module-marks`, data, {
+      .post(`/api/v1/tot/save-module-marks`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -114,7 +114,7 @@ class TotService {
 
   getTrainerMarks(applicationNo, token) {
     return apiClient
-      .get(`/api/v1/user/management/tot/get-trainer-marks/${applicationNo}`, {
+      .get(`/api/v1/tot/get-trainer-marks/${applicationNo}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -125,7 +125,7 @@ class TotService {
 
   generateCertificates(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tot/generate-certificates`, data, {
+      .post(`/api/v1/tot/generate-certificates`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -136,7 +136,7 @@ class TotService {
 
   completeApplication(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tot/complete-application`, data, {
+      .post(`/api/v1/tot/complete-application`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -147,7 +147,7 @@ class TotService {
 
   getInstituteApplied(instituteId, token) {
     return apiClient
-      .get(`/api/v1/user/management/tot/get-institute-applied/${instituteId}`, {
+      .get(`/api/v1/tot/get-institute-applied/${instituteId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -159,7 +159,7 @@ class TotService {
   // TOT programmes that have issued mark sheets (instituteId optional)
   getCertifiedPrograms(instituteId, token) {
     return apiClient
-      .get(`/api/v1/user/management/tot/get-certified-programs`, {
+      .get(`/api/v1/tot/get-certified-programs`, {
         params: instituteId ? { instituteId } : {},
         headers: {
           Authorization: `Bearer ${token}`,
@@ -172,7 +172,7 @@ class TotService {
   // Read-only mark sheet data for the certified trainers of an application
   getCertificates(applicationNo, instituteId, token) {
     return apiClient
-      .get(`/api/v1/user/management/tot/get-certificates/${encodeURIComponent(applicationNo)}`, {
+      .get(`/api/v1/tot/get-certificates/${encodeURIComponent(applicationNo)}`, {
         params: instituteId ? { instituteId } : {},
         headers: {
           Authorization: `Bearer ${token}`,

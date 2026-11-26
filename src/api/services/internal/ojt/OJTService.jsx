@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class OJTService {
   submitOJTCompany(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/ojt/submit-company`, data, {
+      .post(`/api/v1/ojt/submit-company`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -14,7 +14,7 @@ class OJTService {
 
   getCompanyByInstituteId(institute_id, token) {
     return apiClient
-      .get(`/api/v1/user/management/ojt/get-company/${institute_id}`, {
+      .get(`/api/v1/ojt/get-company/${institute_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -25,7 +25,7 @@ class OJTService {
 
   submitOJTAgrement(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/ojt/submit-agreement`, data, {
+      .post(`/api/v1/ojt/submit-agreement`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -36,7 +36,7 @@ class OJTService {
 
   getAgreementByInstituteId(institute_id, token) {
     return apiClient
-      .get(`/api/v1/user/management/ojt/get-agreement/${institute_id}`, {
+      .get(`/api/v1/ojt/get-agreement/${institute_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -47,7 +47,7 @@ class OJTService {
 
   submitOJTTrainee(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/ojt/submit-trainee`, data, {
+      .post(`/api/v1/ojt/submit-trainee`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -58,7 +58,7 @@ class OJTService {
 
   getTraineeByInstituteId(institute_id, token) {
     return apiClient
-      .get(`/api/v1/user/management/ojt/get-trainee/${institute_id}`, {
+      .get(`/api/v1/ojt/get-trainee/${institute_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -69,7 +69,7 @@ class OJTService {
 
   getTraineeOJTReport(token) {
     return apiClient
-      .get(`/api/v1/user/management/ojt/get-trainee-ojt-report`, {
+      .get(`/api/v1/ojt/get-trainee-ojt-report`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

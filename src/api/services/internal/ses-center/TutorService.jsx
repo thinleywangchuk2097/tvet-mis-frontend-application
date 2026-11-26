@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class TutorService {
   getAllTutors(instituteId, token) {
     return apiClient
-      .get(`/api/v1/user/management/tutor/get-all-tutors/${instituteId}`, {
+      .get(`/api/v1/tutor/get-all-tutors/${instituteId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -13,7 +13,7 @@ class TutorService {
   }
   submitTutor(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tutor/submit`, data, {
+      .post(`/api/v1/tutor/submit`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -23,7 +23,7 @@ class TutorService {
   }
   updateTutor(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tutor/update`, data, {
+      .post(`/api/v1/tutor/update`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -35,7 +35,7 @@ class TutorService {
   deleteTutor(tutorId, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/tutor/delete/${tutorId}`,
+        `/api/v1/tutor/delete/${tutorId}`,
         {},
         {
           headers: {
@@ -51,7 +51,7 @@ class TutorService {
   getTutorByApplicationNo(applicationNo, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/tutor/get-tutor-by-application-no/${applicationNo}`,
+        `/api/v1/tutor/get-tutor-by-application-no/${applicationNo}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -64,7 +64,7 @@ class TutorService {
 
   verifyTutor(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tutor/verify-tutor`, data, {
+      .post(`/api/v1/tutor/verify-tutor`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

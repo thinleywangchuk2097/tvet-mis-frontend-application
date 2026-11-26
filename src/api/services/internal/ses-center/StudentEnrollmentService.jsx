@@ -6,7 +6,7 @@ class StudentEnrollmentService {
   getAllEnrollments(instituteId, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/student-enrollment/get-all-enrollments/${instituteId}`,
+        `/api/v1/student-enrollment/get-all-enrollments/${instituteId}`,
         auth(token),
       )
       .then((response) => response)
@@ -16,7 +16,7 @@ class StudentEnrollmentService {
   submitEnrollment(data, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/student-enrollment/submit`,
+        `/api/v1/student-enrollment/submit`,
         data,
         auth(token),
       )
@@ -27,7 +27,7 @@ class StudentEnrollmentService {
   updateEnrollment(data, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/student-enrollment/update`,
+        `/api/v1/student-enrollment/update`,
         data,
         auth(token),
       )
@@ -38,7 +38,7 @@ class StudentEnrollmentService {
   deleteEnrollment(id, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/student-enrollment/delete/${id}`,
+        `/api/v1/student-enrollment/delete/${id}`,
         {},
         auth(token),
       )

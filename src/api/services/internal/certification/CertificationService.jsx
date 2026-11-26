@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class CertificationService {
   getAssessmentInstitutes(token) {
     return apiClient
-      .get(`/api/v1/user/management/certificate/get-assessment-institutes`, {
+      .get(`/api/v1/certificate/get-assessment-institutes`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -15,7 +15,7 @@ class CertificationService {
   getAssessmentCourses(instituteId, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/certificate/get-assessement-courses/${instituteId}`,
+        `/api/v1/certificate/get-assessement-courses/${instituteId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -29,7 +29,7 @@ class CertificationService {
   getServicesAssessementResult(token) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-services-assessement-result`,
+        `/api/v1/accredited-course/get-services-assessement-result`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -48,7 +48,7 @@ class CertificationService {
   ) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-programmes-certification/${institute_id}/${service_id}/${certification_level_id}`,
+        `/api/v1/accredited-course/get-programmes-certification/${institute_id}/${service_id}/${certification_level_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -69,7 +69,7 @@ class CertificationService {
   ) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-passed-trainee-certificate-printing`,
+        `/api/v1/accredited-course/get-passed-trainee-certificate-printing`,
         {
           params: {
             applicationNo: application_no,

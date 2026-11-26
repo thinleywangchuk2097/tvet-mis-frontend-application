@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class CurriculumIndexService {
   submitCurriculum(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/curriculum/submit`, data, {
+      .post(`/api/v1/curriculum/submit`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -15,7 +15,7 @@ class CurriculumIndexService {
   getCurriculumDetailsByApplicationNo(application_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/curriculum/get-curriculum-details/${application_no}`,
+        `/api/v1/curriculum/get-curriculum-details/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -28,7 +28,7 @@ class CurriculumIndexService {
 
   verifyCurriculumDevelopment(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/curriculum/verify-curriculum`, data, {
+      .post(`/api/v1/curriculum/verify-curriculum`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -40,7 +40,7 @@ class CurriculumIndexService {
   getCurriculumDetailsByUserId(user_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/curriculum/get-curriculum-application-details/${user_id}`,
+        `/api/v1/curriculum/get-curriculum-application-details/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -54,7 +54,7 @@ class CurriculumIndexService {
   getCurriculumById(curriculum_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/curriculum/get-curriculums-by-id/${curriculum_id}`,
+        `/api/v1/curriculum/get-curriculums-by-id/${curriculum_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -68,7 +68,7 @@ class CurriculumIndexService {
   getApprovedCurriculumDataByUserId(user_id, curriculum_type, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/curriculum/get-approved-curriculums/${user_id}/${curriculum_type}`,
+        `/api/v1/curriculum/get-approved-curriculums/${user_id}/${curriculum_type}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

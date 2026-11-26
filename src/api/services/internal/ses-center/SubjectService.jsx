@@ -5,7 +5,7 @@ class SubjectService {
    getAllSubjects (instituteId, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/subject/get-all-subjects/${instituteId}`,
+        `/api/v1/subject/get-all-subjects/${instituteId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -17,7 +17,7 @@ class SubjectService {
   }
   submitSubject(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/subject/submit`, data, {
+      .post(`/api/v1/subject/submit`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -27,7 +27,7 @@ class SubjectService {
   }
   updateSubject(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/subject/update`, data, {
+      .post(`/api/v1/subject/update`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -39,7 +39,7 @@ class SubjectService {
   deleteSubject(subjectId, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/subject/delete/${subjectId}`,
+        `/api/v1/subject/delete/${subjectId}`,
         {},
         {
           headers: {
@@ -55,7 +55,7 @@ class SubjectService {
   getSubjectByApplicationNo(applicationNo, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/subject/get-subject-by-application-no/${applicationNo}`,
+        `/api/v1/subject/get-subject-by-application-no/${applicationNo}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -68,7 +68,7 @@ class SubjectService {
 
   verifySubject(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/subject/verify-subject`, data, {
+      .post(`/api/v1/subject/verify-subject`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

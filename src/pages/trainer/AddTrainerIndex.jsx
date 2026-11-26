@@ -40,13 +40,12 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import FileUpload from "../../components/file/FileUpload";
-import { Formik, Form, FieldArray } from "formik";
+import { Formik, Form } from "formik";
 import { useSelector } from "react-redux";
 import * as Yup from "yup";
 import { toast } from "react-toastify";
 import CommonService from "../../api/services/internal/common/CommonService";
 import ApplyAccreditedCourseService from "../../api/services/internal/course/ApplyAccreditedCourseService";
-import ApplyNonAccreditedCourseService from "../../api/services/internal/course/ApplyNonAccreditedCourseService";
 import AddTrainerService from "../../api/services/internal/trainer/AddTrainerService";
 import InstituteRegistrationService from "../../api/services/internal/registration/InstituteRegistrationService";
 
@@ -105,51 +104,29 @@ FormSection.propTypes = {
   children: PropTypes.node,
 };
 
-// "n course(s)" with the course names in a tooltip
-const CoursesCell = ({ courses, getCourseTypeName }) => {
+// the course names, one per line
+const CoursesCell = ({ courses }) => {
   if (!courses?.length) return "-";
   return (
-    <Tooltip
-      arrow
-      title={
-        <Box>
-          {courses.map((course) => (
-            <div key={`${course.courseTypeId}-${course.courseId}`}>
-              {getCourseTypeName(course.courseTypeId)}: {course.courseName}
-            </div>
-          ))}
-        </Box>
-      }
-    >
-      <span>
-        {courses.length} course{courses.length === 1 ? "" : "s"}
-      </span>
-    </Tooltip>
+    <Box>
+      {courses.map((course) => (
+        <div key={course.courseId}>{course.courseName}</div>
+      ))}
+    </Box>
   );
 };
 
 CoursesCell.propTypes = {
   courses: PropTypes.array,
-  getCourseTypeName: PropTypes.func.isRequired,
 };
 
 const DIALOG_TITLES = { add: "Add New Trainer", edit: "Edit Trainer Details" };
-
-const coursePlaceholder = (courseTypeId, loadingCourses) => {
-  if (!courseTypeId) return "Select course type first";
-  return loadingCourses ? "Loading courses..." : "-select-";
-};
 
 const submitLabel = (loading, dialogMode) => {
   if (loading) return "Saving...";
   return dialogMode === "add" ? "Save Trainer" : "Update Trainer";
 };
 
-// changing the course type clears the chosen course
-const handleCourseTypeChange = (formik, index, e) => {
-  formik.handleChange(e);
-  formik.setFieldValue(`courses.${index}.courseId`, "");
-};
 
 const AddTrainerIndex = () => {
   const [trainers, setTrainers] = useState([]);
@@ -167,14 +144,11 @@ const AddTrainerIndex = () => {
   const [genders, setGenders] = useState([]);
   const [academicQualifications, setAcademicQualifications] = useState([]);
   const [employmentTypes, setEmploymentTypes] = useState([]);
-  const [courseTypes, setCourseTypes] = useState([]);
   const [instituteId, setInstituteId] = useState(null);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // Course related states
   const [accreditedCourses, setAccreditedCourses] = useState([]);
-  const [nonAccreditedCourses, setNonAccreditedCourses] = useState([]);
-  const [loadingCourses, setLoadingCourses] = useState(false);
   const access_token = useSelector((state) => state.auth.accessToken);
   const actionId = useSelector((state) => state.auth.id);
   const registration_no = useSelector((state) => state.auth.userId);
@@ -195,9 +169,7 @@ const AddTrainerIndex = () => {
         fetchAcademicQualification(),
         fetchGenders(),
         fetchEmploymentType(),
-        fetchCourseTypes(),
         fetchAccreditedCourses(),
-        fetchNonAccreditedCourses(),
       ]);
       setIsDataLoaded(true);
     } catch (error) {
@@ -275,7 +247,7 @@ const AddTrainerIndex = () => {
 
     const coursesWithNames = parsedCourses.map((course) => ({
       ...course,
-      courseName: getCourseName(course.courseTypeId, course.courseId),
+      courseName: getCourseName(course.courseId),
     }));
 
     return {
@@ -322,16 +294,6 @@ const AddTrainerIndex = () => {
     }
   };
 
-  const fetchCourseTypes = async () => {
-    try {
-      const courseTypesResponse = await CommonService.getByParentId(13);
-      setCourseTypes(courseTypesResponse.data);
-    } catch (error) {
-      console.error("Error fetching course types:", error);
-      toast.error("Failed to fetch course types");
-    }
-  };
-
   const fetchEmploymentType = async () => {
     try {
       const employmentType = await CommonService.getByParentId(11);
@@ -343,7 +305,6 @@ const AddTrainerIndex = () => {
   };
 
   const fetchAccreditedCourses = async () => {
-    setLoadingCourses(true);
     try {
       const response =
         await ApplyAccreditedCourseService.getAccreditedApprovedCourseByUserId(
@@ -355,26 +316,6 @@ const AddTrainerIndex = () => {
       console.error("Error fetching accredited courses:", error);
       toast.error("Failed to fetch accredited courses");
       setAccreditedCourses([]);
-    } finally {
-      setLoadingCourses(false);
-    }
-  };
-
-  const fetchNonAccreditedCourses = async () => {
-    setLoadingCourses(true);
-    try {
-      const response =
-        await ApplyNonAccreditedCourseService.getNonAccreditedApprovedCourseByUserId(
-          registration_no,
-          access_token,
-        );
-      setNonAccreditedCourses(response.data);
-    } catch (error) {
-      console.error("Error fetching non-accredited courses:", error);
-      toast.error("Failed to fetch non-accredited courses");
-      setNonAccreditedCourses([]);
-    } finally {
-      setLoadingCourses(false);
     }
   };
 
@@ -412,34 +353,10 @@ const AddTrainerIndex = () => {
     );
   };
 
-  const getCourseName = (courseTypeId, courseId) => {
-    const coursesList = getCoursesByType(courseTypeId);
-    const course = coursesList.find((c) => String(c.id) === String(courseId));
+  // trainer courses are the institute's approved BQF (accredited) courses
+  const getCourseName = (courseId) => {
+    const course = accreditedCourses.find((c) => String(c.id) === String(courseId));
     return getCourseLabel(course) || `Course ID: ${courseId}`;
-  };
-
-  // Maps the actual course type names from the API:
-  //   "BQF Programme"                          -> accredited courses
-  //   "Non-BQF Programme more than 140 hours"  -> non-accredited courses
-  const getCoursesByType = (courseTypeValue) => {
-    if (!courseTypeValue) return [];
-
-    const selectedCourseType = courseTypes.find(
-      (type) => String(type.id) === String(courseTypeValue),
-    );
-
-    if (!selectedCourseType) return [];
-
-    const name = (selectedCourseType.name || "").trim().toLowerCase();
-
-    // "Non-BQF" must be checked first so it is not swallowed by the "bqf" branch
-    if (name.includes("non-bqf") || name.includes("non bqf")) {
-      return nonAccreditedCourses;
-    }
-    if (name.includes("bqf")) {
-      return accreditedCourses;
-    }
-    return [];
   };
 
   const handleChangePage = (event, newPage) => setPage(newPage);
@@ -567,7 +484,6 @@ const AddTrainerIndex = () => {
         description: selectedTrainer.description || "",
         active: selectedTrainer.active || "Y",
         files: selectedTrainer.files || [],
-        courses: selectedTrainer.courses || [],
       };
     }
     return {
@@ -587,7 +503,6 @@ const AddTrainerIndex = () => {
       description: "",
       active: "Y",
       files: [],
-      courses: [],
     };
   };
 
@@ -632,12 +547,6 @@ const AddTrainerIndex = () => {
       "Description must be at most 500 characters",
     ),
     files: Yup.array().min(0, "Optional"),
-    courses: Yup.array().of(
-      Yup.object().shape({
-        courseTypeId: Yup.string().required("Course type is required"),
-        courseId: Yup.string().required("Course is required"),
-      }),
-    ),
   });
 
   const fileToBase64 = (file) =>
@@ -666,13 +575,6 @@ const AddTrainerIndex = () => {
         values.files.map((file) => fileToBase64(file)),
       );
 
-      const processedCourses = values.courses.map((course) => {
-        return {
-          courseTypeId: parseInt(course.courseTypeId),
-          courseId: parseInt(course.courseId),
-        };
-      });
-
       const payload = {
         id: dialogMode === "edit" ? values.id : null,
         citizenId: values.citizenId || null,
@@ -691,7 +593,6 @@ const AddTrainerIndex = () => {
         instituteId: instituteId,
         createdBy: actionId,
         updatedBy: actionId,
-        courses: processedCourses,
       };
 
       let response;
@@ -749,13 +650,6 @@ const AddTrainerIndex = () => {
     return trainer.workPermitNo;
   };
 
-  const getCourseTypeName = (courseTypeId) => {
-    const courseType = courseTypes.find(
-      (type) => String(type.id) === String(courseTypeId),
-    );
-    return courseType?.name || "";
-  };
-
   if (!isDataLoaded) {
     return (
       <Paper
@@ -785,19 +679,6 @@ const AddTrainerIndex = () => {
       </Paper>
     );
   }
-
-  const courseTypeOptions = courseTypes.map((type) => (
-    <MenuItem key={type.id} value={type.id}>
-      {type.name}
-    </MenuItem>
-  ));
-
-  const renderCourseOptions = (courseTypeId) =>
-    getCoursesByType(courseTypeId).map((c) => (
-      <MenuItem key={c.id} value={c.id}>
-        {getCourseLabel(c)}
-      </MenuItem>
-    ));
 
   return (
     <Paper elevation={3} style={{ padding: 20, margin: 10 }}>
@@ -855,7 +736,7 @@ const AddTrainerIndex = () => {
               <TableCell>Employment Type</TableCell>
               <TableCell>Mobile No.</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Courses</TableCell>
+              <TableCell>Programme</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Action</TableCell>
             </TableRow>
@@ -876,10 +757,7 @@ const AddTrainerIndex = () => {
                   <TableCell>{trainer.mobileNo || "-"}</TableCell>
                   <TableCell>{trainer.email || "-"}</TableCell>
                   <TableCell>
-                    <CoursesCell
-                      courses={trainer.courses}
-                      getCourseTypeName={getCourseTypeName}
-                    />
+                    <CoursesCell courses={trainer.courses} />
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -1385,163 +1263,6 @@ const AddTrainerIndex = () => {
                         />
                       </Grid>
                     </Grid>
-                  </FormSection>
-
-                  {/* Course Assignment Section */}
-                  <FormSection title="Course Assignment">
-                    <FieldArray name="courses">
-                      {({ push, remove }) => (
-                        <>
-                          {formik.values.courses.map((course, index) => (
-                            <Box
-                              key={index}
-                              sx={{
-                                mb: 3,
-                                p: 2,
-                                border: "1px solid",
-                                borderColor: "divider",
-                                borderRadius: 1,
-                              }}
-                            >
-                              <Grid container spacing={2} alignItems="center">
-                                <Grid item size={{ xs: 12, md: 5 }}>
-                                  <TextField
-                                    select
-                                    fullWidth
-                                    label={
-                                      <RequiredLabel>Course Type</RequiredLabel>
-                                    }
-                                    name={`courses.${index}.courseTypeId`}
-                                    size="small"
-                                    value={course.courseTypeId}
-                                    onChange={handleCourseTypeChange.bind(
-                                      null,
-                                      formik,
-                                      index,
-                                    )}
-                                    onBlur={formik.handleBlur}
-                                    error={
-                                      formik.touched.courses?.[index]
-                                        ?.courseTypeId &&
-                                      Boolean(
-                                        formik.errors.courses?.[index]
-                                          ?.courseTypeId,
-                                      )
-                                    }
-                                    helperText={
-                                      formik.touched.courses?.[index]
-                                        ?.courseTypeId &&
-                                      formik.errors.courses?.[index]
-                                        ?.courseTypeId
-                                    }
-                                    slotProps={{
-                                      input: {
-                                        readOnly: dialogMode === "view",
-                                      },
-                                    }}
-                                  >
-                                    <MenuItem value="">-select-</MenuItem>
-                                    {courseTypeOptions}
-                                  </TextField>
-                                </Grid>
-
-                                <Grid item size={{ xs: 12, md: 6 }}>
-                                  <TextField
-                                    select
-                                    fullWidth
-                                    label={
-                                      <RequiredLabel>Course Name</RequiredLabel>
-                                    }
-                                    name={`courses.${index}.courseId`}
-                                    size="small"
-                                    value={course.courseId}
-                                    onChange={formik.handleChange}
-                                    onBlur={formik.handleBlur}
-                                    disabled={
-                                      !course.courseTypeId || loadingCourses
-                                    }
-                                    error={
-                                      formik.touched.courses?.[index]
-                                        ?.courseId &&
-                                      Boolean(
-                                        formik.errors.courses?.[index]
-                                          ?.courseId,
-                                      )
-                                    }
-                                    helperText={
-                                      formik.touched.courses?.[index]
-                                        ?.courseId &&
-                                      formik.errors.courses?.[index]?.courseId
-                                    }
-                                    slotProps={{
-                                      input: {
-                                        readOnly: dialogMode === "view",
-                                      },
-                                    }}
-                                  >
-                                    <MenuItem value="">
-                                      {coursePlaceholder(
-                                        course.courseTypeId,
-                                        loadingCourses,
-                                      )}
-                                    </MenuItem>
-                                    {renderCourseOptions(course.courseTypeId)}
-                                  </TextField>
-                                </Grid>
-
-                                {dialogMode !== "view" && (
-                                  <Grid item size={{ xs: 12, md: 1 }}>
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        justifyContent: "center",
-                                        alignItems: "center",
-                                        height: "100%",
-                                      }}
-                                    >
-                                      <IconButton
-                                        color="error"
-                                        onClick={remove.bind(null, index)}
-                                      >
-                                        <DeleteIcon />
-                                      </IconButton>
-                                    </Box>
-                                  </Grid>
-                                )}
-                              </Grid>
-                            </Box>
-                          ))}
-
-                          {dialogMode !== "view" && (
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              startIcon={<AddIcon />}
-                              onClick={() =>
-                                push({
-                                  courseTypeId: "",
-                                  courseId: "",
-                                })
-                              }
-                              sx={{ mt: 1 }}
-                            >
-                              Add Course
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </FieldArray>
-
-                    {dialogMode === "view" &&
-                      formik.values.courses?.length === 0 && (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ mt: 1 }}
-                        >
-                          No courses assigned
-                        </Typography>
-                      )}
                   </FormSection>
 
                   {/* Supporting Documents Section */}
