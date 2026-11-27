@@ -1,18 +1,22 @@
 import writeXlsxFile from "write-excel-file/universal";
 import { saveAs } from "file-saver";
 
-// numbers, booleans, text and dates are kept as they are; anything else becomes text
+const isPlainCellValue = (value) =>
+  typeof value === "string" ||
+  typeof value === "number" ||
+  typeof value === "boolean" ||
+  value instanceof Date;
+
+// always a cell object: numbers, booleans, text and dates kept as they are,
+// empty values blank, anything else as text
 const toCell = (value) => {
-  if (value === null || value === undefined) return "";
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    value instanceof Date
-  ) {
-    return value;
+  let cellValue = "";
+  if (isPlainCellValue(value)) {
+    cellValue = value;
+  } else if (value !== null && value !== undefined) {
+    cellValue = String(value);
   }
-  return String(value);
+  return { value: cellValue };
 };
 
 export const exportToExcel = async (data, fileName = "Report") => {
@@ -20,8 +24,11 @@ export const exportToExcel = async (data, fileName = "Report") => {
   const headers = data && data.length > 0 ? Object.keys(data[0]) : [];
   const sheetData =
     headers.length > 0
-      ? [headers, ...data.map((item) => headers.map((h) => toCell(item[h])))]
-      : [[""]];
+      ? [
+          headers.map((h) => toCell(h)),
+          ...data.map((item) => headers.map((h) => toCell(item[h]))),
+        ]
+      : [[toCell("")]];
 
   const blob = await writeXlsxFile(sheetData, { sheet: "Sheet1" }).toBlob();
 

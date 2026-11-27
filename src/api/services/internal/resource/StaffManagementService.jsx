@@ -11,6 +11,18 @@ class StaffManagementService {
       .then((response) => response)
       .catch((error) => error);
   }
+  // { exists, message }: is this CID / reference no already staff of the institute?
+  checkStaffDuplicate({ instituteId, citizenId, referenceNo, excludeId }, token) {
+    return apiClient
+      .get(`/api/v1/resource-management/check-staff-duplicate`, {
+        params: { instituteId, citizenId, referenceNo, excludeId },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
   getInstituteStaff(instituteId, token) {
     return apiClient
       .get(

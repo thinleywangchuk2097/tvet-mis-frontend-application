@@ -37,6 +37,15 @@ class DatahubService {
       .then((response) => response)
       .catch((error) => error);
   }
+
+  getCivilServantDetails(cid) {
+    return apiClient
+      .get(
+        `/api/v1/public/data/civil-servant-details/${encodeURIComponent(cid)}`,
+      )
+      .then((response) => response)
+      .catch((error) => error);
+  }
 }
 
 export default new DatahubService();
