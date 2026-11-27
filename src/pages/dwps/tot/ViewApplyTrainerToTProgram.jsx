@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Paper,
   Typography,
@@ -24,7 +24,6 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Divider,
   Fade,
   LinearProgress,
   Tooltip,
@@ -58,23 +57,26 @@ const parseModules = (val) => {
   }
 };
 
-const normalizeAnnouncement = (raw = {}, applicationNo) => ({
-  id: raw.id ?? null,
-  applicationNo: raw.application_no ?? applicationNo,
-  programName: raw.program_name ?? raw.institute_name ?? "—",
-  programCode: raw.program_code ?? "—",
-  programTypeId: raw.program_type_id ?? null,
-  applicationStartDate: raw.application_start_date ?? null,
-  applicationEndDate: raw.application_end_date ?? null,
-  programStartDate: raw.program_start_date ?? null,
-  programEndDate: raw.program_end_date ?? null,
-  maxParticipants: raw.max_participants ?? "—",
-  venue: raw.venue ?? "—",
-  eligibilityCriteria: raw.eligibility_criteria ?? "",
-  remarks: raw.remarks ?? "",
-  instituteName: raw.institute_name ?? "",
-  statusId: raw.status_id ?? null,
-});
+const normalizeAnnouncement = (row, applicationNo) => {
+  const raw = row ?? {};
+  return {
+    id: raw.id ?? null,
+    applicationNo: raw.application_no ?? applicationNo,
+    programName: raw.program_name ?? raw.institute_name ?? "—",
+    programCode: raw.program_code ?? "—",
+    programTypeId: raw.program_type_id ?? null,
+    applicationStartDate: raw.application_start_date ?? null,
+    applicationEndDate: raw.application_end_date ?? null,
+    programStartDate: raw.program_start_date ?? null,
+    programEndDate: raw.program_end_date ?? null,
+    maxParticipants: raw.max_participants ?? "—",
+    venue: raw.venue ?? "—",
+    eligibilityCriteria: raw.eligibility_criteria ?? "",
+    remarks: raw.remarks ?? "",
+    instituteName: raw.institute_name ?? "",
+    statusId: raw.status_id ?? null,
+  };
+};
 
 const normalizeTrainers = (rows = []) => {
   const seen = new Set();
@@ -95,19 +97,19 @@ const normalizeTrainers = (rows = []) => {
             (Number(a.id) || 0) - (Number(b.id) || 0),
         )
         .map((m) => ({
-        id: m.id,
-        moduleOrder: m.moduleOrder ?? null,
-        moduleCode: m.moduleCode ?? "",
-        moduleName: m.moduleName ?? "",
-        duration: m.duration ?? "",
-        weightage: m.weightage ?? "",
-        description: m.description ?? "",
-        contents: (m.contents ?? []).map((c) => ({
-          id: c.id,
-          courseContent: c.courseContent ?? "",
-          fullMark: Number(c.fullMark) || 0,
-        })),
-      }));
+          id: m.id,
+          moduleOrder: m.moduleOrder ?? null,
+          moduleCode: m.moduleCode ?? "",
+          moduleName: m.moduleName ?? "",
+          duration: m.duration ?? "",
+          weightage: m.weightage ?? "",
+          description: m.description ?? "",
+          contents: (m.contents ?? []).map((c) => ({
+            id: c.id,
+            courseContent: c.courseContent ?? "",
+            fullMark: Number(c.fullMark) || 0,
+          })),
+        }));
 
       return {
         id: Number(t.trainer_id),
@@ -116,7 +118,11 @@ const normalizeTrainers = (rows = []) => {
         grade: t.grade ?? null,
         result: t.result ?? null,
         certificateNo: t.certificate_no ?? null,
-        isSelected: t.is_selected === "1" || t.is_selected === 1 || t.is_selected === true || t.is_selected === "true",
+        isSelected:
+          t.is_selected === "1" ||
+          t.is_selected === 1 ||
+          t.is_selected === true ||
+          t.is_selected === "true",
         name: t.name ?? t.trainer_name ?? `Applicant #${t.id ?? idx + 1}`,
         cid: t.cid_no ?? t.cid ?? t.CID ?? "—",
         email: t.email ?? "—",
@@ -434,14 +440,6 @@ const ViewApplyTrainerToTProgram = () => {
     }));
   };
 
-  const getTotalMarks = useCallback(
-    (trainerId) => {
-      const t = trainers.find((x) => x.id === trainerId);
-      return t ? getTrainerTotal(t, traineeMarks) : 0;
-    },
-    [trainers, traineeMarks],
-  );
-
   // ---------- Per-module save ----------
   const handleSaveModule = async (trainer, module) => {
     const key = `${trainer.id}-${module.id}`;
@@ -530,7 +528,10 @@ const ViewApplyTrainerToTProgram = () => {
         throw response;
       }
       setTrainers((prev) =>
-        prev.map((t) => ({ ...t, isSelected: selectedTrainers.includes(t.id) })),
+        prev.map((t) => ({
+          ...t,
+          isSelected: selectedTrainers.includes(t.id),
+        })),
       );
       toast.success(
         response?.data?.message || "Trainer selection saved successfully",
@@ -555,7 +556,9 @@ const ViewApplyTrainerToTProgram = () => {
     if (idx <= 0) return false;
     return trainer.modules
       .slice(0, idx)
-      .some((m) => getModuleContents(m).length > 0 && !isModuleSaved(trainer, m));
+      .some(
+        (m) => getModuleContents(m).length > 0 && !isModuleSaved(trainer, m),
+      );
   };
 
   // Overall application completion:
@@ -582,14 +585,14 @@ const ViewApplyTrainerToTProgram = () => {
 
     // Before selection we don't know the size of the later stages,
     // so count them as at least one unit each.
-    const total =
-      1 + Math.max(modulesTotal, 1) + Math.max(certTotal, 1);
+    const total = 1 + Math.max(modulesTotal, 1) + Math.max(certTotal, 1);
     const done = selectionDone + modulesDone + certDone;
     const percent = completed ? 100 : Math.round((done / total) * 100);
 
     let stage = "Select trainers";
     if (selectionDone && modulesDone < modulesTotal) stage = "Enter marks";
-    else if (selectionDone && certDone < certTotal) stage = "Generate mark sheets";
+    else if (selectionDone && certDone < certTotal)
+      stage = "Generate mark sheets";
     else if (completed) stage = "Application completed";
     else if (selectionDone && certDone === certTotal)
       stage = "Ready to complete — click Done";
@@ -949,14 +952,22 @@ const ViewApplyTrainerToTProgram = () => {
                   },
                 }}
               >
-                <Typography className="step" variant="caption" color="text.secondary">
+                <Typography
+                  className="step"
+                  variant="caption"
+                  color="text.secondary"
+                >
                   <CheckCircleIcon
                     sx={{ fontSize: 15 }}
                     color={progress.selectedCount > 0 ? "success" : "disabled"}
                   />
                   Selection: {progress.selectedCount} trainer(s)
                 </Typography>
-                <Typography className="step" variant="caption" color="text.secondary">
+                <Typography
+                  className="step"
+                  variant="caption"
+                  color="text.secondary"
+                >
                   <CheckCircleIcon
                     sx={{ fontSize: 15 }}
                     color={
@@ -966,9 +977,14 @@ const ViewApplyTrainerToTProgram = () => {
                         : "disabled"
                     }
                   />
-                  Marks: {progress.modulesDone} / {progress.modulesTotal} module(s)
+                  Marks: {progress.modulesDone} / {progress.modulesTotal}{" "}
+                  module(s)
                 </Typography>
-                <Typography className="step" variant="caption" color="text.secondary">
+                <Typography
+                  className="step"
+                  variant="caption"
+                  color="text.secondary"
+                >
                   <CheckCircleIcon
                     sx={{ fontSize: 15 }}
                     color={
@@ -1486,8 +1502,8 @@ const ViewApplyTrainerToTProgram = () => {
                                   locked
                                     ? "Save the previous module marks first"
                                     : !allFilled
-                                    ? "Fill all marks in this module before saving"
-                                    : ""
+                                      ? "Fill all marks in this module before saving"
+                                      : ""
                                 }
                               >
                                 {isSaving
@@ -1836,22 +1852,22 @@ const ViewApplyTrainerToTProgram = () => {
         </Button>
         {activeStep === steps.length - 1 ? (
           !allCertificatesGenerated && (
-          <Button
-            color="success"
-            startIcon={
-              submitting ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <PictureAsPdfIcon />
-              )
-            }
-            onClick={() => setConfirmOpen(true)}
-            size="small"
-            disabled={submitting || completing || completed}
-            variant="contained"
-          >
-            {submitting ? "Generating..." : "Generate Certificate"}
-          </Button>
+            <Button
+              color="success"
+              startIcon={
+                submitting ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <PictureAsPdfIcon />
+                )
+              }
+              onClick={() => setConfirmOpen(true)}
+              size="small"
+              disabled={submitting || completing || completed}
+              variant="contained"
+            >
+              {submitting ? "Generating..." : "Generate Certificate"}
+            </Button>
           )
         ) : (
           <Button
@@ -1917,9 +1933,9 @@ const ViewApplyTrainerToTProgram = () => {
             <strong>{announcement?.programName}</strong>.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {selectedTrainers.length} trainer(s) selected, marks saved and
-            mark sheets generated. The task will be marked as completed and
-            removed from the task list.
+            {selectedTrainers.length} trainer(s) selected, marks saved and mark
+            sheets generated. The task will be marked as completed and removed
+            from the task list.
           </Typography>
         </DialogContent>
         <DialogActions>

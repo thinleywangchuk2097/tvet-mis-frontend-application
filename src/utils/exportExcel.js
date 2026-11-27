@@ -1,25 +1,36 @@
-import ExcelJS from "exceljs";
+import writeXlsxFile from "write-excel-file/universal";
 import { saveAs } from "file-saver";
 
-export const exportToExcel = async (data, fileName = "Report") => {
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet("Sheet1");
+const isPlainCellValue = (value) =>
+  typeof value === "string" ||
+  typeof value === "number" ||
+  typeof value === "boolean" ||
+  value instanceof Date;
 
-  // Add headers and data
-  if (data && data.length > 0) {
-    const headers = Object.keys(data[0]);
-    worksheet.addRow(headers);
-
-    data.forEach((item) => {
-      worksheet.addRow(headers.map((header) => item[header] ?? ""));
-    });
+// always a cell object: numbers, booleans, text and dates kept as they are,
+// empty values blank, anything else as text
+const toCell = (value) => {
+  let cellValue = "";
+  if (isPlainCellValue(value)) {
+    cellValue = value;
+  } else if (value !== null && value !== undefined) {
+    cellValue = String(value);
   }
+  return { value: cellValue };
+};
 
-  const buffer = await workbook.xlsx.writeBuffer();
+export const exportToExcel = async (data, fileName = "Report") => {
+  // Sheet1: column names in the first row, then one row per record
+  const headers = data && data.length > 0 ? Object.keys(data[0]) : [];
+  const sheetData =
+    headers.length > 0
+      ? [
+          headers.map((h) => toCell(h)),
+          ...data.map((item) => headers.map((h) => toCell(item[h]))),
+        ]
+      : [[toCell("")]];
 
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const blob = await writeXlsxFile(sheetData, { sheet: "Sheet1" }).toBlob();
 
   saveAs(blob, `${fileName}.xlsx`);
 };

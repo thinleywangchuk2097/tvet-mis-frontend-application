@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class GenerateTracerService {
   getTracerQuestionDropdownType(token) {
     return apiClient
-      .get(`/api/v1/user/management/tracer/get-tracer-question-dropdown`, {
+      .get(`/api/v1/tracer/get-tracer-question-dropdown`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -14,7 +14,7 @@ class GenerateTracerService {
 
   getParentTracerTypes(token) {
     return apiClient
-      .get(`/api/v1/user/management/tracer/get-parent-tracer-types`, {
+      .get(`/api/v1/tracer/get-parent-tracer-types`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -25,7 +25,7 @@ class GenerateTracerService {
 
   saveTracerQuestions(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tracer/save-tracer-questions`, data, {
+      .post(`/api/v1/tracer/save-tracer-questions`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -36,7 +36,7 @@ class GenerateTracerService {
 
   getTracerAllApplications(token) {
     return apiClient
-      .get(`/api/v1/user/management/tracer/get-all-tracers`, {
+      .get(`/api/v1/tracer/get-all-tracers`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -49,7 +49,7 @@ class GenerateTracerService {
   getTracerResponses(application_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/tracer/get-tracer-responses/${application_no}`,
+        `/api/v1/tracer/get-tracer-responses/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -62,7 +62,7 @@ class GenerateTracerService {
 
   getTracerDetailsByApplicationNo(application_no, token) {
     return apiClient
-      .get(`/api/v1/user/management/tracer/get-tracer/${application_no}`, {
+      .get(`/api/v1/tracer/get-tracer/${application_no}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -73,7 +73,7 @@ class GenerateTracerService {
   
   sendTraineeTracerSurvey(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tracer/send-trainee-survey`, data, {
+      .post(`/api/v1/tracer/send-trainee-survey`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -83,7 +83,7 @@ class GenerateTracerService {
   }
   sendEmployerTracerSurvey(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/tracer/send-employer-survey`, data, {
+      .post(`/api/v1/tracer/send-employer-survey`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

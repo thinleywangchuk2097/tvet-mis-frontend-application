@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class CourseEnrollmentService {
   submitCourseAnnouncement(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/course-announcement/submit`, data, {
+      .post(`/api/v1/course-announcement/submit`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -15,7 +15,7 @@ class CourseEnrollmentService {
   getCourseDetailsAnnouncementByUserId(user_id, service_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/course-announcement/get-application-details/${user_id}/${service_id}`,
+        `/api/v1/course-announcement/get-application-details/${user_id}/${service_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -119,7 +119,7 @@ class CourseEnrollmentService {
   getReAssessmentServiceName(token) {
     return apiClient
       .get(
-        `/api/v1/user/management/course-announcement/get-reassessment-service-name`,
+        `/api/v1/course-announcement/get-reassessment-service-name`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -133,7 +133,7 @@ class CourseEnrollmentService {
   getTraineeDetailsById(traineeId, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/course-announcement/get-trainee-verification-details/${traineeId}`,
+        `/api/v1/course-announcement/get-trainee-verification-details/${traineeId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -176,7 +176,7 @@ class CourseEnrollmentService {
    getListSelectedBQFTraineeForExcel(application_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-list-selected-Trainee-bqf/${application_no}`,
+        `/api/v1/accredited-course/get-list-selected-Trainee-bqf/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

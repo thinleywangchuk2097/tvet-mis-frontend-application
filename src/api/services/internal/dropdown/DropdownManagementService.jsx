@@ -4,7 +4,7 @@ class DropdownManagementService {
   createDropdown(data, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/dropdown-management/create-dropdown`,
+        `/api/v1/dropdown-management/create-dropdown`,
         data,
         {
           headers: {
@@ -19,7 +19,7 @@ class DropdownManagementService {
   updateDropdown(data, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/dropdown-management/update-dropdown`,
+        `/api/v1/dropdown-management/update-dropdown`,
         data,
         {
           headers: {
@@ -34,7 +34,7 @@ class DropdownManagementService {
   deleteDropdown(data, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/dropdown-management/delete-dropdown`,
+        `/api/v1/dropdown-management/delete-dropdown`,
         data,
         {
           headers: {
@@ -47,7 +47,7 @@ class DropdownManagementService {
   }
   getAllDropdownLists(token) {
     return apiClient
-      .get(`/api/v1/user/management/dropdown-management/get-dropdown-lists`, {
+      .get(`/api/v1/dropdown-management/get-dropdown-lists`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

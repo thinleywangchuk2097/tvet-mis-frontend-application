@@ -99,17 +99,17 @@ class InstituteRegistrationService {
   // Institute change: verify (status 56) -> registration saved to audit, then the change is applied
   verifyInstituteChange(data) {
     return apiClient
-      .post(`/api/v1/public/institute-registration/verify-institute-change`, data)
+      .post(
+        `/api/v1/public/institute-registration/verify-institute-change`,
+        data,
+      )
       .then((response) => response)
       .catch((error) => error);
   }
 
   // Institute change: reject (status 58) — same endpoint, registration is left unchanged
   rejectInstituteChange(data) {
-    return apiClient
-      .post(`/api/v1/public/institute-registration/verify-institute-change`, data)
-      .then((response) => response)
-      .catch((error) => error);
+    return this.verifyInstituteChange(data);
   }
 
   // Renewal period by latest SAR grade (C 2y, B 3y, A 4y, A+ 5y, else 1y)

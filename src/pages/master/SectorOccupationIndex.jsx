@@ -74,6 +74,39 @@ const sectorOccupationSchema = Yup.object().shape({
   newIscoCode: Yup.string(),
 });
 
+// Search + occupation filtering (displayOccupations is only for the table;
+// sector.occupations stays complete for editing)
+const filterSectors = (sectors, searchTerm, filterOccupationId) => {
+  const q = searchTerm.trim().toLowerCase();
+  const has = (v) =>
+    String(v || "")
+      .toLowerCase()
+      .includes(q);
+  const sameOccupation = (occ) => String(occ.id) === String(filterOccupationId);
+  const matchesSearch = (occ) => has(occ.occupationName) || has(occ.iscoCode);
+
+  return sectors
+    .map((sector) => {
+      let occs = sector.occupations;
+      if (filterOccupationId) occs = occs.filter(sameOccupation);
+      if (q && !has(sector.sectorName)) occs = occs.filter(matchesSearch);
+      return { ...sector, displayOccupations: occs };
+    })
+    .filter((sector) => {
+      const empty = sector.displayOccupations.length === 0;
+      // hide sectors with no matching occupations (unless the sector name itself matches the search)
+      return !(empty && (filterOccupationId || (q && !has(sector.sectorName))));
+    });
+};
+
+// message when the table has no rows
+const emptyTableMessage = (filterSectorId, filtering) => {
+  if (!filterSectorId) return "Select a Sector to view its occupations.";
+  return filtering
+    ? "No occupations found matching your filter."
+    : "No sectors available.";
+};
+
 const SectorOccupationIndex = () => {
   const theme = useTheme();
   const access_token = useSelector((state) => state.auth.accessToken);
@@ -105,7 +138,9 @@ const SectorOccupationIndex = () => {
         }));
       } else {
         const response =
-          await SectorOccupationService.getAllSectorOccupationsList(access_token);
+          await SectorOccupationService.getAllSectorOccupationsList(
+            access_token,
+          );
         source = transformApiData(response?.data);
       }
 
@@ -237,7 +272,9 @@ const SectorOccupationIndex = () => {
       // "all" = every sector with its occupations; otherwise one sector
       const response =
         sectorId === ALL_SECTORS
-          ? await SectorOccupationService.getAllSectorOccupationsList(access_token)
+          ? await SectorOccupationService.getAllSectorOccupationsList(
+              access_token,
+            )
           : await SectorOccupationService.getSectorOccupationsBySector(
               sectorId,
               access_token,
@@ -284,32 +321,7 @@ const SectorOccupationIndex = () => {
   // Search + occupation filtering (displayOccupations is only for the table;
   // sector.occupations stays complete for editing)
   useEffect(() => {
-    const q = searchTerm.trim().toLowerCase();
-    const has = (v) => String(v || "").toLowerCase().includes(q);
-
-    const result = sectors
-      .map((sector) => {
-        let occs = sector.occupations;
-        if (filterOccupationId) {
-          occs = occs.filter(
-            (occ) => String(occ.id) === String(filterOccupationId),
-          );
-        }
-        if (q && !has(sector.sectorName)) {
-          occs = occs.filter(
-            (occ) => has(occ.occupationName) || has(occ.iscoCode),
-          );
-        }
-        return { ...sector, displayOccupations: occs };
-      })
-      .filter((sector) => {
-        if (filterOccupationId && sector.displayOccupations.length === 0)
-          return false;
-        if (q && !has(sector.sectorName) && sector.displayOccupations.length === 0)
-          return false;
-        return true;
-      });
-
+    const result = filterSectors(sectors, searchTerm, filterOccupationId);
     setFilteredSectors(result);
     setPage(0);
   }, [searchTerm, sectors, filterOccupationId]);
@@ -649,10 +661,17 @@ const SectorOccupationIndex = () => {
             <Button
               variant="outlined"
               startIcon={
-                exporting ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />
+                exporting ? (
+                  <CircularProgress size={14} color="inherit" />
+                ) : (
+                  <DownloadIcon />
+                )
               }
               onClick={handleExportExcel}
-              disabled={exporting || (Boolean(filterSectorId) && filteredSectors.length === 0)}
+              disabled={
+                exporting ||
+                (Boolean(filterSectorId) && filteredSectors.length === 0)
+              }
               size="small"
             >
               {filterSectorId && filterSectorId !== ALL_SECTORS
@@ -928,11 +947,10 @@ const SectorOccupationIndex = () => {
                     <TableRow>
                       <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
                         <Typography variant="body2" color="text.secondary">
-                          {!filterSectorId
-                            ? "Select a Sector to view its occupations."
-                            : searchTerm || filterOccupationId
-                              ? "No occupations found matching your filter."
-                              : "No sectors available."}
+                          {emptyTableMessage(
+                            filterSectorId,
+                            searchTerm || filterOccupationId,
+                          )}
                         </Typography>
                       </TableCell>
                     </TableRow>

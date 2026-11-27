@@ -1113,7 +1113,7 @@ const TracerQuestionGenerator = () => {
       if (
         touched?.questionTypeId &&
         errors?.questionTypeId &&
-        !(question.subQuestions?.length > 0)
+        !question.subQuestions?.length
       ) {
         count++;
       }

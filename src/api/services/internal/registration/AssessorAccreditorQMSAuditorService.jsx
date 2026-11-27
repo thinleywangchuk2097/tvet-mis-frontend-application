@@ -37,6 +37,16 @@ class AssessorAccreditorQMSAuditorService {
       .catch((error) => error);
   }
 
+  // { exists, message }: does this CID / reference no already have a (not rejected) application?
+  checkDuplicateApplication(serviceId, { citizenId, referenceNo }) {
+    return apiClient
+      .get(`/api/v1/public/register/check-duplicate`, {
+        params: { serviceId, citizenId, referenceNo },
+      })
+      .then((response) => response)
+      .catch((error) => error);
+  }
+
   getApplicationByCitizenIdOrReferenceNo(
     citizenId,
     referenceNo,

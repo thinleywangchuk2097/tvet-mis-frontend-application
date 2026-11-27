@@ -4,7 +4,7 @@ class InstituteDashboardService {
   // registrationNo = logged-in institute user id (state.auth.userId)
   getInstituteDashboard(registrationNo, token) {
     return apiClient
-      .get(`/api/v1/user/management/dashboard/institute/${registrationNo}`, {
+      .get(`/api/v1/dashboard/institute/${registrationNo}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -19,7 +19,7 @@ class InstituteDashboardService {
     if (fromDate) params.fromDate = fromDate;
     if (toDate) params.toDate = toDate;
     return apiClient
-      .get(`/api/v1/user/management/dashboard/role-overview/${roleId}`, {
+      .get(`/api/v1/dashboard/role-overview/${roleId}`, {
         params,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -35,7 +35,7 @@ class InstituteDashboardService {
     if (fromDate) params.fromDate = fromDate;
     if (toDate) params.toDate = toDate;
     return apiClient
-      .get(`/api/v1/user/management/dashboard/admin-overview`, {
+      .get(`/api/v1/dashboard/admin-overview`, {
         params,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -48,7 +48,7 @@ class InstituteDashboardService {
   // TTTRC dashboards (Verifier 14 / Head 15): TOT + curriculum data and open tasks
   getTttrcOverview(roleId, token) {
     return apiClient
-      .get(`/api/v1/user/management/dashboard/tttrc-overview/${roleId}`, {
+      .get(`/api/v1/dashboard/tttrc-overview/${roleId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -60,7 +60,7 @@ class InstituteDashboardService {
   // DWPS 1 dashboard: curriculum applications, tracer surveys and open tasks
   getDwps1Overview(roleId, token) {
     return apiClient
-      .get(`/api/v1/user/management/dashboard/dwps1-overview/${roleId}`, {
+      .get(`/api/v1/dashboard/dwps1-overview/${roleId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

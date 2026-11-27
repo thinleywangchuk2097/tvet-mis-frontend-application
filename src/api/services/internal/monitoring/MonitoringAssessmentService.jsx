@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class MonitoringAssessmentService {
   getInstituteTypeDropdown(token) {
     return apiClient
-      .get(`/api/v1/user/management/monitoring/get-institute-type`, {
+      .get(`/api/v1/monitoring/get-institute-type`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -15,7 +15,7 @@ class MonitoringAssessmentService {
   getInstituteDropdown(service_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/monitoring/get-institutes-dropdown/${service_id}`,
+        `/api/v1/monitoring/get-institutes-dropdown/${service_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -27,7 +27,7 @@ class MonitoringAssessmentService {
   }
   submitMonitoringAssessment(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/monitoring/submit`, data, {
+      .post(`/api/v1/monitoring/submit`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -39,7 +39,7 @@ class MonitoringAssessmentService {
    getMonitoringAssessment(user_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/monitoring/get-monitoring-assessment/${user_id}`,
+        `/api/v1/monitoring/get-monitoring-assessment/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -52,7 +52,7 @@ class MonitoringAssessmentService {
 
   updateMonitoringAssessment(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/monitoring/verify`, data, {
+      .post(`/api/v1/monitoring/verify`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -64,7 +64,7 @@ class MonitoringAssessmentService {
    getMonitoringAssessmentByApplicationNo(applicationNo, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/monitoring/get-monitoring-assessment-details/${applicationNo}`,
+        `/api/v1/monitoring/get-monitoring-assessment-details/${applicationNo}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

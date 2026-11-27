@@ -1,6 +1,4 @@
-// StudentDetailsReport.jsx
-// SES centre student report: the centre's own students (same data as Add Student),
-// with filters, search, pagination and Excel export (same pattern as InstituteReportIndex).
+
 import { useState, useEffect, useMemo } from "react";
 import {
   Paper,
@@ -23,7 +21,6 @@ import {
   Divider,
   TablePagination,
   CircularProgress,
-  Chip,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -31,19 +28,14 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { exportToExcel } from "@/utils/exportExcel";
 import InstituteRegistrationService from "../../../api/services/internal/registration/InstituteRegistrationService";
-import StudentService from "../../../api/services/internal/ses-center/StudentService";
 import SubjectService from "../../../api/services/internal/ses-center/SubjectService";
+import StudentEnrollmentService from "../../../api/services/internal/ses-center/StudentEnrollmentService";
 import CommonService from "../../../api/services/internal/common/CommonService";
 
-// Same status ids as the Add Student page
-const STATUS_LIST = [
-  { id: 1, name: "Active", color: "success" },
-  { id: 2, name: "Inactive", color: "error" },
-  { id: 3, name: "Graduated", color: "info" },
-  { id: 4, name: "Suspended", color: "warning" },
-];
+const GENDER_PARENT_ID = 8;
+const ACADEMIC_QUALIFICATION_PARENT_ID = 18; // School Level
 
-// Compact bordered table (same look as the other reports/checklists)
+// Compact bordered table (same look as the other reports)
 const TABLE_STYLE = {
   borderCollapse: "collapse",
   "& th, & td": {
@@ -71,25 +63,12 @@ const isError = (res) => res instanceof Error || res?.isAxiosError;
 const listOf = (res) =>
   !isError(res) && Array.isArray(res?.data) ? res.data : [];
 
-const fmtDate = (d) => {
-  if (!d) return "";
-  const date = new Date(d);
-  if (Number.isNaN(date.getTime())) return String(d);
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const parseSubjects = (raw) => {
-  if (!raw) return [];
-  try {
-    const list = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
+const EMPTY_FILTERS = {
+  year: "",
+  subjectId: "",
+  schoolLevelId: "",
+  genderId: "",
+  search: "",
 };
 
 const StudentDetailsReport = () => {
@@ -100,29 +79,23 @@ const StudentDetailsReport = () => {
   const [students, setStudents] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [genders, setGenders] = useState([]);
-  const [dzongkhags, setDzongkhags] = useState([]);
+  const [schoolLevels, setSchoolLevels] = useState([]);
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [filters, setFilters] = useState({
-    currentClass: "",
-    genderId: "",
-    statusId: "",
-    subjectId: "",
-    search: "",
-  });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [detailsRes, genderRes, dzRes] = await Promise.all([
+        const [detailsRes, genderRes, levelRes] = await Promise.all([
           InstituteRegistrationService.getInstituteDetails(registration_no),
-          CommonService.getByParentId(8),
-          CommonService.getAllDzongkhags(),
+          CommonService.getByParentId(GENDER_PARENT_ID),
+          CommonService.getByParentId(ACADEMIC_QUALIFICATION_PARENT_ID),
         ]);
         setGenders(listOf(genderRes));
-        setDzongkhags(listOf(dzRes));
+        setSchoolLevels(listOf(levelRes));
 
         const instituteId = listOf(detailsRes)[0]?.institute_id;
         if (!instituteId) {
@@ -131,7 +104,7 @@ const StudentDetailsReport = () => {
         }
 
         const [studentRes, subjectRes] = await Promise.all([
-          StudentService.getAllStudents(instituteId, access_token),
+          StudentEnrollmentService.getAllEnrollments(instituteId, access_token),
           SubjectService.getAllSubjects(instituteId, access_token),
         ]);
         setStudents(listOf(studentRes));
@@ -147,75 +120,43 @@ const StudentDetailsReport = () => {
   }, [registration_no, access_token]);
 
   // ---------- lookups ----------
-  const genderName = (id) =>
-    genders.find((g) => String(g.id) === String(id))?.name || "";
-  const dzongkhagName = (id) =>
-    dzongkhags.find((d) => String(d.id) === String(id))?.dzonkhagName || "";
-  const subjectName = (id) => {
-    const s = subjects.find((x) => String(x.id) === String(id));
-    return s ? s.subject_name || s.subject_code : "";
-  };
-  const statusOf = (id) =>
-    STATUS_LIST.find((s) => s.id === Number(id ?? 1)) || {
-      name: "—",
-      color: "default",
-    };
+  const nameOf = (list, id) =>
+    list.find((x) => String(x.id) === String(id))?.name || "";
 
-  // Normalised rows used by the table and the export
-  const rows = useMemo(
+  // years that have enrolments, newest first
+  const years = useMemo(
     () =>
-      students.map((s) => {
-        const subjectIds = parseSubjects(s.subjects)
-          .map((x) => x.subjectId ?? x.subject_id)
-          .filter((x) => x !== undefined && x !== null);
-        return {
-          id: s.id,
-          studentCode: s.student_code || "",
-          name: [s.first_name, s.middle_name, s.last_name]
-            .filter(Boolean)
-            .join(" "),
-          citizenId: s.citizen_id || "",
-          genderId: s.gender_id,
-          dob: s.date_of_birth,
-          currentClass: s.current_class || "",
-          schoolName: s.school_name || "",
-          mobileNo: s.mobile_no || "",
-          email: s.email || "",
-          dzongkhagId: s.dzongkhag_id,
-          exactLocation: s.exact_location || "",
-          emergencyName: s.emergency_contact_name || "",
-          emergencyNo: s.emergency_contact_no || "",
-          enrollmentDate: s.enrollment_date || s.created_at,
-          statusId: Number(s.status_id ?? 1),
-          subjectIds: subjectIds.map(String),
-        };
-      }),
-    [students],
-  );
-
-  const classOptions = useMemo(
-    () =>
-      [...new Set(rows.map((r) => r.currentClass).filter(Boolean))].sort(
-        (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }),
+      [...new Set(students.map((s) => s.enrollment_year).filter(Boolean))].sort(
+        (a, b) => b - a,
       ),
-    [rows],
+    [students],
   );
 
   const filteredRows = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
-    return rows.filter(
-      (r) =>
-        (filters.currentClass === "" || r.currentClass === filters.currentClass) &&
-        (filters.genderId === "" || String(r.genderId) === filters.genderId) &&
-        (filters.statusId === "" || String(r.statusId) === filters.statusId) &&
-        (filters.subjectId === "" || r.subjectIds.includes(filters.subjectId)) &&
+    return students.filter(
+      (s) =>
+        (filters.year === "" || String(s.enrollment_year) === filters.year) &&
+        (filters.subjectId === "" ||
+          String(s.subject_id) === filters.subjectId) &&
+        (filters.schoolLevelId === "" ||
+          String(s.school_level_id) === filters.schoolLevelId) &&
+        (filters.genderId === "" || String(s.gender_id) === filters.genderId) &&
         (q === "" ||
-          r.name.toLowerCase().includes(q) ||
-          r.studentCode.toLowerCase().includes(q) ||
-          r.citizenId.toLowerCase().includes(q) ||
-          r.schoolName.toLowerCase().includes(q)),
+          (s.name || "").toLowerCase().includes(q) ||
+          (s.subject_name || "").toLowerCase().includes(q)),
     );
-  }, [rows, filters]);
+  }, [students, filters]);
+
+  // gender split of the filtered rows (shown above the table)
+  const genderCounts = useMemo(() => {
+    const counts = {};
+    filteredRows.forEach((s) => {
+      const label = nameOf(genders, s.gender_id) || "Not set";
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    return Object.entries(counts);
+  }, [filteredRows, genders]);
 
   const paginatedRows = filteredRows.slice(
     page * rowsPerPage,
@@ -229,13 +170,7 @@ const StudentDetailsReport = () => {
   };
 
   const handleClearFilters = () => {
-    setFilters({
-      currentClass: "",
-      genderId: "",
-      statusId: "",
-      subjectId: "",
-      search: "",
-    });
+    setFilters(EMPTY_FILTERS);
     setPage(0);
   };
 
@@ -243,24 +178,13 @@ const StudentDetailsReport = () => {
 
   // Excel export of the filtered rows (all pages)
   const handleExcelExport = () => {
-    const data = filteredRows.map((r, index) => ({
+    const data = filteredRows.map((s, index) => ({
       SlNo: index + 1,
-      StudentCode: r.studentCode,
-      Name: r.name,
-      CitizenID: r.citizenId,
-      Gender: genderName(r.genderId),
-      DateOfBirth: fmtDate(r.dob),
-      Class: r.currentClass,
-      School: r.schoolName,
-      Subjects: r.subjectIds.map(subjectName).filter(Boolean).join(", "),
-      MobileNo: r.mobileNo,
-      Email: r.email,
-      Dzongkhag: dzongkhagName(r.dzongkhagId),
-      Location: r.exactLocation,
-      EmergencyContact: r.emergencyName,
-      EmergencyContactNo: r.emergencyNo,
-      EnrollmentDate: fmtDate(r.enrollmentDate),
-      Status: statusOf(r.statusId).name,
+      Name: s.name || "",
+      Gender: nameOf(genders, s.gender_id),
+      SchoolLevel: nameOf(schoolLevels, s.school_level_id),
+      Subject: s.subject_name || "",
+      Year: s.enrollment_year || "",
     }));
     exportToExcel(data, `Student_Details_Report_${today}`);
   };
@@ -282,6 +206,25 @@ const StudentDetailsReport = () => {
     );
   }
 
+  const filterSelect = (name, label, allLabel, options) => (
+    <FormControl fullWidth size="small">
+      <InputLabel>{label}</InputLabel>
+      <Select
+        name={name}
+        value={filters[name]}
+        onChange={handleFilterChange}
+        label={label}
+      >
+        <MenuItem value="">{allLabel}</MenuItem>
+        {options.map((o) => (
+          <MenuItem key={o.value} value={o.value}>
+            {o.label}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+
   return (
     <Paper sx={{ p: 2, mt: 1 }}>
       <Typography variant="h6" mb={3}>
@@ -290,82 +233,41 @@ const StudentDetailsReport = () => {
 
       {/* Filter Section */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Class</InputLabel>
-            <Select
-              name="currentClass"
-              value={filters.currentClass}
-              onChange={handleFilterChange}
-              label="Class"
-            >
-              <MenuItem value="">All Classes</MenuItem>
-              {classOptions.map((c) => (
-                <MenuItem key={c} value={c}>
-                  {c}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        <Grid size={{ xs: 12, sm: 6, md: 1.75 }}>
+          {filterSelect(
+            "year",
+            "Year",
+            "All Years",
+            years.map((y) => ({ value: String(y), label: y })),
+          )}
         </Grid>
-
         <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Subject</InputLabel>
-            <Select
-              name="subjectId"
-              value={filters.subjectId}
-              onChange={handleFilterChange}
-              label="Subject"
-            >
-              <MenuItem value="">All Subjects</MenuItem>
-              {subjects.map((s) => (
-                <MenuItem key={s.id} value={String(s.id)}>
-                  {s.subject_name || s.subject_code}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {filterSelect(
+            "subjectId",
+            "Subject",
+            "All Subjects",
+            subjects.map((s) => ({
+              value: String(s.id),
+              label: s.subject_name || `Subject ${s.id}`,
+            })),
+          )}
         </Grid>
-
+        <Grid size={{ xs: 12, sm: 6, md: 2.25 }}>
+          {filterSelect(
+            "schoolLevelId",
+            "School Level",
+            "All Levels",
+            schoolLevels.map((l) => ({ value: String(l.id), label: l.name })),
+          )}
+        </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Gender</InputLabel>
-            <Select
-              name="genderId"
-              value={filters.genderId}
-              onChange={handleFilterChange}
-              label="Gender"
-            >
-              <MenuItem value="">All Genders</MenuItem>
-              {genders.map((g) => (
-                <MenuItem key={g.id} value={String(g.id)}>
-                  {g.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {filterSelect(
+            "genderId",
+            "Gender",
+            "All",
+            genders.map((g) => ({ value: String(g.id), label: g.name })),
+          )}
         </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Status</InputLabel>
-            <Select
-              name="statusId"
-              value={filters.statusId}
-              onChange={handleFilterChange}
-              label="Status"
-            >
-              <MenuItem value="">All Statuses</MenuItem>
-              {STATUS_LIST.map((s) => (
-                <MenuItem key={s.id} value={String(s.id)}>
-                  {s.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-
         <Grid size={{ xs: 12, md: 3.5 }}>
           <Box sx={{ display: "flex", gap: 1 }}>
             <Button
@@ -391,28 +293,44 @@ const StudentDetailsReport = () => {
 
       <Divider sx={{ my: 2 }} />
 
-      {/* Search - right aligned */}
-      <Grid container justifyContent="flex-end" sx={{ mb: 2 }}>
-        <Grid>
-          <TextField
-            size="small"
-            placeholder="Search by name, code, CID or school..."
-            name="search"
-            value={filters.search}
-            onChange={handleFilterChange}
-            sx={{ minWidth: 300 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-        </Grid>
-      </Grid>
+      {/* Summary + search */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 1,
+          mb: 2,
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          Total: <strong>{filteredRows.length}</strong>
+          {genderCounts.map(([label, n]) => (
+            <span key={label}>
+              {" · "}
+              {label}: <strong>{n}</strong>
+            </span>
+          ))}
+        </Typography>
+        <TextField
+          size="small"
+          placeholder="Search by name or subject..."
+          name="search"
+          value={filters.search}
+          onChange={handleFilterChange}
+          sx={{ minWidth: 300 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+      </Box>
 
       {/* Students Table */}
       <TableContainer>
@@ -420,59 +338,34 @@ const StudentDetailsReport = () => {
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: 40 }}>#</TableCell>
-              <TableCell>Student Code</TableCell>
               <TableCell>Name</TableCell>
-              <TableCell>CID</TableCell>
               <TableCell>Gender</TableCell>
-              <TableCell>Class</TableCell>
-              <TableCell>School</TableCell>
-              <TableCell>Subjects</TableCell>
-              <TableCell>Mobile No.</TableCell>
-              <TableCell>Enrolled</TableCell>
-              <TableCell>Status</TableCell>
+              <TableCell>School Level</TableCell>
+              <TableCell>Subject</TableCell>
+              <TableCell align="center">Year</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {paginatedRows.length > 0 ? (
-              paginatedRows.map((r, index) => {
-                const st = statusOf(r.statusId);
-                const subjectNames = r.subjectIds
-                  .map(subjectName)
-                  .filter(Boolean);
-                return (
-                  <TableRow key={r.id} hover>
-                    <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      {r.studentCode || "N/A"}
-                    </TableCell>
-                    <TableCell>{r.name || "N/A"}</TableCell>
-                    <TableCell>{r.citizenId || "N/A"}</TableCell>
-                    <TableCell>{genderName(r.genderId) || "N/A"}</TableCell>
-                    <TableCell>{r.currentClass || "N/A"}</TableCell>
-                    <TableCell>{r.schoolName || "N/A"}</TableCell>
-                    <TableCell>
-                      {subjectNames.length ? subjectNames.join(", ") : "—"}
-                    </TableCell>
-                    <TableCell>{r.mobileNo || "N/A"}</TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      {fmtDate(r.enrollmentDate) || "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        color={st.color}
-                        label={st.name}
-                        sx={{ height: 20, fontSize: "0.7rem" }}
-                      />
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+              paginatedRows.map((s, index) => (
+                <TableRow key={s.id} hover>
+                  <TableCell>{page * rowsPerPage + index + 1}</TableCell>
+                  <TableCell>{s.name || "N/A"}</TableCell>
+                  <TableCell>{nameOf(genders, s.gender_id) || "N/A"}</TableCell>
+                  <TableCell>
+                    {nameOf(schoolLevels, s.school_level_id) || "N/A"}
+                  </TableCell>
+                  <TableCell>{s.subject_name || "N/A"}</TableCell>
+                  <TableCell align="center">
+                    {s.enrollment_year || "N/A"}
+                  </TableCell>
+                </TableRow>
+              ))
             ) : (
               <TableRow>
-                <TableCell colSpan={11} align="center" sx={{ py: 3 }}>
-                  {rows.length === 0
-                    ? "No students added yet"
+                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                  {students.length === 0
+                    ? "No students enrolled yet"
                     : "No students found matching your criteria"}
                 </TableCell>
               </TableRow>

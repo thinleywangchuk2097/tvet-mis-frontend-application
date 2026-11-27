@@ -4,7 +4,7 @@ class ApplyNonAccreditedCourseService {
     
   submitNonAccreditedCourse(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/non-accredited-course/submit`, data, {
+      .post(`/api/v1/non-accredited-course/submit`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -16,7 +16,7 @@ class ApplyNonAccreditedCourseService {
    getNonAccreditedCourseByApplicationNo(application_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/non-accredited-course/get-course-details/${application_no}`,
+        `/api/v1/non-accredited-course/get-course-details/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -30,7 +30,7 @@ class ApplyNonAccreditedCourseService {
    verifyNonAccreditedCourse(data, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/non-accredited-course/verify-non-accredited-course`,
+        `/api/v1/non-accredited-course/verify-non-accredited-course`,
         data,
         {
           headers: {
@@ -44,7 +44,7 @@ class ApplyNonAccreditedCourseService {
    getNonAccreditedCourseDetailsByUserId(user_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/non-accredited-course/get-application-details/${user_id}`,
+        `/api/v1/non-accredited-course/get-application-details/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -58,7 +58,7 @@ class ApplyNonAccreditedCourseService {
    getNonAccreditedApprovedCourseByUserId(user_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/non-accredited-course/get-non-accredited-approved-course-details/${user_id}`,
+        `/api/v1/non-accredited-course/get-non-accredited-approved-course-details/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -72,7 +72,7 @@ class ApplyNonAccreditedCourseService {
    curriculumAlreadyExist(curriculumId,registration_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/non-accredited-course/curriculum-already-exist/${curriculumId}/${registration_no}`,
+        `/api/v1/non-accredited-course/curriculum-already-exist/${curriculumId}/${registration_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

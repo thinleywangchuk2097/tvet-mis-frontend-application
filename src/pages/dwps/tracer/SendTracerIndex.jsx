@@ -181,17 +181,11 @@ const computeVisibility = (questions, selectedValues) => {
 
     if (q.showCondition === "option" && q.dependsOnQuestionId != null) {
       const depFlat = byId[q.dependsOnQuestionId];
-      if (!depFlat) {
-        result = true;
-      } else if (!compute(depFlat)) {
-        result = false;
-      } else {
-        result = evaluateOwnCondition(
-          q,
-          byId,
-          selectedValues,
-          optionTextLookup,
-        );
+      // no dependency found -> stays visible (result is already true)
+      if (depFlat) {
+        result = compute(depFlat)
+          ? evaluateOwnCondition(q, byId, selectedValues, optionTextLookup)
+          : false;
       }
     }
 
@@ -207,6 +201,17 @@ const computeVisibility = (questions, selectedValues) => {
 /* ============================================================
    Main component
    ============================================================ */
+// Empty answer for a question type: [] for multi-choice, { field_0: "", ... } for multiple text, "" otherwise
+const emptyResponse = (type, fields) => {
+  if (type === "checkbox" || type === "multiSelect") return [];
+  if (type === "multipleText") {
+    return Object.fromEntries(
+      (fields || []).map((_, idx) => [`field_${idx}`, ""]),
+    );
+  }
+  return "";
+};
+
 const SendTracerIndex = () => {
   const [surveys, setSurveys] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -643,34 +648,15 @@ const SendTracerIndex = () => {
 
         const initialResponses = {};
         transformedSurvey.questions.forEach((question) => {
-          if (
-            question.questionType === "checkbox" ||
-            question.questionType === "multiSelect"
-          ) {
-            initialResponses[`q_${question.id}`] = [];
-          } else if (question.questionType === "multipleText") {
-            const multiResponses = {};
-            (question.multipleTextFields || []).forEach((_, idx) => {
-              multiResponses[`field_${idx}`] = "";
-            });
-            initialResponses[`q_${question.id}`] = multiResponses;
-          } else {
-            initialResponses[`q_${question.id}`] = "";
-          }
-
+          initialResponses[`q_${question.id}`] = emptyResponse(
+            question.questionType,
+            question.multipleTextFields,
+          );
           (question.subQuestions || []).forEach((sub) => {
-            const subType = getQuestionTypeForId(sub.questionTypeId);
-            if (subType === "checkbox" || subType === "multiSelect") {
-              initialResponses[`sub_${sub.id}`] = [];
-            } else if (subType === "multipleText") {
-              const multi = {};
-              (sub.options || []).forEach((_, idx) => {
-                multi[`field_${idx}`] = "";
-              });
-              initialResponses[`sub_${sub.id}`] = multi;
-            } else {
-              initialResponses[`sub_${sub.id}`] = "";
-            }
+            initialResponses[`sub_${sub.id}`] = emptyResponse(
+              getQuestionTypeForId(sub.questionTypeId),
+              sub.options,
+            );
           });
         });
         setFormResponses(initialResponses);
@@ -793,10 +779,10 @@ const SendTracerIndex = () => {
               const text = typeof opt === "string" ? opt : opt.text;
               return text && text.trim() !== "";
             })
-            .map((opt, idx) => {
+            .map((opt) => {
               const text = typeof opt === "string" ? opt : opt.text;
               return (
-                <MenuItem key={idx} value={text}>
+                <MenuItem key={text} value={text}>
                   {text}
                 </MenuItem>
               );
@@ -844,12 +830,12 @@ const SendTracerIndex = () => {
               const text = typeof opt === "string" ? opt : opt.text;
               return text && text.trim() !== "";
             })
-            .map((opt, idx) => {
+            .map((opt) => {
               const text = typeof opt === "string" ? opt : opt.text;
               const isSelected = selectedValues.indexOf(text) > -1;
               const optionDisabled = limitReached && !isSelected;
               return (
-                <MenuItem key={idx} value={text} disabled={optionDisabled}>
+                <MenuItem key={text} value={text} disabled={optionDisabled}>
                   <Checkbox checked={isSelected} />
                   <ListItemText primary={text} />
                 </MenuItem>

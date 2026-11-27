@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class ProgramMonitoringService {
   getInstituteTypeDropdown(token) {
     return apiClient
-      .get(`/api/v1/user/management/monitoring/get-institute-type`, {
+      .get(`/api/v1/monitoring/get-institute-type`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -14,7 +14,7 @@ class ProgramMonitoringService {
   getInstituteDropdown(service_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/monitoring/get-institutes-dropdown/${service_id}`,
+        `/api/v1/monitoring/get-institutes-dropdown/${service_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -26,7 +26,7 @@ class ProgramMonitoringService {
   }
   getCourseTypes(token) {
     return apiClient
-      .get(`/api/v1/user/management/program-monitoring/get-service`, {
+      .get(`/api/v1/program-monitoring/get-service`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -37,7 +37,7 @@ class ProgramMonitoringService {
   getCourseByInstituteId(institute_id, course_type_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/program-monitoring/get-courses/${institute_id}/${course_type_id}`,
+        `/api/v1/program-monitoring/get-courses/${institute_id}/${course_type_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -50,7 +50,7 @@ class ProgramMonitoringService {
 
   submitProgramMonitoring(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/program-monitoring/submit`, data, {
+      .post(`/api/v1/program-monitoring/submit`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -61,7 +61,7 @@ class ProgramMonitoringService {
   getProgramMonitoring(user_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/program-monitoring/get-program-monitoring/${user_id}`,
+        `/api/v1/program-monitoring/get-program-monitoring/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -74,7 +74,7 @@ class ProgramMonitoringService {
 
   updateProgramMonitoring(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/program-monitoring/verify`, data, {
+      .post(`/api/v1/program-monitoring/verify`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -86,7 +86,7 @@ class ProgramMonitoringService {
    getProgramMonitoringByApplicationNo(applicationNo, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/program-monitoring/get-program-monitoring-details/${applicationNo}`,
+        `/api/v1/program-monitoring/get-program-monitoring-details/${applicationNo}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

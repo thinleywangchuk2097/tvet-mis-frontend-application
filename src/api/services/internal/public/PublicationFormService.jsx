@@ -3,15 +3,15 @@ import apiClient from "../../../axios";
 // Publications & Forms
 //   public : list + download (no login)
 //   tvetqc : create / edit / delete (TVET QC role 22 only)
-const PUBLIC_URL = "/api/v1/public/documents";
-const TVETQC_URL = "/api/v1/tvetqc/documents";
+const PUBLIC_URL = "/api/v1/public/publication-forms";
+const TVETQC_URL = "/api/v1/tvetqc/publication-forms";
 
 const auth = (token, extra = {}) => ({
   headers: { Authorization: `Bearer ${token}` },
   ...extra,
 });
 
-class TvetDocumentService {
+class PublicationFormService {
   // category: "PUBLICATION" | "FORM"
   getPublicDocuments(category) {
     return apiClient
@@ -55,4 +55,4 @@ class TvetDocumentService {
   }
 }
 
-export default new TvetDocumentService();
+export default new PublicationFormService();

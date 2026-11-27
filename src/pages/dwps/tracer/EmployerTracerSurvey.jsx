@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import PropTypes from "prop-types";
 import {
   Box,
@@ -15,12 +15,17 @@ import {
   Checkbox,
   Chip,
   FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  FormControlLabel,
+  FormLabel,
+  Radio,
+  RadioGroup,
+  CircularProgress,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
-import CommonService from "../../../api/services/internal/common/CommonService";
+import SearchIcon from "@mui/icons-material/Search";
+import { toast } from "react-toastify";
+import DatahubService from "../../../api/services/external/datahub/DatahubService";
+import CourseEnrollmentService from "../../../api/services/internal/course/CourseEnrollmentService";
 
 // ==================== PROPTYPES ====================
 
@@ -38,141 +43,216 @@ const employerTracerSurveyPropTypes = {
   }),
 };
 
+// ==================== SOURCES ====================
+
+const ENROLLED_STATUS_ID = 90;
+
+// Each radio option: which API to call and what number it is searched by
+// (keep: optional filter on the returned records)
+const SOURCES = {
+  jobSeeker: {
+    label: "Job Seeker",
+    searchLabel: "Citizenship No (CID)",
+    fetch: (value) => DatahubService.getJobSeekerDetails(value),
+  },
+  foreignWorker: {
+    label: "Foreign Worker",
+    searchLabel: "Work Permit No",
+    fetch: (value) => DatahubService.getForeignWorkerDetails(value),
+  },
+  employer: {
+    label: "Employer",
+    searchLabel: "Employer Application No",
+    fetch: (value) => DatahubService.getEmployerDetails(value),
+  },
+  enrolledTrainee: {
+    label: "Enrolled Trainees",
+    searchLabel: "Course Application No",
+    fetch: (value) =>
+      CourseEnrollmentService.getCourseAppliedTraineesByApplicationNo(value),
+    // only trainees who actually got enrolled (tbl_programme_trainee_enrollment_dtls.status_id = 90)
+    keep: (record) =>
+      Number(record.status_id ?? record.statusId) === ENROLLED_STATUS_ID,
+  },
+};
+
+// candidate field names (lower case, compared without "_" / "-") for each column
+const FIELD_KEYS = {
+  name: [
+    "appname", // job seeker API
+    "applicantname",
+    "employername",
+    "companyname",
+    "establishmentname",
+    "fullname",
+    "name",
+  ],
+  contactPerson: ["contactperson", "contactname", "focalperson"],
+  idNo: [
+    "cidno",
+    "cid",
+    "citizenshipno",
+    "citizenid",
+    "workpermitno",
+    "permitno",
+    "applicationno",
+    "licenseno",
+  ],
+  mobileNo: [
+    "mobileno",
+    "mobile",
+    "mobilenumber",
+    "phoneno",
+    "phone",
+    "contactno",
+  ],
+  email: ["emailid", "email", "emailaddress"],
+};
+
+const isError = (res) => res instanceof Error || res?.isAxiosError;
+const normalizeKey = (key) => key.toLowerCase().replaceAll(/[_-]/g, "");
+const isPlainObject = (v) =>
+  v !== null && typeof v === "object" && !Array.isArray(v);
+
+// The datahub APIs wrap their data differently: use the first list of objects found,
+// otherwise the object itself
+const extractRecords = (data, depth = 0) => {
+  if (Array.isArray(data)) return data.filter(isPlainObject);
+  if (!isPlainObject(data) || depth > 4) return [];
+  for (const value of Object.values(data)) {
+    const found = extractRecords(value, depth + 1);
+    if (found.length > 0) return found;
+  }
+  return depth === 0 ? [data] : [];
+};
+
+// first non-empty value whose key matches one of the candidates (in candidate order)
+const pickField = (record, candidates) => {
+  const byKey = {};
+  Object.entries(record).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      byKey[normalizeKey(key)] = String(value).trim();
+    }
+  });
+  const match = candidates.find((c) => byKey[c] !== undefined);
+  return match ? byKey[match] : "";
+};
+
+const toRecipient = (record, sourceKey, searchValue, index) => {
+  const idNo = pickField(record, FIELD_KEYS.idNo) || searchValue;
+  return {
+    key: `${sourceKey}-${idNo}-${index}`,
+    source: sourceKey,
+    id: idNo,
+    name: pickField(record, FIELD_KEYS.name),
+    contactPerson: pickField(record, FIELD_KEYS.contactPerson),
+    mobileNo: pickField(record, FIELD_KEYS.mobileNo),
+    email: pickField(record, FIELD_KEYS.email),
+  };
+};
+
+const sendButtonLabel = (sending, count) => {
+  if (sending) return "Sending...";
+  return count > 0 ? `Send to (${count})` : "Send";
+};
+
 // ==================== MAIN COMPONENT ====================
 
 const EmployerTracerSurvey = ({ open, onClose, survey, onSend }) => {
-  const [selectedEmployers, setSelectedEmployers] = useState([]);
-  const [industryFilter, setIndustryFilter] = useState("");
-  const [search, setSearch] = useState("");
+  const [source, setSource] = useState("jobSeeker");
+  const [searchValue, setSearchValue] = useState("");
+  const [searching, setSearching] = useState(false);
+  // everyone found so far (several searches can be added to one send)
+  const [recipients, setRecipients] = useState([]);
+  const [selectedKeys, setSelectedKeys] = useState([]);
   const [sending, setSending] = useState(false);
-  const [sectors, setSectors] = useState([]);
 
-  useEffect(() => {
-    fetchSectors();
-  }, []);
+  const handleSourceChange = (e) => {
+    setSource(e.target.value);
+    setSearchValue("");
+  };
 
-  const fetchSectors = async () => {
+  const handleSearch = async () => {
+    const value = searchValue.trim();
+    if (!value) {
+      toast.warning(`Enter ${SOURCES[source].searchLabel}`);
+      return;
+    }
+    setSearching(true);
     try {
-      const response = await CommonService.getAllSectors();
-      setSectors(response.data);
-      console.log("Sectors:", response.data);
-    } catch (error) {
-      console.error("Error fetching sectors:", error);
-    }
-  };
-  // Sample employer data
-  const [employers] = useState([
-    {
-      id: "EMP001",
-      name: "Bhutan Power Corporation",
-      contactPerson: "Tshering Dorji",
-      mobileNo: "17112233",
-      email: "hr@bpc.bt",
-      sectorId: 2, // Power sector ID
-      location: "Thimphu",
-      statusId: 1,
-    },
-    {
-      id: "EMP002",
-      name: "Bhutan Telecom",
-      contactPerson: "Karma Dema",
-      mobileNo: "17223344",
-      email: "careers@bt.bt",
-      sectorId: 5, // ICT sector ID
-      location: "Thimphu",
-      statusId: 1,
-    },
-    {
-      id: "EMP003",
-      name: "Druk Air Corporation",
-      contactPerson: "Sonam Wangdi",
-      mobileNo: "17334455",
-      email: "hr@drukair.bt",
-      sectorId: 7, // Transportation sector ID
-      location: "Paro",
-      statusId: 1,
-    },
-    {
-      id: "EMP004",
-      name: "Bank of Bhutan",
-      contactPerson: "Pema Choden",
-      mobileNo: "17445566",
-      email: "recruitment@bob.bt",
-      sectorId: 10, // Business & Finance sector ID
-      location: "Thimphu",
-      statusId: 1,
-    },
-    {
-      id: "EMP005",
-      name: "Tashi Group",
-      contactPerson: "Jigme Namgyel",
-      mobileNo: "17556677",
-      email: "hr@tashi.bt",
-      sectorId: 15, // Service sector ID
-      location: "Phuentsholing",
-      statusId: 1,
-    },
-    {
-      id: "EMP006",
-      name: "Hotel Druk",
-      contactPerson: "Dechen Wangmo",
-      mobileNo: "17667788",
-      email: "careers@hoteldruk.bt",
-      sectorId: 6, // Tourism & Hospitality sector ID
-      location: "Thimphu",
-      statusId: 1,
-    },
-  ]);
-
-  // Helper function to get sector name from sectorId
-  const getSectorName = (sectorId) => {
-    const sector = sectors.find((s) => s.id === sectorId);
-    return sector ? sector.sectorName : "Unknown Sector";
-  };
-
-  // Filter employers based on industry and search
-  const filteredEmployers = employers.filter((employer) => {
-    const matchesIndustry = industryFilter
-      ? employer.sectorId === parseInt(industryFilter)
-      : true;
-    const matchesSearch = search
-      ? employer.name.toLowerCase().includes(search.toLowerCase()) ||
-        employer.contactPerson.toLowerCase().includes(search.toLowerCase()) ||
-        employer.email.toLowerCase().includes(search.toLowerCase())
-      : true;
-    return matchesIndustry && matchesSearch;
-  });
-
-  const handleSelectAllEmployers = (event) => {
-    if (event.target.checked) {
-      setSelectedEmployers(filteredEmployers.map((e) => e.id));
-    } else {
-      setSelectedEmployers([]);
-    }
-  };
-
-  const handleSelectEmployer = (id) => {
-    setSelectedEmployers((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id);
-      } else {
-        return [...prev, id];
+      const res = await SOURCES[source].fetch(value);
+      if (isError(res)) {
+        toast.error(res?.response?.data?.message || "Failed to fetch details");
+        return;
       }
-    });
+      const keep = SOURCES[source].keep ?? (() => true);
+      const found = extractRecords(res?.data)
+        .filter(keep)
+        .map((r, i) => toRecipient(r, source, value, i));
+      if (found.length === 0) {
+        toast.info(
+          `No ${SOURCES[source].label.toLowerCase()} found for ${value}`,
+        );
+        return;
+      }
+      // skip people already in the list (same source + id + mobile)
+      const existing = new Set(
+        recipients.map((r) => `${r.source}|${r.id}|${r.mobileNo}`),
+      );
+      const added = found.filter(
+        (r) => !existing.has(`${r.source}|${r.id}|${r.mobileNo}`),
+      );
+      setRecipients((prev) => [...prev, ...added]);
+      // new people with a mobile or email are selected straight away
+      setSelectedKeys((prev) => [
+        ...prev,
+        ...added.filter((r) => r.mobileNo || r.email).map((r) => r.key),
+      ]);
+      setSearchValue("");
+      toast.success(`${added.length} record(s) added`);
+    } catch (error) {
+      console.error("Error fetching recipients:", error);
+      toast.error("Failed to fetch details");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectAll = (event) => {
+    setSelectedKeys(event.target.checked ? recipients.map((r) => r.key) : []);
+  };
+
+  const handleSelect = (key) => {
+    setSelectedKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
+
+  const handleClear = () => {
+    setRecipients([]);
+    setSelectedKeys([]);
   };
 
   const handleSend = async () => {
-    if (selectedEmployers.length === 0) {
-      alert("Please select at least one employer to send the survey to");
+    const selected = recipients.filter((r) => selectedKeys.includes(r.key));
+    if (selected.length === 0) {
+      toast.warning(
+        "Please select at least one recipient to send the survey to",
+      );
       return;
     }
-
     setSending(true);
     try {
-      const selectedEmployerDetails = employers.filter((e) =>
-        selectedEmployers.includes(e.id),
+      // same shape as before (EmployerDTO: id, name, contactPerson, mobileNo, email)
+      await onSend(
+        selected.map(({ id, name, contactPerson, mobileNo, email }) => ({
+          id,
+          name,
+          contactPerson,
+          mobileNo,
+          email,
+        })),
       );
-      await onSend(selectedEmployerDetails);
     } catch (error) {
       console.error("Error sending survey:", error);
     } finally {
@@ -182,11 +262,14 @@ const EmployerTracerSurvey = ({ open, onClose, survey, onSend }) => {
 
   if (!open) return null;
 
+  const allSelected =
+    recipients.length > 0 && selectedKeys.length === recipients.length;
+
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Select Employers to Send Survey
+          Select Recipients to Send Survey
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
           Survey: {survey?.applicationNo} • {survey?.parentTracerType} -{" "}
@@ -198,54 +281,76 @@ const EmployerTracerSurvey = ({ open, onClose, survey, onSend }) => {
         </Typography>
       </Box>
 
-      {/* Industry and Search Filters */}
+      {/* Source + search */}
       <Box sx={{ mb: 3 }}>
-        <Grid container spacing={2}>
-          <Grid item size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Filter by Sector</InputLabel>
-              <Select
-                value={industryFilter}
-                onChange={(e) => setIndustryFilter(e.target.value)}
-                label="Filter by Sector"
-              >
-                <MenuItem value="">All Sectors</MenuItem>
-                {sectors
-                  .filter((sector) => sector.isActive === "Y") // Only show active sectors
-                  .map((sector) => (
-                    <MenuItem key={sector.id} value={sector.id}>
-                      {sector.sectorName}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
+        <FormControl sx={{ mb: 1 }}>
+          <FormLabel sx={{ fontSize: "0.85rem" }}>Search from</FormLabel>
+          <RadioGroup row value={source} onChange={handleSourceChange}>
+            {Object.entries(SOURCES).map(([key, s]) => (
+              <FormControlLabel
+                key={key}
+                value={key}
+                control={<Radio size="small" />}
+                label={s.label}
+              />
+            ))}
+          </RadioGroup>
+        </FormControl>
+        <Grid container spacing={2} alignItems="center">
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               size="small"
-              label="Search by Employer Name or Contact Person"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
+              label={SOURCES[source].searchLabel}
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSearch();
+              }}
             />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={
+                  searching ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <SearchIcon />
+                  )
+                }
+                onClick={handleSearch}
+                disabled={searching}
+              >
+                {searching ? "Searching..." : "Search & Add"}
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={handleClear}
+                disabled={recipients.length === 0}
+              >
+                Clear List
+              </Button>
+            </Box>
           </Grid>
         </Grid>
       </Box>
 
-      {/* Selected Employers Count */}
-      {selectedEmployers.length > 0 && (
+      {/* Selected count */}
+      {selectedKeys.length > 0 && (
         <Box sx={{ mb: 2 }}>
           <Chip
-            label={`${selectedEmployers.length} employer(s) selected`}
-            onDelete={() => setSelectedEmployers([])}
+            label={`${selectedKeys.length} recipient(s) selected`}
+            onDelete={() => setSelectedKeys([])}
             color="primary"
             size="small"
           />
         </Box>
       )}
 
-      {/* Employers Table */}
+      {/* Recipients table */}
       <TableContainer>
         <Table
           size="small"
@@ -263,72 +368,65 @@ const EmployerTracerSurvey = ({ open, onClose, survey, onSend }) => {
             <TableRow>
               <TableCell padding="checkbox" align="center">
                 <Checkbox
-                  checked={
-                    filteredEmployers.length > 0 &&
-                    selectedEmployers.length === filteredEmployers.length
-                  }
-                  indeterminate={
-                    selectedEmployers.length > 0 &&
-                    selectedEmployers.length < filteredEmployers.length
-                  }
-                  onChange={handleSelectAllEmployers}
+                  checked={allSelected}
+                  indeterminate={selectedKeys.length > 0 && !allSelected}
+                  onChange={handleSelectAll}
                   size="small"
                 />
               </TableCell>
               <TableCell align="center" width={40}>
                 #
               </TableCell>
-              <TableCell>Employer Name</TableCell>
+              <TableCell>Source</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>ID / Application No</TableCell>
               <TableCell>Contact Person</TableCell>
               <TableCell>Mobile No</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Sector</TableCell>
-              <TableCell>Location</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredEmployers.length > 0 ? (
-              filteredEmployers.map((employer, index) => {
-                const isSelected = selectedEmployers.includes(employer.id);
-                return (
-                  <TableRow
-                    key={employer.id}
-                    sx={{ bgcolor: isSelected ? "#f0f7ff" : "inherit" }}
-                    selected={isSelected}
-                  >
-                    <TableCell padding="checkbox" align="center">
-                      <Checkbox
-                        checked={isSelected}
-                        onChange={() => handleSelectEmployer(employer.id)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="center">{index + 1}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {employer.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{employer.contactPerson}</TableCell>
-                    <TableCell>{employer.mobileNo}</TableCell>
-                    <TableCell>{employer.email}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getSectorName(employer.sectorId)}
-                        size="small"
-                        variant="outlined"
-                        color="info"
-                      />
-                    </TableCell>
-                    <TableCell>{employer.location}</TableCell>
-                  </TableRow>
-                );
-              })
-            ) : (
+            {recipients.map((r, index) => {
+              const isSelected = selectedKeys.includes(r.key);
+              return (
+                <TableRow
+                  key={r.key}
+                  sx={{ bgcolor: isSelected ? "#f0f7ff" : "inherit" }}
+                  selected={isSelected}
+                >
+                  <TableCell padding="checkbox" align="center">
+                    <Checkbox
+                      checked={isSelected}
+                      onChange={() => handleSelect(r.key)}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell align="center">{index + 1}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={SOURCES[r.source].label}
+                      size="small"
+                      variant="outlined"
+                      color="info"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {r.name || "—"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{r.id || "—"}</TableCell>
+                  <TableCell>{r.contactPerson || "—"}</TableCell>
+                  <TableCell>{r.mobileNo || "—"}</TableCell>
+                  <TableCell>{r.email || "—"}</TableCell>
+                </TableRow>
+              );
+            })}
+            {recipients.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                   <Typography color="textSecondary">
-                    No employers found
+                    Choose a source above and search to add recipients
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -351,11 +449,9 @@ const EmployerTracerSurvey = ({ open, onClose, survey, onSend }) => {
           color="success"
           startIcon={<SendIcon />}
           onClick={handleSend}
-          disabled={selectedEmployers.length === 0 || sending}
+          disabled={selectedKeys.length === 0 || sending}
         >
-          {sending
-            ? "Sending..."
-            : `Send to ${selectedEmployers.length > 0 ? `(${selectedEmployers.length})` : ""}`}
+          {sendButtonLabel(sending, selectedKeys.length)}
         </Button>
       </Box>
     </Box>

@@ -1,4 +1,4 @@
-// Shared helpers for the Self Assessment Report (TVET Provider Accreditation)
+// Shared helpers for the TVET Provider Accreditation Report (TVET Provider Accreditation)
 
 export const SAR_SERVICE_ID = 19;
 export const DEFAULT_ALLOCATED_POINT = 4;
@@ -19,12 +19,12 @@ export const ATTACHMENT_TYPES = {
   VERIFICATION: "VERIFICATION",
 };
 
-// Accreditation grading
+// Accreditation grading. renewalYears = TVET provider accreditation renewal cycle
 export const GRADE_SCALE = [
-  { grade: "A+", min: 901, max: 1000, color: "#1b5e20" },
-  { grade: "A", min: 801, max: 900, color: "#2e7d32" },
-  { grade: "B", min: 701, max: 800, color: "#0277bd" },
-  { grade: "C", min: 601, max: 700, color: "#ef6c00" },
+  { grade: "A+", min: 901, max: 1000, color: "#1b5e20", renewalYears: 5 },
+  { grade: "A", min: 801, max: 900, color: "#2e7d32", renewalYears: 4 },
+  { grade: "B", min: 701, max: 800, color: "#0277bd", renewalYears: 3 },
+  { grade: "C", min: 601, max: 700, color: "#ef6c00", renewalYears: 2 },
   { grade: "Not Accredited", min: 0, max: 600, color: "#c62828" },
 ];
 
@@ -35,6 +35,13 @@ export const resolveGrade = (score) => {
   if (value > 700) return GRADE_SCALE[2];
   if (value > 600) return GRADE_SCALE[3];
   return GRADE_SCALE[4];
+};
+
+// "Every 5 years" for A+ ... "Every 2 years" for C; "Not Accredited" below C; "-" when no grade yet
+export const getRenewalLabel = (grade) => {
+  if (!grade) return "-";
+  const years = GRADE_SCALE.find((g) => g.grade === grade)?.renewalYears;
+  return years ? `Every ${years} years` : "Not Accredited";
 };
 
 export const getGradeColor = (grade) =>
@@ -150,6 +157,9 @@ export const getPointOptions = (allocated = DEFAULT_ALLOCATED_POINT) =>
 const toNumber = (value) =>
   value === "" || value === null || value === undefined ? null : Number(value);
 
+// Every criteria (tab) must score at least this share of its allocated score to submit
+export const MIN_CRITERIA_PERCENT = 30;
+
 /**
  * Calculates totals for one criteria.
  * points : { [subIndicatorId]: number }
@@ -172,12 +182,15 @@ export const computeCriteriaScore = (criteria, points = {}) => {
     criteria.allocatedTotal > 0
       ? (earned / criteria.allocatedTotal) * criteria.weight
       : 0;
+  const minScore = (Number(criteria.weight || 0) * MIN_CRITERIA_PERCENT) / 100;
   return {
     allocated: criteria.allocatedTotal,
     earned,
     answered,
     total,
     score,
+    minScore,
+    meetsMinimum: score >= minScore,
   };
 };
 
@@ -202,6 +215,7 @@ export const computeSummary = (tree = [], points = {}) => {
     answered,
     total,
     complete: total > 0 && answered === total,
+    belowMinimum: rows.filter((r) => !r.meetsMinimum),
     grade: resolveGrade(totalScore),
   };
 };

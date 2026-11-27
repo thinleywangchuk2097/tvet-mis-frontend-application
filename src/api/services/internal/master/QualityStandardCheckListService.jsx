@@ -1,6 +1,6 @@
 import apiClient from "../../../axios";
 
-const BASE = "/api/v1/user/management/quality_standard_check_list";
+const BASE = "/api/v1/quality-standard-check-list";
 
 class QualityStandardCheckListService {
   // Services that have a checklist: [{ service_id, service_name }]

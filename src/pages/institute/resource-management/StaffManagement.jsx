@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import PropTypes from "prop-types";
 import {
   Paper,
@@ -159,6 +159,10 @@ const mapStaffData = (rawData) => {
       email: item.email || "",
       mobileNo: item.mobile_no || "",
       referenceNo: item.reference_no || "",
+      agencyName: item.agency_name || "",
+      fieldOfStudy: item.field_of_study || "",
+      positionLevel: item.position_level || "",
+      employeeId: item.employee_id || "",
       genderId: item.gender_id || "",
       dob: item.dob || "",
       instituteId: item.institute_id,
@@ -172,7 +176,6 @@ const mapStaffData = (rawData) => {
         employmentTypeId: emp.employmentTypeId || emp.employment_type_id,
         qualificationId: emp.qualificationId || emp.qualification_id,
         designation: emp.designation,
-        resignationDate: emp.resignationDate || emp.resignation_date,
       })),
       stafftraininghistory: trainingHistory.map((train) => ({
         id: train.id,
@@ -180,7 +183,6 @@ const mapStaffData = (rawData) => {
         trainingStart: train.trainingStart || train.training_start,
         trainingEnd: train.trainingEnd || train.training_end,
         providerName: train.providerName || train.provider_name,
-        resignationDate: train.resignationDate || train.resignation_date,
         fundingSourceId: train.fundingSourceId || train.funding_source_id,
         trainingCost: train.trainingCost || train.training_cost,
       })),
@@ -188,6 +190,58 @@ const mapStaffData = (rawData) => {
       registrationNo: item.registration_no,
     };
   });
+};
+
+// "First Middle Last" from the Datahub citizen record
+const citizenFullName = (citizen) =>
+  [citizen.firstName, citizen.middleName, citizen.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+// Datahub sends "M" / "F": match the gender dropdown by name or first letter
+const findGenderOption = (genders, gender) => {
+  if (!gender) return null;
+  const g = String(gender).trim().toLowerCase();
+  if (!g) return null;
+  return genders.find((opt) => {
+    const name = String(opt.name || "")
+      .trim()
+      .toLowerCase();
+    return name === g || name.startsWith(g.charAt(0));
+  });
+};
+
+// dob comes as "DD/MM/YYYY" — convert to "YYYY-MM-DD" for <input type="date">
+// civil servant details stored with the staff record (only when the ZESt lookup has them)
+const CIVIL_SERVANT_FIELDS = ["agencyName", "fieldOfStudy", "positionLevel", "employeeId"];
+
+const clearCivilServantFields = (setFieldValue) =>
+  CIVIL_SERVANT_FIELDS.forEach((field) => setFieldValue(field, ""));
+
+// first employee record of the RCSC ZESt civil servant lookup, or null
+const civilServantOf = (response) =>
+  response?.data?.employeeFullDetailsByCID?.employee?.[0] || null;
+
+// dropdown option whose name matches the text (case-insensitive)
+const findOptionByName = (options, text) => {
+  const t = String(text || "").trim().toLowerCase();
+  if (!t) return null;
+  return (
+    options.find((o) => String(o.name || "").trim().toLowerCase() === t) ||
+    options.find((o) => String(o.name || "").trim().toLowerCase().includes(t)) ||
+    null
+  );
+};
+
+// "2006-07-01+00:00" -> "2006-07-01"
+const toDateOnly = (value) => (value ? String(value).slice(0, 10) : "");
+
+const toInputDate = (dob) => {
+  const parts = dob.split("/");
+  if (parts.length !== 3) return dob;
+  const [day, month, year] = parts;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
 const StaffManagement = () => {
@@ -203,6 +257,13 @@ const StaffManagement = () => {
   const [editingIndex, setEditingIndex] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetchingCitizen, setFetchingCitizen] = useState(false);
+  // "already staff of this institute" message, shown under the CID / Reference No field
+  const [duplicateMessage, setDuplicateMessage] = useState("");
+  const duplicateTimer = useRef(null);
+  const latestDuplicateCheck = useRef("");
+
+  // current dropdown lists for the (debounced) CID lookup, which is created only once
+  const lookupOptions = useRef({ genders: [], employmentTypes: [], qualifications: [] });
   const [staff, setStaff] = useState([]);
   const [instituteDetails, setInstituteDetails] = useState(null);
   const [instituteId, setInstituteId] = useState(null);
@@ -211,6 +272,7 @@ const StaffManagement = () => {
   const [genders, setGenders] = useState([]);
   const [employmentTypes, setEmploymentTypes] = useState([]);
   const [qualifications, setQualifications] = useState([]);
+  lookupOptions.current = { genders, employmentTypes, qualifications };
   const [fundingSources, setFundingSources] = useState([]);
 
   // Fetch all dropdown data on component mount
@@ -263,7 +325,60 @@ const StaffManagement = () => {
     }
   };
 
-  // Function to fetch citizen details from Datahub
+  // 600 ms after typing stops: is this CID / reference no already staff of the institute?
+  const scheduleDuplicateCheck = ({ citizenId, referenceNo }, excludeId) => {
+    clearTimeout(duplicateTimer.current);
+    const key = `${citizenId || ""}|${referenceNo || ""}`;
+    latestDuplicateCheck.current = key;
+    setDuplicateMessage("");
+    if (!instituteId || (!citizenId && !referenceNo)) return;
+    duplicateTimer.current = setTimeout(async () => {
+      const response = await StaffManagementService.checkStaffDuplicate(
+        { instituteId, citizenId, referenceNo, excludeId: excludeId || undefined },
+        access_token,
+      );
+      if (latestDuplicateCheck.current !== key) return; // a newer value was typed
+      setDuplicateMessage(response?.data?.exists ? response.data.message : "");
+    }, 600);
+  };
+
+  // failed save: 409 = already staff of this institute (also shown under the field)
+  const showSaveError = (response, fallback) => {
+    const message = response?.response?.data?.message;
+    if (response?.response?.status === 409) setDuplicateMessage(message || "");
+    toast.error(message || fallback);
+  };
+
+  // Civil servant (RCSC ZESt) record -> staff form, including the current employment
+  const fillFromCivilServant = (employee, setFieldValue) => {
+    const { genders: genderList, employmentTypes: typeList, qualifications: qualificationList } =
+      lookupOptions.current;
+    setFieldValue("name", String(employee.fullName || "").replace(/\s+/g, " ").trim());
+    const gender = findGenderOption(genderList, employee.gender);
+    if (gender) setFieldValue("genderId", String(gender.id));
+    if (employee.mobile) setFieldValue("mobileNo", String(employee.mobile));
+    if (employee.emailID) setFieldValue("email", employee.emailID);
+    setFieldValue("agencyName", employee.agencyName || "");
+    setFieldValue("fieldOfStudy", employee.fieldOfStudy || "");
+    setFieldValue("positionLevel", employee.positionLevel || "");
+    setFieldValue("employeeId", employee.employeeID || "");
+
+    setFieldValue("staffemploymenthistory.0.designation", employee.position || "");
+    setFieldValue("staffemploymenthistory.0.appointmentDate", toDateOnly(employee.appointmentDate));
+    const type = findOptionByName(typeList, employee.employmentType);
+    if (type) setFieldValue("staffemploymenthistory.0.employmentTypeId", String(type.id));
+    const qualification = findOptionByName(qualificationList, employee.qualification);
+    if (qualification) setFieldValue("staffemploymenthistory.0.qualificationId", String(qualification.id));
+  };
+
+  const clearCitizenFields = (setFieldValue) => {
+    setFieldValue("name", "");
+    setFieldValue("genderId", "");
+    setFieldValue("dob", "");
+    clearCivilServantFields(setFieldValue);
+  };
+
+  // CID lookup: civil servant (ZESt) first; only when none is found, the citizen register (Datahub)
   const fetchCitizenDetails = async (citizenId, setFieldValue) => {
     if (!citizenId || citizenId.length !== 11) {
       return;
@@ -271,6 +386,16 @@ const StaffManagement = () => {
 
     setFetchingCitizen(true);
     try {
+      const employee = civilServantOf(
+        await DatahubService.getCivilServantDetails(citizenId),
+      );
+      if (employee) {
+        fillFromCivilServant(employee, setFieldValue);
+        toast.success("Civil servant details fetched successfully");
+        return;
+      }
+
+      clearCivilServantFields(setFieldValue); // not a civil servant
       const response =
         await DatahubService.getDetailsByCitizenshipNo(citizenId);
 
@@ -278,56 +403,26 @@ const StaffManagement = () => {
 
       if (citizenData && (citizenData.cid || citizenData.firstName)) {
         // Build full name including middle name if present
-        const nameParts = [
-          citizenData.firstName,
-          citizenData.middleName,
-          citizenData.lastName,
-        ].filter(Boolean);
+        setFieldValue("name", citizenFullName(citizenData));
 
-        const fullName = nameParts.join(" ").trim();
-
-        setFieldValue("name", fullName);
-
-        if (citizenData.gender) {
-          // Datahub sends "M" / "F": match the gender dropdown by its first letter
-          const g = String(citizenData.gender).trim().toLowerCase();
-          const option = genders.find(
-            (opt) =>
-              String(opt.name || "").trim().toLowerCase() === g ||
-              String(opt.name || "").trim().toLowerCase().charAt(0) === g.charAt(0),
-          );
-          if (option) {
-            setFieldValue("genderId", String(option.id));
-          }
+        const option = findGenderOption(lookupOptions.current.genders, citizenData.gender);
+        if (option) {
+          setFieldValue("genderId", String(option.id));
         }
 
-        // FIXED: dob comes as "DD/MM/YYYY" — convert to "YYYY-MM-DD" for <input type="date">
         if (citizenData.dob) {
-          const parts = citizenData.dob.split("/");
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            setFieldValue(
-              "dob",
-              `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`,
-            );
-          } else {
-            setFieldValue("dob", citizenData.dob);
-          }
+          setFieldValue("dob", toInputDate(citizenData.dob));
         }
 
         toast.success("Citizen details fetched successfully");
       } else {
         toast.warning("No citizen found with this ID");
-        setFieldValue("name", "");
-        setFieldValue("genderId", "");
-        setFieldValue("dob", "");
+        clearCitizenFields(setFieldValue);
       }
     } catch (error) {
       console.error("Error fetching citizen details:", error);
       toast.error("Failed to fetch citizen details");
-      setFieldValue("name", "");
-      setFieldValue("genderId", "");
-      setFieldValue("dob", "");
+      clearCitizenFields(setFieldValue);
     } finally {
       setFetchingCitizen(false);
     }
@@ -351,6 +446,10 @@ const StaffManagement = () => {
     email: "",
     mobileNo: "",
     referenceNo: "",
+    agencyName: "",
+    fieldOfStudy: "",
+    positionLevel: "",
+    employeeId: "",
     genderId: "",
     dob: "",
     createdBy: actionId || 1,
@@ -362,7 +461,6 @@ const StaffManagement = () => {
         employmentTypeId: "",
         qualificationId: "",
         designation: "",
-        resignationDate: "",
       },
     ],
     stafftraininghistory: [
@@ -371,7 +469,6 @@ const StaffManagement = () => {
         trainingStart: "",
         trainingEnd: "",
         providerName: "",
-        resignationDate: "",
         fundingSourceId: "",
         trainingCost: "",
       },
@@ -448,7 +545,6 @@ const StaffManagement = () => {
         employmentTypeId: Yup.string().required("Employment type is required"),
         qualificationId: Yup.string().required("Qualification is required"),
         designation: Yup.string().required("Designation is required"),
-        resignationDate: Yup.string().nullable(),
       }),
     ),
 
@@ -460,7 +556,6 @@ const StaffManagement = () => {
         providerName: Yup.string().required("Provider name is required"),
         trainingCost: Yup.string().required("Training cost is required"),
         fundingSourceId: Yup.string().required("Funding source is required"),
-        resignationDate: Yup.string().nullable(),
       }),
     ),
   });
@@ -546,6 +641,8 @@ const StaffManagement = () => {
         setOpenDialog(false);
         setEditingIndex(null);
         await fetchStaff();
+      } else {
+        showSaveError(response, "Failed to save staff");
       }
     } catch (error) {
       console.error("Error saving staff:", error);
@@ -571,6 +668,10 @@ const StaffManagement = () => {
         email: values.email,
         mobileNo: values.mobileNo,
         referenceNo: values.referenceNo || "",
+        agencyName: values.agencyName || "",
+        fieldOfStudy: values.fieldOfStudy || "",
+        positionLevel: values.positionLevel || "",
+        employeeId: values.employeeId || "",
         genderId: values.genderId ? parseInt(values.genderId) : null,
         dob: values.dob || "",
         instituteId: instituteId ? parseInt(instituteId) : null,
@@ -586,7 +687,6 @@ const StaffManagement = () => {
             ? parseInt(emp.qualificationId)
             : null,
           designation: emp.designation,
-          resignationDate: emp.resignationDate || null,
         })),
         stafftraininghistory: values.stafftraininghistory.map((train) => ({
           id: train.id || null,
@@ -594,7 +694,6 @@ const StaffManagement = () => {
           trainingStart: train.trainingStart,
           trainingEnd: train.trainingEnd,
           providerName: train.providerName,
-          resignationDate: train.resignationDate || null,
           fundingSourceId: train.fundingSourceId
             ? parseInt(train.fundingSourceId)
             : null,
@@ -612,6 +711,8 @@ const StaffManagement = () => {
         setOpenDialog(false);
         setEditingIndex(null);
         await fetchStaff();
+      } else {
+        showSaveError(response, "Failed to update staff");
       }
     } catch (error) {
       console.error("Error updating staff:", error);
@@ -658,6 +759,16 @@ const StaffManagement = () => {
       (s) => s === member || (member.id && String(s.id) === String(member.id)),
     );
 
+  // dropdown options for the employment / training history rows (built once, outside the rows)
+  const toOptions = (items) =>
+    items.map((item) => (
+      <MenuItem key={item.id} value={item.id.toString()}>
+        {item.name}
+      </MenuItem>
+    ));
+  const employmentTypeOptions = toOptions(employmentTypes);
+  const qualificationOptions = toOptions(qualifications);
+  const fundingSourceOptions = toOptions(fundingSources);
   return (
     <Paper elevation={3} sx={{ p: 3, m: 2 }}>
       <Typography variant="h5" gutterBottom>
@@ -687,6 +798,7 @@ const StaffManagement = () => {
             startIcon={<AddIcon />}
             onClick={() => {
               setEditingIndex(null);
+              setDuplicateMessage("");
               setOpenDialog(true);
             }}
           >
@@ -709,13 +821,15 @@ const StaffManagement = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   <CircularProgress size={30} />
                 </TableCell>
               </TableRow>
-            ) : filteredStaff.length > 0 ? (
+            )}
+            {!loading &&
+              filteredStaff.length > 0 &&
               filteredStaff
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((staffMember, index) => (
@@ -733,6 +847,7 @@ const StaffManagement = () => {
                         color="primary"
                         onClick={() => {
                           setEditingIndex(staffIndexOf(staffMember));
+                          setDuplicateMessage("");
                           setOpenDialog(true);
                         }}
                       >
@@ -757,8 +872,8 @@ const StaffManagement = () => {
                       </IconButton>
                     </TableCell>
                   </TableRow>
-                ))
-            ) : (
+                ))}
+            {!loading && filteredStaff.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   {instituteId
@@ -813,7 +928,9 @@ const StaffManagement = () => {
             )}
           </Avatar>
           <Box sx={{ flex: 1 }}>
-            <Typography sx={{ fontWeight: 700, fontSize: "1.1rem", lineHeight: 1.2 }}>
+            <Typography
+              sx={{ fontWeight: 700, fontSize: "1.1rem", lineHeight: 1.2 }}
+            >
               {editingIndex !== null ? "Edit Staff" : "Add Staff"}
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -826,7 +943,6 @@ const StaffManagement = () => {
         </DialogTitle>
         <DialogContent
           sx={{
-            bgcolor: (t) => (t.palette.mode === "dark" ? "background.default" : "#f7f9fc"),
             pt: "20px !important",
           }}
         >
@@ -898,6 +1014,7 @@ const StaffManagement = () => {
                               value={values.hasCitizenId}
                               onChange={(e) => {
                                 handleChange(e);
+                                scheduleDuplicateCheck({}, values.id);
                                 setFieldValue("citizenId", "");
                                 setFieldValue("referenceNo", "");
                                 setFieldValue("name", "");
@@ -931,9 +1048,12 @@ const StaffManagement = () => {
                                     </>
                                   }
                                   name="citizenId"
-                                  helperText="Enter 11 digit citizen ID"
+                                  helperText={
+                                    duplicateMessage || "Enter 11 digit citizen ID"
+                                  }
                                   error={Boolean(
-                                    touched.citizenId && errors.citizenId,
+                                    duplicateMessage ||
+                                      (touched.citizenId && errors.citizenId),
                                   )}
                                   onChange={(e) => {
                                     const value = e.target.value.replace(
@@ -942,6 +1062,13 @@ const StaffManagement = () => {
                                     );
                                     if (value.length <= 11) {
                                       setFieldValue("citizenId", value);
+                                      scheduleDuplicateCheck(
+                                        {
+                                          citizenId:
+                                            value.length === 11 ? value : "",
+                                        },
+                                        values.id,
+                                      );
                                       if (
                                         value.length === 11 &&
                                         editingIndex === null
@@ -954,6 +1081,7 @@ const StaffManagement = () => {
                                         setFieldValue("name", "");
                                         setFieldValue("genderId", "");
                                         setFieldValue("dob", "");
+                                        clearCivilServantFields(setFieldValue);
                                       }
                                     }
                                   }}
@@ -985,7 +1113,6 @@ const StaffManagement = () => {
                                   slotProps={{
                                     input: {
                                       readOnly: true,
-                                      sx: { bgcolor: "#f5f5f5" },
                                     },
                                   }}
                                 />
@@ -1005,6 +1132,15 @@ const StaffManagement = () => {
                                     </>
                                   }
                                   name="referenceNo"
+                                  onChange={(e) => {
+                                    handleChange(e);
+                                    scheduleDuplicateCheck(
+                                      { referenceNo: e.target.value.trim() },
+                                      values.id,
+                                    );
+                                  }}
+                                  error={Boolean(duplicateMessage)}
+                                  helperText={duplicateMessage || undefined}
                                 />
                                 <ErrorMessage
                                   name="referenceNo"
@@ -1142,10 +1278,6 @@ const StaffManagement = () => {
                                     sx={{
                                       mb: 2,
                                       p: 2,
-                                      bgcolor:
-                                        idx % 2 === 0
-                                          ? "action.hover"
-                                          : "transparent",
                                       borderRadius: 1,
                                     }}
                                     alignItems="center"
@@ -1186,14 +1318,7 @@ const StaffManagement = () => {
                                         <MenuItem value="">
                                           Select Employment Type
                                         </MenuItem>
-                                        {employmentTypes.map((type) => (
-                                          <MenuItem
-                                            key={type.id}
-                                            value={type.id.toString()}
-                                          >
-                                            {type.name}
-                                          </MenuItem>
-                                        ))}
+                                        {employmentTypeOptions}
                                       </Field>
                                       <ErrorMessage
                                         name={`staffemploymenthistory.${idx}.employmentTypeId`}
@@ -1216,14 +1341,7 @@ const StaffManagement = () => {
                                         <MenuItem value="">
                                           Select Qualification
                                         </MenuItem>
-                                        {qualifications.map((qualification) => (
-                                          <MenuItem
-                                            key={qualification.id}
-                                            value={qualification.id.toString()}
-                                          >
-                                            {qualification.name}
-                                          </MenuItem>
-                                        ))}
+                                        {qualificationOptions}
                                       </Field>
                                       <ErrorMessage
                                         name={`staffemploymenthistory.${idx}.qualificationId`}
@@ -1250,7 +1368,7 @@ const StaffManagement = () => {
                                     <Grid item size={{ xs: 12, md: 1 }}>
                                       {idx > 0 && (
                                         <IconButton
-                                          onClick={() => remove(idx)}
+                                          onClick={remove.bind(null, idx)}
                                           sx={{
                                             color: "error.main",
                                             borderRadius: "50%",
@@ -1277,7 +1395,6 @@ const StaffManagement = () => {
                                     employmentTypeId: "",
                                     qualificationId: "",
                                     designation: "",
-                                    resignationDate: "",
                                   })
                                 }
                               >
@@ -1320,10 +1437,6 @@ const StaffManagement = () => {
                                     sx={{
                                       mb: 2,
                                       p: 2,
-                                      bgcolor:
-                                        idx % 2 === 0
-                                          ? "action.hover"
-                                          : "transparent",
                                       borderRadius: 1,
                                     }}
                                     alignItems="center"
@@ -1416,14 +1529,7 @@ const StaffManagement = () => {
                                         <MenuItem value="">
                                           Select Funding Source
                                         </MenuItem>
-                                        {fundingSources.map((source) => (
-                                          <MenuItem
-                                            key={source.id}
-                                            value={source.id.toString()}
-                                          >
-                                            {source.name}
-                                          </MenuItem>
-                                        ))}
+                                        {fundingSourceOptions}
                                       </Field>
                                       <ErrorMessage
                                         name={`stafftraininghistory.${idx}.fundingSourceId`}
@@ -1447,21 +1553,10 @@ const StaffManagement = () => {
                                         component="div"
                                       />
                                     </Grid>
-                                    <Grid item size={{ xs: 12, md: 3 }}>
-                                      <Field
-                                        as={TextField}
-                                        fullWidth
-                                        type="date"
-                                        label="Resignation Date"
-                                        size="small"
-                                        name={`stafftraininghistory.${idx}.resignationDate`}
-                                        InputLabelProps={{ shrink: true }}
-                                      />
-                                    </Grid>
                                     <Grid item size={{ xs: 12, md: 1 }}>
                                       {idx > 0 && (
                                         <IconButton
-                                          onClick={() => remove(idx)}
+                                          onClick={remove.bind(null, idx)}
                                           sx={{
                                             color: "error.main",
                                             borderRadius: "50%",
@@ -1489,7 +1584,6 @@ const StaffManagement = () => {
                                     trainingEnd: "",
                                     providerName: "",
                                     trainingCost: "",
-                                    resignationDate: "",
                                     fundingSourceId: "",
                                   })
                                 }
@@ -1529,7 +1623,7 @@ const StaffManagement = () => {
                         size="small"
                         variant="contained"
                         color="primary"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || Boolean(duplicateMessage)}
                         startIcon={
                           isSubmitting ? (
                             <CircularProgress size={16} color="inherit" />

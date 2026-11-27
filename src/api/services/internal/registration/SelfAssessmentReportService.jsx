@@ -1,6 +1,6 @@
 import apiClient from "../../../axios";
 
-const BASE_URL = "/api/v1/user/management/self-assessment-report";
+const BASE_URL = "/api/v1/self-assessment-report";
 
 class SelfAssessmentReportService {
   submitSelfAssessmentReport(data, token) {

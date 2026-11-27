@@ -96,7 +96,6 @@ const validationSchema = Yup.object({
     .matches(/^\d{8}$/, "Mobile No must be exactly 8 digits"),
   email: Yup.string().email("Invalid email").required("Email is required"),
   sectorId: Yup.string().required("Field of Training is required"),
-  courseId: Yup.string().required("Course is required"),
   activityLevelId: Yup.string().required("Activity Level is required"),
   files: Yup.array().min(1, "Please upload at least one supporting document"),
 
@@ -135,11 +134,11 @@ const validationSchema = Yup.object({
 // Supplementary Education Service (SES) Centre proposal
 const SES_SERVICE_ID = 34;
 
-// SES (34): course, activity level and supporting documents are optional
+// SES (34): activity level and supporting documents are optional
+// (no course is asked for any proposal)
 const getValidationSchema = (serviceId) =>
   Number(serviceId) === SES_SERVICE_ID
     ? validationSchema.shape({
-        courseId: Yup.string().nullable(),
         activityLevelId: Yup.string().nullable(),
         files: Yup.array(),
       })
@@ -175,8 +174,17 @@ const extractCitizenName = (payload) => {
   return "";
 };
 
+
+// heading of the profile section: SES centre, assessment centre (35) or training provider
+const profileTitle = (isSES, serviceId) => {
+  if (isSES) return "Supplementary Education Service Centre Profile";
+  return Number(serviceId) === 35 ? "Assessment Center Profile" : "Training Provider Profile";
+};
+
 const InstituteSesCentreAssessmentCentreProposal = () => {
   const [loading, setLoading] = useState(false);
+  // set when the proposed institute name is already used by another proposal
+  const [nameTakenMessage, setNameTakenMessage] = useState("");
 
   // ✅ Per-field loading state instead of a single shared boolean
   const [fetchingCitizen, setFetchingCitizen] = useState({
@@ -197,8 +205,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
   const [otherOwnershipTypes, setOtherOwnershipTypes] = useState([]);
   const [activityLevels, setActivityLevels] = useState([]);
   const [typeOfOwners, setTypeOfOwners] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [loadingCourses, setLoadingCourses] = useState(false);
   const [declaration, setDeclaration] = useState([]);
 
   const navigate = useNavigate();
@@ -313,25 +319,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
     }
   };
 
-  const fetchCoursesBySector = async (sectorId) => {
-    if (!sectorId) {
-      setCourses([]);
-      return;
-    }
-
-    setLoadingCourses(true);
-    try {
-      const response = await CommonService.getOccupationsBySectorId(sectorId);
-      setCourses(response.data);
-    } catch (error) {
-      console.error("Error fetching courses:", error);
-      toast.error("Failed to load courses for selected sector");
-      setCourses([]);
-    } finally {
-      setLoadingCourses(false);
-    }
-  };
-
   const fetchServiceName = async () => {
     try {
       const response = await CommonService.getServiceName(serviceId);
@@ -427,7 +414,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       promoterCitizenId: "",
       promoterName: "",
       sectorId: "",
-      courseId: "",
       activityLevelId: "",
       files: [],
       declarationAccepted: false,
@@ -459,7 +445,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
           promoterCitizenId: values.promoterCitizenId || null,
           promoterName: values.promoterName || null,
           sectorId: values.sectorId || null,
-          courseId: values.courseId || null,
           activityLevelId: values.activityLevelId || null,
           serviceId: serviceId,
           assignedRoleId: 7,
@@ -472,6 +457,9 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
 
         const response =
           await InstituteProposalService.submitInstituteProposal(payload);
+        if (response.status === 409) {
+          setNameTakenMessage(response.response?.data?.message || "");
+        }
         if (response.status == 201) {
           toast.success(
             `${serviceName} form submitted successfully! Application No: ${response.data.applicationNo}`,
@@ -480,7 +468,11 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
           resetForm();
           navigate("/");
         } else {
-          toast.error("Submission failed. Please try again.");
+          // e.g. 409: the proposed institute name is already used
+          toast.error(
+            response?.response?.data?.message ||
+              "Submission failed. Please try again.",
+          );
         }
       } catch (error) {
         toast.error(error.message || "Submission failed");
@@ -489,6 +481,23 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
       }
     },
   });
+
+  // while typing: ~0.6 s after the user stops, check whether another proposal already uses the name
+  const proposedName = formik.values.proposedInstituteName;
+  useEffect(() => {
+    const name = proposedName?.trim();
+    setNameTakenMessage("");
+    if (!name) return undefined;
+    let cancelled = false; // ignore the answer if the user typed again meanwhile
+    const timer = setTimeout(async () => {
+      const res = await InstituteProposalService.checkDuplicateName(name);
+      if (!cancelled) setNameTakenMessage(res?.data?.exists ? res.data.message : "");
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [proposedName]);
 
   const isOthersType = () => formik.values.ownershipTypeId === "2";
 
@@ -1068,11 +1077,7 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
             }}
           >
             <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-              {isSES
-                ? "Supplementary Education Service Centre Profile"
-                : Number(serviceId) === 35
-                  ? "Assessment Center Profile"
-                  : "Training Provider Profile"}
+              {profileTitle(isSES, serviceId)}
             </Typography>
             <Divider sx={{ mb: 3 }} />
             <Grid container spacing={3}>
@@ -1086,16 +1091,18 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   error={
-                    formik.touched.proposedInstituteName &&
-                    Boolean(formik.errors.proposedInstituteName)
+                    Boolean(nameTakenMessage) ||
+                    (formik.touched.proposedInstituteName &&
+                      Boolean(formik.errors.proposedInstituteName))
                   }
                   helperText={
-                    formik.touched.proposedInstituteName &&
-                    formik.errors.proposedInstituteName &&
-                    String(formik.errors.proposedInstituteName).replace(
-                      DEFAULT_PROPOSED_NAME_LABEL,
-                      proposedNameLabel,
-                    )
+                    nameTakenMessage ||
+                    (formik.touched.proposedInstituteName &&
+                      formik.errors.proposedInstituteName &&
+                      String(formik.errors.proposedInstituteName).replace(
+                        DEFAULT_PROPOSED_NAME_LABEL,
+                        proposedNameLabel,
+                      ))
                   }
                 />
               </Grid>
@@ -1200,8 +1207,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                   value={formik.values.sectorId}
                   onChange={(e) => {
                     formik.handleChange(e);
-                    formik.setFieldValue("courseId", "");
-                    fetchCoursesBySector(e.target.value);
                   }}
                   onBlur={formik.handleBlur}
                   error={
@@ -1218,46 +1223,6 @@ const InstituteSesCentreAssessmentCentreProposal = () => {
                     ))}
                 </TextField>
               </Grid>
-
-              {/* not shown for SES (34) */}
-              {!isSES && (
-                <Grid item size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    select
-                    fullWidth
-                    label={requiredLabel("Course")}
-                    name="courseId"
-                    size="small"
-                    value={formik.values.courseId}
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    error={
-                      formik.touched.courseId && Boolean(formik.errors.courseId)
-                    }
-                    helperText={
-                      formik.touched.courseId && formik.errors.courseId
-                    }
-                    disabled={!formik.values.sectorId || loadingCourses}
-                    slotProps={{
-                      input: {
-                        endAdornment: loadingCourses && (
-                          <CircularProgress size={20} />
-                        ),
-                      },
-                    }}
-                  >
-                    <MenuItem value="">
-                      {loadingCourses ? "Loading courses..." : "Select Course"}
-                    </MenuItem>
-                    {Array.isArray(courses) &&
-                      courses.map((course) => (
-                        <MenuItem key={course.id} value={course.id.toString()}>
-                          {course.occupationName || course.name}
-                        </MenuItem>
-                      ))}
-                  </TextField>
-                </Grid>
-              )}
 
               {/* not shown for SES (34) */}
               {!isSES && (

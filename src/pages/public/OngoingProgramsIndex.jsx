@@ -1,10 +1,5 @@
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-} from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Table,
@@ -14,263 +9,122 @@ import {
   TableHead,
   TableRow,
   TablePagination,
-  Chip,
-  Stack,
   Typography,
   alpha,
-  Grid,
   TextField,
   MenuItem,
   Button,
-  Paper,
-  keyframes,
+  Skeleton,
 } from "@mui/material";
-import HistoryIcon from "@mui/icons-material/History";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchIcon from "@mui/icons-material/Search";
 import PublicPageService from "../../api/services/internal/public/PublicPageService";
 import CommonService from "../../api/services/internal/common/CommonService";
 
-// ── Animations (kept minimal)
-const gradientShift = keyframes`
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-`;
+// ── Look shared with the Course announcements table
+const NAVY = "#0a2d6e";
+const BLUE = "#1565c0";
+const LINE = "#e3eaf4";
+// own header colour so this table is easy to tell apart from Course announcements (navy)
+const HEAD = "#00695c";
 
-const pulse = keyframes`
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.02); }
-`;
-
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-`;
-
-// ── Shared table styles
 const TS = {
   "& th": {
-    bgcolor: "#e8f1fb",
+    bgcolor: HEAD,
+    color: "#fff",
     fontWeight: 700,
-    fontSize: "0.77rem",
-    color: "#0a2d6e",
-    whiteSpace: "nowrap",
+    fontSize: "0.74rem",
+    letterSpacing: 0.2,
+    lineHeight: 1.25,
+    borderBottom: "none",
+    py: 1,
+    px: 1.25,
   },
   "& td": {
     fontSize: "0.8rem",
+    color: "#0f1f3d",
+    borderBottom: `1px solid ${LINE}`,
+    py: 1,
+    px: 1.25,
+    verticalAlign: "middle",
   },
-  "& th, & td": { border: "1px solid #dbe5f0", py: 0.85, px: 1.2 },
-  "& tbody tr:hover td": { bgcolor: "#f5f9ff" },
+  "& tbody tr:nth-of-type(even) td": { bgcolor: "#f8fcfb" },
+  "& tbody tr:hover td": { bgcolor: "#eef7f5" },
 };
 
-// ── Format date function
-const formatDate = (dateString) => {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+// "2026-11-12" -> "12 Nov 2026"
+const formatDate = (d) =>
+  d
+    ? new Date(d).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+
+// course length as "7 months", "1 month 2 days" or "20 days"
+const courseDuration = (start, end) => {
+  if (!start || !end) return null;
+  const a = new Date(start);
+  const b = new Date(end);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b < a) return null;
+  let months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  let anchor = new Date(a.getFullYear(), a.getMonth() + months, a.getDate());
+  while (months > 0 && anchor > b) {
+    months -= 1;
+    anchor = new Date(a.getFullYear(), a.getMonth() + months, a.getDate());
+  }
+  const days = Math.round((b - anchor) / 86400000);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  if (months <= 0) return plural(Math.max(days, 1), "day");
+  return days > 0 ? `${plural(months, "month")} ${plural(days, "day")}` : plural(months, "month");
 };
 
-// Style for TextField to remove hover effects
-const textFieldStyle = {
+// share of the course already run (0-100), from today's date
+const courseProgress = (start, end) => {
+  const a = new Date(start).getTime();
+  const b = new Date(end).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return null;
+  return Math.round(Math.min(100, Math.max(0, ((Date.now() - a) / (b - a)) * 100)));
+};
+
+// compact filter controls (search + dropdowns)
+const filterSx = {
   "& .MuiOutlinedInput-root": {
-    "&:hover fieldset": {
-      borderColor: "rgba(0, 0, 0, 0.23)",
-    },
+    height: 34,
+    fontSize: "0.8rem",
+    borderRadius: 2,
+    bgcolor: "#fff",
+    "& fieldset": { borderColor: LINE },
+    "&:hover fieldset": { borderColor: "#b9c8dc" },
+    "&.Mui-focused fieldset": { borderColor: "#1565c0", borderWidth: 1 },
   },
+  "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" },
+  "& input::placeholder": { fontSize: "0.8rem", opacity: 0.7 },
 };
 
-// ── OPTIMIZED Moving Banner Component ──
-const MovingBanner = ({ announcements }) => {
-  const containerRef = useRef(null);
-  const contentRef = useRef(null);
+const menuItemSx = { fontSize: "0.8rem", minHeight: 32 };
 
-  useEffect(() => {
-    if (
-      !containerRef.current ||
-      !contentRef.current ||
-      announcements.length === 0
-    )
-      return;
+const Pill = ({ label, color }) => (
+  <Box
+    component="span"
+    sx={{
+      display: "inline-block",
+      px: 1,
+      py: 0.25,
+      borderRadius: 10,
+      fontSize: "0.7rem",
+      fontWeight: 600,
+      color,
+      bgcolor: alpha(color, 0.1),
+      whiteSpace: "nowrap",
+    }}
+  >
+    {label}
+  </Box>
+);
+Pill.propTypes = { label: PropTypes.node, color: PropTypes.string };
 
-    const container = containerRef.current;
-    const content = contentRef.current;
-
-    let animationId = null;
-    let startTime = null;
-    let paused = false;
-    let position = 0;
-    const speed = 0.5; // pixels per frame
-
-    // Check if content width exceeds container
-    const contentWidth = content.scrollWidth / 2; // Because we duplicate
-    const containerWidth = container.clientWidth;
-
-    if (contentWidth <= containerWidth) {
-      // No need to animate if content fits
-      content.style.transform = "translateX(0)";
-      return;
-    }
-
-    const animate = (timestamp) => {
-      if (paused) {
-        animationId = requestAnimationFrame(animate);
-        return;
-      }
-
-      if (!startTime) startTime = timestamp;
-      const delta = timestamp - startTime;
-      startTime = timestamp;
-
-      position -= speed * (delta / 16); // Normalize to 60fps
-
-      // Reset position when we've scrolled past half the content
-      if (Math.abs(position) >= contentWidth) {
-        position = 0;
-      }
-
-      content.style.transform = `translateX(${position}px)`;
-      animationId = requestAnimationFrame(animate);
-    };
-
-    const handleMouseEnter = () => {
-      paused = true;
-    };
-
-    const handleMouseLeave = () => {
-      paused = false;
-      startTime = null;
-    };
-
-    container.addEventListener("mouseenter", handleMouseEnter);
-    container.addEventListener("mouseleave", handleMouseLeave);
-
-    animationId = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-      }
-      container.removeEventListener("mouseenter", handleMouseEnter);
-      container.removeEventListener("mouseleave", handleMouseLeave);
-    };
-  }, [announcements]);
-
-  if (announcements.length === 0) return null;
-
-  // Create display items (duplicate for seamless loop)
-  const displayItems = [...announcements, ...announcements];
-
-  return (
-    <Box
-      ref={containerRef}
-      sx={{
-        mb: 3,
-        overflow: "hidden",
-        whiteSpace: "nowrap",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        borderRadius: 2,
-        py: 1.5,
-        position: "relative",
-        cursor: "pointer",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background:
-            "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
-          backgroundSize: "200% 100%",
-          animation: `${shimmer} 3s infinite`,
-          pointerEvents: "none",
-        },
-      }}
-    >
-      <Box
-        ref={contentRef}
-        sx={{
-          display: "inline-block",
-          whiteSpace: "nowrap",
-          willChange: "transform",
-        }}
-      >
-        {displayItems.map((announcement, idx) => (
-          <Box
-            key={`${announcement.id}-${idx}`}
-            component="span"
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              mx: 3,
-              color: "white",
-              fontWeight: "bold",
-              fontSize: "0.95rem",
-              textShadow: "1px 1px 2px rgba(0,0,0,0.2)",
-              gap: 1,
-            }}
-          >
-            <Box
-              component="span"
-              sx={{
-                display: "inline-block",
-                px: 1.5,
-                py: 0.3,
-                bgcolor: "rgba(255,255,255,0.2)",
-                borderRadius: 2,
-                fontSize: "0.85rem",
-              }}
-            >
-              🎓 {announcement.courseName}
-            </Box>
-            <Box component="span" sx={{ opacity: 0.8 }}>
-              @
-            </Box>
-            <Box component="span" sx={{ fontSize: "0.85rem" }}>
-              {announcement.instituteName}
-            </Box>
-            <Box component="span" sx={{ mx: 0.5 }}>
-              📅
-            </Box>
-            <Box component="span" sx={{ fontSize: "0.85rem" }}>
-              {formatDate(announcement.startDate)} -{" "}
-              {formatDate(announcement.endDate)}
-            </Box>
-            <Box
-              component="span"
-              sx={{
-                ml: 1,
-                px: 1.5,
-                py: 0.3,
-                bgcolor: "#4caf50",
-                borderRadius: 3,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 0.5,
-                fontSize: "0.75rem",
-                fontWeight: "bold",
-                transition: "all 0.3s ease",
-                animation: "none", // Remove blink animation for performance
-              }}
-            >
-              <Box component="span" sx={{ fontSize: "0.7rem" }}>
-                ●
-              </Box>
-              ACTIVE
-            </Box>
-          </Box>
-        ))}
-      </Box>
-    </Box>
-  );
-};
-
-// ── Main Component ──
 const OngoingProgramsIndex = () => {
   const [ongoingCourses, setOngoingCourses] = useState([]);
   const [progPage, setProgPage] = useState(0);
@@ -278,116 +132,73 @@ const OngoingProgramsIndex = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // Filter states
+  // Filters
   const [searchText, setSearchText] = useState("");
   const [certificateLevelFilter, setCertificateLevelFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
 
-  // Dropdown states
+  // Dropdowns
   const [certificationLevels, setCertificationLevels] = useState([]);
   const [dzongkhags, setDzongkhags] = useState([]);
 
-  // Memoized helper functions
   const getCertificationLevelName = useMemo(() => {
     const levelMap = new Map();
-    certificationLevels.forEach((level) => {
-      levelMap.set(parseInt(level.id), level.name);
-    });
-    return (levelId) => {
-      if (!levelId) return "N/A";
-      return levelMap.get(parseInt(levelId)) || levelId;
-    };
+    certificationLevels.forEach((level) => levelMap.set(parseInt(level.id), level.name));
+    return (levelId) => (levelId ? levelMap.get(parseInt(levelId)) || levelId : "N/A");
   }, [certificationLevels]);
 
   const getDzongkhagName = useMemo(() => {
     const dzongMap = new Map();
-    dzongkhags.forEach((dzong) => {
-      dzongMap.set(parseInt(dzong.id), dzong.dzonkhagName);
-    });
-    return (locationId) => {
-      if (!locationId) return "N/A";
-      return dzongMap.get(parseInt(locationId)) || "N/A";
-    };
+    dzongkhags.forEach((dz) => dzongMap.set(parseInt(dz.id), dz.dzonkhagName));
+    return (locationId) => (locationId ? dzongMap.get(parseInt(locationId)) || "N/A" : "N/A");
   }, [dzongkhags]);
 
   useEffect(() => {
-    fetchOngoingCourses();
-    fetchDropdownData();
-    fetchDzongkhags();
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(false);
+        const response = await PublicPageService.getOngoingCourses();
+        if (response instanceof Error || response?.isAxiosError) throw response;
+        setOngoingCourses(Array.isArray(response?.data) ? response.data : []);
+      } catch (err) {
+        console.error("Error fetching ongoing courses:", err);
+        setError(true);
+        setOngoingCourses([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+    CommonService.getAllCertificateLevels()
+      .then((res) => setCertificationLevels(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setCertificationLevels([]));
+    CommonService.getAllDzongkhags()
+      .then((res) => setDzongkhags(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setDzongkhags([]));
   }, []);
 
-  const fetchOngoingCourses = async () => {
-    try {
-      setLoading(true);
-      setError(false);
-      const response = await PublicPageService.getOngoingCourses();
-      setOngoingCourses(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error("Error fetching ongoing courses:", error);
-      setError(true);
-      setOngoingCourses([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDropdownData = async () => {
-    try {
-      const levelsResponse = await CommonService.getAllCertificateLevels();
-      setCertificationLevels(
-        Array.isArray(levelsResponse.data) ? levelsResponse.data : [],
-      );
-    } catch (error) {
-      console.error("Error fetching dropdown data:", error);
-      setCertificationLevels([]);
-    }
-  };
-
-  const fetchDzongkhags = async () => {
-    try {
-      const dzongkhagLists = await CommonService.getAllDzongkhags();
-      setDzongkhags(
-        Array.isArray(dzongkhagLists.data) ? dzongkhagLists.data : [],
-      );
-    } catch (error) {
-      console.error("Error fetching dzongkhags:", error);
-      setDzongkhags([]);
-    }
-  };
-
-  // Create moving course announcements from actual course data (memoized)
-  const movingAnnouncements = useMemo(() => {
-    if (!ongoingCourses.length) return [];
-
-    return ongoingCourses.map((course) => ({
-      id: course.id || course.application_no,
-      courseName: course.course_name || "Course",
-      instituteName: course.institute_name || "Institute",
-      startDate: course.course_start_date,
-      endDate: course.course_end_date,
-    }));
-  }, [ongoingCourses]);
-
-  // Filtering logic with useMemo
   const filteredCourses = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
     return ongoingCourses.filter((course) => {
       const matchesSearch =
-        searchText === "" ||
-        course.course_name?.toLowerCase().includes(searchText.toLowerCase()) ||
-        course.institute_name?.toLowerCase().includes(searchText.toLowerCase());
-
-      const matchesCertificateLevel = certificateLevelFilter
-        ? parseInt(course.certification_level_id) ===
-          parseInt(certificateLevelFilter)
+        !q ||
+        course.course_name?.toLowerCase().includes(q) ||
+        course.institute_name?.toLowerCase().includes(q);
+      const matchesLevel = certificateLevelFilter
+        ? parseInt(course.certification_level_id) === parseInt(certificateLevelFilter)
         : true;
-
       const matchesLocation = locationFilter
         ? parseInt(course.training_location_id) === parseInt(locationFilter)
         : true;
-
-      return matchesSearch && matchesCertificateLevel && matchesLocation;
+      return matchesSearch && matchesLevel && matchesLocation;
     });
   }, [searchText, certificateLevelFilter, locationFilter, ongoingCourses]);
+
+  const totalTrainees = useMemo(
+    () => filteredCourses.reduce((s, c) => s + (Number(c.total_no_trainees) || 0), 0),
+    [filteredCourses],
+  );
 
   const handleReset = useCallback(() => {
     setSearchText("");
@@ -396,251 +207,187 @@ const OngoingProgramsIndex = () => {
     setProgPage(0);
   }, []);
 
-  if (loading) {
-    return (
-      <Box sx={{ textAlign: "center", py: 4 }}>
-        <Typography sx={{ color: "#666" }}>
-          Loading ongoing programs...
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ textAlign: "center", py: 4 }}>
-        <Typography
-          sx={{
-            color: "error.main",
-            fontWeight: 600,
-            fontSize: "0.9rem",
-          }}
-        >
-          Unable to connect to the server
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            color: "#666",
-            mt: 1,
-            display: "block",
-          }}
-        >
-          Please try again later.
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
-    <Paper
-      sx={{
-        p: 2,
-        border: "1px solid",
-        borderColor: "divider",
-      }}
-    >
-      {/* Moving Course Announcements Banner - OPTIMIZED */}
-      <MovingBanner announcements={movingAnnouncements} />
-
-      <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 2 }}>
-        <Box
-          sx={{
-            width: 36,
-            height: 36,
-            borderRadius: 1.5,
-            bgcolor: alpha("#1565c0", 0.12),
-            color: "#1565c0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            animation: `${pulse} 2s ease-in-out infinite`,
+    <Box>
+      {/* Filters: one compact row */}
+      <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, mb: 1.5 }}>
+        <TextField
+          placeholder="Search course or training provider"
+          size="small"
+          value={searchText}
+          onChange={(e) => {
+            setSearchText(e.target.value);
+            setProgPage(0);
           }}
+          slotProps={{
+            input: {
+              startAdornment: <SearchIcon sx={{ color: "#90a4ae", fontSize: 17, mr: 0.75 }} />,
+            },
+          }}
+          sx={{ ...filterSx, flex: { xs: "1 1 100%", sm: "0 1 320px" } }}
+        />
+        <TextField
+          select
+          size="small"
+          value={certificateLevelFilter}
+          onChange={(e) => {
+            setCertificateLevelFilter(e.target.value);
+            setProgPage(0);
+          }}
+          slotProps={{ select: { displayEmpty: true, MenuProps: { PaperProps: { sx: { maxHeight: 320 } } } } }}
+          sx={{ ...filterSx, width: { xs: "100%", sm: 190 } }}
         >
-          <HistoryIcon sx={{ fontSize: 20 }} />
-        </Box>
-        <Box>
-          <Typography
-            fontWeight={800}
-            sx={{
-              fontSize: "0.95rem",
-              background:
-                "linear-gradient(135deg, #0a1929 0%, #1565c0 50%, #0a1929 100%)",
-              backgroundSize: "200% auto",
-              color: "transparent",
-              backgroundClip: "text",
-              WebkitBackgroundClip: "text",
-              animation: `${gradientShift} 3s ease infinite`,
-            }}
-          >
-            Program Activity
-          </Typography>
-        </Box>
-      </Stack>
-
-      {/* Filters Section */}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item size={{ xs: 12, sm: 6, md: 4 }}>
-          <TextField
-            label="Search by Course or Institute"
-            size="small"
-            fullWidth
-            value={searchText}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              setProgPage(0);
-            }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <SearchIcon
-                    sx={{ color: "#90a4ae", fontSize: 16, mr: 0.5 }}
-                  />
-                ),
-              },
-            }}
-            sx={textFieldStyle}
-          />
-        </Grid>
-
-        <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            select
-            label="Filter by Certificate Level"
-            size="small"
-            fullWidth
-            value={certificateLevelFilter}
-            onChange={(e) => {
-              setCertificateLevelFilter(e.target.value);
-              setProgPage(0);
-            }}
-            sx={textFieldStyle}
-          >
-            <MenuItem value="">All Levels</MenuItem>
-            {certificationLevels.map((level) => (
-              <MenuItem key={level.id} value={level.id}>
-                {level.name}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            select
-            label="Filter by Location"
-            size="small"
-            fullWidth
-            value={locationFilter}
-            onChange={(e) => {
-              setLocationFilter(e.target.value);
-              setProgPage(0);
-            }}
-            sx={textFieldStyle}
-          >
-            <MenuItem value="">All Locations</MenuItem>
-            {dzongkhags.map((dzongkhag) => (
-              <MenuItem key={dzongkhag.id} value={dzongkhag.id}>
-                {dzongkhag.dzonkhagName}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        <Grid
-          item
-          size={{ xs: 12, sm: 6, md: 2 }}
-          sx={{ display: "flex", alignItems: "center" }}
+          <MenuItem value="" sx={menuItemSx}>
+            All certificate levels
+          </MenuItem>
+          {certificationLevels.map((x) => (
+            <MenuItem key={x.id} value={x.id} sx={menuItemSx}>
+              {x.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          select
+          size="small"
+          value={locationFilter}
+          onChange={(e) => {
+            setLocationFilter(e.target.value);
+            setProgPage(0);
+          }}
+          slotProps={{ select: { displayEmpty: true, MenuProps: { PaperProps: { sx: { maxHeight: 320 } } } } }}
+          sx={{ ...filterSx, width: { xs: "100%", sm: 190 } }}
         >
-          <Button
-            variant="contained"
-            color="error"
-            size="small"
-            startIcon={<RestartAltIcon />}
-            fullWidth
-            onClick={handleReset}
-            sx={{
-              height: 40,
-            }}
-          >
-            Reset
-          </Button>
-        </Grid>
-      </Grid>
+          <MenuItem value="" sx={menuItemSx}>
+            All locations
+          </MenuItem>
+          {dzongkhags.map((x) => (
+            <MenuItem key={x.id} value={x.id} sx={menuItemSx}>
+              {x.dzonkhagName}
+            </MenuItem>
+          ))}
+        </TextField>
+        <Button
+          size="small"
+          startIcon={<RestartAltIcon sx={{ fontSize: "16px !important" }} />}
+          onClick={handleReset}
+          sx={{ height: 34, px: 1.25, textTransform: "none", fontWeight: 600, fontSize: "0.78rem", color: "text.secondary", "&:hover": { color: "#1565c0", bgcolor: "transparent" } }}
+        >
+          Reset
+        </Button>
+      </Box>
 
-      <TableContainer sx={{ borderRadius: 1.5, border: "1px solid #dbe5f0" }}>
-        <Table size="small" sx={TS}>
+      {!loading && !error && (
+        <Typography sx={{ fontSize: "0.78rem", color: "text.secondary", mb: 1 }}>
+          {filteredCourses.length} programme{filteredCourses.length === 1 ? "" : "s"} running
+          {totalTrainees > 0 && ` · ${totalTrainees.toLocaleString()} trainees`}
+        </Typography>
+      )}
+
+      <TableContainer sx={{ borderRadius: 2, border: `1px solid ${LINE}`, overflowX: "auto" }}>
+        <Table size="small" sx={{ ...TS, minWidth: 900 }}>
           <TableHead>
             <TableRow>
-              <TableCell>Training Institute</TableCell>
-              <TableCell>Course Name</TableCell>
-              <TableCell>Certificate Level</TableCell>
-              <TableCell>Training Location</TableCell>
-              <TableCell>Start Date</TableCell>
-              <TableCell>End Date</TableCell>
-              <TableCell align="center">Total Trainees</TableCell>
+              <TableCell align="center" sx={{ width: 44 }}>#</TableCell>
+              <TableCell sx={{ minWidth: 220 }}>Course / Level</TableCell>
+              <TableCell sx={{ minWidth: 200 }}>Training Provider / Location</TableCell>
+              <TableCell>Course Date</TableCell>
+              <TableCell sx={{ minWidth: 150 }}>Progress</TableCell>
+              <TableCell align="center">Trainees</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredCourses.length > 0 ? (
+            {loading ? (
+              [0, 1, 2].map((i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={6}>
+                    <Skeleton height={30} />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <Typography sx={{ fontWeight: 600, color: "text.secondary" }}>
+                    Ongoing programmes could not be loaded
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                    Please try again later.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : filteredCourses.length > 0 ? (
               filteredCourses
-                .slice(
-                  progPage * progRowsPerPage,
-                  progPage * progRowsPerPage + progRowsPerPage,
-                )
-                .map((course, index) => (
-                  <TableRow key={course.application_no || index}>
-                    <TableCell sx={{ fontWeight: 500 }}>
-                      {course.institute_name || "N/A"}
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 600,
-                        color: "#0a1929",
-                      }}
-                    >
-                      {course.course_name || "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      {getCertificationLevelName(course.certification_level_id)}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getDzongkhagName(course.training_location_id)}
-                        size="small"
-                        sx={{
-                          bgcolor: alpha("#1565c0", 0.1),
-                          color: "#1565c0",
-                          fontWeight: 500,
-                          fontSize: "0.7rem",
-                          height: 24,
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ fontSize: "0.76rem" }}>
-                      {formatDate(course.course_start_date)}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: "0.76rem" }}>
-                      {formatDate(course.course_end_date)}
-                    </TableCell>
-                    <TableCell align="center">
-                      {course.total_no_trainees !== undefined
-                        ? course.total_no_trainees
-                        : "N/A"}
-                    </TableCell>
-                  </TableRow>
-                ))
+                .slice(progPage * progRowsPerPage, progPage * progRowsPerPage + progRowsPerPage)
+                .map((course, index) => {
+                  const duration = courseDuration(course.course_start_date, course.course_end_date);
+                  const progress = courseProgress(course.course_start_date, course.course_end_date);
+                  return (
+                    <TableRow key={course.application_no || index}>
+                      <TableCell align="center" sx={{ color: "text.secondary" }}>
+                        {progPage * progRowsPerPage + index + 1}
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.84rem", color: NAVY, lineHeight: 1.3 }}>
+                          {course.course_name || "N/A"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.74rem", color: "text.secondary" }}>
+                          {getCertificationLevelName(course.certification_level_id)}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography sx={{ fontSize: "0.8rem", lineHeight: 1.3, mb: 0.4 }}>
+                          {course.institute_name || "N/A"}
+                        </Typography>
+                        <Pill label={getDzongkhagName(course.training_location_id)} color="#00838f" />
+                      </TableCell>
+
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        <Typography sx={{ fontSize: "0.76rem" }}>
+                          {formatDate(course.course_start_date)} –
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.76rem", mb: 0.25 }}>
+                          {formatDate(course.course_end_date)}
+                        </Typography>
+                        {duration && <Pill label={duration} color={BLUE} />}
+                      </TableCell>
+
+                      {/* how far the course has run */}
+                      <TableCell>
+                        {progress === null ? (
+                          "—"
+                        ) : (
+                          <>
+                            <Typography sx={{ fontSize: "0.76rem", fontVariantNumeric: "tabular-nums" }}>
+                              <b>{progress}%</b>
+                              <Box component="span" sx={{ color: "text.secondary" }}> complete</Box>
+                            </Typography>
+                            <Box sx={{ mt: 0.5, height: 5, borderRadius: 3, bgcolor: alpha(NAVY, 0.08), overflow: "hidden" }}>
+                              <Box sx={{ height: "100%", width: `${progress}%`, borderRadius: 3, bgcolor: "#2e7d32" }} />
+                            </Box>
+                          </>
+                        )}
+                      </TableCell>
+
+                      <TableCell align="center">
+                        <Typography sx={{ fontWeight: 700, color: NAVY, fontVariantNumeric: "tabular-nums" }}>
+                          {course.total_no_trainees ?? "—"}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={7}
-                  align="center"
-                  sx={{
-                    color: "error.main",
-                    fontWeight: 600,
-                  }}
-                >
-                  No data available
+                <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                  <SearchIcon sx={{ fontSize: 34, color: "#cfd8e3" }} />
+                  <Typography sx={{ fontWeight: 600, color: "text.secondary" }}>
+                    No ongoing programmes found
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                    Try another level or location, or reset the filters.
+                  </Typography>
                 </TableCell>
               </TableRow>
             )}
@@ -661,13 +408,13 @@ const OngoingProgramsIndex = () => {
           }}
           rowsPerPageOptions={[5, 10, 25]}
           sx={{
+            mt: 0.5,
             "& .MuiTablePagination-toolbar": { minHeight: 40 },
-            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
-              { fontSize: "0.75rem" },
+            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: "0.75rem" },
           }}
         />
       )}
-    </Paper>
+    </Box>
   );
 };
 

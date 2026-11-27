@@ -184,6 +184,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   // ---------- Helper: tooltip text for assessment inputs ----------
 
   const getInternalAssessmentTooltip = (traineeId) => {
+    if (isApplicationEndorsed()) {
+      return "Internal Assessment cannot be changed after endorsement";
+    }
     const hasValue =
       traineeInternalAssessments[traineeId] &&
       traineeInternalAssessments[traineeId] !== "";
@@ -199,6 +202,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   // the competency stays editable after it is chosen
   const getCompetencyTooltip = (traineeId) => {
+    if (isApplicationEndorsed()) {
+      return "Internal Assessment cannot be changed after endorsement";
+    }
     const hasValue =
       traineeInternalAssessments[traineeId] &&
       traineeInternalAssessments[traineeId] !== "";
@@ -352,7 +358,6 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
         : response.data;
       setCourseDetails(programmeData);
       console.log("Programme details fetched:", programmeData);
-      
     } catch (error) {
       console.error("Error fetching programme details:", error);
       toast.error("Failed to fetch programme details");
@@ -483,6 +488,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
   };
 
   const handleInternalAssessmentChange = (traineeId, value) => {
+    // Internal Assessment is locked once the application is endorsed (59)
+    if (isApplicationEndorsed()) return;
     setTraineeInternalAssessments((prev) => ({
       ...prev,
       [traineeId]: value,
@@ -826,18 +833,16 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
           : null,
       }));
     } else {
+      // numeric levels send numbers, competency levels send the selected value
+      const numeric = isNumericCertificationLevel();
+      const markValue = (value) => {
+        if (!value) return null;
+        return numeric ? parseInt(value) : value;
+      };
       payload.traineeMarks = selectedTrainees.map((trainee) => ({
         traineeId: parseInt(trainee.id),
-        theoryAssessment: isNumericCertificationLevel()
-          ? traineeTheoryAssessments[trainee.id]
-            ? parseInt(traineeTheoryAssessments[trainee.id])
-            : null
-          : traineeTheoryAssessments[trainee.id] || null,
-        practicalAssessment: isNumericCertificationLevel()
-          ? traineePracticalAssessments[trainee.id]
-            ? parseInt(traineePracticalAssessments[trainee.id])
-            : null
-          : traineePracticalAssessments[trainee.id] || null,
+        theoryAssessment: markValue(traineeTheoryAssessments[trainee.id]),
+        practicalAssessment: markValue(traineePracticalAssessments[trainee.id]),
       }));
     }
 
@@ -1008,7 +1013,8 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     // Total = Internal Assessment + Theory + Practical (calculated here, not saved)
     const internalRaw =
       traineeInternalAssessments[trainee.id] || trainee.internal_assessment;
-    const hasInternal = internalRaw !== null && internalRaw !== undefined && internalRaw !== "";
+    const hasInternal =
+      internalRaw !== null && internalRaw !== undefined && internalRaw !== "";
     const total =
       (parseInt(internalRaw) || 0) +
       (parseInt(firstValue) || 0) +
@@ -1053,11 +1059,13 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
 
   // ---------- Derived tooltip/disabled states ----------
 
-  const moveToPendingTooltip = hasCADates
-    ? "⚠️ Cannot move trainees to pending when CA dates are set. Please clear CA dates first."
-    : selectedSelectedRows.length === 0
-      ? "Please select at least one trainee to move back"
-      : "";
+  let moveToPendingTooltip = "";
+  if (hasCADates) {
+    moveToPendingTooltip =
+      "⚠️ Cannot move trainees to pending when CA dates are set. Please clear CA dates first.";
+  } else if (selectedSelectedRows.length === 0) {
+    moveToPendingTooltip = "Please select at least one trainee to move back";
+  }
 
   // Move to Selected is only allowed before the application has a status
   const status = courseDetails?.application_status_id;
@@ -1070,13 +1078,16 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
       String(status).toLowerCase() === "null"
     );
 
-  const moveToSelectedTooltip = hasCADates
-    ? "⚠️ Cannot move trainees to selected when CA dates are set. Please clear CA dates first."
-    : moveToSelectedLocked
-      ? "Trainees can be moved to selected only before the application is submitted"
-      : selectedPendingRows.length === 0
-      ? "Please select at least one trainee to move"
-      : "";
+  let moveToSelectedTooltip = "";
+  if (hasCADates) {
+    moveToSelectedTooltip =
+      "⚠️ Cannot move trainees to selected when CA dates are set. Please clear CA dates first.";
+  } else if (moveToSelectedLocked) {
+    moveToSelectedTooltip =
+      "Trainees can be moved to selected only before the application is submitted";
+  } else if (selectedPendingRows.length === 0) {
+    moveToSelectedTooltip = "Please select at least one trainee to move";
+  }
 
   const submitTooltip = (() => {
     if (!isSubmitAllowedStatus()) {
@@ -1088,17 +1099,18 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
     return "";
   })();
 
-  const moveToPendingButtonLabel = movingTrainees
-    ? "Moving..."
-    : hasCADates
-      ? "Movement Disabled"
-      : `Move to Pending`;
-
-  const moveToSelectedButtonLabel = movingTrainees
-    ? "Moving..."
-    : moveToSelectedLocked
-      ? "Movement Disabled"
-      : `Move to Selected`;
+  const moveButtonLabel = (disabled, label) => {
+    if (movingTrainees) return "Moving...";
+    return disabled ? "Movement Disabled" : label;
+  };
+  const moveToPendingButtonLabel = moveButtonLabel(
+    hasCADates,
+    "Move to Pending",
+  );
+  const moveToSelectedButtonLabel = moveButtonLabel(
+    moveToSelectedLocked,
+    "Move to Selected",
+  );
 
   const submitButtonLabel = submitting
     ? "Submitting..."
@@ -1213,7 +1225,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                             ? "Viva Assessment"
                             : "Theory Assessment"}
                         </TableCell>
-                        <TableCell align="center">Practical Assessment</TableCell>
+                        <TableCell align="center">
+                          Practical Assessment
+                        </TableCell>
                         {showTotalColumn() && (
                           <TableCell align="center">Total</TableCell>
                         )}
@@ -1268,10 +1282,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                                 statusList,
                               )}
                               size="small"
-                              sx={getStatusColor(
-                                trainee.status_id,
-                                statusList,
-                              )}
+                              sx={getStatusColor(trainee.status_id, statusList)}
                             />
                           </TableCell>
                           {showInternalAssessment && (
@@ -1322,7 +1333,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                                             ? 20
                                             : 100,
                                         },
-                                        readOnly: false,
+                                        readOnly: isApplicationEndorsed(),
                                       },
                                     }}
                                     sx={{
@@ -1366,6 +1377,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                                           e.target.value,
                                         )
                                       }
+                                      readOnly={isApplicationEndorsed()}
                                       displayEmpty
                                     >
                                       <MenuItem value="" disabled>
@@ -1391,7 +1403,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                           {/* Overall Result: read-only box like the assessment columns;
                               a cell on every row (empty "—" when no result yet) so columns stay aligned */}
                           {isApplicationEndorsed() &&
-                            selectedTrainees.some((t) => t.result_status_id) && (
+                            selectedTrainees.some(
+                              (t) => t.result_status_id,
+                            ) && (
                               <TableCell>
                                 {(() => {
                                   const name = trainee.result_status_id
@@ -1413,7 +1427,9 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                                         size="small"
                                         value={name || "—"}
                                         fullWidth
-                                        slotProps={{ input: { readOnly: true } }}
+                                        slotProps={{
+                                          input: { readOnly: true },
+                                        }}
                                         sx={{
                                           ...ASSESS_TEXT_SX,
                                           backgroundColor: "#f5f5f5",
@@ -1474,9 +1490,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                     hasCADates
                   }
                   color={hasCADates ? "grey" : "secondary"}
-                  icon={
-                    hasCADates ? <BlockIcon /> : <ArrowBackIcon />
-                  }
+                  icon={hasCADates ? <BlockIcon /> : <ArrowBackIcon />}
                   label={moveToPendingButtonLabel}
                   count={selectedSelectedRows.length}
                   tooltip={moveToPendingTooltip}
@@ -1604,10 +1618,7 @@ const AccreditatedRPLCourseTraineeSelectionIndex = () => {
                                 statusList,
                               )}
                               size="small"
-                              sx={getStatusColor(
-                                trainee.status_id,
-                                statusList,
-                              )}
+                              sx={getStatusColor(trainee.status_id, statusList)}
                             />
                           </TableCell>
                           <TableCell align="center">

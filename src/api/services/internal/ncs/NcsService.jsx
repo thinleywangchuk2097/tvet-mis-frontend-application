@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class NcsService {
   submitNcs(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/ncs/ncs-create`, data, {
+      .post(`/api/v1/ncs/ncs-create`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -17,7 +17,7 @@ class NcsService {
 
   updateNcs(id, data, token) {
     return apiClient
-      .put(`/api/v1/user/management/ncs/ncs-update/${id}`, data, {
+      .put(`/api/v1/ncs/ncs-update/${id}`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -32,7 +32,7 @@ class NcsService {
   // NCS list for one sector (includes occupation_name)
   getNcsDetailsBySector(sectorId, token) {
     return apiClient
-      .get(`/api/v1/user/management/ncs/get-ncs-details-by-sector/${sectorId}`, {
+      .get(`/api/v1/ncs/get-ncs-details-by-sector/${sectorId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -46,7 +46,7 @@ class NcsService {
 
   getNcsDetails(token) {
     return apiClient
-      .get(`/api/v1/user/management/ncs/get-ncs-details`, {
+      .get(`/api/v1/ncs/get-ncs-details`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -61,7 +61,7 @@ class NcsService {
   getAlreadyNcsDetailsExist(sector_id, occupation_id, certification_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/ncs/get-ncs-already-exist/${sector_id}/${occupation_id}/${certification_id}`,
+        `/api/v1/ncs/get-ncs-already-exist/${sector_id}/${occupation_id}/${certification_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -77,7 +77,7 @@ class NcsService {
 
   getProgrammeTitleById(programme_id, token) {
     return apiClient
-      .get(`/api/v1/user/management/ncs/get-programme-title/${programme_id}`, {
+      .get(`/api/v1/ncs/get-programme-title/${programme_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -91,7 +91,7 @@ class NcsService {
 
    getAllNcsProgrammes(token) {
     return apiClient
-      .get(`/api/v1/user/management/ncs/get-ncs-programmes`, {
+      .get(`/api/v1/ncs/get-ncs-programmes`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -105,7 +105,7 @@ class NcsService {
 
    getAllCertificateLevelNcsProgrammes(token) {
     return apiClient
-      .get(`/api/v1/user/management/ncs/get-ncs-certificate-level-programmes`, {
+      .get(`/api/v1/ncs/get-ncs-certificate-level-programmes`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

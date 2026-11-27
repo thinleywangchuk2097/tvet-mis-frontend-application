@@ -165,6 +165,13 @@ CountBarChart.propTypes = {
   horizontal: PropTypes.bool,
 };
 
+
+// renewal due: red when overdue, orange within 60 days
+const renewalDueColor = (days) => {
+  if (days < 0) return "error.main";
+  return days < 60 ? "warning.main" : "text.secondary";
+};
+
 const AssessmentCentreDashboard = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -436,13 +443,7 @@ const AssessmentCentreDashboard = () => {
                   </Typography>
                   <Typography
                     variant="caption"
-                    color={
-                      v.days < 0
-                        ? "error.main"
-                        : v.days < 60
-                          ? "warning.main"
-                          : "text.secondary"
-                    }
+                    color={renewalDueColor(v.days)}
                   >
                     {v.days < 0
                       ? `${Math.abs(v.days)} days overdue`
@@ -539,15 +540,17 @@ const AssessmentCentreDashboard = () => {
         <Grid size={{ xs: 12, md: 5 }}>
           <Panel title="Assessments by certificate level">
             <Box sx={{ height: 240 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : byLevel.length ? (
+              )}
+              {!loading && byLevel.length > 0 && (
                 <CountBarChart
                   data={byLevel}
                   name="Assessments"
                   color={theme.palette.primary.main}
                 />
-              ) : (
+              )}
+              {!loading && byLevel.length === 0 && (
                 <Empty text="No RPL assessments yet" />
               )}
             </Box>
@@ -572,16 +575,18 @@ const AssessmentCentreDashboard = () => {
             }
           >
             <Box sx={{ height: 240 }}>
-              {loading ? (
+              {loading && (
                 <Skeleton variant="rounded" height="100%" />
-              ) : byProgramme.length ? (
+              )}
+              {!loading && byProgramme.length > 0 && (
                 <CountBarChart
                   data={byProgramme}
                   name="Assessments"
                   color={theme.palette.primary.main}
                   horizontal
                 />
-              ) : (
+              )}
+              {!loading && byProgramme.length === 0 && (
                 <Empty text="No RPL assessments yet" />
               )}
             </Box>
@@ -604,9 +609,10 @@ const AssessmentCentreDashboard = () => {
               </Button>
             }
           >
-            {loading ? (
+            {loading && (
               <Skeleton variant="rounded" height={160} />
-            ) : sortedAll.length ? (
+            )}
+            {!loading && sortedAll.length > 0 && (
               <TableContainer sx={{ maxHeight: 340 }}>
                 <Table size="small" stickyHeader sx={BORDERED_TABLE}>
                   <TableHead>
@@ -663,7 +669,8 @@ const AssessmentCentreDashboard = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
-            ) : (
+            )}
+            {!loading && sortedAll.length === 0 && (
               <Box sx={{ height: 120 }}>
                 <Empty text="No RPL assessments announced yet" />
               </Box>
@@ -684,9 +691,10 @@ const AssessmentCentreDashboard = () => {
               </Button>
             }
           >
-            {loading ? (
+            {loading && (
               <Skeleton variant="rounded" height={160} />
-            ) : approvedCourses.length ? (
+            )}
+            {!loading && approvedCourses.length > 0 && (
               <TableContainer sx={{ maxHeight: 340 }}>
                 <Table size="small" stickyHeader sx={BORDERED_TABLE}>
                   <TableHead>
@@ -718,7 +726,8 @@ const AssessmentCentreDashboard = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
-            ) : (
+            )}
+            {!loading && approvedCourses.length === 0 && (
               <Box sx={{ height: 120 }}>
                 <Empty text="No approved RPL courses yet" />
               </Box>

@@ -114,9 +114,6 @@ const TrackApplicationStatusIndex = () => {
           searchFilters.searchQuery.trim(),
           access_token,
         );
-
-      console.log("API Response:", response.data);
-
       if (response && response.data) {
         let dataArray = [];
 

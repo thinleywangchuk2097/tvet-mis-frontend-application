@@ -61,24 +61,73 @@ const AUTO_SAVE_INTERVAL_MS = 60000;
 //   59 Endorsed  -> TVETQC     : Approve (57) / Reject (58)
 const STAGE_ACTIONS = {
   55: [
-    { statusId: 56, label: "Verify", color: "success", icon: <CheckCircleIcon /> },
+    {
+      statusId: 56,
+      label: "Verify",
+      color: "success",
+      icon: <CheckCircleIcon />,
+    },
     { statusId: 58, label: "Reject", color: "error", icon: <CancelIcon /> },
   ],
   56: [
-    { statusId: 59, label: "Endorse", color: "primary", icon: <VerifiedIcon /> },
+    {
+      statusId: 59,
+      label: "Endorse",
+      color: "primary",
+      icon: <VerifiedIcon />,
+    },
     { statusId: 58, label: "Reject", color: "error", icon: <CancelIcon /> },
   ],
   59: [
-    { statusId: 57, label: "Approve", color: "success", icon: <CheckCircleIcon /> },
+    {
+      statusId: 57,
+      label: "Approve",
+      color: "success",
+      icon: <CheckCircleIcon />,
+    },
     { statusId: 58, label: "Reject", color: "error", icon: <CancelIcon /> },
   ],
 };
 
 const ACTION_TEXT = {
-  [SAR_STATUS.VERIFIED]: { title: "Verify Self Assessment Report", verb: "verify", done: "Report verified successfully" },
-  [SAR_STATUS.ENDORSED]: { title: "Endorse Self Assessment Report", verb: "endorse", done: "Report endorsed successfully" },
-  [SAR_STATUS.APPROVED]: { title: "Approve Self Assessment Report", verb: "approve", done: "Report approved successfully" },
-  [SAR_STATUS.REJECTED]: { title: "Reject Self Assessment Report", verb: "reject", done: "Report rejected successfully" },
+  [SAR_STATUS.VERIFIED]: {
+    title: "Verify TVET Provider Accreditation Report",
+    verb: "verify",
+    done: "Report verified successfully",
+  },
+  [SAR_STATUS.ENDORSED]: {
+    title: "Endorse TVET Provider Accreditation Report",
+    verb: "endorse",
+    done: "Report endorsed successfully",
+  },
+  [SAR_STATUS.APPROVED]: {
+    title: "Approve TVET Provider Accreditation Report",
+    verb: "approve",
+    done: "Report approved successfully",
+  },
+  [SAR_STATUS.REJECTED]: {
+    title: "Reject TVET Provider Accreditation Report",
+    verb: "reject",
+    done: "Report rejected successfully",
+  },
+};
+
+// status chip: approved = green, rejected = red, otherwise blue
+const statusChipColor = (statusId) => {
+  const id = Number(statusId);
+  if (id === SAR_STATUS.APPROVED) return "success";
+  if (id === SAR_STATUS.REJECTED) return "error";
+  return "info";
+};
+
+// draft banner text
+const draftMessage = (dirty, lastSavedAt) => {
+  if (dirty)
+    return "You have unsaved changes. They are auto-saved every minute.";
+  if (lastSavedAt) {
+    return `All changes saved at ${lastSavedAt.toLocaleTimeString()}.`;
+  }
+  return "Earned points can be entered over several days - use Save Draft to keep your progress.";
 };
 
 const ViewSelfAssessmentReport = () => {
@@ -115,7 +164,6 @@ const ViewSelfAssessmentReport = () => {
   const [recList, setRecList] = useState([]);
   const [recMembers, setRecMembers] = useState([]);
 
-
   // Draft / action state
   const [dirty, setDirty] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -139,7 +187,10 @@ const ViewSelfAssessmentReport = () => {
     stageActions.length > 0 &&
     Number(currentStatusId) !== SAR_STATUS.VERIFIED;
 
-  const criteria = useMemo(() => buildQualityTree(rawStandards), [rawStandards]);
+  const criteria = useMemo(
+    () => buildQualityTree(rawStandards),
+    [rawStandards],
+  );
   const summary = useMemo(
     () => computeSummary(criteria, earnedPoints),
     [criteria, earnedPoints],
@@ -150,7 +201,8 @@ const ViewSelfAssessmentReport = () => {
   // ------------------------------------------------------------------
   const fetchQualityStandards = async () => {
     try {
-      const response = await CommonService.getAllQualitystandards(SAR_SERVICE_ID);
+      const response =
+        await CommonService.getAllQualitystandards(SAR_SERVICE_ID);
       setRawStandards(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching quality standards:", error);
@@ -210,7 +262,9 @@ const ViewSelfAssessmentReport = () => {
       let instituteData = null;
       if (registrationNo) {
         const response =
-          await InstituteRegistrationService.getInstituteDetails(registrationNo);
+          await InstituteRegistrationService.getInstituteDetails(
+            registrationNo,
+          );
         instituteData = Array.isArray(response.data)
           ? response.data[0]
           : response.data;
@@ -280,7 +334,7 @@ const ViewSelfAssessmentReport = () => {
     // remarks set = that member has endorsed). Names are looked up from the REC user list.
     setRecMembers(
       parseJson(data.rec_members, [])
-        .filter((r) => r && r.userId)
+        .filter((r) => r?.userId)
         .map((r) => ({
           userId: String(r.userId),
           name: "",
@@ -298,7 +352,7 @@ const ViewSelfAssessmentReport = () => {
       await Promise.all([fetchReportDetails(), fetchQualityStandards()]);
     } catch (error) {
       console.error("Error fetching report data:", error);
-      toast.error("Failed to load Self Assessment Report");
+      toast.error("Failed to load TVET Provider Accreditation Report");
     } finally {
       setLoading(false);
     }
@@ -367,7 +421,7 @@ const ViewSelfAssessmentReport = () => {
         .filter((a) => a.userId)
         .map((a) => ({ userId: a.userId, name: a.name })),
       coordinators: coordinators
-        .filter((c) => c.name && c.name.trim())
+        .filter((c) => c.name?.trim())
         .map((c) => ({ name: c.name.trim(), designation: c.designation })),
       recMembers: recMembers.map((r) => ({ userId: r.userId })),
     }),
@@ -426,7 +480,15 @@ const ViewSelfAssessmentReport = () => {
       AUTO_SAVE_INTERVAL_MS,
     );
     return () => clearTimeout(timer);
-  }, [dirty, canEdit, earnedPoints, justifications, accreditors, coordinators, recMembers]);
+  }, [
+    dirty,
+    canEdit,
+    earnedPoints,
+    justifications,
+    accreditors,
+    coordinators,
+    recMembers,
+  ]);
 
   // ------------------------------------------------------------------
   // Workflow actions
@@ -454,12 +516,16 @@ const ViewSelfAssessmentReport = () => {
         return false;
       }
       if (coordinators.some((c) => !c.name.trim())) {
-        toast.error("Please enter the programme co-ordinator name or remove the empty row");
+        toast.error(
+          "Please enter the programme co-ordinator name or remove the empty row",
+        );
         setTabValue(2);
         return false;
       }
       if (recMembers.length === 0) {
-        toast.error("Please assign at least one REC member before verification");
+        toast.error(
+          "Please assign at least one REC member before verification",
+        );
         setTabValue(3);
         return false;
       }
@@ -518,7 +584,8 @@ const ViewSelfAssessmentReport = () => {
           toast.info(response.data.message);
         } else {
           toast.success(
-            ACTION_TEXT[selectedStatusId]?.done || "Action completed successfully",
+            ACTION_TEXT[selectedStatusId]?.done ||
+              "Action completed successfully",
           );
         }
         closeDialog();
@@ -527,14 +594,14 @@ const ViewSelfAssessmentReport = () => {
       } else {
         toast.error(
           response.response?.data?.message ||
-            "Failed to process Self Assessment Report",
+            "Failed to process TVET Provider Accreditation Report",
         );
       }
     } catch (error) {
       console.error("Error performing action:", error);
       toast.error(
         error.response?.data?.message ||
-          "Failed to process Self Assessment Report",
+          "Failed to process TVET Provider Accreditation Report",
       );
     } finally {
       setActionLoading(false);
@@ -567,10 +634,10 @@ const ViewSelfAssessmentReport = () => {
       <Box sx={{ m: 3 }}>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={700} textAlign="center" mb={3}>
-            Self Assessment Report
+            TVET Provider Accreditation Report
           </Typography>
           <Alert severity="error">
-            Self Assessment Report with Application No:{" "}
+            TVET Provider Accreditation Report with Application No:{" "}
             <strong>{applicationNo}</strong> not found
           </Alert>
         </Paper>
@@ -593,7 +660,7 @@ const ViewSelfAssessmentReport = () => {
         >
           <Box>
             <Typography variant="h6" fontWeight={700}>
-              Self Assessment Report - TVET Provider Accreditation
+              TVET Provider Accreditation Report - TVET Provider Accreditation
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Application No: <strong>{applicationNo}</strong> ·{" "}
@@ -604,17 +671,15 @@ const ViewSelfAssessmentReport = () => {
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip
               label={reportData.status_name || "Pending"}
-              color={
-                Number(currentStatusId) === SAR_STATUS.APPROVED
-                  ? "success"
-                  : Number(currentStatusId) === SAR_STATUS.REJECTED
-                    ? "error"
-                    : "info"
-              }
+              color={statusChipColor(currentStatusId)}
             />
             <Chip
               label={`Score: ${formatScore(summary.totalScore)} / ${summary.totalWeight}`}
-              sx={{ bgcolor: summary.grade.color, color: "#fff", fontWeight: 700 }}
+              sx={{
+                bgcolor: summary.grade.color,
+                color: "#fff",
+                fontWeight: 700,
+              }}
             />
             <Chip
               label={`Grade: ${summary.grade.grade}`}
@@ -625,6 +690,12 @@ const ViewSelfAssessmentReport = () => {
                 fontWeight: 700,
               }}
             />
+            {summary.grade.renewalYears && (
+              <Chip
+                label={`Renewal: every ${summary.grade.renewalYears} years`}
+                variant="outlined"
+              />
+            )}
           </Stack>
         </Stack>
         <Divider />
@@ -658,11 +729,7 @@ const ViewSelfAssessmentReport = () => {
               </Button>
             }
           >
-            {dirty
-              ? "You have unsaved changes. They are auto-saved every minute."
-              : lastSavedAt
-                ? `All changes saved at ${lastSavedAt.toLocaleTimeString()}.`
-                : "Earned points can be entered over several days - use Save Draft to keep your progress."}
+            {draftMessage(dirty, lastSavedAt)}
           </Alert>
         )}
 
@@ -674,7 +741,10 @@ const ViewSelfAssessmentReport = () => {
                 Basic Information
               </Typography>
               <Divider sx={{ mb: 2 }} />
-              <BasicInformationSection basicInfo={basicInfo} loading={basicLoading} />
+              <BasicInformationSection
+                basicInfo={basicInfo}
+                loading={basicLoading}
+              />
             </Paper>
           )}
 
@@ -756,7 +826,13 @@ const ViewSelfAssessmentReport = () => {
             )}
           </Stack>
 
-          <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="flex-end"
+            flexWrap="wrap"
+            useFlexGap
+          >
             {tabValue > 0 && (
               <Button
                 variant="outlined"
@@ -794,7 +870,12 @@ const ViewSelfAssessmentReport = () => {
                     startIcon={action.icon}
                     onClick={() => openActionDialog(action.statusId)}
                     disabled={actionLoading || savingDraft}
-                    sx={{ px: 3, py: 0.5, fontWeight: 600, textTransform: "none" }}
+                    sx={{
+                      px: 3,
+                      py: 0.5,
+                      fontWeight: 600,
+                      textTransform: "none",
+                    }}
                   >
                     {action.label}
                   </Button>
@@ -806,7 +887,12 @@ const ViewSelfAssessmentReport = () => {
       </Paper>
 
       {/* Action Dialog */}
-      <Dialog open={actionDialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+      <Dialog
+        open={actionDialogOpen}
+        onClose={closeDialog}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>
           {ACTION_TEXT[selectedStatusId]?.title || "Confirm Action"}
         </DialogTitle>
@@ -820,7 +906,10 @@ const ViewSelfAssessmentReport = () => {
             <br />
             <strong>
               Score: {formatScore(summary.totalScore)} / {summary.totalWeight} (
-              {summary.grade.grade})
+              {summary.grade.grade}
+              {summary.grade.renewalYears &&
+                `, renewal every ${summary.grade.renewalYears} years`}
+              )
             </strong>
           </DialogContentText>
           <TextField
@@ -855,7 +944,9 @@ const ViewSelfAssessmentReport = () => {
           </Button>
           <Button
             onClick={handleAction}
-            color={selectedStatusId === SAR_STATUS.REJECTED ? "error" : "primary"}
+            color={
+              selectedStatusId === SAR_STATUS.REJECTED ? "error" : "primary"
+            }
             variant="contained"
             size="small"
             disabled={

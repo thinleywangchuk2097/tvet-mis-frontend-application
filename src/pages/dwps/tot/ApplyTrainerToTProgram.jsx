@@ -64,6 +64,18 @@ const trainerTablePropTypes = {
 };
 
 // ==================== TRAINER TABLE COMPONENT ====================
+
+// Apply button: spinner while applying, tick once applied, otherwise send
+const applyButtonIcon = (submitting, alreadyApplied) => {
+  if (submitting) return <CircularProgress size={16} color="inherit" />;
+  return alreadyApplied ? <CheckCircleIcon /> : <SendIcon />;
+};
+
+const applyButtonLabel = (alreadyApplied, submitting, selectedCount) => {
+  if (alreadyApplied) return "Already Applied";
+  return submitting ? "Applying..." : `Apply Selected (${selectedCount})`;
+};
+
 const TrainerTable = ({
   announcementId,
   trainersList,
@@ -243,26 +255,14 @@ const TrainerTable = ({
         <Button
           variant="contained"
           color="success"
-          startIcon={
-            submitting ? (
-              <CircularProgress size={16} color="inherit" />
-            ) : alreadyApplied ? (
-              <CheckCircleIcon />
-            ) : (
-              <SendIcon />
-            )
-          }
+          startIcon={applyButtonIcon(submitting, alreadyApplied)}
           onClick={() => onApplyTrainers(announcementId)}
           disabled={
             alreadyApplied || submitting || selectedCount === 0 || loading
           }
           size="small"
         >
-          {alreadyApplied
-            ? "Already Applied"
-            : submitting
-              ? "Applying..."
-              : `Apply Selected (${selectedCount})`}
+          {applyButtonLabel(alreadyApplied, submitting, selectedCount)}
         </Button>
       </Box>
     </Box>
@@ -868,13 +868,14 @@ const ApplyTrainerToTProgram = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={10} align="center">
                   <CircularProgress size={30} />
                 </TableCell>
               </TableRow>
-            ) : filteredAnnouncements.length > 0 ? (
+            )}
+            {!loading && filteredAnnouncements.length > 0 && (
               filteredAnnouncements
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((item, index) => {
@@ -1029,7 +1030,8 @@ const ApplyTrainerToTProgram = () => {
                     </React.Fragment>
                   );
                 })
-            ) : (
+            )}
+            {!loading && filteredAnnouncements.length === 0 && (
               <TableRow>
                 <TableCell colSpan={10} align="center">
                   No TOT announcements available

@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class ApplyAccreditedCourseService {
   submitAccreditedCourse(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/accredited-course/submit`, data, {
+      .post(`/api/v1/accredited-course/submit`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -15,7 +15,7 @@ class ApplyAccreditedCourseService {
   getAccreditedCourseByApplicationNo(application_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-course-details/${application_no}`,
+        `/api/v1/accredited-course/get-course-details/${application_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -28,7 +28,7 @@ class ApplyAccreditedCourseService {
   getAccreditedCourseDetailsByUserId(user_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-application-details/${user_id}`,
+        `/api/v1/accredited-course/get-application-details/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -42,7 +42,7 @@ class ApplyAccreditedCourseService {
   verifyAccreditedCourse(data, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/accredited-course/verify-accredited-course`,
+        `/api/v1/accredited-course/verify-accredited-course`,
         data,
         {
           headers: {
@@ -57,7 +57,7 @@ class ApplyAccreditedCourseService {
   getAccreditedApprovedCourseByUserId(user_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-accredited-approved-course-details/${user_id}`,
+        `/api/v1/accredited-course/get-accredited-approved-course-details/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -71,7 +71,7 @@ class ApplyAccreditedCourseService {
   getAccreditedApprovedCertificateCourseByUserId(user_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-accredited-approved-certificate-course-details/${user_id}`,
+        `/api/v1/accredited-course/get-accredited-approved-certificate-course-details/${user_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -85,7 +85,7 @@ class ApplyAccreditedCourseService {
   getAccreditedCourseByInstituteId(institute_id, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-accredited-course/${institute_id}`,
+        `/api/v1/accredited-course/get-accredited-course/${institute_id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -99,7 +99,7 @@ class ApplyAccreditedCourseService {
   curriculumExistAlready(curriculumId, registration_no, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/accredited-course/get-curriculum-exist/${curriculumId}/${registration_no}`,
+        `/api/v1/accredited-course/get-curriculum-exist/${curriculumId}/${registration_no}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

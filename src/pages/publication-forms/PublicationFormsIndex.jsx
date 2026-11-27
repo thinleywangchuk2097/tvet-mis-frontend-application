@@ -42,14 +42,14 @@ import DownloadIcon from "@mui/icons-material/Download";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
-import TvetDocumentService from "../../../api/services/internal/public/TvetDocumentService";
+import PublicationFormService from "../../api/services/internal/public/PublicationFormService";
 import {
   CATEGORY,
   fileExtension,
   fileTypeMeta,
   formatDate,
   formatFileSize,
-} from "../../public/documents/documentUtils";
+} from "../public/documents/documentUtils";
 
 const TVETQC_ROLE_ID = "22";
 const NAVY = "#0a2d6e";
@@ -89,7 +89,8 @@ const toDocumentDto = (file) =>
     const reader = new FileReader();
     reader.onload = (e) =>
       resolve({
-        content: String(e.target.result).split(",")[1],
+        // readAsDataURL gives "data:<type>;base64,<content>"
+        content: (typeof e.target.result === "string" ? e.target.result : "").split(",")[1],
         name: file.name,
         originalFilename: file.name,
         contentType: file.type || "application/octet-stream",
@@ -99,7 +100,7 @@ const toDocumentDto = (file) =>
     reader.readAsDataURL(file);
   });
 
-const ManageDocumentsIndex = () => {
+const PublicationFormsIndex = () => {
   const token = useSelector((state) => state.auth.accessToken);
   const roleId = useSelector((state) => state.auth.current_roleId);
   const allowed = String(roleId) === TVETQC_ROLE_ID;
@@ -123,7 +124,7 @@ const ManageDocumentsIndex = () => {
   const load = useCallback(() => {
     if (!allowed) return;
     setLoading(true);
-    TvetDocumentService.getDocuments(undefined, token).then((res) => {
+    PublicationFormService.getDocuments(undefined, token).then((res) => {
       if (isError(res)) {
         toast.error(errorText(res, "Could not load documents."));
         setRows([]);
@@ -224,8 +225,8 @@ const ManageDocumentsIndex = () => {
         file: form.file ? await toDocumentDto(form.file) : null,
       };
       const res = form.id
-        ? await TvetDocumentService.updateDocument(form.id, payload, token)
-        : await TvetDocumentService.createDocument(payload, token);
+        ? await PublicationFormService.updateDocument(form.id, payload, token)
+        : await PublicationFormService.createDocument(payload, token);
       if (isError(res)) {
         toast.error(errorText(res, "Could not save. Please check the details."));
         return;
@@ -244,7 +245,7 @@ const ManageDocumentsIndex = () => {
   const confirmDelete = async () => {
     if (!toDelete) return;
     setDeleting(true);
-    const res = await TvetDocumentService.deleteDocument(toDelete.id, token);
+    const res = await PublicationFormService.deleteDocument(toDelete.id, token);
     setDeleting(false);
     if (isError(res)) {
       toast.error(errorText(res, "Could not delete."));
@@ -350,19 +351,21 @@ const ManageDocumentsIndex = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
+              {loading &&
                 [0, 1, 2].map((i) => (
                   <TableRow key={i}>
                     <TableCell colSpan={5}><Skeleton height={32} /></TableCell>
                   </TableRow>
-                ))
-              ) : visible.length === 0 ? (
+                ))}
+              {!loading && visible.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 5, color: "text.secondary" }}>
                     {search ? "Nothing matches your search." : "Nothing added yet. Use the Add button to upload the first one."}
                   </TableCell>
                 </TableRow>
-              ) : (
+              )}
+              {!loading &&
+                visible.length > 0 &&
                 visible
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((row, i) => {
@@ -396,7 +399,7 @@ const ManageDocumentsIndex = () => {
                         <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                           {row.hasFile && (
                             <Tooltip title="Download">
-                              <IconButton size="small" component="a" href={TvetDocumentService.getDownloadUrl(row.id)}>
+                              <IconButton size="small" component="a" href={PublicationFormService.getDownloadUrl(row.id)}>
                                 <DownloadIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
@@ -414,8 +417,7 @@ const ManageDocumentsIndex = () => {
                         </TableCell>
                       </TableRow>
                     );
-                  })
-              )}
+                  })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -545,4 +547,4 @@ const ManageDocumentsIndex = () => {
   );
 };
 
-export default ManageDocumentsIndex;
+export default PublicationFormsIndex;

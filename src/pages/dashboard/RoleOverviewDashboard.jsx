@@ -664,7 +664,7 @@ const RoleOverviewDashboard = ({
       {/* ---------------- Applications table ---------------- */}
       {showApplicationsTable && (
       <Panel
-        title="Applications"
+        title="Applications (updated in the last 3 days)"
         sx={{ p: 0, "& > div:first-of-type": { px: 2, pt: 2 } }}
         action={
           <TextField
@@ -719,7 +719,7 @@ const RoleOverviewDashboard = ({
                   >
                     {search
                       ? "No applications match your search"
-                      : "No applications in this period"}
+                      : "No applications updated in the last 3 days"}
                   </TableCell>
                 </TableRow>
               ) : (

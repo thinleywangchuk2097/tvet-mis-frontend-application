@@ -45,6 +45,7 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CourseTraineeAnnouncementsIndex from "./CourseTraineeAnnouncementsIndex";
 import OngoingProgramsIndex from "./OngoingProgramsIndex";
 import TvetCardsIndex from "./TvetCardsIndex";
+import NoticeTicker from "./NoticeTicker";
 import KeyIndicatorsTable from "./glance/KeyIndicatorsTable";
 import ProviderSplitCard from "./glance/ProviderSplitCard";
 import DistributionCharts from "./glance/DistributionCharts";
@@ -378,9 +379,9 @@ const PublicIndex = () => {
   const trackCard = (
     <Box
       sx={{
-        p: { xs: 2.25, md: 3 },
-        borderRadius: 3,
-        width: { xs: "100%", md: 500 },
+        p: { xs: 1.75, md: 2 },
+        borderRadius: 2.5,
+        width: { xs: "100%", md: 440 },
         flexShrink: 0,
         bgcolor: alpha("#ffffff", 0.08),
         backdropFilter: "blur(14px)",
@@ -389,12 +390,12 @@ const PublicIndex = () => {
         boxShadow: "0 24px 60px rgba(3, 14, 40, 0.35)",
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1.25 }}>
         <Box
           sx={{
-            width: 42,
-            height: 42,
-            borderRadius: 2,
+            width: 32,
+            height: 32,
+            borderRadius: 1.5,
             display: "grid",
             placeItems: "center",
             bgcolor: alpha(SAFFRON, 0.18),
@@ -402,18 +403,15 @@ const PublicIndex = () => {
             flexShrink: 0,
           }}
         >
-          <TrackChangesIcon />
+          <TrackChangesIcon sx={{ fontSize: 19 }} />
         </Box>
         <Box>
           <Typography
             component="h2"
             fontWeight={700}
-            sx={{ fontSize: "1.1rem", color: "#fff", lineHeight: 1.2 }}
+            sx={{ fontSize: "0.98rem", color: "#fff", lineHeight: 1.2 }}
           >
-            Track your application
-          </Typography>
-          <Typography sx={{ color: alpha("#fff", 0.72), fontSize: "0.85rem" }}>
-            Enter the application number from your submission.
+            Track your application status
           </Typography>
         </Box>
       </Stack>
@@ -441,14 +439,15 @@ const PublicIndex = () => {
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ fontSize: 18, color: alpha("#fff", 0.7) }} />
+                  <Search sx={{ fontSize: 16, color: alpha("#fff", 0.7) }} />
                 </InputAdornment>
               ),
             },
           }}
           sx={{
             "& .MuiOutlinedInput-root": {
-              height: 44,
+              height: 36,
+              fontSize: "0.85rem",
               color: "#fff",
               borderRadius: 2,
               bgcolor: alpha("#ffffff", 0.1),
@@ -469,8 +468,9 @@ const PublicIndex = () => {
             color: NAVY,
             textTransform: "none",
             fontWeight: 700,
-            px: 3,
-            height: 44,
+            px: 2.25,
+            height: 36,
+            fontSize: "0.85rem",
             borderRadius: 2,
             whiteSpace: "nowrap",
             boxShadow: "none",
@@ -480,7 +480,7 @@ const PublicIndex = () => {
           {trackLoading ? (
             <CircularProgress size={18} sx={{ color: NAVY }} />
           ) : (
-            "Track"
+            "Search"
           )}
         </Button>
       </Box>
@@ -762,34 +762,9 @@ const PublicIndex = () => {
         </Grid>
       </Container>
 
-      {/* ── Announcements ticker (full width) ─────────────────────────── */}
-      <Box
-        role="region"
-        aria-label="Announcements"
-        sx={{
-          mt: 2.5,
-          width: "100%",
-          overflow: "hidden",
-          bgcolor: NAVY,
-          py: 1.1,
-          "&:hover .ticker-text": { animationPlayState: "paused" },
-        }}
-      >
-        <Box component="style">{`@keyframes tvetTicker{from{transform:translateX(0)}to{transform:translateX(-100%)}}`}</Box>
-        <Typography
-          className="ticker-text"
-          sx={{
-            display: "inline-block",
-            whiteSpace: "nowrap",
-            pl: "100%",
-            color: "#e3f2fd",
-            fontSize: "0.92rem",
-            animation: reduceMotion ? "none" : "tvetTicker 60s linear infinite",
-          }}
-        >
-          {notificationMessages.join("     •     ")}
-        </Typography>
-      </Box>
+      {/* ── Notice bar (full width) ──────────────────────────────────── */}
+      {/* notice bar: TVET QC public notices (falls back to course messages) */}
+      <NoticeTicker fallbackMessages={notificationMessages} reduceMotion={reduceMotion} />
 
       {/* ── Page body ─────────────────────────────────────────────────── */}
       <Box sx={{ flex: 1 }}>
@@ -858,94 +833,77 @@ const PublicIndex = () => {
           title="Resources"
           description="Standards, curricula, publications and forms for trainees, training providers and TVET professionals."
         >
-          {/* one row of four on desktop, two on tablet, one on phone */}
-          <Grid container spacing={2}>
+          {/* compact tiles: one row of four on desktop, two on tablet, one on phone */}
+          <Grid container spacing={1.5}>
             {RESOURCES.map((r) => (
               <Grid key={r.href} size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box
                   component="a"
                   href={r.href}
                   sx={{
-                    position: "relative",
                     display: "flex",
-                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 1.25,
                     height: "100%",
-                    p: 2.5,
-                    borderRadius: 3,
+                    px: 1.5,
+                    py: 1.25,
+                    borderRadius: 2,
                     bgcolor: "background.paper",
                     border: `1px solid ${LINE}`,
-                    boxShadow: "0 2px 8px rgba(10,45,110,0.05)",
+                    borderLeft: `3px solid ${r.accent}`,
                     textDecoration: "none",
                     color: "inherit",
-                    overflow: "hidden",
-                    transition: "transform .2s ease, box-shadow .2s ease, border-color .2s ease",
-                    "&::before": {
-                      content: '""',
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 3,
-                      background: `linear-gradient(90deg, ${BLUE}, ${NAVY})`,
-                      transform: "scaleX(0)",
-                      transformOrigin: "left",
-                      transition: "transform .25s ease",
-                    },
+                    transition: "box-shadow .2s ease, transform .2s ease, border-color .2s ease",
                     "&:hover, &:focus-visible": {
-                      transform: "translateY(-3px)",
-                      borderColor: alpha(BLUE, 0.35),
-                      boxShadow: "0 14px 30px rgba(10,45,110,0.12)",
+                      transform: "translateY(-2px)",
+                      boxShadow: "0 8px 20px rgba(10,45,110,0.10)",
+                      borderColor: alpha(r.accent, 0.45),
+                      borderLeftColor: r.accent,
                     },
-                    "&:hover::before, &:focus-visible::before": { transform: "scaleX(1)" },
                     "&:hover .res-arrow, &:focus-visible .res-arrow": {
-                      transform: "translateX(4px)",
+                      transform: "translateX(3px)",
+                      color: r.accent,
                     },
-                    "&:focus-visible": {
-                      outline: `2px solid ${BLUE}`,
-                      outlineOffset: 2,
-                    },
+                    "&:focus-visible": { outline: `2px solid ${BLUE}`, outlineOffset: 2 },
                   }}
                 >
                   <Box
                     sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 2,
+                      width: 32,
+                      height: 32,
+                      flexShrink: 0,
+                      borderRadius: 1.5,
                       display: "grid",
                       placeItems: "center",
                       color: r.accent,
                       bgcolor: alpha(r.accent, 0.1),
-                      mb: 1.5,
-                      "& svg": { fontSize: 20 },
+                      "& svg": { fontSize: 18 },
                     }}
                   >
                     {r.icon}
                   </Box>
-                  <Typography fontWeight={700} sx={{ color: NAVY, fontSize: "1.02rem" }}>
-                    {r.label}
-                  </Typography>
-                  <Typography
-                    sx={{ color: "text.secondary", fontSize: "0.85rem", mt: 0.5, flex: 1 }}
-                  >
-                    {r.desc}
-                  </Typography>
-                  <Box
-                    sx={{
-                      mt: 2,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                      color: BLUE,
-                      fontWeight: 600,
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    View
-                    <ArrowForwardIcon
-                      className="res-arrow"
-                      sx={{ fontSize: 16, transition: "transform .2s ease" }}
-                    />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 700, color: NAVY, fontSize: "0.88rem", lineHeight: 1.3 }}>
+                      {r.label}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        color: "text.secondary",
+                        fontSize: "0.75rem",
+                        lineHeight: 1.35,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={r.desc}
+                    >
+                      {r.desc}
+                    </Typography>
                   </Box>
+                  <ArrowForwardIcon
+                    className="res-arrow"
+                    sx={{ fontSize: 16, color: "#9db0c9", transition: "transform .2s ease, color .2s ease", flexShrink: 0 }}
+                  />
                 </Box>
               </Grid>
             ))}

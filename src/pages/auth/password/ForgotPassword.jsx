@@ -130,7 +130,7 @@ const ForgotPasswordPage = () => {
                   mb: 3,
                 }}
               >
-                Password reset link sent successfully! Please check your email.
+                Password reset link sent successfully! Please check your email and SMS.
               </Alert>
               <Button
                 fullWidth

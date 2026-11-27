@@ -166,6 +166,19 @@ const useInstituteData = (registration_no) => {
   const [instituteDetails, setInstituteDetails] = useState(null);
   const [currentInstituteData, setCurrentInstituteData] = useState(null);
   const [loading, setLoading] = useState(true);
+  // institute_id from tbl_institute_registration_dtls (registration_no = logged-in user id)
+  const [registeredInstituteId, setRegisteredInstituteId] = useState(null);
+
+  useEffect(() => {
+    if (!registration_no) return;
+    InstituteRegistrationService.getInstituteDetails(registration_no).then(
+      (res) => {
+        if (res instanceof Error || res?.isAxiosError) return;
+        const row = Array.isArray(res?.data) ? res.data[0] : res?.data;
+        if (row?.institute_id) setRegisteredInstituteId(row.institute_id);
+      },
+    );
+  }, [registration_no]);
 
   const getOwnershipTypeName = useCallback(
     (id, ownershipTypes, otherOwnershipTypes) => {
@@ -192,7 +205,7 @@ const useInstituteData = (registration_no) => {
         await InstituteRegistrationService.getInstituteChangeDetails(
           registration_no,
         );
-        console.log("Institute change details response:", response.data);
+      console.log("Institute change details response:", response.data);
       const instituteData =
         Array.isArray(response.data) && response.data.length > 0
           ? response.data[0]
@@ -239,6 +252,7 @@ const useInstituteData = (registration_no) => {
 
   return {
     instituteDetails,
+    registeredInstituteId,
     currentInstituteData,
     loading,
     getOwnershipTypeName,
@@ -703,6 +717,147 @@ const toPartnerArray = (raw) => {
   return [];
 };
 
+// Change request sent to the backend (service 10, submitted -> role 7)
+const buildChangePayload = (values, instituteId, documents, createdBy) => {
+  const partners = values.partners || [];
+  return {
+    // institute_id from tbl_institute_registration_dtls (never the proposal id)
+    instituteId,
+    reasonForChange: values.reasonForChange,
+    changeType: values.changeType,
+    dzongkhagId: values.dzongkhag_id ? parseInt(values.dzongkhag_id) : null,
+    exactLocation: values.exact_location || null,
+    instituteName: values.proposed_institute_name || null,
+    ownershipTypeId: values.ownership_type_id || null,
+    otherOwnershipTypeId: values.other_ownership_type_id || null,
+    registrationNo: values.registration_no || null,
+    companyName: values.company_name || null,
+    otherName: values.other_name || null,
+    otherAddress: values.other_address || null,
+    promoterCitizenId: values.promoter_citizen_id || null,
+    promoterName: values.promoter_name || null,
+    partners:
+      partners.length > 0
+        ? partners.map((partner) => ({
+            partnerName: partner.partnerName || null,
+            typeOfOwner: partner.typeOfOwnerId || null,
+            citizenId: partner.partnerCidNo || null,
+            registrationNo: partner.partnerCompanyRegistrationNo || null,
+            companyName: partner.partnerCompanyName || null,
+          }))
+        : null,
+    documents,
+    serviceId: 10,
+    assignedRoleId: 7,
+    statusId: 55,
+    createdBy,
+  };
+};
+
+// Submits the change request; onSuccess runs after the backend accepts it
+const submitChangeRequest = async (values, ctx) => {
+  const {
+    instituteData,
+    actionId,
+    entityLabel,
+    designOnly,
+    setSubmitting,
+    onSuccess,
+  } = ctx;
+  // institute_id must come from tbl_institute_registration_dtls
+  if (!instituteData.registeredInstituteId) {
+    toast.error(
+      "Registered institute not found for this account. Please refresh and try again.",
+    );
+    return;
+  }
+  setSubmitting(true);
+  try {
+    const documents =
+      values.files.length > 0
+        ? await Promise.all(values.files.map(fileToBase64))
+        : [];
+    const payload = buildChangePayload(
+      values,
+      instituteData.registeredInstituteId,
+      documents,
+      actionId,
+    );
+
+    if (designOnly) {
+      // Not connected to the backend yet (e.g. SES centre change)
+      console.log(`${entityLabel} change payload (not submitted):`, payload);
+      toast.info(`${entityLabel} change submission is not connected yet.`);
+      return;
+    }
+
+    const response =
+      await InstituteRegistrationService.submitInstituteChange(payload);
+    if (response.status === 200 || response.status === 201) {
+      toast.success("Change request submitted successfully!");
+      await onSuccess();
+    }
+  } catch (error) {
+    toast.error(error.message || "Failed to submit change request");
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+// "Request progress" checklist: type of change, change details, reason
+const buildProgressSteps = (values, errors, changeSummary, changed) => {
+  const otherErrors = Object.keys(errors).filter(
+    (k) => !["changeType", "reasonForChange", "files"].includes(k),
+  );
+  const reason = (values.reasonForChange || "").trim();
+  return [
+    {
+      label: "Type of change",
+      done: !!values.changeType,
+      detail: values.changeType
+        ? changeSummary[0] || "selected"
+        : "not selected",
+    },
+    {
+      label: "Change details",
+      done: !!values.changeType && changed && otherErrors.length === 0,
+      detail: changeDetailsStatus(
+        values.changeType,
+        otherErrors.length,
+        changed,
+      ),
+    },
+    {
+      label: "Reason",
+      done: reason.length >= 5,
+      detail: reason.length >= 5 ? "provided" : "min. 5 characters",
+    },
+  ];
+};
+
+// colours of the progress panel (green once everything is done)
+const progressTheme = (complete) =>
+  complete
+    ? {
+        border: "success.main",
+        background: "#f1f8f4",
+        text: "success.main",
+        bar: "success",
+      }
+    : {
+        border: "divider",
+        background: "#f8fafc",
+        text: "primary.main",
+        bar: "primary",
+      };
+
+// "Change details" line of the checklist
+const changeDetailsStatus = (changeType, errorCount, changed) => {
+  if (!changeType) return "select a type first";
+  if (errorCount > 0) return `${errorCount} field(s) to fix`;
+  return changed ? "filled" : "not filled";
+};
+
 const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
   const navigate = useNavigate();
   const entityLower = entityLabel.toLowerCase();
@@ -736,72 +891,20 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
   const formik = useFormik({
     initialValues: formValues,
     validationSchema: getValidationSchema(entityLabel),
-    onSubmit: async (values) => {
-      setSubmitting(true);
-      try {
-        const documents =
-          values.files.length > 0
-            ? await Promise.all(values.files.map(fileToBase64))
-            : [];
-
-        const payload = {
-          instituteId:
-            instituteData.instituteDetails?.id ||
-            instituteData.instituteDetails?.institute_id,
-          reasonForChange: values.reasonForChange,
-          changeType: values.changeType,
-          dzongkhagId: values.dzongkhag_id
-            ? parseInt(values.dzongkhag_id)
-            : null,
-          exactLocation: values.exact_location || null,
-          instituteName: values.proposed_institute_name || null,
-          ownershipTypeId: values.ownership_type_id || null,
-          otherOwnershipTypeId: values.other_ownership_type_id || null,
-          registrationNo: values.registration_no || null,
-          companyName: values.company_name || null,
-          otherName: values.other_name || null,
-          otherAddress: values.other_address || null,
-          promoterCitizenId: values.promoter_citizen_id || null,
-          promoterName: values.promoter_name || null,
-          partners:
-            (values.partners || []).length > 0
-              ? (values.partners || []).map((partner) => ({
-                  partnerName: partner.partnerName || null,
-                  typeOfOwner: partner.typeOfOwnerId || null,
-                  citizenId: partner.partnerCidNo || null,
-                  registrationNo: partner.partnerCompanyRegistrationNo || null,
-                  companyName: partner.partnerCompanyName || null,
-                }))
-              : null,
-          documents: documents,
-          serviceId: 10,
-          assignedRoleId: 7,
-          statusId: 55,
-          createdBy: actionId,
-        };
-
-        if (designOnly) {
-          // Not connected to the backend yet (e.g. SES centre change)
-          console.log(`${entityLabel} change payload (not submitted):`, payload);
-          toast.info(`${entityLabel} change submission is not connected yet.`);
-          return;
-        }
-
-        const response =
-          await InstituteRegistrationService.submitInstituteChange(payload);
-        if (response.status === 200 || response.status === 201) {
-          toast.success("Change request submitted successfully!");
+    onSubmit: (values) =>
+      submitChangeRequest(values, {
+        instituteData,
+        actionId,
+        entityLabel,
+        designOnly,
+        setSubmitting,
+        onSuccess: async () => {
           navigate("/");
           formik.resetForm();
           stepper.goToStep(0);
           await instituteData.fetchInstituteDetails();
-        }
-      } catch (error) {
-        toast.error(error.message || "Failed to submit change request");
-      } finally {
-        setSubmitting(false);
-      }
-    },
+        },
+      }),
   });
 
   // ===== EFFECTS =====
@@ -844,7 +947,8 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
       return !!formik.values.proposed_institute_name;
     } else if (formik.values.changeType === CHANGE_TYPES.OWNERSHIP) {
       return !!(
-        formik.values.ownership_type_id || (formik.values.partners || []).length > 0
+        formik.values.ownership_type_id ||
+        (formik.values.partners || []).length > 0
       );
     }
     return false;
@@ -1371,38 +1475,17 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
 
   // ---- Request progress (same rules as the Next / Submit buttons) ----
   const v = formik.values;
-  const otherErrors = Object.keys(formik.errors).filter(
-    (k) => !["changeType", "reasonForChange", "files"].includes(k),
+  const progressSteps = buildProgressSteps(
+    v,
+    formik.errors,
+    getChangeSummary(),
+    hasChanges(),
   );
-  const reason = (v.reasonForChange || "").trim();
-  const progressSteps = [
-    {
-      label: "Type of change",
-      done: !!v.changeType,
-      detail: v.changeType ? getChangeSummary()[0] || "selected" : "not selected",
-    },
-    {
-      label: "Change details",
-      done: !!v.changeType && hasChanges() && otherErrors.length === 0,
-      detail:
-        !v.changeType
-          ? "select a type first"
-          : otherErrors.length > 0
-            ? `${otherErrors.length} field(s) to fix`
-            : hasChanges()
-              ? "filled"
-              : "not filled",
-    },
-    {
-      label: "Reason",
-      done: reason.length >= 5,
-      detail: reason.length >= 5 ? "provided" : "min. 5 characters",
-    },
-  ];
   const docCount = v.files?.length || 0;
   const progressPercent = Math.round(
     (progressSteps.filter((st) => st.done).length / progressSteps.length) * 100,
   );
+  const progressColors = progressTheme(progressPercent === 100);
   const canSubmit = hasChanges() && !!v.reasonForChange;
 
   return (
@@ -1447,8 +1530,8 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
           sx={{
             p: 2,
             mb: 4,
-            borderColor: progressPercent === 100 ? "success.main" : "divider",
-            bgcolor: progressPercent === 100 ? "#f1f8f4" : "#f8fafc",
+            borderColor: progressColors.border,
+            bgcolor: progressColors.background,
           }}
         >
           <Box
@@ -1460,17 +1543,14 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
             }}
           >
             <Typography fontWeight={600}>Request progress</Typography>
-            <Typography
-              fontWeight={700}
-              color={progressPercent === 100 ? "success.main" : "primary.main"}
-            >
+            <Typography fontWeight={700} color={progressColors.text}>
               {progressPercent}%
             </Typography>
           </Box>
           <LinearProgress
             variant="determinate"
             value={progressPercent}
-            color={progressPercent === 100 ? "success" : "primary"}
+            color={progressColors.bar}
             sx={{ height: 8, borderRadius: 4 }}
           />
           <Box sx={{ display: "flex", gap: 2.5, mt: 1.25, flexWrap: "wrap" }}>
@@ -1482,7 +1562,10 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
                 {st.done ? (
                   <CheckCircleIcon color="success" sx={{ fontSize: 17 }} />
                 ) : (
-                  <RadioButtonUncheckedIcon color="disabled" sx={{ fontSize: 17 }} />
+                  <RadioButtonUncheckedIcon
+                    color="disabled"
+                    sx={{ fontSize: 17 }}
+                  />
                 )}
                 <Typography variant="caption" fontWeight={600}>
                   {st.label}
@@ -1496,7 +1579,10 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
               {docCount > 0 ? (
                 <CheckCircleIcon color="success" sx={{ fontSize: 17 }} />
               ) : (
-                <RadioButtonUncheckedIcon color="disabled" sx={{ fontSize: 17 }} />
+                <RadioButtonUncheckedIcon
+                  color="disabled"
+                  sx={{ fontSize: 17 }}
+                />
               )}
               <Typography variant="caption" fontWeight={600}>
                 Documents
@@ -1672,32 +1758,34 @@ const InstituteChange = ({ entityLabel = "Institute", designOnly = false }) => {
                 }
               >
                 <span>
-              <Button
-                type="button"
-                variant="contained"
-                startIcon={
-                  submitting ? (
-                    <CircularProgress size={20} />
-                  ) : (
-                    <ArrowUpwardIcon />
-                  )
-                }
-                disabled={
-                  submitting || !hasChanges() || !formik.values.reasonForChange
-                }
-                sx={{ textTransform: "none" }}
-                onClick={() => {
-                  if (Object.keys(formik.errors).length > 0) {
-                    toast.error(
-                      "Please fix all validation errors before submitting. Check all required fields.",
-                    );
-                    return;
-                  }
-                  formik.handleSubmit();
-                }}
-              >
-                {submitting ? "Submitting..." : "Submit"}
-              </Button>
+                  <Button
+                    type="button"
+                    variant="contained"
+                    startIcon={
+                      submitting ? (
+                        <CircularProgress size={20} />
+                      ) : (
+                        <ArrowUpwardIcon />
+                      )
+                    }
+                    disabled={
+                      submitting ||
+                      !hasChanges() ||
+                      !formik.values.reasonForChange
+                    }
+                    sx={{ textTransform: "none" }}
+                    onClick={() => {
+                      if (Object.keys(formik.errors).length > 0) {
+                        toast.error(
+                          "Please fix all validation errors before submitting. Check all required fields.",
+                        );
+                        return;
+                      }
+                      formik.handleSubmit();
+                    }}
+                  >
+                    {submitting ? "Submitting..." : "Submit"}
+                  </Button>
                 </span>
               </Tooltip>
             ) : (

@@ -182,8 +182,6 @@ const paymentInfoCardPropTypes = {
     redirectUrl: PropTypes.string,
   }),
   onGeneratePayment: PropTypes.func.isRequired,
-  renewalData: PropTypes.object,
-  navigate: PropTypes.func.isRequired,
 };
 
 // ==================== UTILITY FUNCTIONS ====================
@@ -382,7 +380,7 @@ const useQualityStandards = () => {
   const fetchQualityStandards = useCallback(async (serviceId) => {
     try {
       const response = await CommonService.getAllQualitystandards(serviceId);
-      if (response.data && response.data.length > 0) {
+      if (response.data?.length > 0) {
         const mainCategories = response.data.filter(
           (item) => item.parentId === 0,
         );
@@ -1006,12 +1004,7 @@ const QualityChecklistTable = ({
 
 QualityChecklistTable.propTypes = qualityChecklistTablePropTypes;
 
-const PaymentInfoCard = ({
-  paymentStatus,
-  onGeneratePayment,
-  renewalData,
-  navigate,
-}) => {
+const PaymentInfoCard = ({ paymentStatus, onGeneratePayment }) => {
   if (paymentStatus) {
     return (
       <Card variant="outlined" sx={{ p: 0 }}>
@@ -1304,6 +1297,118 @@ const PaymentInfoCard = ({
 
 PaymentInfoCard.propTypes = paymentInfoCardPropTypes;
 
+// ==================== DIALOG / VALIDITY HELPERS ====================
+const DIALOG_TITLES = {
+  [STATUS.VERIFY]: "Verify Renewal",
+  [STATUS.APPROVE]: "Approve Renewal",
+  [STATUS.REJECT]: "Reject Renewal",
+  [STATUS.ENDORSE]: "Endorse Renewal",
+  [STATUS.VERIFY_REC]: "Verify Renewal",
+  [STATUS.REJECT_REC]: "Reject Renewal",
+};
+
+const CONFIRM_LABELS = {
+  [STATUS.VERIFY]: "Confirm Verify",
+  [STATUS.APPROVE]: "Confirm Approve",
+  [STATUS.REJECT]: "Confirm Reject",
+  [STATUS.ENDORSE]: "Confirm Endorse",
+  [STATUS.VERIFY_REC]: "Confirm Verify",
+  [STATUS.REJECT_REC]: "Confirm Reject",
+};
+
+// remarks sent to the backend for the chosen action
+const actionRemarks = (statusId, remarks, endorseRemarks) => {
+  if (statusId === STATUS.REJECT) return remarks;
+  if (statusId === STATUS.ENDORSE) return endorseRemarks;
+  return "";
+};
+
+const confirmVerb = (statusId) =>
+  statusId === STATUS.VERIFY || statusId === STATUS.VERIFY_REC
+    ? "verify"
+    : "approve";
+
+const confirmColor = (statusId) =>
+  statusId === STATUS.REJECT ? "error" : "success";
+
+// remarks are mandatory for reject and endorse
+const isConfirmDisabled = (dialog) => {
+  if (dialog.actionLoading) return true;
+  if (dialog.selectedStatusId === STATUS.REJECT) return !dialog.remarks.trim();
+  if (dialog.selectedStatusId === STATUS.ENDORSE) {
+    return !dialog.endorseRemarks.trim();
+  }
+  return false;
+};
+
+// tuition renewals have one detail tab instead of trainers + courses
+const tabIndexes = (isTuitionService) =>
+  isTuitionService
+    ? { documents: 2, quality: 3 }
+    : { documents: 3, quality: 4 };
+
+const currentValiditySuffix = (validity) =>
+  validity.currentValidity
+    ? ` (currently valid until ${validity.currentValidity}).`
+    : ".";
+
+// Renewal period: service 8 by SAR grade (C 2y, B 3y, A 4y, A+ 5y, otherwise 1y); others 1y
+const RenewalValidityAlert = ({ validity }) => {
+  if (!validity) return null;
+
+  if (!validity.gradeBased) {
+    return (
+      <Alert severity="info" icon={<VerifiedIcon />} sx={{ mb: 2 }}>
+        Renewal period <strong>1 year</strong>. If approved today, valid until{" "}
+        <strong>{validity.validUntilIfApprovedToday}</strong>
+        {currentValiditySuffix(validity)}
+      </Alert>
+    );
+  }
+
+  return (
+    <Alert
+      severity={validity.grade ? "info" : "warning"}
+      icon={<VerifiedIcon />}
+      sx={{ mb: 2 }}
+    >
+      {validity.grade ? (
+        <>
+          Latest Self Assessment grade:{" "}
+          <Chip
+            size="small"
+            color="primary"
+            label={validity.grade}
+            sx={{ height: 20, fontWeight: 700, mx: 0.5 }}
+          />
+          — renewal period <strong>{validity.years} year(s)</strong> (1 year +{" "}
+          {validity.additionalYears} additional year
+          {validity.additionalYears === 1 ? "" : "s"}).
+        </>
+      ) : (
+        <>
+          No Self Assessment grade found — renewal period{" "}
+          <strong>1 year</strong>.
+        </>
+      )}{" "}
+      If approved today, valid until{" "}
+      <strong>{validity.validUntilIfApprovedToday}</strong>
+      {currentValiditySuffix(validity)}
+    </Alert>
+  );
+};
+
+RenewalValidityAlert.propTypes = {
+  validity: PropTypes.shape({
+    gradeBased: PropTypes.bool,
+    grade: PropTypes.string,
+    years: PropTypes.number,
+    additionalYears: PropTypes.number,
+    validUntilIfApprovedToday: PropTypes.string,
+    currentValidity: PropTypes.string,
+  }),
+};
+
 // ==================== MAIN COMPONENT ====================
 const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
   const access_token = useSelector((state) => state.auth.accessToken);
@@ -1403,8 +1508,7 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
       );
 
       if (serviceIdForQuality) {
-        const structured =
-          await qualityStandards.fetchQualityStandards(serviceIdForQuality);
+        await qualityStandards.fetchQualityStandards(serviceIdForQuality);
         if (data.quality_standard_responses) {
           qualityStandards.setRawQualityStandards(
             data.quality_standard_responses,
@@ -1425,7 +1529,7 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
       });
       setDocuments(parsedDocuments);
 
-      if (courses && courses.length > 0) {
+      if (courses?.length > 0) {
         courses.forEach(async (course) => {
           if (course.sectorId) {
             await masterData.fetchCoursesBySector(course.sectorId);
@@ -1492,12 +1596,7 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
         recMemberUserId: userId,
         updatedBy: actionId,
         documents: newDocuments,
-        remarks:
-          selectedStatusId === STATUS.REJECT
-            ? remarks
-            : selectedStatusId === STATUS.ENDORSE
-              ? endorseRemarks
-              : "",
+        remarks: actionRemarks(selectedStatusId, remarks, endorseRemarks),
         qualityStandards: qualityStandardsData,
         overallRemarks: currentRoleId == 23 ? overallRemarks : "",
       };
@@ -1844,8 +1943,6 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
             <PaymentInfoCard
               paymentStatus={payment.paymentStatus}
               onGeneratePayment={handleGeneratePayment}
-              renewalData={renewalData}
-              navigate={navigate}
             />
           </Paper>
         </Grid>
@@ -1981,6 +2078,73 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
     dialog,
   ]);
 
+  // dialog body: remarks for endorse / reject, plain confirmation otherwise
+  const renderDialogContent = () => {
+    const id = dialog.selectedStatusId;
+    if (id === STATUS.ENDORSE) {
+      return (
+        <>
+          <DialogContentText sx={{ mb: 2 }}>
+            Please provide remarks for endorsing this renewal:
+            <br />
+            <strong>Application No: {renewalData?.application_no}</strong>
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Remarks"
+            fullWidth
+            multiline
+            rows={4}
+            value={dialog.endorseRemarks}
+            onChange={(e) => {
+              dialog.setEndorseRemarks(e.target.value);
+              dialog.setRemarksError("");
+            }}
+            error={!!dialog.remarksError}
+            helperText={dialog.remarksError}
+            required
+          />
+        </>
+      );
+    }
+    if (id === STATUS.REJECT || id === STATUS.REJECT_REC) {
+      return (
+        <>
+          <DialogContentText sx={{ mb: 2 }}>
+            Please provide remarks for rejecting this renewal:
+            <br />
+            <strong>Application No: {renewalData?.application_no}</strong>
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Remarks"
+            fullWidth
+            multiline
+            rows={4}
+            value={dialog.remarks}
+            onChange={(e) => {
+              dialog.setRemarks(e.target.value);
+              dialog.setRemarksError("");
+            }}
+            error={!!dialog.remarksError}
+            helperText={dialog.remarksError}
+            required
+          />
+        </>
+      );
+    }
+    return (
+      <DialogContentText>
+        Are you sure you want to {confirmVerb(dialog.selectedStatusId)} this
+        renewal?
+        <br />
+        <strong>Application No: {renewalData?.application_no}</strong>
+      </DialogContentText>
+    );
+  };
+
   if (loading) {
     return (
       <Box sx={{ p: 1, minHeight: "100vh" }}>
@@ -2009,6 +2173,7 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
 
   const tabs = getTabs();
   const isLastTab = tabValue === tabs.length - 1;
+  const tabIdx = tabIndexes(isTuitionService);
 
   return (
     <Box>
@@ -2018,48 +2183,7 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
         </Typography>
 
         {/* Renewal period: service 8 by SAR grade (C 2y, B 3y, A 4y, A+ 5y, otherwise 1y); others 1y */}
-        {renewalValidity && !renewalValidity.gradeBased && (
-          <Alert severity="info" icon={<VerifiedIcon />} sx={{ mb: 2 }}>
-            Renewal period <strong>1 year</strong>. If approved today, valid
-            until <strong>{renewalValidity.validUntilIfApprovedToday}</strong>
-            {renewalValidity.currentValidity
-              ? ` (currently valid until ${renewalValidity.currentValidity}).`
-              : "."}
-          </Alert>
-        )}
-        {renewalValidity && renewalValidity.gradeBased && (
-          <Alert
-            severity={renewalValidity.grade ? "info" : "warning"}
-            icon={<VerifiedIcon />}
-            sx={{ mb: 2 }}
-          >
-            {renewalValidity.grade ? (
-              <>
-                Latest Self Assessment grade:{" "}
-                <Chip
-                  size="small"
-                  color="primary"
-                  label={renewalValidity.grade}
-                  sx={{ height: 20, fontWeight: 700, mx: 0.5 }}
-                />
-                — renewal period{" "}
-                <strong>{renewalValidity.years} year(s)</strong> (1 year +{" "}
-                {renewalValidity.additionalYears} additional year
-                {renewalValidity.additionalYears === 1 ? "" : "s"}).
-              </>
-            ) : (
-              <>
-                No Self Assessment grade found — renewal period{" "}
-                <strong>1 year</strong>.
-              </>
-            )}{" "}
-            If approved today, valid until{" "}
-            <strong>{renewalValidity.validUntilIfApprovedToday}</strong>
-            {renewalValidity.currentValidity
-              ? ` (currently valid until ${renewalValidity.currentValidity}).`
-              : "."}
-          </Alert>
-        )}
+        <RenewalValidityAlert validity={renewalValidity} />
         <Divider />
 
         <Tabs
@@ -2077,8 +2201,8 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
         {!isTuitionService && tabValue === 1 && renderTrainers()}
         {!isTuitionService && tabValue === 2 && renderCourses()}
         {isTuitionService && tabValue === 1 && renderTuitionDetails()}
-        {tabValue === (isTuitionService ? 2 : 3) && renderDocuments()}
-        {tabValue === (isTuitionService ? 3 : 4) && renderQualityStandards()}
+        {tabValue === tabIdx.documents && renderDocuments()}
+        {tabValue === tabIdx.quality && renderQualityStandards()}
         {currentRoleId == 7 &&
           tabValue === tabs.length - 1 &&
           renderPaymentTab()}
@@ -2130,83 +2254,9 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
         fullWidth
       >
         <DialogTitle>
-          {dialog.selectedStatusId === STATUS.VERIFY
-            ? "Verify Renewal"
-            : dialog.selectedStatusId === STATUS.APPROVE
-              ? "Approve Renewal"
-              : dialog.selectedStatusId === STATUS.REJECT
-                ? "Reject Renewal"
-                : dialog.selectedStatusId === STATUS.ENDORSE
-                  ? "Endorse Renewal"
-                  : dialog.selectedStatusId === STATUS.VERIFY_REC
-                    ? "Verify Renewal"
-                    : dialog.selectedStatusId === STATUS.REJECT_REC
-                      ? "Reject Renewal"
-                      : "Confirm Action"}
+          {DIALOG_TITLES[dialog.selectedStatusId] || "Confirm Action"}
         </DialogTitle>
-        <DialogContent>
-          {dialog.selectedStatusId === STATUS.ENDORSE ? (
-            <>
-              <DialogContentText sx={{ mb: 2 }}>
-                Please provide remarks for endorsing this renewal:
-                <br />
-                <strong>Application No: {renewalData?.application_no}</strong>
-              </DialogContentText>
-              <TextField
-                autoFocus
-                margin="dense"
-                label="Remarks"
-                fullWidth
-                multiline
-                rows={4}
-                value={dialog.endorseRemarks}
-                onChange={(e) => {
-                  dialog.setEndorseRemarks(e.target.value);
-                  dialog.setRemarksError("");
-                }}
-                error={!!dialog.remarksError}
-                helperText={dialog.remarksError}
-                required
-              />
-            </>
-          ) : dialog.selectedStatusId === STATUS.REJECT ||
-            dialog.selectedStatusId === STATUS.REJECT_REC ? (
-            <>
-              <DialogContentText sx={{ mb: 2 }}>
-                Please provide remarks for rejecting this renewal:
-                <br />
-                <strong>Application No: {renewalData?.application_no}</strong>
-              </DialogContentText>
-              <TextField
-                autoFocus
-                margin="dense"
-                label="Remarks"
-                fullWidth
-                multiline
-                rows={4}
-                value={dialog.remarks}
-                onChange={(e) => {
-                  dialog.setRemarks(e.target.value);
-                  dialog.setRemarksError("");
-                }}
-                error={!!dialog.remarksError}
-                helperText={dialog.remarksError}
-                required
-              />
-            </>
-          ) : (
-            <DialogContentText>
-              Are you sure you want to{" "}
-              {dialog.selectedStatusId === STATUS.VERIFY ||
-              dialog.selectedStatusId === STATUS.VERIFY_REC
-                ? "verify"
-                : "approve"}{" "}
-              this renewal?
-              <br />
-              <strong>Application No: {renewalData?.application_no}</strong>
-            </DialogContentText>
-          )}
-        </DialogContent>
+        <DialogContent>{renderDialogContent()}</DialogContent>
         <DialogActions>
           <Button
             color="error"
@@ -2219,35 +2269,15 @@ const ViewInstituteSesCentreAssessmentCentreRenewal = () => {
           </Button>
           <Button
             onClick={handleAction}
-            color={
-              dialog.selectedStatusId === STATUS.REJECT ? "error" : "success"
-            }
+            color={confirmColor(dialog.selectedStatusId)}
             variant="contained"
             size="small"
-            disabled={
-              dialog.actionLoading ||
-              (dialog.selectedStatusId === STATUS.REJECT &&
-                !dialog.remarks.trim()) ||
-              (dialog.selectedStatusId === STATUS.ENDORSE &&
-                !dialog.endorseRemarks.trim())
-            }
+            disabled={isConfirmDisabled(dialog)}
           >
             {dialog.actionLoading ? (
               <CircularProgress size={24} />
-            ) : dialog.selectedStatusId === STATUS.VERIFY ? (
-              "Confirm Verify"
-            ) : dialog.selectedStatusId === STATUS.APPROVE ? (
-              "Confirm Approve"
-            ) : dialog.selectedStatusId === STATUS.REJECT ? (
-              "Confirm Reject"
-            ) : dialog.selectedStatusId === STATUS.ENDORSE ? (
-              "Confirm Endorse"
-            ) : dialog.selectedStatusId === STATUS.VERIFY_REC ? (
-              "Confirm Verify"
-            ) : dialog.selectedStatusId === STATUS.REJECT_REC ? (
-              "Confirm Reject"
             ) : (
-              "Confirm"
+              CONFIRM_LABELS[dialog.selectedStatusId] || "Confirm"
             )}
           </Button>
         </DialogActions>

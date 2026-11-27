@@ -3,7 +3,7 @@ import apiClient from "../../../axios";
 class UserProfileService {
   updateUserProfile(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/user-profile/update-user-profile`, data, {
+      .post(`/api/v1/user-profile/update-user-profile`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -14,7 +14,7 @@ class UserProfileService {
 
   getUserProfile(userId, token) {
     return apiClient
-      .get(`/api/v1/user/management/user-profile/get-user-profile/${userId}`, {
+      .get(`/api/v1/user-profile/get-user-profile/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -24,7 +24,7 @@ class UserProfileService {
   }
   getUserProfileImage(userId, token) {
     return apiClient
-      .get(`/api/v1/user/management/user-profile/image/${userId}`, {
+      .get(`/api/v1/user-profile/image/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -65,7 +65,7 @@ class UserProfileService {
   getUserAssociatedRoles(userId, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/user-profile/get-user-associated-roles/${userId}`,
+        `/api/v1/user-profile/get-user-associated-roles/${userId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -78,7 +78,7 @@ class UserProfileService {
 
   switchRole(data, token) {
     return apiClient
-      .post(`/api/v1/user/management/user-profile/update-switch-role`, data, {
+      .post(`/api/v1/user-profile/update-switch-role`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -90,7 +90,7 @@ class UserProfileService {
   getUserNameCurrentRoleName(userId, token) {
     return apiClient
       .get(
-        `/api/v1/user/management/user-profile/get-username-current-role/${userId}`,
+        `/api/v1/user-profile/get-username-current-role/${userId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -103,7 +103,7 @@ class UserProfileService {
   deleteProfileImage(userId, token) {
     return apiClient
       .post(
-        `/api/v1/user/management/user-profile/delete-profile-image/${userId}`,
+        `/api/v1/user-profile/delete-profile-image/${userId}`,
         {},
         {
           headers: {

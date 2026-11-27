@@ -31,6 +31,12 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
  * ViewAccreditedCourseRegistration: search an active REC user, add, remove.
  * The REC members receive the endorsement task when the report is verified.
  */
+// tooltip of a REC member chip
+const recTooltip = (rec, readOnly) => {
+  if (rec.endorsed) return "Endorsed";
+  return readOnly ? "Endorsement pending" : "Click the icon to remove";
+};
+
 const RecMembersSection = ({
   recList = [],
   recMembers,
@@ -90,13 +96,7 @@ const RecMembersSection = ({
                 {recMembers.map((rec) => (
                   <Tooltip
                     key={rec.userId}
-                    title={
-                      rec.endorsed
-                        ? "Endorsed"
-                        : readOnly
-                          ? "Endorsement pending"
-                          : "Click the icon to remove"
-                    }
+                    title={recTooltip(rec, readOnly)}
                     arrow
                   >
                     <span>
@@ -148,10 +148,9 @@ const RecMembersSection = ({
                         o.mobileNo?.includes(q),
                     );
                   }}
-                  renderOption={(props, o) => {
-                    const { key, ...rest } = props;
+                  renderOption={({ key, ...optionProps }, o) => {
                     return (
-                      <li key={key} {...rest}>
+                      <li key={key} {...optionProps}>
                         <Box>
                           <Typography variant="body2">{o.name}</Typography>
                           <Typography variant="caption" color="text.secondary">

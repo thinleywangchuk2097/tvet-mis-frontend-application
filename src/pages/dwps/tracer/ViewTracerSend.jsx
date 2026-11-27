@@ -24,7 +24,6 @@ import {
   Chip,
   OutlinedInput,
   ListItemText,
-  Grid,
   Stack,
   Input,
   FormHelperText,
@@ -373,15 +372,12 @@ const computeVisibility = (questions, selectedValues) => {
     }
     if (q.showCondition === "option" && q.dependsOnQuestionId != null) {
       const depFlat = byId[q.dependsOnQuestionId];
-      if (!depFlat) result = true;
-      else if (!compute(depFlat)) result = false;
-      else
-        result = evaluateOwnCondition(
-          q,
-          byId,
-          selectedValues,
-          optionTextLookup,
-        );
+      // no dependency found -> stays visible (result is already true)
+      if (depFlat) {
+        result = compute(depFlat)
+          ? evaluateOwnCondition(q, byId, selectedValues, optionTextLookup)
+          : false;
+      }
     }
     computing.delete(q.__key);
     visibility[q.__key] = result;
@@ -863,11 +859,17 @@ const ViewTracerSend = () => {
           return acc;
         }, {});
       }
-      const hasValue = Array.isArray(currentValue)
-        ? currentValue.length > 0
-        : typeof currentValue === "object" && currentValue !== null
-          ? Object.values(currentValue).some((v) => v !== "" && v != null)
-          : currentValue !== "" && currentValue != null && currentValue !== 0;
+      let hasValue;
+      if (Array.isArray(currentValue)) {
+        hasValue = currentValue.length > 0;
+      } else if (typeof currentValue === "object" && currentValue !== null) {
+        hasValue = Object.values(currentValue).some(
+          (v) => v !== "" && v != null,
+        );
+      } else {
+        hasValue =
+          currentValue !== "" && currentValue != null && currentValue !== 0;
+      }
       if (hasValue) {
         nextValues[key] = emptyValue;
         changed = true;

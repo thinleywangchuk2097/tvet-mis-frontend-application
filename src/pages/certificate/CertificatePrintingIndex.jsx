@@ -104,9 +104,46 @@ const totalMark = (record) => {
   return String(Math.round(parts.reduce((a, b) => a + b, 0) * 100) / 100);
 };
 
-const isRplRecord = (record) => ["39", "41"].includes(String(record?.service_id));
+const isRplRecord = (record) =>
+  ["39", "41"].includes(String(record?.service_id));
 
 /** Stable row key (trainee CID + announcement no). */
+// ==================== FILTER HELPERS ====================
+// institute / program type / programme dropdowns
+const matchesSelects = (r, institute, programmeType, programme) => {
+  if (institute && r.institute_name !== institute) return false;
+  if (programmeType && r.programme_type !== programmeType) return false;
+  return !programme || r.application_no === programme.applicationNo;
+};
+
+// course end date within From / End date (inclusive)
+const endDateInRange = (r, fromDate, toDate) => {
+  if (!fromDate && !toDate) return true;
+  const end = toDateOnly(r.course_end_date);
+  if (!end) return false;
+  if (fromDate && end < fromDate) return false;
+  return !toDate || end <= toDate;
+};
+
+const matchesSearch = (r, q) => {
+  if (!q) return true;
+  return [
+    r.applicant_name,
+    r.cid_no,
+    r.application_no,
+    r.course_name,
+    r.certificate_no,
+  ]
+    .filter((v) => v !== null && v !== undefined)
+    .some((v) => String(v).toLowerCase().includes(q));
+};
+
+// RPL rows show the Viva mark in the Theory column
+const theoryHeader = (allRpl, someRpl) => {
+  if (allRpl) return "Viva";
+  return someRpl ? "Theory / Viva" : "Theory";
+};
+
 const rowKey = (r) => `${r.cid_no ?? ""}|${r.application_no ?? ""}`;
 
 const CertificatePrintingIndex = () => {
@@ -135,9 +172,8 @@ const CertificatePrintingIndex = () => {
     if (!access_token) return;
     setLoadingReports(true);
     try {
-      const res = await ReportService.getAllTraineesDetailsForCertificate(
-        access_token,
-      );
+      const res =
+        await ReportService.getAllTraineesDetailsForCertificate(access_token);
       if (res instanceof Error || res?.isAxiosError) throw res;
       setReports(toArray(res));
       setSelected([]);
@@ -158,12 +194,16 @@ const CertificatePrintingIndex = () => {
   // ==================== FILTER OPTIONS ====================
   const instituteOptions = useMemo(
     () =>
-      [...new Set(reports.map((r) => r.institute_name).filter(Boolean))].sort(),
+      [...new Set(reports.map((r) => r.institute_name).filter(Boolean))].sort(
+        (a, b) => String(a).localeCompare(String(b)),
+      ),
     [reports],
   );
   const programmeTypeOptions = useMemo(
     () =>
-      [...new Set(reports.map((r) => r.programme_type).filter(Boolean))].sort(),
+      [...new Set(reports.map((r) => r.programme_type).filter(Boolean))].sort(
+        (a, b) => String(a).localeCompare(String(b)),
+      ),
     [reports],
   );
 
@@ -197,35 +237,31 @@ const CertificatePrintingIndex = () => {
   // ==================== FILTERED ROWS ====================
   // Nothing is shown until at least one filter is applied
   const hasFilter = Boolean(
-    institute || programmeType || programme || fromDate || toDate || search.trim(),
+    institute ||
+    programmeType ||
+    programme ||
+    fromDate ||
+    toDate ||
+    search.trim(),
   );
 
   const filteredReports = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!institute && !programmeType && !programme && !fromDate && !toDate && !q)
+    if (
+      !institute &&
+      !programmeType &&
+      !programme &&
+      !fromDate &&
+      !toDate &&
+      !q
+    )
       return [];
-    return reports.filter((r) => {
-      if (institute && r.institute_name !== institute) return false;
-      if (programmeType && r.programme_type !== programmeType) return false;
-      if (programme && r.application_no !== programme.applicationNo) return false;
-      // course end date within From / End date (inclusive)
-      if (fromDate || toDate) {
-        const end = toDateOnly(r.course_end_date);
-        if (!end) return false;
-        if (fromDate && end < fromDate) return false;
-        if (toDate && end > toDate) return false;
-      }
-      if (!q) return true;
-      return [
-        r.applicant_name,
-        r.cid_no,
-        r.application_no,
-        r.course_name,
-        r.certificate_no,
-      ]
-        .filter((v) => v !== null && v !== undefined)
-        .some((v) => String(v).toLowerCase().includes(q));
-    });
+    return reports.filter(
+      (r) =>
+        matchesSelects(r, institute, programmeType, programme) &&
+        endDateInRange(r, fromDate, toDate) &&
+        matchesSearch(r, q),
+    );
   }, [reports, institute, programmeType, programme, fromDate, toDate, search]);
 
   useEffect(() => {
@@ -267,7 +303,9 @@ const CertificatePrintingIndex = () => {
       await generateAssessmentCertificatePrintPdf(buildPdfPayload(report));
     } catch (err) {
       console.error("❌ Certificate print generation failed:", err);
-      toast.error(`Could not generate certificate: ${err?.message || "unknown"}`);
+      toast.error(
+        `Could not generate certificate: ${err?.message || "unknown"}`,
+      );
     } finally {
       setDownloading(false);
     }
@@ -287,7 +325,9 @@ const CertificatePrintingIndex = () => {
       );
     } catch (err) {
       console.error("❌ Bulk certificate print generation failed:", err);
-      toast.error(`Could not generate certificates: ${err?.message || "unknown"}`);
+      toast.error(
+        `Could not generate certificates: ${err?.message || "unknown"}`,
+      );
     } finally {
       setDownloading(false);
     }
@@ -312,7 +352,11 @@ const CertificatePrintingIndex = () => {
             value={institute}
             onChange={(_e, v) => setInstitute(v)}
             renderInput={(params) => (
-              <TextField {...params} label="Institute" placeholder="All institutes" />
+              <TextField
+                {...params}
+                label="Institute"
+                placeholder="All institutes"
+              />
             )}
           />
         </Grid>
@@ -352,7 +396,11 @@ const CertificatePrintingIndex = () => {
             getOptionLabel={(o) => o?.label || ""}
             isOptionEqualToValue={(o, v) => o.applicationNo === v.applicationNo}
             renderInput={(params) => (
-              <TextField {...params} label="Programme (Application No)" placeholder="All programmes" />
+              <TextField
+                {...params}
+                label="Programme (Application No)"
+                placeholder="All programmes"
+              />
             )}
           />
         </Grid>
@@ -420,7 +468,11 @@ const CertificatePrintingIndex = () => {
           variant="contained"
           size="small"
           startIcon={
-            downloading ? <CircularProgress size={14} color="inherit" /> : <PrintIcon />
+            downloading ? (
+              <CircularProgress size={14} color="inherit" />
+            ) : (
+              <PrintIcon />
+            )
           }
           onClick={() => handleBulkPdf(filteredReports, "All")}
           disabled={downloading || filteredReports.length === 0}
@@ -451,9 +503,7 @@ const CertificatePrintingIndex = () => {
                 <Checkbox
                   size="small"
                   checked={allSelected}
-                  indeterminate={
-                    selectedInView.length > 0 && !allSelected
-                  }
+                  indeterminate={selectedInView.length > 0 && !allSelected}
                   onChange={toggleAll}
                   disabled={filteredReports.length === 0}
                 />
@@ -469,7 +519,7 @@ const CertificatePrintingIndex = () => {
               <TableCell>Course End Date</TableCell>
               <TableCell>Certificate</TableCell>
               <TableCell>Internal</TableCell>
-              <TableCell>{allRpl ? "Viva" : someRpl ? "Theory / Viva" : "Theory"}</TableCell>
+              <TableCell>{theoryHeader(allRpl, someRpl)}</TableCell>
               <TableCell>Practical</TableCell>
               <TableCell>Total</TableCell>
               <TableCell>Result</TableCell>
@@ -478,13 +528,14 @@ const CertificatePrintingIndex = () => {
           </TableHead>
 
           <TableBody>
-            {loadingReports ? (
+            {loadingReports && (
               <TableRow>
                 <TableCell colSpan={17} align="center" sx={{ py: 4 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
-            ) : paginatedReports.length > 0 ? (
+            )}
+            {!loadingReports &&
               paginatedReports.map((report, index) => {
                 const key = rowKey(report);
                 return (
@@ -498,12 +549,16 @@ const CertificatePrintingIndex = () => {
                     </TableCell>
                     <TableCell>{page * rowsPerPage + index + 1}</TableCell>
                     <TableCell>{val(report, "institute_name")}</TableCell>
-                    <TableCell>{val(report, "applicant_name", "name")}</TableCell>
+                    <TableCell>
+                      {val(report, "applicant_name", "name")}
+                    </TableCell>
                     <TableCell>{val(report, "cid_no", "cid")}</TableCell>
                     <TableCell>{val(report, "gender")}</TableCell>
                     <TableCell>{val(report, "programme_type")}</TableCell>
                     <TableCell>{val(report, "course_name")}</TableCell>
-                    <TableCell>{formatDate(report.course_start_date)}</TableCell>
+                    <TableCell>
+                      {formatDate(report.course_start_date)}
+                    </TableCell>
                     <TableCell>{formatDate(report.course_end_date)}</TableCell>
                     <TableCell>{val(report, "certification_level")}</TableCell>
                     <TableCell>
@@ -516,8 +571,12 @@ const CertificatePrintingIndex = () => {
                         ? val(report, "viva_assessment_mark")
                         : val(report, "theory_assessment_mark")}
                     </TableCell>
-                    <TableCell>{val(report, "practical_assessment_mark")}</TableCell>
-                    <TableCell sx={{ fontWeight: isDiplomaRecord(report) ? 600 : 400 }}>
+                    <TableCell>
+                      {val(report, "practical_assessment_mark")}
+                    </TableCell>
+                    <TableCell
+                      sx={{ fontWeight: isDiplomaRecord(report) ? 600 : 400 }}
+                    >
                       {totalMark(report)}
                     </TableCell>
                     <TableCell>{val(report, "overall_result")}</TableCell>
@@ -535,8 +594,8 @@ const CertificatePrintingIndex = () => {
                     </TableCell>
                   </TableRow>
                 );
-              })
-            ) : (
+              })}
+            {!loadingReports && paginatedReports.length === 0 && (
               <TableRow>
                 <TableCell colSpan={17} align="center" sx={{ py: 3 }}>
                   {hasFilter

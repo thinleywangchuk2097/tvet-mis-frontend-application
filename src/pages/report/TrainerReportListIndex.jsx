@@ -27,7 +27,6 @@ import { toast } from "react-toastify";
 import { exportToExcel } from "@/utils/exportExcel";
 import CommonService from "../../api/services/internal/common/CommonService";
 import ApplyAccreditedCourseService from "../../api/services/internal/course/ApplyAccreditedCourseService";
-import ApplyNonAccreditedCourseService from "../../api/services/internal/course/ApplyNonAccreditedCourseService";
 import AddTrainerService from "../../api/services/internal/trainer/AddTrainerService";
 import InstituteRegistrationService from "../../api/services/internal/registration/InstituteRegistrationService";
 
@@ -63,6 +62,11 @@ const safeFilePart = (text) =>
     .replace(/[\\/:*?"<>|]+/g, "")
     .replace(/\s+/g, "_");
 
+const idTypeOf = (t) => {
+  if (t.citizen_id) return "CID";
+  return t.work_permit_no ? "Work Permit" : "";
+};
+
 const headCell = {
   border: "1px solid #ccc",
   fontWeight: "bold",
@@ -83,9 +87,7 @@ const TrainerReportListIndex = () => {
   const [genders, setGenders] = useState([]);
   const [qualifications, setQualifications] = useState([]);
   const [employmentTypes, setEmploymentTypes] = useState([]);
-  const [courseTypes, setCourseTypes] = useState([]);
   const [accreditedCourses, setAccreditedCourses] = useState([]);
-  const [nonAccreditedCourses, setNonAccreditedCourses] = useState([]);
 
   const [search, setSearch] = useState("");
   const [employmentFilter, setEmploymentFilter] = useState("");
@@ -111,20 +113,13 @@ const TrainerReportListIndex = () => {
         genderRes,
         qualificationRes,
         employmentRes,
-        courseTypeRes,
         accreditedRes,
-        nonAccreditedRes,
       ] = await Promise.all([
         AddTrainerService.getAllTrainer(inst.institute_id, access_token),
         CommonService.getByParentId(8),
         CommonService.getByParentId(18),
         CommonService.getByParentId(11),
-        CommonService.getByParentId(13),
         ApplyAccreditedCourseService.getAccreditedApprovedCourseByUserId(
-          registration_no,
-          access_token,
-        ),
-        ApplyNonAccreditedCourseService.getNonAccreditedApprovedCourseByUserId(
           registration_no,
           access_token,
         ),
@@ -134,9 +129,7 @@ const TrainerReportListIndex = () => {
       setGenders(listOf(genderRes));
       setQualifications(listOf(qualificationRes));
       setEmploymentTypes(listOf(employmentRes));
-      setCourseTypes(listOf(courseTypeRes));
       setAccreditedCourses(listOf(accreditedRes));
-      setNonAccreditedCourses(listOf(nonAccreditedRes));
     } catch (e) {
       console.error("Trainer report load failed:", e);
       toast.error("Failed to load the trainer report");
@@ -149,22 +142,15 @@ const TrainerReportListIndex = () => {
     load();
   }, [load]);
 
-  // course name from its type: "Non-BQF ..." -> non-accredited, "BQF ..." -> accredited
+  // trainer courses are the institute's approved BQF (accredited) courses
   const courseName = useCallback(
-    (courseTypeId, courseId) => {
-      const typeName = nameById(courseTypes, courseTypeId).toLowerCase();
-      const list =
-        typeName.includes("non-bqf") || typeName.includes("non bqf")
-          ? nonAccreditedCourses
-          : typeName.includes("bqf")
-            ? accreditedCourses
-            : [];
-      const c = list.find((x) => String(x.id) === String(courseId));
+    (courseId) => {
+      const c = accreditedCourses.find((x) => String(x.id) === String(courseId));
       return (
         c?.course_name || c?.name || c?.programme_title || (courseId ? `Course ${courseId}` : "")
       );
     },
-    [courseTypes, accreditedCourses, nonAccreditedCourses],
+    [accreditedCourses],
   );
 
   const trainers = useMemo(
@@ -173,7 +159,7 @@ const TrainerReportListIndex = () => {
         id: t.id,
         name: t.name || "",
         idNo: t.citizen_id || t.work_permit_no || "",
-        idType: t.citizen_id ? "CID" : t.work_permit_no ? "Work Permit" : "",
+        idType: idTypeOf(t),
         genderId: t.gender_id,
         gender: nameById(genders, t.gender_id),
         qualification: nameById(qualifications, t.qualification_id),
@@ -185,15 +171,11 @@ const TrainerReportListIndex = () => {
         email: t.email || "",
         mobileNo: t.mobile_no || "",
         courses: parseCourses(t.courses)
-          .map((c) => {
-            const type = nameById(courseTypes, c.courseTypeId);
-            const course = courseName(c.courseTypeId, c.courseId);
-            return [course, type ? `(${type})` : ""].filter(Boolean).join(" ");
-          })
+          .map((c) => courseName(c.courseId))
           .filter(Boolean)
           .join("; "),
       })),
-    [rawTrainers, genders, qualifications, employmentTypes, courseTypes, courseName],
+    [rawTrainers, genders, qualifications, employmentTypes, courseName],
   );
 
   const filtered = useMemo(() => {
@@ -368,13 +350,14 @@ const TrainerReportListIndex = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {loading && (
               <TableRow>
                 <TableCell colSpan={12} align="center" sx={{ py: 2 }}>
                   <CircularProgress size={24} />
                 </TableCell>
               </TableRow>
-            ) : pageRows.length > 0 ? (
+            )}
+            {!loading &&
               pageRows.map((t, i) => (
                 <TableRow key={t.id || i} hover>
                   <TableCell sx={cell}>{page * rowsPerPage + i + 1}</TableCell>
@@ -394,8 +377,8 @@ const TrainerReportListIndex = () => {
                   <TableCell sx={cell}>{t.mobileNo || "—"}</TableCell>
                   <TableCell sx={{ ...cell, minWidth: 200 }}>{t.courses || "—"}</TableCell>
                 </TableRow>
-              ))
-            ) : (
+              ))}
+            {!loading && pageRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={12} align="center" sx={{ py: 2 }}>
                   <Typography variant="body2" color="text.secondary">

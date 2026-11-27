@@ -4,7 +4,7 @@ class DwpsService {
 
   getDashboardData(userId, currentRoleId, token) {
     return apiClient
-      .get(`/api/v1/user/management/dashboard/${userId}/${currentRoleId}`, {
+      .get(`/api/v1/dashboard/${userId}/${currentRoleId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

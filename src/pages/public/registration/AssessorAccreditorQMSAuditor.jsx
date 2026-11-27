@@ -215,6 +215,10 @@ const AssessorAccreditorQMSAuditor = () => {
   const [hasCitizenId, setHasCitizenId] = useState("yes");
   const [loading, setLoading] = useState(false);
   const [fetchingCitizen, setFetchingCitizen] = useState(false);
+  // shown under the CID / Reference No field when that person already applied for this type
+  const [idTakenMessage, setIdTakenMessage] = useState("");
+  const referenceCheckTimer = useRef(null);
+  const latestReferenceNo = useRef("");
   const formikRef = useRef();
 
   // State for dropdown data
@@ -304,6 +308,26 @@ const AssessorAccreditorQMSAuditor = () => {
     );
   };
 
+  // Reference No (applicants without CID): check our records ~0.6 s after typing stops
+  const scheduleReferenceCheck = (value) => {
+    clearTimeout(referenceCheckTimer.current);
+    setIdTakenMessage("");
+    const referenceNo = value?.trim() || "";
+    latestReferenceNo.current = referenceNo;
+    if (!referenceNo) return;
+    referenceCheckTimer.current = setTimeout(async () => {
+      const res =
+        await AssessorAccreditorQMSAuditorService.checkDuplicateApplication(
+          serviceId,
+          { referenceNo },
+        );
+      // ignore the answer if the user typed again meanwhile
+      if (latestReferenceNo.current === referenceNo) {
+        setIdTakenMessage(res?.data?.exists ? res.data.message : "");
+      }
+    }, 600);
+  };
+
   const fetchAndFillCitizenDetails = async (cid, formik) => {
     if (!cid || cid.length !== 11) {
       toast.warning("Please enter a valid 11-digit CID");
@@ -312,6 +336,20 @@ const AssessorAccreditorQMSAuditor = () => {
 
     setFetchingCitizen(true);
     try {
+      // 1. our database first: already applied (not rejected) for this registration type?
+      const check =
+        await AssessorAccreditorQMSAuditorService.checkDuplicateApplication(
+          serviceId,
+          { citizenId: cid },
+        );
+      setIdTakenMessage(check?.data?.exists ? check.data.message : "");
+      if (check?.data?.exists) {
+        formik.setFieldValue("fullName", "");
+        formik.setFieldValue("genderId", "");
+        return;
+      }
+
+      // 2. only then the citizen details from Datahub
       const response = await DatahubService.getDetailsByCitizenshipNo(cid);
       // FIXED: Datahub returns citizen object directly (flat structure)
       const citizen = response.data;
@@ -412,6 +450,11 @@ const AssessorAccreditorQMSAuditor = () => {
         setDropdownData((prev) => ({ ...prev, selectedSectorId: "" }));
         setHasCitizenId("yes");
         navigate("/");
+      } else if (response?.status === 409) {
+        // this CID / reference no already has an application for this registration type
+        setIdTakenMessage(response.response?.data?.message || "");
+      } else {
+        toast.error(response?.response?.data?.message || "Submission failed");
       }
     } catch (error) {
       console.error("Submission error:", error);
@@ -445,17 +488,23 @@ const AssessorAccreditorQMSAuditor = () => {
               name="citizenId"
               size="small"
               value={formik.values.citizenId || ""}
-              onChange={formik.handleChange}
-              onBlur={(e) => {
-                formik.handleBlur(e);
+              onChange={(e) => {
+                formik.handleChange(e);
+                setIdTakenMessage("");
+                // all 11 digits typed: check our records, then fetch the citizen details
                 if (e.target.value?.length === 11) {
                   fetchAndFillCitizenDetails(e.target.value, formik);
                 }
               }}
+              onBlur={formik.handleBlur}
               error={
-                formik.touched.citizenId && Boolean(formik.errors.citizenId)
+                Boolean(idTakenMessage) ||
+                (formik.touched.citizenId && Boolean(formik.errors.citizenId))
               }
-              helperText={formik.touched.citizenId && formik.errors.citizenId}
+              helperText={
+                idTakenMessage ||
+                (formik.touched.citizenId && formik.errors.citizenId)
+              }
               disabled={loading}
               placeholder="Enter your Citizen ID Number"
               InputProps={{
@@ -471,13 +520,19 @@ const AssessorAccreditorQMSAuditor = () => {
               name="referenceNo"
               size="small"
               value={formik.values.referenceNo || ""}
-              onChange={formik.handleChange}
+              onChange={(e) => {
+                formik.handleChange(e);
+                scheduleReferenceCheck(e.target.value);
+              }}
               onBlur={formik.handleBlur}
               error={
-                formik.touched.referenceNo && Boolean(formik.errors.referenceNo)
+                Boolean(idTakenMessage) ||
+                (formik.touched.referenceNo &&
+                  Boolean(formik.errors.referenceNo))
               }
               helperText={
-                formik.touched.referenceNo && formik.errors.referenceNo
+                idTakenMessage ||
+                (formik.touched.referenceNo && formik.errors.referenceNo)
               }
               disabled={loading}
               placeholder="Enter reference number"
@@ -1102,7 +1157,10 @@ const AssessorAccreditorQMSAuditor = () => {
             <RadioGroup
               row
               value={hasCitizenId}
-              onChange={(e) => setHasCitizenId(e.target.value)}
+              onChange={(e) => {
+                setHasCitizenId(e.target.value);
+                setIdTakenMessage("");
+              }}
               sx={{ mt: 1 }}
             >
               <FormControlLabel value="yes" control={<Radio />} label="Yes" />
@@ -1145,7 +1203,11 @@ const AssessorAccreditorQMSAuditor = () => {
                     fontWeight: 600,
                     textTransform: "none",
                   }}
-                  disabled={loading || !formik.values.declarationAccepted}
+                  disabled={
+                    loading ||
+                    !formik.values.declarationAccepted ||
+                    Boolean(idTakenMessage)
+                  }
                 >
                   Submit
                 </Button>
@@ -1167,6 +1229,7 @@ const AssessorAccreditorQMSAuditor = () => {
                       selectedSectorId: "",
                     }));
                     setHasCitizenId("yes");
+                    setIdTakenMessage("");
                   }}
                   disabled={loading}
                 >

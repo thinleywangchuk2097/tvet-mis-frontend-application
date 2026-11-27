@@ -21,6 +21,11 @@ import {
   fmt,
 } from "./glanceData";
 
+// serial numbers run across all groups (1, 2, 3 ...)
+const SERIAL = new Map(
+  INDICATOR_GROUPS.flatMap((g) => g.rows).map((row, i) => [row.name, i + 1]),
+);
+
 const num = { fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
 
 const KeyIndicatorsTable = () => {
@@ -56,6 +61,7 @@ const KeyIndicatorsTable = () => {
         >
           <TableHead>
             <TableRow>
+              <TableCell align="center" sx={{ width: 48 }}>#</TableCell>
               <TableCell>Indicator</TableCell>
               <TableCell align="right" sx={{ width: 90 }}>Public</TableCell>
               <TableCell align="right" sx={{ width: 90 }}>Private</TableCell>
@@ -67,7 +73,7 @@ const KeyIndicatorsTable = () => {
               <Fragment key={group.title}>
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     sx={{
                       bgcolor: "#eaf1fb !important",
                       fontWeight: 700,
@@ -86,6 +92,9 @@ const KeyIndicatorsTable = () => {
                   return (
                     <Fragment key={row.name}>
                       <TableRow hover>
+                        <TableCell align="center" sx={{ color: "text.secondary", ...num }}>
+                          {SERIAL.get(row.name)}
+                        </TableCell>
                         <TableCell>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                             {row.name}
@@ -110,8 +119,11 @@ const KeyIndicatorsTable = () => {
                       </TableRow>
                       {expandable &&
                         isOpen &&
-                        row.subItems.map((sub) => (
+                        row.subItems.map((sub, si) => (
                           <TableRow key={sub.name} sx={{ "& td": { color: "text.secondary", fontSize: "0.8rem" } }}>
+                            <TableCell align="center" sx={num}>
+                              {SERIAL.get(row.name)}.{si + 1}
+                            </TableCell>
                             <TableCell sx={{ pl: "28px !important" }}>{sub.name}</TableCell>
                             <TableCell align="right" sx={num}>{fmt(sub.pub)}</TableCell>
                             <TableCell align="right" sx={num}>{fmt(sub.pvt)}</TableCell>
